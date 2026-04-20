@@ -10,6 +10,21 @@
   const MAX_FONT_FAMILIES = 5;
   const MAX_NAV_LABELS = 6;
   const MAX_STRUCTURE_HEADINGS = 4;
+  const MAX_REDACTION_REGIONS = 80;
+  const SENSITIVE_TEXT_PATTERNS = [
+    {
+      kind: "email",
+      regex: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi
+    },
+    {
+      kind: "phone",
+      regex: /(?:\+?\d[\d().\s-]{7,}\d)/g
+    },
+    {
+      kind: "secret",
+      regex: /\b(?:sk_(?:live|test)_[A-Za-z0-9]{12,}|gh[pousr]_[A-Za-z0-9]{20,}|AIza[0-9A-Za-z\-_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|(?:api[_-]?key|secret|token|access[_-]?token)[^A-Za-z0-9]{0,3}[A-Za-z0-9_\-]{10,})\b/gi
+    }
+  ];
   const GENERIC_FONT_FAMILIES = new Set([
     "sans-serif",
     "serif",
@@ -62,6 +77,13 @@
     if (message.type === "LUMEN_EXTRACT_BLUEPRINT") {
       Promise.resolve()
         .then(() => sendResponse({ ok: true, blueprint: extractBrandBlueprint() }))
+        .catch((error) => sendResponse({ ok: false, error: error.message }));
+      return true;
+    }
+
+    if (message.type === "LUMEN_SCAN_REDACTIONS") {
+      Promise.resolve()
+        .then(() => sendResponse({ ok: true, redactions: scanSensitiveRegions() }))
         .catch((error) => sendResponse({ ok: false, error: error.message }));
       return true;
     }
@@ -167,6 +189,20 @@
         viewportHeight: metrics.viewportHeight
       },
       structure: structureHeadings
+    };
+  }
+
+  function scanSensitiveRegions() {
+    const context = captureState.scrollContext || detectScrollContext();
+    const collected = [
+      ...collectSensitiveTextRegions(context),
+      ...collectSensitiveFieldRegions(context)
+    ];
+    const regions = mergeSensitiveRegions(collected).slice(0, MAX_REDACTION_REGIONS);
+
+    return {
+      count: regions.length,
+      regions
     };
   }
 
@@ -503,6 +539,223 @@
     }
 
     return elements;
+  }
+
+  function collectSensitiveTextRegions(context) {
+    const regions = [];
+    const walker = document.createTreeWalker(
+      document.body || document.documentElement,
+      NodeFilter.SHOW_TEXT
+    );
+
+    while (walker.nextNode() && regions.length < MAX_REDACTION_REGIONS) {
+      const node = walker.currentNode;
+
+      if (!(node instanceof Text)) {
+        continue;
+      }
+
+      const parent = node.parentElement;
+      const rawText = node.nodeValue || "";
+
+      if (!parent || !rawText.trim() || shouldSkipSensitiveScan(parent) || !isElementVisible(parent)) {
+        continue;
+      }
+
+      for (const pattern of SENSITIVE_TEXT_PATTERNS) {
+        const regex = new RegExp(pattern.regex.source, pattern.regex.flags);
+        let match = regex.exec(rawText);
+
+        while (match && regions.length < MAX_REDACTION_REGIONS) {
+          if (!match[0]?.trim()) {
+            match = regex.exec(rawText);
+            continue;
+          }
+
+          const range = document.createRange();
+          range.setStart(node, match.index);
+          range.setEnd(node, match.index + match[0].length);
+
+          const rects = [...range.getClientRects()]
+            .map((rect) => buildRedactionRegion(rect, context, pattern.kind))
+            .filter(Boolean);
+
+          regions.push(...rects);
+          match = regex.exec(rawText);
+        }
+      }
+    }
+
+    return regions.slice(0, MAX_REDACTION_REGIONS);
+  }
+
+  function collectSensitiveFieldRegions(context) {
+    const regions = [];
+
+    for (const node of document.querySelectorAll("input, textarea, [contenteditable='true'], a[href^='mailto:'], a[href^='tel:']")) {
+      if (!(node instanceof HTMLElement) || !isElementVisible(node) || shouldSkipSensitiveScan(node)) {
+        continue;
+      }
+
+      const kind = inferSensitiveElementKind(node);
+
+      if (!kind) {
+        continue;
+      }
+
+      const region = buildRedactionRegion(node.getBoundingClientRect(), context, kind);
+
+      if (region) {
+        regions.push(region);
+      }
+
+      if (regions.length >= MAX_REDACTION_REGIONS) {
+        break;
+      }
+    }
+
+    return regions;
+  }
+
+  function inferSensitiveElementKind(node) {
+    if (!(node instanceof HTMLElement)) {
+      return "";
+    }
+
+    if (node.matches("a[href^='mailto:']")) {
+      return "email";
+    }
+
+    if (node.matches("a[href^='tel:']")) {
+      return "phone";
+    }
+
+    if (node instanceof HTMLInputElement) {
+      if (node.type === "password" && node.value) {
+        return "secret";
+      }
+
+      if (["email", "tel"].includes(node.type) && node.value) {
+        return node.type === "email" ? "email" : "phone";
+      }
+
+      return matchSensitiveKind(node.value || "");
+    }
+
+    if (node instanceof HTMLTextAreaElement) {
+      return matchSensitiveKind(node.value || "");
+    }
+
+    return matchSensitiveKind(node.innerText || node.textContent || "");
+  }
+
+  function matchSensitiveKind(text) {
+    if (!text || !text.trim()) {
+      return "";
+    }
+
+    for (const pattern of SENSITIVE_TEXT_PATTERNS) {
+      const regex = new RegExp(pattern.regex.source, pattern.regex.flags);
+
+      if (regex.test(text)) {
+        return pattern.kind;
+      }
+    }
+
+    return "";
+  }
+
+  function buildRedactionRegion(rect, context, kind) {
+    if (!rect || rect.width < 2 || rect.height < 2) {
+      return null;
+    }
+
+    const coordinates = toScrollCoordinates(rect, context);
+
+    if (!coordinates) {
+      return null;
+    }
+
+    return {
+      kind,
+      left: Math.round(coordinates.left),
+      top: Math.round(coordinates.top),
+      width: Math.round(coordinates.width),
+      height: Math.round(coordinates.height)
+    };
+  }
+
+  function toScrollCoordinates(rect, context) {
+    if (context.isDocument) {
+      return {
+        left: rect.left + window.scrollX,
+        top: rect.top + window.scrollY,
+        width: rect.width,
+        height: rect.height
+      };
+    }
+
+    if (!(context.node instanceof HTMLElement)) {
+      return null;
+    }
+
+    const rootRect = context.node.getBoundingClientRect();
+
+    return {
+      left: rect.left - rootRect.left + context.node.scrollLeft,
+      top: rect.top - rootRect.top + context.node.scrollTop,
+      width: rect.width,
+      height: rect.height
+    };
+  }
+
+  function mergeSensitiveRegions(regions) {
+    const merged = [];
+    const ordered = regions
+      .filter((region) => region && region.width > 0 && region.height > 0)
+      .sort((left, right) => left.top - right.top || left.left - right.left);
+
+    for (const region of ordered) {
+      const last = merged[merged.length - 1];
+
+      if (last && canMergeSensitiveRegion(last, region)) {
+        const currentRight = last.left + last.width;
+        const currentBottom = last.top + last.height;
+        const nextRight = region.left + region.width;
+        const nextBottom = region.top + region.height;
+
+        last.left = Math.min(last.left, region.left);
+        last.top = Math.min(last.top, region.top);
+        last.width = Math.max(currentRight, nextRight) - last.left;
+        last.height = Math.max(currentBottom, nextBottom) - last.top;
+        continue;
+      }
+
+      merged.push({ ...region });
+    }
+
+    return merged;
+  }
+
+  function canMergeSensitiveRegion(left, right) {
+    const horizontalGap = right.left - (left.left + left.width);
+    const verticalGap = right.top - (left.top + left.height);
+    const overlapsHorizontally =
+      right.left <= left.left + left.width + 12 && right.left + right.width >= left.left - 12;
+    const overlapsVertically =
+      right.top <= left.top + left.height + 10 && right.top + right.height >= left.top - 10;
+
+    return left.kind === right.kind &&
+      horizontalGap <= 12 &&
+      verticalGap <= 10 &&
+      overlapsHorizontally &&
+      overlapsVertically;
+  }
+
+  function shouldSkipSensitiveScan(node) {
+    return Boolean(
+      node.closest("script, style, noscript, svg, canvas, [aria-hidden='true'], [hidden]")
+    );
   }
 
   function isElementVisible(node) {

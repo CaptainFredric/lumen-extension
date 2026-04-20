@@ -39,6 +39,7 @@ export const LUMEN_CONFIG = {
   defaults: {
     removeStickyHeaders: true,
     forceLazyLoad: true,
+    autoRedact: false,
     devicePreset: "desktop",
     exportPreset: "raw"
   }

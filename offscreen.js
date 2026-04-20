@@ -33,10 +33,11 @@ async function routeMessage(message) {
   }
 }
 
-function initializeSession({ sessionId, page, options }) {
+function initializeSession({ sessionId, page, options, redactions = [] }) {
   stitchSessions.set(sessionId, {
     page,
     options,
+    redactions,
     segments: []
   });
 
@@ -100,7 +101,8 @@ async function renderSession(session) {
     width: renderModel.canvasWidth,
     height: renderModel.canvasHeight,
     pixelRatio: renderModel.effectiveScale,
-    appliedPreset
+    appliedPreset,
+    redactionCount: renderModel.redactions.length
   };
 }
 
@@ -131,6 +133,13 @@ async function buildRenderModel(session) {
     canvasWidth,
     canvasHeight,
     effectiveScale,
+    redactions: (session.redactions || []).map((region) => ({
+      ...region,
+      left: Math.max(0, Math.round(region.left * effectiveScale)),
+      top: Math.max(0, Math.round(region.top * effectiveScale)),
+      width: Math.max(1, Math.round(region.width * effectiveScale)),
+      height: Math.max(1, Math.round(region.height * effectiveScale))
+    })),
     segments: hydratedSegments.map((segment) => {
       const cropTopPixels = Math.round(segment.cropTopCss * effectiveScale);
       const cropBottomPixels = Math.round(segment.cropBottomCss * effectiveScale);
@@ -211,6 +220,8 @@ function renderSliceCanvas(renderModel, sliceStart, sliceEnd) {
       drawHeight
     );
   }
+
+  applyRedactionRegions(canvas, context, renderModel.redactions, sliceStart, sliceEnd);
 
   return canvas;
 }
@@ -381,6 +392,103 @@ function drawAddressBar(context, x, y, width, height) {
   roundPath(context, x, y, width, height, 999);
   context.fillStyle = "rgba(255, 255, 255, 0.12)";
   context.fill();
+}
+
+function applyRedactionRegions(canvas, context, redactions, sliceStart, sliceEnd) {
+  for (const region of redactions) {
+    const drawStart = Math.max(sliceStart, region.top);
+    const drawEnd = Math.min(sliceEnd, region.top + region.height);
+
+    if (drawEnd <= drawStart) {
+      continue;
+    }
+
+    const x = Math.max(0, region.left);
+    const y = drawStart - sliceStart;
+    const width = Math.min(canvas.width - x, region.width);
+    const height = Math.min(canvas.height - y, drawEnd - drawStart);
+
+    if (width <= 1 || height <= 1) {
+      continue;
+    }
+
+    pixelateRegion(canvas, context, x, y, width, height);
+    drawRedactionShell(context, x, y, width, height, region.kind);
+  }
+}
+
+function pixelateRegion(canvas, context, x, y, width, height) {
+  const sourceCanvas = document.createElement("canvas");
+  sourceCanvas.width = width;
+  sourceCanvas.height = height;
+
+  const sourceContext = sourceCanvas.getContext("2d");
+  if (!sourceContext) {
+    return;
+  }
+  sourceContext.drawImage(canvas, x, y, width, height, 0, 0, width, height);
+
+  const sampleCanvas = document.createElement("canvas");
+  sampleCanvas.width = Math.max(1, Math.round(width / 18));
+  sampleCanvas.height = Math.max(1, Math.round(height / 18));
+
+  const sampleContext = sampleCanvas.getContext("2d");
+  if (!sampleContext) {
+    return;
+  }
+  sampleContext.drawImage(sourceCanvas, 0, 0, width, height, 0, 0, sampleCanvas.width, sampleCanvas.height);
+
+  context.save();
+  roundPath(context, x, y, width, height, Math.min(18, width / 2, height / 2));
+  context.clip();
+  context.imageSmoothingEnabled = false;
+  context.drawImage(sampleCanvas, 0, 0, sampleCanvas.width, sampleCanvas.height, x, y, width, height);
+  context.restore();
+}
+
+function drawRedactionShell(context, x, y, width, height, kind) {
+  const radius = Math.min(18, width / 2, height / 2);
+  const stripeCount = Math.max(3, Math.round(width / 42));
+
+  context.save();
+  roundPath(context, x, y, width, height, radius);
+  context.fillStyle = "rgba(4, 10, 18, 0.66)";
+  context.fill();
+  context.strokeStyle = "rgba(255, 255, 255, 0.14)";
+  context.lineWidth = 1;
+  context.stroke();
+  context.clip();
+
+  context.strokeStyle = "rgba(134, 221, 255, 0.2)";
+  context.lineWidth = 1;
+
+  for (let index = -1; index <= stripeCount; index += 1) {
+    const offset = index * 28;
+    context.beginPath();
+    context.moveTo(x + offset, y + height);
+    context.lineTo(x + offset + 32, y);
+    context.stroke();
+  }
+
+  if (width >= 80 && height >= 24) {
+    context.fillStyle = "rgba(244, 247, 255, 0.78)";
+    context.font = "600 11px 'SF Pro Display', 'IBM Plex Sans', sans-serif";
+    context.fillText(formatRedactionLabel(kind), x + 10, y + 16);
+  }
+
+  context.restore();
+}
+
+function formatRedactionLabel(kind) {
+  if (kind === "email") {
+    return "EMAIL";
+  }
+
+  if (kind === "phone") {
+    return "PHONE";
+  }
+
+  return "SENSITIVE";
 }
 
 function drawRoundedRect(context, x, y, width, height, radius, fillStyle) {

@@ -12,6 +12,7 @@ const ui = {
   analyzeButton: document.querySelector("#analyzeButton"),
   removeStickyHeaders: document.querySelector("#removeStickyHeaders"),
   forceLazyLoad: document.querySelector("#forceLazyLoad"),
+  autoRedact: document.querySelector("#autoRedact"),
   deviceButtons: [...document.querySelectorAll("[data-device]")],
   exportButtons: [...document.querySelectorAll("[data-export]")],
   statusPanel: document.querySelector("#statusPanel"),
@@ -109,6 +110,7 @@ async function bootstrap() {
 function bindEvents() {
   ui.removeStickyHeaders.addEventListener("change", persistCurrentSettings);
   ui.forceLazyLoad.addEventListener("change", persistCurrentSettings);
+  ui.autoRedact.addEventListener("change", persistCurrentSettings);
 
   for (const button of ui.deviceButtons) {
     button.addEventListener("click", () => {
@@ -142,6 +144,7 @@ async function restoreSettings() {
 
   ui.removeStickyHeaders.checked = Boolean(currentSettings.removeStickyHeaders);
   ui.forceLazyLoad.checked = Boolean(currentSettings.forceLazyLoad);
+  ui.autoRedact.checked = Boolean(currentSettings.autoRedact);
   updateDeviceButtons();
   updateExportButtons();
 }
@@ -167,6 +170,7 @@ async function persistCurrentSettings() {
   currentSettings = {
     removeStickyHeaders: ui.removeStickyHeaders.checked,
     forceLazyLoad: ui.forceLazyLoad.checked,
+    autoRedact: ui.autoRedact.checked,
     devicePreset: currentSettings.devicePreset,
     exportPreset: currentSettings.exportPreset
   };
@@ -235,7 +239,7 @@ async function handleCaptureClick() {
       tone: "success",
       eyebrow: "Saved",
       title: "Capture complete",
-      detail: `${response.files.length} file${response.files.length === 1 ? "" : "s"} saved using ${response.exportPreset} export mode.`,
+      detail: buildCaptureSuccessMessage(response),
       badge: "Ready",
       progress: 1
     });
@@ -475,6 +479,7 @@ function renderHistory(history) {
       item.host || "",
       formatTimestamp(item.capturedAt),
       `${item.files?.length || 0} file${item.files?.length === 1 ? "" : "s"}`,
+      item.redactionCount ? `${item.redactionCount} redaction${item.redactionCount === 1 ? "" : "s"}` : "",
       item.blueprintSummary?.siteType || ""
     ]
       .filter(Boolean)
@@ -581,6 +586,10 @@ function stageToEyebrow(stage) {
     return "Inspect";
   }
 
+  if (stage === "sanitize") {
+    return "Sanitize";
+  }
+
   return "Capture";
 }
 
@@ -590,6 +599,8 @@ function stageToBadge(stage) {
       return "Prep";
     case "inspect":
       return "Inspect";
+    case "sanitize":
+      return "Sanitize";
     case "capture":
       return "Capture";
     case "stitch":
@@ -620,6 +631,16 @@ function formatTimestamp(rawValue) {
     hour: "numeric",
     minute: "2-digit"
   }).format(date);
+}
+
+function buildCaptureSuccessMessage(response) {
+  const fileText = `${response.files.length} file${response.files.length === 1 ? "" : "s"} saved using ${response.exportPreset} export mode`;
+
+  if (!response.redactionCount) {
+    return `${fileText}.`;
+  }
+
+  return `${fileText}. ${response.redactionCount} sensitive region${response.redactionCount === 1 ? "" : "s"} sanitized.`;
 }
 
 function formatCompactNumber(value) {

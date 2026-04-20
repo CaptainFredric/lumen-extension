@@ -10,13 +10,14 @@ The current product foundation already includes:
 2. A content-script preparation pass in `content.js` for sticky-layer cleanup and lazy-load preflight scrolling
 3. An offscreen document stitcher in `offscreen.js` that composes retina-aware full-page captures
 4. A Brand Blueprint inspector that extracts palette, fonts, layout, headline, CTA, and navigation signals from the active page
-5. Studio export presets that can package captures into browser and phone poster mockups
-6. A polished popup UI in `popup.html`, `popup.css`, and `popup.js`
-7. A local-first backend slice for demo auth and capture history sync in `backend/`
-8. A GitHub Pages workflow in `.github/workflows/pages.yml`
-9. A GitHub Pages-ready landing site in `docs/`
-10. A simple SaaS gating surface in `config.js` through `isProUser` and per-feature access flags
-11. A lower-friction permission model where desktop capture uses `activeTab`, while mobile capture requests only the active site origin on demand
+5. Auto-redaction that can detect emails, phone numbers, tokens, and filled fields before export
+6. Studio export presets that can package captures into browser and phone poster mockups
+7. A polished popup UI in `popup.html`, `popup.css`, and `popup.js`
+8. A local-first backend slice for demo auth and capture history sync in `backend/`
+9. A GitHub Pages workflow in `.github/workflows/pages.yml`
+10. A GitHub Pages-ready landing site in `docs/`
+11. A simple SaaS gating surface in `config.js` through `isProUser` and per-feature access flags
+12. A lower-friction permission model where desktop capture uses `activeTab`, while mobile capture requests only the active site origin on demand
 
 ## Architecture
 
@@ -29,9 +30,10 @@ The current flow is:
 3. Content script freezes motion, optionally forces lazy-loaded content to render, and hides fixed, sticky, or high-z UI
 4. Background scrolls the page in slices, respects Chrome capture throttling, and sends each viewport image to the offscreen document
 5. While the page is prepared, Lumen can also extract a Brand Blueprint from the live DOM
-6. Offscreen can return raw stitched files or transform the output into browser and phone poster exports
-7. If a page exceeds safe canvas limits, Lumen falls back to tiled raw exports instead of failing
-8. Background downloads the final capture set, persists the latest blueprint, writes capture history, and restores the page state
+6. If auto-redaction is enabled, the content script scans for sensitive text regions and filled fields before the final render
+7. Offscreen can return raw stitched files or transform the output into browser and phone poster exports
+8. If a page exceeds safe canvas limits, Lumen falls back to tiled raw exports instead of failing
+9. Background downloads the final capture set, persists the latest blueprint, writes capture history, and restores the page state
 
 ### Inspector
 
@@ -60,7 +62,7 @@ The first planned integration points are already marked in code comments:
 
 1. Session bootstrap and billing state in `popup.js`
 2. Capture metadata upload in `background.js`
-3. Studio transforms such as mockup frames, blur, and redaction in `offscreen.js`
+3. Studio transforms such as annotation layers and richer social layouts in `offscreen.js`
 
 ## Local Development
 
@@ -75,7 +77,7 @@ The first planned integration points are already marked in code comments:
 
 1. Open any normal `https://` page
 2. Open the Lumen popup
-3. Toggle sticky cleanup or lazy-load forcing as needed
+3. Toggle sticky cleanup, lazy-load forcing, or auto-redaction as needed
 4. Trigger `Analyze Page` to inspect the page system
 5. Choose `Raw`, `Browser`, or `Phone` export mode
 6. Trigger `Capture Full Page` to save the stitched image and refresh the latest blueprint
@@ -103,7 +105,7 @@ The core capture and studio foundation is real now, but the highest-leverage nex
 
 1. Replace the demo session with a true OAuth flow and billing check
 2. Add cloud sync destinations and a production capture-history backend
-3. Add annotation and redaction passes inside the offscreen studio
+3. Add annotation composition and editor controls inside the offscreen studio
 4. Add site-specific fallbacks for highly dynamic apps with virtualization or shadow-root heavy layouts
 5. Add branded icons, store screenshots, and packaging for launch
 

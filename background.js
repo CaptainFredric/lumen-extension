@@ -176,13 +176,28 @@ async function runCaptureFlow(options = getDefaultSettings()) {
 
     const page = prepareResult.page;
     const sessionId = crypto.randomUUID();
+    let redactionScan = {
+      count: 0,
+      regions: []
+    };
+
+    if (options.autoRedact) {
+      broadcastProgress({
+        stage: "sanitize",
+        title: "Scanning sensitive data",
+        detail: "Looking for emails, phone numbers, tokens, and filled fields before export."
+      });
+
+      redactionScan = await requestRedactionScan(target.tab.id);
+    }
 
     await maybeExtractBlueprint(target.tab.id);
 
     await initializeStitchSession({
       sessionId,
       page,
-      options
+      options,
+      redactions: redactionScan.regions
     });
 
     const segments = await capturePageSegments(target, page, sessionId);
@@ -219,6 +234,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
       capturedAt: new Date().toISOString(),
       files: downloadedFiles,
       tileCount: stitched.outputs.length,
+      redactionCount: stitched.redactionCount,
       dimensions: {
         width: stitched.width,
         height: stitched.height
@@ -242,7 +258,11 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     broadcastProgress({
       stage: "done",
       title: "Capture ready",
-      detail: `${segments} slices stitched and ${downloadedFiles.length} file${downloadedFiles.length === 1 ? "" : "s"} saved successfully.`,
+      detail: buildCaptureCompletionDetail({
+        segmentCount: segments,
+        fileCount: downloadedFiles.length,
+        redactionCount: stitched.redactionCount
+      }),
       progress: 1
     });
 
@@ -252,6 +272,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
       segmentCount: segments,
       exportPreset: stitched.appliedPreset,
       tileCount: stitched.outputs.length,
+      redactionCount: stitched.redactionCount,
       dimensions: {
         width: stitched.width,
         height: stitched.height
@@ -477,6 +498,21 @@ async function requestBrandBlueprint(tabId) {
   return response.blueprint;
 }
 
+async function requestRedactionScan(tabId) {
+  const response = await chrome.tabs.sendMessage(tabId, {
+    type: "LUMEN_SCAN_REDACTIONS"
+  });
+
+  if (!response?.ok || !Array.isArray(response.redactions?.regions)) {
+    throw createFriendlyError(
+      "Auto-redaction failed",
+      response?.error || "Lumen could not scan the page for sensitive regions."
+    );
+  }
+
+  return response.redactions;
+}
+
 async function persistLatestBlueprint(blueprint) {
   await chrome.storage.local.set({
     [STORAGE_KEYS.latestBlueprint]: blueprint
@@ -622,6 +658,17 @@ function sanitizeSegment(input) {
 
 function createFriendlyError(title, description) {
   return { title, description };
+}
+
+function buildCaptureCompletionDetail({ segmentCount, fileCount, redactionCount }) {
+  const sliceText = `${segmentCount} slice${segmentCount === 1 ? "" : "s"} stitched`;
+  const fileText = `${fileCount} file${fileCount === 1 ? "" : "s"} saved`;
+
+  if (!redactionCount) {
+    return `${sliceText} and ${fileText} successfully.`;
+  }
+
+  return `${sliceText}, ${fileText}, and ${redactionCount} sensitive region${redactionCount === 1 ? "" : "s"} sanitized.`;
 }
 
 function normalizeCaptureError(error) {
