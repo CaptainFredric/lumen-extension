@@ -11,6 +11,7 @@ The scaffold already includes:
 3. An offscreen document stitcher in `offscreen.js` that composes retina-aware full-page captures
 4. A polished popup UI in `popup.html`, `popup.css`, and `popup.js`
 5. A simple SaaS gating surface in `config.js` through `isProUser` and per-feature access flags
+6. A lower-friction permission model where desktop capture uses `activeTab`, while mobile capture requests only the active site origin on demand
 
 ## Architecture
 

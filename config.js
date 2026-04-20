@@ -58,3 +58,7 @@ export function buildOriginPattern(rawUrl) {
 export function getDefaultSettings() {
   return structuredClone(LUMEN_CONFIG.defaults);
 }
+
+export function isOriginPermissionSupported(rawUrl = "") {
+  return /^https?:/i.test(rawUrl);
+}

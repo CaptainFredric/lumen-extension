@@ -1,8 +1,10 @@
 import {
   LUMEN_CONFIG,
   STORAGE_KEYS,
+  buildOriginPattern,
   getDefaultSettings,
-  getFeatureAccess
+  getFeatureAccess,
+  isOriginPermissionSupported
 } from "./config.js";
 
 const ui = {
@@ -140,6 +142,10 @@ async function handleCaptureClick() {
   });
 
   try {
+    if (!(await ensurePermissionsForCurrentCapture())) {
+      return;
+    }
+
     const response = await chrome.runtime.sendMessage({
       type: "LUMEN_START_CAPTURE",
       payload: {
@@ -172,6 +178,56 @@ async function handleCaptureClick() {
     captureBusy = false;
     ui.captureButton.disabled = false;
   }
+}
+
+async function ensurePermissionsForCurrentCapture() {
+  if (currentSettings.devicePreset !== "mobile") {
+    return true;
+  }
+
+  const [tab] = await chrome.tabs.query({
+    active: true,
+    lastFocusedWindow: true
+  });
+
+  if (!tab?.url || !isOriginPermissionSupported(tab.url)) {
+    return true;
+  }
+
+  const origin = buildOriginPattern(tab.url);
+  const contains = await chrome.permissions.contains({
+    origins: [origin]
+  });
+
+  if (contains) {
+    return true;
+  }
+
+  showStatus({
+    tone: "neutral",
+    eyebrow: "Permission",
+    title: "Mobile capture needs site access",
+    detail: "Chrome will ask for access to this site so Lumen can open the temporary mobile viewport and inject the capture script there.",
+    badge: "Prompt",
+    progress: 0.06
+  });
+
+  const granted = await chrome.permissions.request({
+    origins: [origin]
+  });
+
+  if (!granted) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Permission",
+      title: "Site access denied",
+      detail: "Mobile capture needs temporary permission for this site. Desktop capture still works without it.",
+      badge: "Blocked",
+      progress: 0.08
+    });
+  }
+
+  return granted;
 }
 
 async function handleMockSignIn() {
