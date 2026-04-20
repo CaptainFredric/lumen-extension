@@ -16,7 +16,7 @@ The current product foundation already includes:
 8. A polished popup UI in `popup.html`, `popup.css`, and `popup.js`
 9. A local-first backend slice for demo auth and capture history sync in `backend/`
 10. A GitHub Pages workflow in `.github/workflows/pages.yml`
-11. A GitHub Pages-ready landing site in `docs/`
+11. A GitHub Pages-ready landing site in `docs/`, plus a root fallback so misconfigured branch-root Pages still resolve to the product page
 12. A simple SaaS gating surface in `config.js` through `isProUser` and per-feature access flags
 13. A lower-friction permission model where desktop capture uses `activeTab`, while viewport-based tablet, mobile, and responsive set capture request only the active site origin on demand
 
