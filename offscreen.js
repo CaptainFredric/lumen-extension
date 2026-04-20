@@ -1,3 +1,5 @@
+import { LUMEN_CONFIG } from "./config.js";
+
 const MAX_CANVAS_EDGE = 16384;
 const MAX_CANVAS_AREA = 268435456;
 
@@ -66,30 +68,109 @@ async function finalizeSession(sessionId) {
 }
 
 async function renderSession(session) {
+  const renderModel = await buildRenderModel(session);
+  const requestedPreset = session.options?.exportPreset || "raw";
+  const canRenderSingle = canFitCanvas(renderModel.canvasWidth, renderModel.canvasHeight);
+
+  let outputs = [];
+  let appliedPreset = requestedPreset;
+
+  if (canRenderSingle) {
+    const baseCanvas = renderSliceCanvas(renderModel, 0, renderModel.canvasHeight);
+    const enhancedCanvas = renderPresentationCanvas(baseCanvas, {
+      preset: requestedPreset,
+      devicePreset: session.options?.devicePreset || "desktop"
+    });
+
+    appliedPreset = enhancedCanvas === baseCanvas ? "raw" : requestedPreset;
+    outputs = [enhancedCanvas];
+  } else {
+    appliedPreset = "raw";
+    outputs = renderTiledCanvases(renderModel);
+  }
+
+  return {
+    outputs: outputs.map((canvas, index) => ({
+      dataUrl: canvas.toDataURL("image/png"),
+      width: canvas.width,
+      height: canvas.height,
+      index,
+      total: outputs.length
+    })),
+    width: renderModel.canvasWidth,
+    height: renderModel.canvasHeight,
+    pixelRatio: renderModel.effectiveScale,
+    appliedPreset
+  };
+}
+
+async function buildRenderModel(session) {
   const orderedSegments = [...session.segments].sort((left, right) => left.index - right.index);
 
   if (!orderedSegments.length) {
     throw new Error("No capture slices were received.");
   }
 
-  const firstImage = await loadImage(orderedSegments[0].dataUrl);
+  const hydratedSegments = [];
+
+  for (const segment of orderedSegments) {
+    const image = await loadImage(segment.dataUrl);
+    hydratedSegments.push({
+      ...segment,
+      image
+    });
+  }
+
+  const firstImage = hydratedSegments[0].image;
   const effectiveScale =
     firstImage.naturalWidth / session.page.viewportWidth || session.page.devicePixelRatio || 1;
-
   const canvasWidth = Math.max(1, Math.round(session.page.viewportWidth * effectiveScale));
   const canvasHeight = Math.max(1, Math.round(session.page.pageHeight * effectiveScale));
 
-  if (
-    canvasWidth > MAX_CANVAS_EDGE ||
-    canvasHeight > MAX_CANVAS_EDGE ||
-    canvasWidth * canvasHeight > MAX_CANVAS_AREA
-  ) {
-    throw new Error("The rendered page dimensions exceed safe canvas limits.");
+  return {
+    canvasWidth,
+    canvasHeight,
+    effectiveScale,
+    segments: hydratedSegments.map((segment) => {
+      const cropTopPixels = Math.round(segment.cropTopCss * effectiveScale);
+      const cropBottomPixels = Math.round(segment.cropBottomCss * effectiveScale);
+      const sourceHeight = segment.image.naturalHeight - cropTopPixels - cropBottomPixels;
+      const drawTopPixels = Math.round((segment.topCss + segment.cropTopCss) * effectiveScale);
+
+      return {
+        image: segment.image,
+        sourceHeight,
+        sourceY: cropTopPixels,
+        drawTop: drawTopPixels,
+        drawBottom: drawTopPixels + sourceHeight
+      };
+    })
+  };
+}
+
+function renderTiledCanvases(renderModel) {
+  const tileHeight = Math.max(
+    2048,
+    Math.min(
+      LUMEN_CONFIG.capture.tileMaxOutputHeight,
+      MAX_CANVAS_EDGE,
+      Math.floor(MAX_CANVAS_AREA / renderModel.canvasWidth)
+    )
+  );
+  const canvases = [];
+
+  for (let startY = 0; startY < renderModel.canvasHeight; startY += tileHeight) {
+    const endY = Math.min(renderModel.canvasHeight, startY + tileHeight);
+    canvases.push(renderSliceCanvas(renderModel, startY, endY));
   }
 
+  return canvases;
+}
+
+function renderSliceCanvas(renderModel, sliceStart, sliceEnd) {
   const canvas = document.createElement("canvas");
-  canvas.width = canvasWidth;
-  canvas.height = canvasHeight;
+  canvas.width = renderModel.canvasWidth;
+  canvas.height = sliceEnd - sliceStart;
 
   const context = canvas.getContext("2d", {
     alpha: false
@@ -102,40 +183,220 @@ async function renderSession(session) {
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, canvas.width, canvas.height);
 
-  for (const segment of orderedSegments) {
-    const image = await loadImage(segment.dataUrl);
-    const cropTopPixels = Math.round(segment.cropTopCss * effectiveScale);
-    const cropBottomPixels = Math.round(segment.cropBottomCss * effectiveScale);
-    const sourceHeight = image.naturalHeight - cropTopPixels - cropBottomPixels;
-    const drawTopPixels = Math.round((segment.topCss + segment.cropTopCss) * effectiveScale);
-
-    if (sourceHeight <= 0) {
+  for (const segment of renderModel.segments) {
+    if (segment.sourceHeight <= 0) {
       continue;
     }
 
+    const drawStart = Math.max(sliceStart, segment.drawTop);
+    const drawEnd = Math.min(sliceEnd, segment.drawBottom);
+
+    if (drawEnd <= drawStart) {
+      continue;
+    }
+
+    const localDrawY = drawStart - sliceStart;
+    const sourceOffset = drawStart - segment.drawTop;
+    const drawHeight = drawEnd - drawStart;
+
     context.drawImage(
-      image,
+      segment.image,
       0,
-      cropTopPixels,
-      image.naturalWidth,
-      sourceHeight,
+      segment.sourceY + sourceOffset,
+      segment.image.naturalWidth,
+      drawHeight,
       0,
-      drawTopPixels,
+      localDrawY,
       canvas.width,
-      sourceHeight
+      drawHeight
     );
   }
 
-  // Future Studio hook:
-  // Apply redaction, browser frames, brand blueprint overlays, and social
-  // export variants here before the final asset is encoded.
+  return canvas;
+}
 
-  return {
-    dataUrl: canvas.toDataURL("image/png"),
-    width: canvas.width,
-    height: canvas.height,
-    pixelRatio: effectiveScale
-  };
+function renderPresentationCanvas(sourceCanvas, { preset, devicePreset }) {
+  if (preset === "raw") {
+    return sourceCanvas;
+  }
+
+  if (
+    sourceCanvas.height > LUMEN_CONFIG.studio.maxMockupSourceHeight ||
+    !canFitCanvas(sourceCanvas.width, sourceCanvas.height)
+  ) {
+    return sourceCanvas;
+  }
+
+  if (preset === "browser") {
+    return renderBrowserPoster(sourceCanvas);
+  }
+
+  if (preset === "phone") {
+    return renderPhonePoster(sourceCanvas, devicePreset);
+  }
+
+  return sourceCanvas;
+}
+
+function renderBrowserPoster(sourceCanvas) {
+  const padding = LUMEN_CONFIG.studio.posterPadding;
+  const maxInnerWidth = 1480;
+  const innerScale = Math.min(1, maxInnerWidth / sourceCanvas.width);
+  const contentWidth = Math.round(sourceCanvas.width * innerScale);
+  const contentHeight = Math.round(sourceCanvas.height * innerScale);
+  const topBarHeight = 52;
+  const chromeHeight = topBarHeight + 18;
+  const posterWidth = contentWidth + padding * 2;
+  const posterHeight = contentHeight + chromeHeight + padding * 2;
+
+  if (!canFitCanvas(posterWidth, posterHeight)) {
+    return sourceCanvas;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = posterWidth;
+  canvas.height = posterHeight;
+
+  const context = canvas.getContext("2d");
+
+  context.fillStyle = createPosterGradient(context, canvas.width, canvas.height);
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  drawPosterGlow(context, canvas.width, canvas.height, "#59d0ff");
+  drawRoundedRect(context, padding, padding, contentWidth, contentHeight + chromeHeight, 32, "#0a1220");
+
+  context.fillStyle = "rgba(255, 255, 255, 0.08)";
+  context.fillRect(padding, padding, contentWidth, topBarHeight);
+  context.fillStyle = "#101a2f";
+  context.fillRect(padding, padding + topBarHeight, contentWidth, 18);
+
+  drawWindowDots(context, padding + 24, padding + 26);
+  drawAddressBar(context, padding + 112, padding + 16, contentWidth - 160, 22);
+
+  context.save();
+  roundPath(context, padding, padding + chromeHeight, contentWidth, contentHeight, 22);
+  context.clip();
+  context.drawImage(sourceCanvas, 0, 0, sourceCanvas.width, sourceCanvas.height, padding, padding + chromeHeight, contentWidth, contentHeight);
+  context.restore();
+
+  return canvas;
+}
+
+function renderPhonePoster(sourceCanvas, devicePreset) {
+  const padding = 96;
+  const frameWidth = devicePreset === "mobile" ? 470 : 430;
+  const frameHeight = devicePreset === "mobile" ? 920 : 880;
+  const posterWidth = frameWidth + padding * 2;
+  const posterHeight = frameHeight + padding * 2;
+
+  if (!canFitCanvas(posterWidth, posterHeight)) {
+    return sourceCanvas;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = posterWidth;
+  canvas.height = posterHeight;
+
+  const context = canvas.getContext("2d");
+
+  context.fillStyle = createPosterGradient(context, canvas.width, canvas.height);
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  drawPosterGlow(context, canvas.width, canvas.height, "#8de7ff");
+
+  const phoneX = padding;
+  const phoneY = padding;
+  const corner = 58;
+
+  drawRoundedRect(context, phoneX, phoneY, frameWidth, frameHeight, corner, "#050910");
+  drawRoundedRect(context, phoneX + 10, phoneY + 10, frameWidth - 20, frameHeight - 20, 48, "#0a1220");
+
+  context.fillStyle = "rgba(255, 255, 255, 0.1)";
+  roundPath(context, phoneX + frameWidth * 0.28, phoneY + 18, frameWidth * 0.44, 16, 999);
+  context.fill();
+
+  const screenX = phoneX + 22;
+  const screenY = phoneY + 44;
+  const screenWidth = frameWidth - 44;
+  const screenHeight = frameHeight - 70;
+  const scale = screenWidth / sourceCanvas.width;
+  const visibleSourceHeight = Math.min(sourceCanvas.height, Math.round(screenHeight / scale));
+
+  context.save();
+  roundPath(context, screenX, screenY, screenWidth, screenHeight, 36);
+  context.clip();
+  context.drawImage(
+    sourceCanvas,
+    0,
+    0,
+    sourceCanvas.width,
+    visibleSourceHeight,
+    screenX,
+    screenY,
+    screenWidth,
+    visibleSourceHeight * scale
+  );
+
+  const fade = context.createLinearGradient(0, screenY + screenHeight * 0.72, 0, screenY + screenHeight);
+  fade.addColorStop(0, "rgba(10, 18, 32, 0)");
+  fade.addColorStop(1, "rgba(10, 18, 32, 0.92)");
+  context.fillStyle = fade;
+  context.fillRect(screenX, screenY, screenWidth, screenHeight);
+  context.restore();
+
+  return canvas;
+}
+
+function canFitCanvas(width, height) {
+  return width <= MAX_CANVAS_EDGE && height <= MAX_CANVAS_EDGE && width * height <= MAX_CANVAS_AREA;
+}
+
+function createPosterGradient(context, width, height) {
+  const gradient = context.createLinearGradient(0, 0, width, height);
+  gradient.addColorStop(0, "#07111f");
+  gradient.addColorStop(0.5, "#10223d");
+  gradient.addColorStop(1, "#060a13");
+  return gradient;
+}
+
+function drawPosterGlow(context, width, height, color) {
+  const gradient = context.createRadialGradient(width * 0.18, height * 0.16, 40, width * 0.18, height * 0.16, width * 0.55);
+  gradient.addColorStop(0, `${color}66`);
+  gradient.addColorStop(1, "transparent");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, width, height);
+}
+
+function drawWindowDots(context, startX, centerY) {
+  const colors = ["#ff6b6b", "#ffd166", "#4ade80"];
+
+  colors.forEach((color, index) => {
+    context.beginPath();
+    context.fillStyle = color;
+    context.arc(startX + index * 16, centerY, 5, 0, Math.PI * 2);
+    context.fill();
+  });
+}
+
+function drawAddressBar(context, x, y, width, height) {
+  roundPath(context, x, y, width, height, 999);
+  context.fillStyle = "rgba(255, 255, 255, 0.12)";
+  context.fill();
+}
+
+function drawRoundedRect(context, x, y, width, height, radius, fillStyle) {
+  roundPath(context, x, y, width, height, radius);
+  context.fillStyle = fillStyle;
+  context.fill();
+}
+
+function roundPath(context, x, y, width, height, radius) {
+  context.beginPath();
+  context.moveTo(x + radius, y);
+  context.arcTo(x + width, y, x + width, y + height, radius);
+  context.arcTo(x + width, y + height, x, y + height, radius);
+  context.arcTo(x, y + height, x, y, radius);
+  context.arcTo(x, y, x + width, y, radius);
+  context.closePath();
 }
 
 function loadImage(dataUrl) {

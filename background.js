@@ -4,27 +4,62 @@ import {
   getDefaultSettings,
   isRestrictedCaptureUrl
 } from "./config.js";
+import {
+  bootstrapAppState,
+  clearSession,
+  persistCaptureRecord,
+  readLocalState,
+  startDemoSession
+} from "./lumen-backend.js";
 
 const OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
 const OFFSCREEN_REASON = "BLOBS";
 const CAPTURE_PROGRESS_EVENT = "LUMEN_CAPTURE_PROGRESS";
 const BLUEPRINT_UPDATE_EVENT = "LUMEN_BLUEPRINT_UPDATED";
+const SESSION_UPDATE_EVENT = "LUMEN_SESSION_UPDATED";
+const HISTORY_UPDATE_EVENT = "LUMEN_HISTORY_UPDATED";
 
 let captureInFlight = false;
 let analyzeInFlight = false;
 let offscreenCreationPromise = null;
 
 chrome.runtime.onInstalled.addListener(async () => {
-  const stored = await chrome.storage.sync.get(STORAGE_KEYS.settings);
+  const [syncState, localState] = await Promise.all([
+    chrome.storage.sync.get(STORAGE_KEYS.settings),
+    chrome.storage.local.get([STORAGE_KEYS.session, STORAGE_KEYS.captureHistory])
+  ]);
 
-  if (!stored[STORAGE_KEYS.settings]) {
+  if (!syncState[STORAGE_KEYS.settings]) {
     await chrome.storage.sync.set({
       [STORAGE_KEYS.settings]: getDefaultSettings()
     });
   }
+
+  if (!localState[STORAGE_KEYS.session] || !Array.isArray(localState[STORAGE_KEYS.captureHistory])) {
+    const snapshot = await readLocalState();
+    const localPatch = {};
+
+    if (!localState[STORAGE_KEYS.session]) {
+      localPatch[STORAGE_KEYS.session] = snapshot.session;
+    }
+
+    if (!Array.isArray(localState[STORAGE_KEYS.captureHistory])) {
+      localPatch[STORAGE_KEYS.captureHistory] = snapshot.captureHistory;
+    }
+
+    await chrome.storage.local.set(localPatch);
+  }
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "LUMEN_BOOTSTRAP_APP") {
+    bootstrapAppState()
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
   if (message?.type === "LUMEN_START_CAPTURE") {
     if (captureInFlight) {
       sendResponse({
@@ -73,13 +108,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message?.type === "LUMEN_MOCK_SIGN_IN") {
-    sendResponse({
-      ok: true,
-      notice:
-        "Auth is mocked in this scaffold. Replace this branch with your SaaS session bootstrap and billing state fetch."
-    });
+  if (message?.type === "LUMEN_DEMO_SIGN_IN") {
+    startDemoSession()
+      .then(async (session) => {
+        broadcastSession(session);
+        const localState = await readLocalState();
+        sendResponse({
+          ok: true,
+          session,
+          captureHistory: localState.captureHistory
+        });
+      })
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
   }
+
+  if (message?.type === "LUMEN_SIGN_OUT") {
+    clearSession()
+      .then((session) => {
+        broadcastSession(session);
+        sendResponse({ ok: true, session });
+      })
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
 });
 
 async function runCaptureFlow(options = getDefaultSettings()) {
@@ -139,9 +194,10 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     });
 
     const stitched = await finalizeStitchSession(sessionId);
-    const fileName = buildCaptureFileName({
+    const fileBaseName = buildCaptureFileBaseName({
       title: page.title,
       url: page.url,
+      exportPreset: stitched.appliedPreset,
       devicePreset: options.devicePreset
     });
 
@@ -151,12 +207,32 @@ async function runCaptureFlow(options = getDefaultSettings()) {
       detail: "Writing the capture to your Downloads folder."
     });
 
-    await chrome.downloads.download({
-      url: stitched.dataUrl,
-      filename: `Lumen/${fileName}`,
-      conflictAction: "uniquify",
-      saveAs: false
+    const downloadedFiles = await downloadRenderedOutputs(stitched.outputs, fileBaseName);
+    const blueprint = await getLatestBlueprint();
+    const captureHistory = await persistCaptureRecord({
+      id: crypto.randomUUID(),
+      title: page.title,
+      host: new URL(page.url).host,
+      url: page.url,
+      devicePreset: options.devicePreset,
+      exportPreset: stitched.appliedPreset,
+      capturedAt: new Date().toISOString(),
+      files: downloadedFiles,
+      tileCount: stitched.outputs.length,
+      dimensions: {
+        width: stitched.width,
+        height: stitched.height
+      },
+      blueprintSummary: blueprint
+        ? {
+            siteType: blueprint.identity?.siteType || "",
+            heroHeadline: blueprint.identity?.heroHeadline || "",
+            primaryCta: blueprint.identity?.primaryCta || ""
+          }
+        : null
     });
+
+    broadcastHistory(captureHistory);
 
     // Future SaaS hook:
     // POST metadata, page metrics, and the final asset reference to
@@ -166,13 +242,16 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     broadcastProgress({
       stage: "done",
       title: "Capture ready",
-      detail: `${segments} slices stitched and saved successfully.`,
+      detail: `${segments} slices stitched and ${downloadedFiles.length} file${downloadedFiles.length === 1 ? "" : "s"} saved successfully.`,
       progress: 1
     });
 
     return {
-      fileName,
+      fileName: downloadedFiles[0] || "",
+      files: downloadedFiles,
       segmentCount: segments,
+      exportPreset: stitched.appliedPreset,
+      tileCount: stitched.outputs.length,
       dimensions: {
         width: stitched.width,
         height: stitched.height
@@ -216,8 +295,13 @@ async function runBlueprintFlow() {
 
   const blueprint = await requestBrandBlueprint(sourceTab.id);
   await persistLatestBlueprint(blueprint);
+  const localState = await readLocalState();
 
-  return { blueprint };
+  return {
+    blueprint,
+    captureHistory: localState.captureHistory,
+    session: localState.session
+  };
 }
 
 async function capturePageSegments(target, page, sessionId) {
@@ -280,7 +364,7 @@ async function capturePageSegments(target, page, sessionId) {
     if (previousTop !== null && actualTop <= previousTop) {
       throw createFriendlyError(
         "Capture Stalled",
-        "The page stopped moving before the full document could be captured. This usually means the document is inside a custom scroll container."
+        "The page stopped moving before the full document could be captured. This usually points to a complex app shell, virtualized feed, or runtime layout that needs a site-specific fallback."
       );
     }
 
@@ -521,12 +605,12 @@ async function waitForTabComplete(tabId, timeoutMs = 15000) {
   });
 }
 
-function buildCaptureFileName({ title, url, devicePreset }) {
+function buildCaptureFileBaseName({ title, url, devicePreset, exportPreset }) {
   const host = new URL(url).hostname.replace(/^www\./, "");
   const safeTitle = sanitizeSegment(title || host).slice(0, 64);
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
 
-  return `${safeTitle || "capture"}-${devicePreset}-${timestamp}.png`;
+  return `${safeTitle || "capture"}-${devicePreset}-${exportPreset}-${timestamp}`;
 }
 
 function sanitizeSegment(input) {
@@ -557,7 +641,7 @@ function normalizeCaptureError(error) {
   if (/canvas/i.test(message) || /dimensions/i.test(message)) {
     return createFriendlyError(
       "Page Too Large To Stitch",
-      "The final bitmap exceeded safe canvas limits. Add a PDF export path or tile the output into multiple images for extremely tall pages."
+      "The final bitmap exceeded safe browser canvas limits. Lumen already falls back to tiled exports for large pages, but this page still needs a lower-scale or alternate export path."
     );
   }
 
@@ -568,6 +652,20 @@ function broadcastProgress(payload) {
   chrome.runtime.sendMessage({
     type: CAPTURE_PROGRESS_EVENT,
     payload
+  }).catch(() => {});
+}
+
+function broadcastSession(session) {
+  chrome.runtime.sendMessage({
+    type: SESSION_UPDATE_EVENT,
+    payload: session
+  }).catch(() => {});
+}
+
+function broadcastHistory(captureHistory) {
+  chrome.runtime.sendMessage({
+    type: HISTORY_UPDATE_EVENT,
+    payload: captureHistory
   }).catch(() => {});
 }
 
@@ -591,6 +689,34 @@ async function waitForCaptureWindow(previousCaptureTimestamp) {
   }
 
   return Date.now();
+}
+
+async function downloadRenderedOutputs(outputs, fileBaseName) {
+  const downloadedFiles = [];
+
+  for (const output of outputs) {
+    const suffix =
+      outputs.length > 1
+        ? `-part-${String(output.index + 1).padStart(2, "0")}-of-${String(output.total).padStart(2, "0")}`
+        : "";
+    const filename = `Lumen/${fileBaseName}${suffix}.png`;
+
+    await chrome.downloads.download({
+      url: output.dataUrl,
+      filename,
+      conflictAction: "uniquify",
+      saveAs: false
+    });
+
+    downloadedFiles.push(filename);
+  }
+
+  return downloadedFiles;
+}
+
+async function getLatestBlueprint() {
+  const stored = await chrome.storage.local.get(STORAGE_KEYS.latestBlueprint);
+  return stored[STORAGE_KEYS.latestBlueprint] || null;
 }
 
 function sleep(ms) {

@@ -28,7 +28,9 @@
     originalScrollX: 0,
     originalScrollY: 0,
     freezeStyleNode: null,
-    prepared: false
+    prepared: false,
+    scrollRoot: null,
+    scrollContext: null
   };
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -68,15 +70,17 @@
   async function handlePrepareCapture(options = {}) {
     await restorePageState();
 
-    captureState.originalScrollX = window.scrollX;
-    captureState.originalScrollY = window.scrollY;
+    captureState.scrollContext = detectScrollContext();
+    captureState.scrollRoot = captureState.scrollContext.node;
+    captureState.originalScrollX = getScrollLeft();
+    captureState.originalScrollY = getScrollTop();
 
     freezeAnimationsAndSmoothScroll();
 
     if (options.forceLazyLoad) {
       await runPreflightScroll();
     } else {
-      window.scrollTo(0, 0);
+      setScrollTop(0);
       await settleFrames(2);
     }
 
@@ -98,19 +102,15 @@
   }
 
   async function scrollToPosition(top) {
-    const maxScrollTop = Math.max(0, getPageMetrics().pageHeight - window.innerHeight);
+    const metrics = getPageMetrics();
+    const maxScrollTop = Math.max(0, metrics.pageHeight - metrics.viewportHeight);
     const clampedTop = Math.max(0, Math.min(top, maxScrollTop));
 
-    window.scrollTo({
-      top: clampedTop,
-      left: 0,
-      behavior: "auto"
-    });
-
+    setScrollTop(clampedTop);
     await settleFrames(2);
 
     return {
-      top: Math.round(window.scrollY)
+      top: Math.round(getScrollTop())
     };
   }
 
@@ -119,15 +119,13 @@
     removeFreezeStyle();
 
     if (captureState.prepared) {
-      window.scrollTo({
-        top: captureState.originalScrollY,
-        left: captureState.originalScrollX,
-        behavior: "auto"
-      });
+      setScrollTop(captureState.originalScrollY);
       await settleFrames(1);
     }
 
     captureState.prepared = false;
+    captureState.scrollRoot = null;
+    captureState.scrollContext = null;
   }
 
   function extractBrandBlueprint() {
@@ -147,7 +145,9 @@
         title: document.title,
         url: window.location.href,
         host: window.location.host,
-        description: getMetaDescription()
+        description: getMetaDescription(),
+        scrollMode: metrics.scrollMode,
+        scrollContainer: metrics.scrollContainer
       },
       identity: {
         siteType: inferSiteType(layout),
@@ -266,26 +266,26 @@
 
   async function runPreflightScroll() {
     const metrics = getPageMetrics();
-    const maxScrollTop = Math.max(0, metrics.pageHeight - window.innerHeight);
-    const step = Math.max(320, Math.round(window.innerHeight * 0.82));
+    const maxScrollTop = Math.max(0, metrics.pageHeight - metrics.viewportHeight);
+    const step = Math.max(240, Math.round(metrics.viewportHeight * 0.82));
 
-    window.scrollTo(0, 0);
+    setScrollTop(0);
     await settleFrames(1);
 
     for (let top = 0; top < maxScrollTop; top += step) {
-      window.scrollTo(0, top);
+      setScrollTop(top);
       await pause(36);
     }
 
-    window.scrollTo(0, maxScrollTop);
+    setScrollTop(maxScrollTop);
     await pause(120);
 
     for (let top = maxScrollTop; top > 0; top -= step) {
-      window.scrollTo(0, top);
+      setScrollTop(top);
       await pause(20);
     }
 
-    window.scrollTo(0, 0);
+    setScrollTop(0);
     await settleFrames(2);
   }
 
@@ -622,24 +622,120 @@
   }
 
   function getPageMetrics() {
+    const context = captureState.scrollContext || detectScrollContext();
+    const root = context.node;
     const doc = document.documentElement;
     const body = document.body;
-    const pageHeight = Math.max(
-      doc.scrollHeight,
-      doc.offsetHeight,
-      doc.clientHeight,
-      body?.scrollHeight || 0,
-      body?.offsetHeight || 0
-    );
+
+    const pageHeight = context.isDocument
+      ? Math.max(
+          doc.scrollHeight,
+          doc.offsetHeight,
+          doc.clientHeight,
+          body?.scrollHeight || 0,
+          body?.offsetHeight || 0
+        )
+      : root.scrollHeight;
 
     return {
       title: document.title,
       url: window.location.href,
-      viewportWidth: Math.round(doc.clientWidth),
-      viewportHeight: Math.round(window.innerHeight),
+      viewportWidth: Math.round(context.isDocument ? doc.clientWidth : root.clientWidth),
+      viewportHeight: Math.round(context.isDocument ? window.innerHeight : root.clientHeight),
       pageHeight: Math.round(pageHeight),
-      devicePixelRatio: window.devicePixelRatio || 1
+      devicePixelRatio: window.devicePixelRatio || 1,
+      scrollMode: context.isDocument ? "document" : "container",
+      scrollContainer: context.label
     };
+  }
+
+  function detectScrollContext() {
+    const documentRoot = document.scrollingElement || document.documentElement;
+    const candidates = [
+      {
+        node: documentRoot,
+        isDocument: true,
+        score: 1,
+        label: "document"
+      }
+    ];
+
+    for (const node of document.querySelectorAll("body *")) {
+      if (!(node instanceof HTMLElement)) {
+        continue;
+      }
+
+      if (!isElementVisible(node)) {
+        continue;
+      }
+
+      const style = window.getComputedStyle(node);
+      const overflowY = style.overflowY;
+      const canScroll =
+        /(auto|scroll|overlay)/.test(overflowY) &&
+        node.scrollHeight > node.clientHeight + 180 &&
+        node.clientHeight > window.innerHeight * 0.34 &&
+        node.clientWidth > window.innerWidth * 0.38;
+
+      if (!canScroll) {
+        continue;
+      }
+
+      const rect = node.getBoundingClientRect();
+      const coverageScore =
+        Math.min(1, rect.width / window.innerWidth) + Math.min(1, rect.height / window.innerHeight);
+      const densityScore = Math.min(3, node.scrollHeight / Math.max(1, node.clientHeight));
+
+      candidates.push({
+        node,
+        isDocument: false,
+        score: coverageScore * 2 + densityScore,
+        label: buildElementLabel(node)
+      });
+    }
+
+    return candidates.sort((left, right) => right.score - left.score)[0];
+  }
+
+  function getScrollTop() {
+    const context = captureState.scrollContext || detectScrollContext();
+
+    return context.isDocument ? window.scrollY : context.node.scrollTop;
+  }
+
+  function getScrollLeft() {
+    const context = captureState.scrollContext || detectScrollContext();
+
+    return context.isDocument ? window.scrollX : context.node.scrollLeft;
+  }
+
+  function setScrollTop(top) {
+    const context = captureState.scrollContext || detectScrollContext();
+    const clampedTop = Math.max(0, Math.min(top, context.node.scrollHeight));
+
+    if (context.isDocument) {
+      window.scrollTo({
+        top: clampedTop,
+        left: captureState.originalScrollX,
+        behavior: "auto"
+      });
+      return;
+    }
+
+    context.node.scrollTo({
+      top: clampedTop,
+      left: captureState.originalScrollX,
+      behavior: "auto"
+    });
+  }
+
+  function buildElementLabel(node) {
+    const tag = node.tagName.toLowerCase();
+    const id = node.id ? `#${node.id}` : "";
+    const classes = [...node.classList].slice(0, 2).join(".");
+    const classSuffix = classes ? `.${classes}` : "";
+
+    return `${tag}${id}${classSuffix}`;
   }
 
   function pause(ms) {

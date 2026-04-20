@@ -1,19 +1,22 @@
 # Lumen
 
-Lumen is a Manifest V3 Chrome extension scaffold for premium web capture workflows. It is designed as the technical base for a freemium SaaS product where the screenshot is only the entry point and the monetized value comes from cleanup, polish, archiving, sync, and analysis.
+Lumen is a Manifest V3 Chrome extension foundation for premium web capture workflows. It is designed as the technical base for a freemium SaaS product where the screenshot is only the entry point and the monetized value comes from cleanup, polish, archiving, sync, and analysis.
 
 ## Current Foundation
 
-The scaffold already includes:
+The current product foundation already includes:
 
 1. A service-worker driven capture pipeline in `background.js`
 2. A content-script preparation pass in `content.js` for sticky-layer cleanup and lazy-load preflight scrolling
 3. An offscreen document stitcher in `offscreen.js` that composes retina-aware full-page captures
 4. A Brand Blueprint inspector that extracts palette, fonts, layout, headline, CTA, and navigation signals from the active page
-5. A polished popup UI in `popup.html`, `popup.css`, and `popup.js`
-6. A GitHub Pages-ready landing site in `docs/`
-7. A simple SaaS gating surface in `config.js` through `isProUser` and per-feature access flags
-8. A lower-friction permission model where desktop capture uses `activeTab`, while mobile capture requests only the active site origin on demand
+5. Studio export presets that can package captures into browser and phone poster mockups
+6. A polished popup UI in `popup.html`, `popup.css`, and `popup.js`
+7. A local-first backend slice for demo auth and capture history sync in `backend/`
+8. A GitHub Pages workflow in `.github/workflows/pages.yml`
+9. A GitHub Pages-ready landing site in `docs/`
+10. A simple SaaS gating surface in `config.js` through `isProUser` and per-feature access flags
+11. A lower-friction permission model where desktop capture uses `activeTab`, while mobile capture requests only the active site origin on demand
 
 ## Architecture
 
@@ -26,8 +29,9 @@ The current flow is:
 3. Content script freezes motion, optionally forces lazy-loaded content to render, and hides fixed, sticky, or high-z UI
 4. Background scrolls the page in slices, respects Chrome capture throttling, and sends each viewport image to the offscreen document
 5. While the page is prepared, Lumen can also extract a Brand Blueprint from the live DOM
-6. Offscreen document stitches the slices into one PNG and returns the final data URL
-7. Background downloads the final capture, persists the latest blueprint, and restores the page state
+6. Offscreen can return raw stitched files or transform the output into browser and phone poster exports
+7. If a page exceeds safe canvas limits, Lumen falls back to tiled raw exports instead of failing
+8. Background downloads the final capture set, persists the latest blueprint, writes capture history, and restores the page state
 
 ### Inspector
 
@@ -38,6 +42,17 @@ The inspector is the first real workflow differentiator in the repo today. It cu
 3. quantized dominant colors
 4. most-used typography families
 5. layout density metrics such as sections, visuals, forms, buttons, and words
+
+### Backend Slice
+
+The backend slice is intentionally small, but it is real:
+
+1. it can create a demo session
+2. it can return the active session
+3. it can accept capture history records
+4. it can return the capture history for that session
+
+This keeps the extension usable in a purely local mode while allowing the first remote sync path when a backend is reachable.
 
 ### SaaS Hooks
 
@@ -56,30 +71,41 @@ The first planned integration points are already marked in code comments:
 3. Click `Load unpacked`
 4. Select this `lumen-extension` directory
 
-### Test the scaffold
+### Test the extension
 
 1. Open any normal `https://` page
 2. Open the Lumen popup
 3. Toggle sticky cleanup or lazy-load forcing as needed
 4. Trigger `Analyze Page` to inspect the page system
-5. Trigger `Capture Full Page` to save the stitched image and refresh the latest blueprint
-6. Confirm the image is downloaded into `Downloads/Lumen`
+5. Choose `Raw`, `Browser`, or `Phone` export mode
+6. Trigger `Capture Full Page` to save the stitched image and refresh the latest blueprint
+7. Confirm the latest capture appears in the Archive panel
+8. Confirm the image is downloaded into `Downloads/Lumen`
+
+### Run the backend slice
+
+```bash
+npm run api
+```
+
+The local API listens on `http://127.0.0.1:8787`.
 
 ### Publish the landing site
 
-1. In GitHub, set Pages to deploy from `main` and the `/docs` folder
-2. Wait for Pages to build
-3. Use the generated URL as the public landing site
+1. In GitHub, enable Pages to deploy through GitHub Actions
+2. Push changes to `main`
+3. Wait for the `Deploy Pages` workflow to complete
+4. Use the generated Pages URL as the public landing site
 
 ## Constraints To Address Next
 
-The current scaffold is intentionally strong, but it is still a scaffold. The highest-leverage next tasks are:
+The core capture and studio foundation is real now, but the highest-leverage next tasks are still clear:
 
-1. Add support for pages that render inside nested scroll containers instead of the main document
-2. Add a tile or PDF fallback when extremely tall pages exceed canvas limits
-3. Replace the mocked auth state with a real SaaS session and billing check
-4. Add the first true Pro studio export such as browser-frame beautification
-5. Add asset branding such as real extension icons and store screenshots
+1. Replace the demo session with a true OAuth flow and billing check
+2. Add cloud sync destinations and a production capture-history backend
+3. Add annotation and redaction passes inside the offscreen studio
+4. Add site-specific fallbacks for highly dynamic apps with virtualization or shadow-root heavy layouts
+5. Add branded icons, store screenshots, and packaging for launch
 
 ## Suggested Product Roadmap
 

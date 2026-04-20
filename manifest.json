@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Lumen",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A premium web capture and workflow foundation for clean full-page screenshots, studio polish, and future SaaS sync.",
   "minimum_chrome_version": "109",
   "permissions": [

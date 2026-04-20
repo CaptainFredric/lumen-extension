@@ -31,6 +31,7 @@
           <span>Sticky cleanup</span>
           <span>Retina stitch</span>
           <span>Brand blueprint</span>
+          <span>Studio exports</span>
         </div>
       </header>
 
@@ -69,6 +70,18 @@
           <div class="segmented-control" id="devicePreset">
             <button type="button" class="segment is-active" data-device="desktop">Desktop</button>
             <button type="button" class="segment" data-device="mobile">Mobile</button>
+          </div>
+        </div>
+
+        <div class="device-block">
+          <div class="device-copy">
+            <strong>Studio export</strong>
+            <small>Raw keeps the original page. Browser and Phone turn the capture into a poster export.</small>
+          </div>
+          <div class="segmented-control segmented-control-wide" id="exportPreset">
+            <button type="button" class="segment is-active" data-export="raw">Raw</button>
+            <button type="button" class="segment" data-export="browser">Browser</button>
+            <button type="button" class="segment" data-export="phone">Phone</button>
           </div>
         </div>
 
@@ -182,9 +195,9 @@
         <div class="panel-head">
           <div>
             <p class="section-label">Studio & SaaS</p>
-            <h2>Pro workflow shell</h2>
+            <h2>Session and sync state</h2>
           </div>
-          <span class="tiny-note">Auth mocked</span>
+          <span id="backendBadge" class="tiny-note">Local-first</span>
         </div>
 
         <div class="feature-row">
@@ -202,22 +215,51 @@
         <div class="auth-shell">
           <div class="auth-copy">
             <p class="section-label">Account</p>
-            <h3>Sign in to unlock the workflow layer.</h3>
-            <p>
-              Replace this shell with your real session bootstrap, billing state, and
-              destination sync controls.
+            <h3 id="accountTitle">Free local session</h3>
+            <p id="accountDescription">
+              Start a demo session to unlock the first backend slice: session state and capture history sync when an API is reachable.
             </p>
+          </div>
+
+          <div class="account-meta">
+            <div class="metric-item compact-metric">
+              <span>Plan</span>
+              <strong id="accountPlan">Free</strong>
+            </div>
+            <div class="metric-item compact-metric">
+              <span>Source</span>
+              <strong id="accountSource">Local</strong>
+            </div>
           </div>
 
           <div class="auth-actions">
             <button id="signInButton" class="secondary-button" type="button">
-              Continue with Google
+              Start Demo Session
             </button>
             <button id="billingButton" class="ghost-button" type="button">
               Billing portal
             </button>
+            <button id="signOutButton" class="ghost-button is-hidden" type="button">
+              Sign out
+            </button>
           </div>
         </div>
+      </section>
+
+      <section class="panel history-panel">
+        <div class="panel-head">
+          <div>
+            <p class="section-label">Archive</p>
+            <h2>Recent captures</h2>
+          </div>
+          <span id="historyCount" class="tiny-note">0 items</span>
+        </div>
+
+        <div id="historyEmpty" class="empty-state">
+          Captures will appear here with export mode, files, and blueprint summary.
+        </div>
+
+        <div id="historyList" class="history-list is-hidden"></div>
       </section>
     </div>
 

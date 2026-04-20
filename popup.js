@@ -13,6 +13,7 @@ const ui = {
   removeStickyHeaders: document.querySelector("#removeStickyHeaders"),
   forceLazyLoad: document.querySelector("#forceLazyLoad"),
   deviceButtons: [...document.querySelectorAll("[data-device]")],
+  exportButtons: [...document.querySelectorAll("[data-export]")],
   statusPanel: document.querySelector("#statusPanel"),
   statusEyebrow: document.querySelector("#statusEyebrow"),
   statusTitle: document.querySelector("#statusTitle"),
@@ -20,8 +21,14 @@ const ui = {
   statusBadge: document.querySelector("#statusBadge"),
   progressFill: document.querySelector("#progressFill"),
   signInButton: document.querySelector("#signInButton"),
+  signOutButton: document.querySelector("#signOutButton"),
   billingButton: document.querySelector("#billingButton"),
   proChips: [...document.querySelectorAll("[data-pro-feature]")],
+  backendBadge: document.querySelector("#backendBadge"),
+  accountTitle: document.querySelector("#accountTitle"),
+  accountDescription: document.querySelector("#accountDescription"),
+  accountPlan: document.querySelector("#accountPlan"),
+  accountSource: document.querySelector("#accountSource"),
   blueprintTimestamp: document.querySelector("#blueprintTimestamp"),
   blueprintEmpty: document.querySelector("#blueprintEmpty"),
   blueprintContent: document.querySelector("#blueprintContent"),
@@ -39,11 +46,20 @@ const ui = {
   metricVisuals: document.querySelector("#metricVisuals"),
   metricWords: document.querySelector("#metricWords"),
   colorStrip: document.querySelector("#colorStrip"),
-  fontStrip: document.querySelector("#fontStrip")
+  fontStrip: document.querySelector("#fontStrip"),
+  historyCount: document.querySelector("#historyCount"),
+  historyEmpty: document.querySelector("#historyEmpty"),
+  historyList: document.querySelector("#historyList")
 };
 
 let currentSettings = getDefaultSettings();
 let actionBusy = false;
+let currentSession = {
+  signedIn: false,
+  plan: "free",
+  source: "local",
+  backendReachable: false
+};
 
 bootstrap().catch((error) => {
   showStatus({
@@ -73,13 +89,21 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "LUMEN_BLUEPRINT_UPDATED") {
     renderBlueprint(message.payload);
   }
+
+  if (message?.type === "LUMEN_SESSION_UPDATED") {
+    renderSession(message.payload);
+  }
+
+  if (message?.type === "LUMEN_HISTORY_UPDATED") {
+    renderHistory(message.payload || []);
+  }
 });
 
 async function bootstrap() {
   applyProGates();
   await restoreSettings();
-  await restoreLatestBlueprint();
   bindEvents();
+  await restoreAppState();
 }
 
 function bindEvents() {
@@ -94,9 +118,19 @@ function bindEvents() {
     });
   }
 
+  for (const button of ui.exportButtons) {
+    button.addEventListener("click", () => {
+      currentSettings.exportPreset = button.dataset.export;
+      updateExportButtons();
+      persistCurrentSettings();
+    });
+  }
+
   ui.captureButton.addEventListener("click", handleCaptureClick);
   ui.analyzeButton.addEventListener("click", handleAnalyzeClick);
-  ui.signInButton.addEventListener("click", handleMockSignIn);
+  ui.signInButton.addEventListener("click", handleSignIn);
+  ui.signOutButton.addEventListener("click", handleSignOut);
+  ui.billingButton.addEventListener("click", handleBillingClick);
 }
 
 async function restoreSettings() {
@@ -109,18 +143,32 @@ async function restoreSettings() {
   ui.removeStickyHeaders.checked = Boolean(currentSettings.removeStickyHeaders);
   ui.forceLazyLoad.checked = Boolean(currentSettings.forceLazyLoad);
   updateDeviceButtons();
+  updateExportButtons();
 }
 
-async function restoreLatestBlueprint() {
-  const stored = await chrome.storage.local.get(STORAGE_KEYS.latestBlueprint);
-  renderBlueprint(stored[STORAGE_KEYS.latestBlueprint] || null);
+async function restoreAppState() {
+  const response = await chrome.runtime.sendMessage({
+    type: "LUMEN_BOOTSTRAP_APP"
+  });
+
+  if (!response?.ok) {
+    renderBlueprint(null);
+    renderHistory([]);
+    renderSession(currentSession);
+    return;
+  }
+
+  renderBlueprint(response.latestBlueprint);
+  renderHistory(response.captureHistory || []);
+  renderSession(response.session || currentSession);
 }
 
 async function persistCurrentSettings() {
   currentSettings = {
     removeStickyHeaders: ui.removeStickyHeaders.checked,
     forceLazyLoad: ui.forceLazyLoad.checked,
-    devicePreset: currentSettings.devicePreset
+    devicePreset: currentSettings.devicePreset,
+    exportPreset: currentSettings.exportPreset
   };
 
   await chrome.storage.sync.set({
@@ -134,6 +182,12 @@ function updateDeviceButtons() {
   }
 }
 
+function updateExportButtons() {
+  for (const button of ui.exportButtons) {
+    button.classList.toggle("is-active", button.dataset.export === currentSettings.exportPreset);
+  }
+}
+
 function applyProGates() {
   for (const chip of ui.proChips) {
     const feature = chip.dataset.proFeature;
@@ -142,11 +196,6 @@ function applyProGates() {
     chip.classList.toggle("is-locked", !enabled);
     chip.disabled = !enabled;
   }
-
-  ui.billingButton.disabled = !LUMEN_CONFIG.isProUser;
-  ui.signInButton.textContent = LUMEN_CONFIG.isProUser
-    ? "Pro account active"
-    : "Continue with Google";
 }
 
 async function handleCaptureClick() {
@@ -161,7 +210,7 @@ async function handleCaptureClick() {
     tone: "neutral",
     eyebrow: "Capture",
     title: "Queueing capture",
-    detail: "Passing your current settings into the background pipeline.",
+    detail: "Passing your capture and export settings into the pipeline.",
     badge: "Queued",
     progress: 0.05
   });
@@ -186,7 +235,7 @@ async function handleCaptureClick() {
       tone: "success",
       eyebrow: "Saved",
       title: "Capture complete",
-      detail: `${response.fileName} saved with ${response.segmentCount} stitched slices and the latest blueprint refreshed.`,
+      detail: `${response.files.length} file${response.files.length === 1 ? "" : "s"} saved using ${response.exportPreset} export mode.`,
       badge: "Ready",
       progress: 1
     });
@@ -303,19 +352,137 @@ async function ensurePermissionsForCurrentCapture() {
   return granted;
 }
 
-async function handleMockSignIn() {
+async function handleSignIn() {
   const response = await chrome.runtime.sendMessage({
-    type: "LUMEN_MOCK_SIGN_IN"
+    type: "LUMEN_DEMO_SIGN_IN"
   });
 
+  if (!response?.ok) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Auth",
+      title: "Session bootstrap failed",
+      detail: response?.error?.description || "The demo session could not be started.",
+      badge: "Failed",
+      progress: 0.12
+    });
+    return;
+  }
+
+  renderSession(response.session);
+  renderHistory(response.captureHistory || []);
+
+  showStatus({
+    tone: "success",
+    eyebrow: "Auth",
+    title: "Demo session started",
+    detail: response.session.source === "remote"
+      ? "Connected to the backend slice and ready to sync captures."
+      : "Backend was not reachable, so Lumen started a local demo session and kept working.",
+    badge: "Ready",
+    progress: 1
+  });
+}
+
+async function handleSignOut() {
+  const response = await chrome.runtime.sendMessage({
+    type: "LUMEN_SIGN_OUT"
+  });
+
+  if (!response?.ok) {
+    return;
+  }
+
+  renderSession(response.session);
   showStatus({
     tone: "neutral",
     eyebrow: "Auth",
-    title: "SaaS hook placeholder",
-    detail: response?.notice || "Replace this with your real session bootstrap.",
-    badge: "Mock",
-    progress: 0.1
+    title: "Signed out",
+    detail: "Lumen returned to a free local session.",
+    badge: "Idle",
+    progress: 0.08
   });
+}
+
+function handleBillingClick() {
+  showStatus({
+    tone: "neutral",
+    eyebrow: "Billing",
+    title: "Billing endpoint reserved",
+    detail: "The UI contract is in place, but the demo backend does not implement a billing portal yet.",
+    badge: "Soon",
+    progress: 0.12
+  });
+}
+
+function renderSession(session) {
+  currentSession = session || currentSession;
+
+  const signedIn = Boolean(currentSession?.signedIn);
+  const plan = currentSession?.plan || "free";
+  const source = currentSession?.source || "local";
+  const backendReachable = Boolean(currentSession?.backendReachable);
+
+  ui.accountTitle.textContent = signedIn
+    ? `${currentSession.user?.name || "Lumen user"}`
+    : "Free local session";
+  ui.accountDescription.textContent = signedIn
+    ? backendReachable
+      ? "Session is connected to the backend slice. New captures can sync into history."
+      : "Session is active, but the backend was not reachable. Lumen keeps state locally and will still archive captures in this browser."
+    : "Start a demo session to unlock the first backend slice: session state and capture history sync when an API is reachable.";
+  ui.accountPlan.textContent = plan.replace(/-/g, " ");
+  ui.accountSource.textContent = source;
+  ui.backendBadge.textContent = backendReachable ? "Backend reachable" : "Local-first";
+  ui.signInButton.classList.toggle("is-hidden", signedIn);
+  ui.signOutButton.classList.toggle("is-hidden", !signedIn);
+  ui.billingButton.disabled = !signedIn || !/pro/i.test(plan);
+}
+
+function renderHistory(history) {
+  const items = Array.isArray(history) ? history : [];
+  ui.historyCount.textContent = `${items.length} item${items.length === 1 ? "" : "s"}`;
+  ui.historyList.replaceChildren();
+
+  if (!items.length) {
+    ui.historyEmpty.classList.remove("is-hidden");
+    ui.historyList.classList.add("is-hidden");
+    return;
+  }
+
+  ui.historyEmpty.classList.add("is-hidden");
+  ui.historyList.classList.remove("is-hidden");
+
+  for (const item of items.slice(0, 5)) {
+    const row = document.createElement("article");
+    row.className = "history-item";
+
+    const topRow = document.createElement("div");
+    topRow.className = "history-head";
+
+    const title = document.createElement("strong");
+    title.textContent = item.title || item.host || "Untitled capture";
+
+    const badge = document.createElement("span");
+    badge.className = "tiny-note";
+    badge.textContent = item.exportPreset || "raw";
+
+    topRow.append(title, badge);
+
+    const meta = document.createElement("p");
+    meta.className = "history-meta";
+    meta.textContent = [
+      item.host || "",
+      formatTimestamp(item.capturedAt),
+      `${item.files?.length || 0} file${item.files?.length === 1 ? "" : "s"}`,
+      item.blueprintSummary?.siteType || ""
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+    row.append(topRow, meta);
+    ui.historyList.appendChild(row);
+  }
 }
 
 function renderBlueprint(blueprint) {

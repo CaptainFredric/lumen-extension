@@ -25,6 +25,7 @@ node_modules/
 # local env
 .env
 .env.*
+backend/data/store.json
 
 # extension artifacts
 captures/

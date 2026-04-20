@@ -3,18 +3,28 @@ export const LUMEN_CONFIG = {
   capture: {
     maxSegments: 30,
     captureThrottleMs: 550,
+    historyLimit: 12,
     preflightStepFactor: 0.82,
     preflightPauseMs: 36,
     segmentSettleMs: 180,
+    tileMaxOutputHeight: 12000,
     mobileViewport: {
       width: 430,
       height: 932
     }
   },
+  studio: {
+    maxMockupSourceHeight: 4200,
+    exportPresets: ["raw", "browser", "phone"],
+    posterPadding: 88
+  },
   api: {
     baseUrl: "https://api.lumen.app",
+    localBaseUrl: "http://127.0.0.1:8787",
     endpoints: {
       session: "/v1/session",
+      demoSession: "/v1/session/demo",
+      logout: "/v1/session/logout",
       captures: "/v1/captures",
       billing: "/v1/billing/portal",
       syncDestinations: "/v1/integrations"
@@ -29,13 +39,16 @@ export const LUMEN_CONFIG = {
   defaults: {
     removeStickyHeaders: true,
     forceLazyLoad: true,
-    devicePreset: "desktop"
+    devicePreset: "desktop",
+    exportPreset: "raw"
   }
 };
 
 export const STORAGE_KEYS = {
   settings: "lumen.capture.settings",
-  latestBlueprint: "lumen.inspector.latestBlueprint"
+  latestBlueprint: "lumen.inspector.latestBlueprint",
+  session: "lumen.account.session",
+  captureHistory: "lumen.capture.history"
 };
 
 export function isRestrictedCaptureUrl(url = "") {
@@ -62,4 +75,8 @@ export function getDefaultSettings() {
 
 export function isOriginPermissionSupported(rawUrl = "") {
   return /^https?:/i.test(rawUrl);
+}
+
+export function getApiBaseUrls() {
+  return [LUMEN_CONFIG.api.localBaseUrl, LUMEN_CONFIG.api.baseUrl].filter(Boolean);
 }
