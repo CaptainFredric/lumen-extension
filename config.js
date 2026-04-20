@@ -8,9 +8,15 @@ export const LUMEN_CONFIG = {
     preflightPauseMs: 36,
     segmentSettleMs: 180,
     tileMaxOutputHeight: 12000,
-    mobileViewport: {
-      width: 430,
-      height: 932
+    viewports: {
+      tablet: {
+        width: 1024,
+        height: 1366
+      },
+      mobile: {
+        width: 430,
+        height: 932
+      }
     }
   },
   studio: {
@@ -80,4 +86,62 @@ export function isOriginPermissionSupported(rawUrl = "") {
 
 export function getApiBaseUrls() {
   return [LUMEN_CONFIG.api.localBaseUrl, LUMEN_CONFIG.api.baseUrl].filter(Boolean);
+}
+
+export function getCaptureVariants(devicePreset = "desktop") {
+  if (devicePreset === "responsive") {
+    return [
+      {
+        id: "desktop",
+        label: "Desktop",
+        mode: "desktop"
+      },
+      {
+        id: "tablet",
+        label: "Tablet",
+        mode: "viewport",
+        viewport: LUMEN_CONFIG.capture.viewports.tablet
+      },
+      {
+        id: "mobile",
+        label: "Mobile",
+        mode: "viewport",
+        viewport: LUMEN_CONFIG.capture.viewports.mobile
+      }
+    ];
+  }
+
+  if (devicePreset === "tablet") {
+    return [
+      {
+        id: "tablet",
+        label: "Tablet",
+        mode: "viewport",
+        viewport: LUMEN_CONFIG.capture.viewports.tablet
+      }
+    ];
+  }
+
+  if (devicePreset === "mobile") {
+    return [
+      {
+        id: "mobile",
+        label: "Mobile",
+        mode: "viewport",
+        viewport: LUMEN_CONFIG.capture.viewports.mobile
+      }
+    ];
+  }
+
+  return [
+    {
+      id: "desktop",
+      label: "Desktop",
+      mode: "desktop"
+    }
+  ];
+}
+
+export function requiresOriginPermission(devicePreset = "desktop") {
+  return getCaptureVariants(devicePreset).some((variant) => variant.mode === "viewport");
 }

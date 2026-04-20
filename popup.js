@@ -4,7 +4,9 @@ import {
   buildOriginPattern,
   getDefaultSettings,
   getFeatureAccess,
-  isOriginPermissionSupported
+  getCaptureVariants,
+  isOriginPermissionSupported,
+  requiresOriginPermission
 } from "./config.js";
 
 const ui = {
@@ -239,7 +241,7 @@ async function handleCaptureClick() {
       tone: "success",
       eyebrow: "Saved",
       title: "Capture complete",
-      detail: buildCaptureSuccessMessage(response),
+      detail: buildCaptureSuccessMessage(response, currentSettings.devicePreset),
       badge: "Ready",
       progress: 1
     });
@@ -307,7 +309,7 @@ async function handleAnalyzeClick() {
 }
 
 async function ensurePermissionsForCurrentCapture() {
-  if (currentSettings.devicePreset !== "mobile") {
+  if (!requiresOriginPermission(currentSettings.devicePreset)) {
     return true;
   }
 
@@ -332,8 +334,8 @@ async function ensurePermissionsForCurrentCapture() {
   showStatus({
     tone: "neutral",
     eyebrow: "Permission",
-    title: "Mobile capture needs site access",
-    detail: "Chrome will ask for access to this site so Lumen can open the temporary mobile viewport and inject the capture script there.",
+    title: "Viewport capture needs site access",
+    detail: "Chrome will ask for access to this site so Lumen can open temporary tablet or mobile viewports and inject the capture script there.",
     badge: "Prompt",
     progress: 0.06
   });
@@ -347,7 +349,7 @@ async function ensurePermissionsForCurrentCapture() {
       tone: "error",
       eyebrow: "Permission",
       title: "Site access denied",
-      detail: "Mobile capture needs temporary permission for this site. Desktop capture still works without it.",
+      detail: "Tablet, mobile, and responsive set capture need temporary permission for this site. Desktop capture still works without it.",
       badge: "Blocked",
       progress: 0.08
     });
@@ -478,6 +480,7 @@ function renderHistory(history) {
     meta.textContent = [
       item.host || "",
       formatTimestamp(item.capturedAt),
+      item.variants?.length ? `${item.variants.length} view${item.variants.length === 1 ? "" : "s"}` : "",
       `${item.files?.length || 0} file${item.files?.length === 1 ? "" : "s"}`,
       item.redactionCount ? `${item.redactionCount} redaction${item.redactionCount === 1 ? "" : "s"}` : "",
       item.blueprintSummary?.siteType || ""
@@ -633,14 +636,15 @@ function formatTimestamp(rawValue) {
   }).format(date);
 }
 
-function buildCaptureSuccessMessage(response) {
+function buildCaptureSuccessMessage(response, devicePreset) {
   const fileText = `${response.files.length} file${response.files.length === 1 ? "" : "s"} saved using ${response.exportPreset} export mode`;
+  const variantCount = response.variantCount || getCaptureVariants(devicePreset).length;
 
   if (!response.redactionCount) {
-    return `${fileText}.`;
+    return variantCount > 1 ? `${fileText}. ${variantCount} responsive views captured.` : `${fileText}.`;
   }
 
-  return `${fileText}. ${response.redactionCount} sensitive region${response.redactionCount === 1 ? "" : "s"} sanitized.`;
+  return `${fileText}. ${variantCount > 1 ? `${variantCount} responsive views captured. ` : ""}${response.redactionCount} sensitive region${response.redactionCount === 1 ? "" : "s"} sanitized.`;
 }
 
 function formatCompactNumber(value) {

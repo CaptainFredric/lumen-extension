@@ -2,6 +2,7 @@ import {
   LUMEN_CONFIG,
   STORAGE_KEYS,
   getDefaultSettings,
+  getCaptureVariants,
   isRestrictedCaptureUrl
 } from "./config.js";
 import {
@@ -154,139 +155,92 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     );
   }
 
-  broadcastProgress({
-    stage: "prepare",
-    title: "Preparing page",
-    detail: "Injecting the Lumen page agent and normalizing the document."
+  const variants = getCaptureVariants(options.devicePreset);
+  const results = [];
+  let blueprint = null;
+
+  for (let index = 0; index < variants.length; index += 1) {
+    const result = await captureVariant({
+      sourceTab,
+      variant: variants[index],
+      options,
+      extractBlueprint: index === 0
+    });
+
+    results.push(result);
+    blueprint ||= result.blueprint;
+  }
+
+  const firstResult = results[0];
+  const downloadedFiles = results.flatMap((result) => result.downloadedFiles);
+  const segmentCount = results.reduce((sum, result) => sum + result.segmentCount, 0);
+  const tileCount = results.reduce((sum, result) => sum + result.tileCount, 0);
+  const redactionCount = results.reduce((sum, result) => sum + result.redactionCount, 0);
+  const variantSummaries = results.map((result) => ({
+    id: result.variant.id,
+    label: result.variant.label,
+    files: result.downloadedFiles,
+    exportPreset: result.exportPreset,
+    tileCount: result.tileCount,
+    redactionCount: result.redactionCount,
+    dimensions: result.dimensions
+  }));
+
+  if (!blueprint) {
+    blueprint = await getLatestBlueprint();
+  }
+
+  const captureHistory = await persistCaptureRecord({
+    id: crypto.randomUUID(),
+    title: firstResult.page.title,
+    host: new URL(firstResult.page.url).host,
+    url: firstResult.page.url,
+    devicePreset: options.devicePreset,
+    exportPreset: firstResult.exportPreset,
+    capturedAt: new Date().toISOString(),
+    files: downloadedFiles,
+    tileCount,
+    redactionCount,
+    variants: variantSummaries,
+    dimensions: firstResult.dimensions,
+    blueprintSummary: blueprint
+      ? {
+          siteType: blueprint.identity?.siteType || "",
+          heroHeadline: blueprint.identity?.heroHeadline || "",
+          primaryCta: blueprint.identity?.primaryCta || ""
+        }
+      : null
   });
 
-  const target = await createCaptureTarget(sourceTab, options.devicePreset);
+  broadcastHistory(captureHistory);
 
-  try {
-    await ensureContentScript(target.tab.id);
+  // Future SaaS hook:
+  // POST metadata, page metrics, and the final asset reference to
+  // `${LUMEN_CONFIG.api.baseUrl}${LUMEN_CONFIG.api.endpoints.captures}`
+  // once auth and cloud persistence are wired in.
 
-    const prepareResult = await chrome.tabs.sendMessage(target.tab.id, {
-      type: "LUMEN_PREPARE_CAPTURE",
-      options
-    });
+  broadcastProgress({
+    stage: "done",
+    title: variants.length > 1 ? "Responsive set ready" : "Capture ready",
+    detail: buildCaptureCompletionDetail({
+      segmentCount,
+      fileCount: downloadedFiles.length,
+      redactionCount,
+      variantCount: variants.length
+    }),
+    progress: 1
+  });
 
-    if (!prepareResult?.ok) {
-      throw new Error("Page preparation did not complete.");
-    }
-
-    const page = prepareResult.page;
-    const sessionId = crypto.randomUUID();
-    let redactionScan = {
-      count: 0,
-      regions: []
-    };
-
-    if (options.autoRedact) {
-      broadcastProgress({
-        stage: "sanitize",
-        title: "Scanning sensitive data",
-        detail: "Looking for emails, phone numbers, tokens, and filled fields before export."
-      });
-
-      redactionScan = await requestRedactionScan(target.tab.id);
-    }
-
-    await maybeExtractBlueprint(target.tab.id);
-
-    await initializeStitchSession({
-      sessionId,
-      page,
-      options,
-      redactions: redactionScan.regions
-    });
-
-    const segments = await capturePageSegments(target, page, sessionId);
-
-    broadcastProgress({
-      stage: "stitch",
-      title: "Compositing image",
-      detail: `Drawing ${segments} capture slices into the offscreen studio.`
-    });
-
-    const stitched = await finalizeStitchSession(sessionId);
-    const fileBaseName = buildCaptureFileBaseName({
-      title: page.title,
-      url: page.url,
-      exportPreset: stitched.appliedPreset,
-      devicePreset: options.devicePreset
-    });
-
-    broadcastProgress({
-      stage: "save",
-      title: "Saving file",
-      detail: "Writing the capture to your Downloads folder."
-    });
-
-    const downloadedFiles = await downloadRenderedOutputs(stitched.outputs, fileBaseName);
-    const blueprint = await getLatestBlueprint();
-    const captureHistory = await persistCaptureRecord({
-      id: crypto.randomUUID(),
-      title: page.title,
-      host: new URL(page.url).host,
-      url: page.url,
-      devicePreset: options.devicePreset,
-      exportPreset: stitched.appliedPreset,
-      capturedAt: new Date().toISOString(),
-      files: downloadedFiles,
-      tileCount: stitched.outputs.length,
-      redactionCount: stitched.redactionCount,
-      dimensions: {
-        width: stitched.width,
-        height: stitched.height
-      },
-      blueprintSummary: blueprint
-        ? {
-            siteType: blueprint.identity?.siteType || "",
-            heroHeadline: blueprint.identity?.heroHeadline || "",
-            primaryCta: blueprint.identity?.primaryCta || ""
-          }
-        : null
-    });
-
-    broadcastHistory(captureHistory);
-
-    // Future SaaS hook:
-    // POST metadata, page metrics, and the final asset reference to
-    // `${LUMEN_CONFIG.api.baseUrl}${LUMEN_CONFIG.api.endpoints.captures}`
-    // once auth and cloud persistence are wired in.
-
-    broadcastProgress({
-      stage: "done",
-      title: "Capture ready",
-      detail: buildCaptureCompletionDetail({
-        segmentCount: segments,
-        fileCount: downloadedFiles.length,
-        redactionCount: stitched.redactionCount
-      }),
-      progress: 1
-    });
-
-    return {
-      fileName: downloadedFiles[0] || "",
-      files: downloadedFiles,
-      segmentCount: segments,
-      exportPreset: stitched.appliedPreset,
-      tileCount: stitched.outputs.length,
-      redactionCount: stitched.redactionCount,
-      dimensions: {
-        width: stitched.width,
-        height: stitched.height
-      }
-    };
-  } finally {
-    await resetStitchSessionSilently();
-
-    if (target.kind === "desktop") {
-      await restoreTabState(target.tab.id);
-    } else {
-      await closeWindowSafely(target.windowId);
-    }
-  }
+  return {
+    fileName: downloadedFiles[0] || "",
+    files: downloadedFiles,
+    segmentCount,
+    exportPreset: firstResult.exportPreset,
+    tileCount,
+    redactionCount,
+    variantCount: variants.length,
+    dimensions: firstResult.dimensions
+  };
 }
 
 async function runBlueprintFlow() {
@@ -325,7 +279,109 @@ async function runBlueprintFlow() {
   };
 }
 
-async function capturePageSegments(target, page, sessionId) {
+async function captureVariant({ sourceTab, variant, options, extractBlueprint }) {
+  const target = await createCaptureTarget(sourceTab, variant);
+
+  try {
+    broadcastProgress({
+      stage: "prepare",
+      title: `Preparing ${variant.label} capture`,
+      detail: buildVariantProgressDetail(variant, "prepare")
+    });
+
+    await ensureContentScript(target.tab.id);
+
+    const prepareResult = await chrome.tabs.sendMessage(target.tab.id, {
+      type: "LUMEN_PREPARE_CAPTURE",
+      options
+    });
+
+    if (!prepareResult?.ok) {
+      throw new Error("Page preparation did not complete.");
+    }
+
+    const page = prepareResult.page;
+    const sessionId = crypto.randomUUID();
+    let redactionScan = {
+      count: 0,
+      regions: []
+    };
+    let blueprint = null;
+
+    if (options.autoRedact) {
+      broadcastProgress({
+        stage: "sanitize",
+        title: `Scanning ${variant.label.toLowerCase()} view`,
+        detail: `Looking for emails, phone numbers, tokens, and filled fields in the ${variant.label.toLowerCase()} layout.`
+      });
+
+      redactionScan = await requestRedactionScan(target.tab.id);
+    }
+
+    if (extractBlueprint) {
+      blueprint = await maybeExtractBlueprint(target.tab.id);
+    }
+
+    await initializeStitchSession({
+      sessionId,
+      page,
+      options: {
+        ...options,
+        devicePreset: variant.id
+      },
+      redactions: redactionScan.regions
+    });
+
+    const segmentCount = await capturePageSegments(target, page, sessionId, variant);
+
+    broadcastProgress({
+      stage: "stitch",
+      title: `Compositing ${variant.label.toLowerCase()} output`,
+      detail: `Drawing ${segmentCount} ${variant.label.toLowerCase()} slice${segmentCount === 1 ? "" : "s"} into the offscreen studio.`
+    });
+
+    const stitched = await finalizeStitchSession(sessionId);
+    const fileBaseName = buildCaptureFileBaseName({
+      title: page.title,
+      url: page.url,
+      exportPreset: stitched.appliedPreset,
+      devicePreset: variant.id
+    });
+
+    broadcastProgress({
+      stage: "save",
+      title: `Saving ${variant.label.toLowerCase()} files`,
+      detail: `Writing the ${variant.label.toLowerCase()} capture to your Downloads folder.`
+    });
+
+    const downloadedFiles = await downloadRenderedOutputs(stitched.outputs, fileBaseName);
+
+    return {
+      variant,
+      page,
+      blueprint,
+      downloadedFiles,
+      segmentCount,
+      tileCount: stitched.outputs.length,
+      redactionCount: stitched.redactionCount,
+      exportPreset: stitched.appliedPreset,
+      dimensions: {
+        width: stitched.width,
+        height: stitched.height
+      }
+    };
+  } finally {
+    await resetStitchSessionSilently();
+
+    if (target.kind === "desktop") {
+      await restoreTabState(target.tab.id);
+    } else {
+      await closeWindowSafely(target.windowId);
+    }
+  }
+}
+
+async function capturePageSegments(target, page, sessionId, variant) {
   const maxSegments = LUMEN_CONFIG.capture.maxSegments;
   let lastCaptureTimestamp = 0;
   let previousTop = null;
@@ -373,8 +429,8 @@ async function capturePageSegments(target, page, sessionId) {
 
     broadcastProgress({
       stage: "capture",
-      title: `Capturing slice ${segmentCount}`,
-      detail: `Viewport ${segmentCount} of the scrolling page stack.`,
+      title: `Capturing ${variant.label.toLowerCase()} slice ${segmentCount}`,
+      detail: `Viewport ${segmentCount} of the ${variant.label.toLowerCase()} scrolling stack.`,
       progress
     });
 
@@ -399,8 +455,8 @@ async function capturePageSegments(target, page, sessionId) {
   );
 }
 
-async function createCaptureTarget(tab, devicePreset) {
-  if (devicePreset !== "mobile") {
+async function createCaptureTarget(tab, variant) {
+  if (variant.mode === "desktop") {
     return {
       kind: "desktop",
       tab,
@@ -408,7 +464,7 @@ async function createCaptureTarget(tab, devicePreset) {
     };
   }
 
-  const { width, height } = LUMEN_CONFIG.capture.mobileViewport;
+  const { width, height } = variant.viewport;
 
   const createdWindow = await chrome.windows.create({
     url: tab.url,
@@ -418,24 +474,24 @@ async function createCaptureTarget(tab, devicePreset) {
     focused: false
   });
 
-  const [mobileTab] = await chrome.tabs.query({
+  const [viewportTab] = await chrome.tabs.query({
     windowId: createdWindow.id,
     active: true
   });
 
-  if (!mobileTab?.id) {
+  if (!viewportTab?.id) {
     throw createFriendlyError(
-      "Mobile View Failed",
-      "Chrome could not create the temporary mobile capture window."
+      `${variant.label} View Failed`,
+      `Chrome could not create the temporary ${variant.label.toLowerCase()} capture window.`
     );
   }
 
-  await waitForTabComplete(mobileTab.id);
+  await waitForTabComplete(viewportTab.id);
   await sleep(260);
 
   return {
-    kind: "mobile",
-    tab: mobileTab,
+    kind: "viewport",
+    tab: viewportTab,
     windowId: createdWindow.id
   };
 }
@@ -457,8 +513,10 @@ async function maybeExtractBlueprint(tabId) {
 
     const blueprint = await requestBrandBlueprint(tabId);
     await persistLatestBlueprint(blueprint);
+    return blueprint;
   } catch (error) {
     console.debug("Lumen blueprint extraction skipped:", error);
+    return null;
   }
 }
 
@@ -660,15 +718,38 @@ function createFriendlyError(title, description) {
   return { title, description };
 }
 
-function buildCaptureCompletionDetail({ segmentCount, fileCount, redactionCount }) {
+function buildCaptureCompletionDetail({ segmentCount, fileCount, redactionCount, variantCount }) {
   const sliceText = `${segmentCount} slice${segmentCount === 1 ? "" : "s"} stitched`;
   const fileText = `${fileCount} file${fileCount === 1 ? "" : "s"} saved`;
+  const variantText = variantCount > 1 ? `${variantCount} responsive views captured` : "";
 
-  if (!redactionCount) {
+  if (!redactionCount && !variantText) {
     return `${sliceText} and ${fileText} successfully.`;
   }
 
-  return `${sliceText}, ${fileText}, and ${redactionCount} sensitive region${redactionCount === 1 ? "" : "s"} sanitized.`;
+  const fragments = [sliceText, fileText];
+
+  if (variantText) {
+    fragments.push(variantText);
+  }
+
+  if (redactionCount) {
+    fragments.push(`${redactionCount} sensitive region${redactionCount === 1 ? "" : "s"} sanitized`);
+  }
+
+  return `${fragments.join(", ")}.`;
+}
+
+function buildVariantProgressDetail(variant, stage) {
+  if (stage === "prepare" && variant.mode === "desktop") {
+    return "Injecting the Lumen page agent into the active tab and normalizing the document.";
+  }
+
+  if (stage === "prepare") {
+    return `Opening a temporary ${variant.label.toLowerCase()} viewport, then normalizing the page for capture.`;
+  }
+
+  return `${variant.label} capture in progress.`;
 }
 
 function normalizeCaptureError(error) {

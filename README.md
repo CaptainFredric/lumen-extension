@@ -10,14 +10,15 @@ The current product foundation already includes:
 2. A content-script preparation pass in `content.js` for sticky-layer cleanup and lazy-load preflight scrolling
 3. An offscreen document stitcher in `offscreen.js` that composes retina-aware full-page captures
 4. A Brand Blueprint inspector that extracts palette, fonts, layout, headline, CTA, and navigation signals from the active page
-5. Auto-redaction that can detect emails, phone numbers, tokens, and filled fields before export
-6. Studio export presets that can package captures into browser and phone poster mockups
-7. A polished popup UI in `popup.html`, `popup.css`, and `popup.js`
-8. A local-first backend slice for demo auth and capture history sync in `backend/`
-9. A GitHub Pages workflow in `.github/workflows/pages.yml`
-10. A GitHub Pages-ready landing site in `docs/`
-11. A simple SaaS gating surface in `config.js` through `isProUser` and per-feature access flags
-12. A lower-friction permission model where desktop capture uses `activeTab`, while mobile capture requests only the active site origin on demand
+5. Responsive set capture that can generate desktop, tablet, and mobile outputs from one action
+6. Auto-redaction that can detect emails, phone numbers, tokens, and filled fields before export
+7. Studio export presets that can package captures into browser and phone poster mockups
+8. A polished popup UI in `popup.html`, `popup.css`, and `popup.js`
+9. A local-first backend slice for demo auth and capture history sync in `backend/`
+10. A GitHub Pages workflow in `.github/workflows/pages.yml`
+11. A GitHub Pages-ready landing site in `docs/`
+12. A simple SaaS gating surface in `config.js` through `isProUser` and per-feature access flags
+13. A lower-friction permission model where desktop capture uses `activeTab`, while viewport-based tablet, mobile, and responsive set capture request only the active site origin on demand
 
 ## Architecture
 
@@ -30,10 +31,11 @@ The current flow is:
 3. Content script freezes motion, optionally forces lazy-loaded content to render, and hides fixed, sticky, or high-z UI
 4. Background scrolls the page in slices, respects Chrome capture throttling, and sends each viewport image to the offscreen document
 5. While the page is prepared, Lumen can also extract a Brand Blueprint from the live DOM
-6. If auto-redaction is enabled, the content script scans for sensitive text regions and filled fields before the final render
-7. Offscreen can return raw stitched files or transform the output into browser and phone poster exports
-8. If a page exceeds safe canvas limits, Lumen falls back to tiled raw exports instead of failing
-9. Background downloads the final capture set, persists the latest blueprint, writes capture history, and restores the page state
+6. If responsive set capture is selected, Lumen repeats the pipeline for desktop, tablet, and mobile viewports and archives the outputs together
+7. If auto-redaction is enabled, the content script scans for sensitive text regions and filled fields before the final render
+8. Offscreen can return raw stitched files or transform the output into browser and phone poster exports
+9. If a page exceeds safe canvas limits, Lumen falls back to tiled raw exports instead of failing
+10. Background downloads the final capture set, persists the latest blueprint, writes capture history, and restores the page state
 
 ### Inspector
 
@@ -79,10 +81,11 @@ The first planned integration points are already marked in code comments:
 2. Open the Lumen popup
 3. Toggle sticky cleanup, lazy-load forcing, or auto-redaction as needed
 4. Trigger `Analyze Page` to inspect the page system
-5. Choose `Raw`, `Browser`, or `Phone` export mode
-6. Trigger `Capture Full Page` to save the stitched image and refresh the latest blueprint
-7. Confirm the latest capture appears in the Archive panel
-8. Confirm the image is downloaded into `Downloads/Lumen`
+5. Choose `Desktop`, `Tablet`, `Mobile`, or `Set` for the capture device
+6. Choose `Raw`, `Browser`, or `Phone` export mode
+7. Trigger `Capture Full Page` to save the stitched image and refresh the latest blueprint
+8. Confirm the latest capture appears in the Archive panel
+9. Confirm the image is downloaded into `Downloads/Lumen`
 
 ### Run the backend slice
 

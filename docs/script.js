@@ -1,4 +1,4 @@
-const revealNodes = document.querySelectorAll("[data-reveal]");
+const revealNodes = [...document.querySelectorAll("[data-reveal]")];
 const workflowSteps = [...document.querySelectorAll(".workflow-step")];
 const workflowVisual = document.querySelector(".workflow-visual");
 const tiltNode = document.querySelector("[data-tilt]");
@@ -12,7 +12,7 @@ const revealObserver = new IntersectionObserver(
     }
   },
   {
-    threshold: 0.16
+    threshold: 0.14
   }
 );
 
@@ -20,7 +20,7 @@ for (const node of revealNodes) {
   revealObserver.observe(node);
 }
 
-const stepObserver = new IntersectionObserver(
+const workflowObserver = new IntersectionObserver(
   (entries) => {
     const activeEntry = entries
       .filter((entry) => entry.isIntersecting)
@@ -41,12 +41,12 @@ const stepObserver = new IntersectionObserver(
     }
   },
   {
-    threshold: 0.55
+    threshold: 0.5
   }
 );
 
 for (const step of workflowSteps) {
-  stepObserver.observe(step);
+  workflowObserver.observe(step);
 }
 
 if (tiltNode && window.matchMedia("(prefers-reduced-motion: no-preference)").matches) {
@@ -54,13 +54,13 @@ if (tiltNode && window.matchMedia("(prefers-reduced-motion: no-preference)").mat
     const bounds = tiltNode.getBoundingClientRect();
     const offsetX = (event.clientX - bounds.left) / bounds.width - 0.5;
     const offsetY = (event.clientY - bounds.top) / bounds.height - 0.5;
-    const rotateX = offsetY * -5;
-    const rotateY = offsetX * 7;
+    const rotateX = offsetY * -4.5;
+    const rotateY = offsetX * 6;
 
-    tiltNode.style.transform = `perspective(1400px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+    tiltNode.style.transform = `perspective(1500px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
   });
 
   tiltNode.addEventListener("pointerleave", () => {
-    tiltNode.style.transform = "perspective(1400px) rotateX(0deg) rotateY(0deg)";
+    tiltNode.style.transform = "perspective(1500px) rotateX(0deg) rotateY(0deg)";
   });
 }

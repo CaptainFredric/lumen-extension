@@ -322,6 +322,10 @@ h3 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.segmented-control-device {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .segment,
 .capture-button,
 .secondary-action,
@@ -339,7 +343,7 @@ h3 {
 }
 
 .segment {
-  min-width: 86px;
+  min-width: 0;
   padding: 10px 12px;
   border-radius: 10px;
   background: transparent;

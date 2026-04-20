@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Lumen | The Intelligent Web Canvas</title>
+    <title>Lumen | Browser Capture That Survives Contact With Real Work</title>
     <meta
       name="description"
-      content="Lumen turns browser capture into a workflow: clean full-page screenshots, studio polish, cloud-ready archives, and brand blueprint inspection."
+      content="Lumen turns browser capture into a serious workflow: clean the page, capture responsive views, redact sensitive data, inspect the brand system, and keep the result ready for teams."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -20,7 +20,7 @@
     <div class="noise"></div>
 
     <header class="site-header">
-      <a class="brand" href="#top">
+      <a class="brand" href="#top" aria-label="Lumen home">
         <span class="brand-mark">L</span>
         <span class="brand-copy">
           <strong>Lumen</strong>
@@ -28,24 +28,48 @@
         </span>
       </a>
 
-      <nav class="site-nav">
+      <nav class="site-nav" aria-label="Primary">
         <a href="#product">Product</a>
         <a href="#workflow">Workflow</a>
+        <a href="#mechanics">Mechanics</a>
         <a href="#pricing">Pricing</a>
-        <a href="https://github.com/CaptainFredric/lumen-extension" target="_blank" rel="noreferrer">
-          GitHub
-        </a>
       </nav>
+
+      <div class="header-actions">
+        <a
+          class="nav-link"
+          href="https://github.com/CaptainFredric/lumen-extension"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Repository
+        </a>
+        <a
+          class="nav-link nav-link-strong"
+          href="https://github.com/CaptainFredric"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Dan DeBugger
+        </a>
+      </div>
     </header>
 
     <main>
       <section class="hero" id="top">
         <div class="hero-copy" data-reveal>
-          <p class="kicker">Chrome extension + workflow product</p>
-          <h1>Lumen turns the web into a working canvas.</h1>
+          <p class="kicker">Presented as a product, not a gimmick</p>
+          <p class="maker-line">
+            Built publicly by
+            <a href="https://github.com/CaptainFredric" target="_blank" rel="noreferrer">
+              Dan DeBugger
+            </a>
+          </p>
+          <h1>Capture the page once. Leave with something you can actually use.</h1>
           <p class="hero-body">
-            Capture the page cleanly, inspect its visual system, frame it for sharing, and
-            keep the whole artifact ready for teams, archives, and competitor watchlists.
+            Lumen cleans the page, captures desktop, tablet, and mobile layouts, auto-redacts
+            sensitive data, extracts the brand system, and keeps the result ready for design
+            review, QA evidence, marketing research, or competitor watch.
           </p>
 
           <div class="hero-actions">
@@ -55,226 +79,337 @@
               target="_blank"
               rel="noreferrer"
             >
-              Open the repository
+              Explore the repository
             </a>
             <a class="secondary-link" href="#workflow">See the workflow</a>
           </div>
 
-          <div class="hero-ribbon">
-            <span>Flawless capture engine</span>
-            <span>Studio exports</span>
-            <span>Brand blueprint inspector</span>
+          <div class="hero-proof">
+            <span>MV3 extension foundation</span>
+            <span>Responsive set capture</span>
+            <span>Auto-redaction</span>
+            <span>Brand Blueprint inspector</span>
           </div>
         </div>
 
         <div class="hero-stage" data-tilt data-reveal>
-          <div class="browser-frame">
-            <div class="frame-topbar">
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
-            <div class="frame-body">
-              <div class="frame-hero-band"></div>
-              <div class="frame-nav-strip"></div>
-              <div class="frame-grid">
-                <span></span>
-                <span></span>
-                <span></span>
-                <span></span>
-                <span></span>
-                <span></span>
-              </div>
-              <div class="frame-copy-lines">
-                <span></span>
-                <span></span>
-                <span></span>
-                <span></span>
-              </div>
-            </div>
-          </div>
+          <div class="hero-glow hero-glow-one"></div>
+          <div class="hero-glow hero-glow-two"></div>
 
-          <div class="phone-frame">
-            <div class="phone-notch"></div>
-            <div class="phone-screen">
-              <div class="phone-hero"></div>
-              <div class="phone-copy">
+          <div class="capture-board">
+            <article class="device-plane plane-desktop">
+              <div class="plane-bar">
                 <span></span>
                 <span></span>
                 <span></span>
               </div>
-            </div>
-          </div>
+              <div class="plane-shell">
+                <div class="screen-band"></div>
+                <div class="screen-copy">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <div class="screen-grid">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <div class="redaction-badge">Auto-redact</div>
+              </div>
+              <p class="plane-label">Desktop capture</p>
+            </article>
 
-          <div class="blueprint-sheet">
-            <p>Brand Blueprint</p>
-            <div class="blueprint-swatches">
-              <span></span>
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
-            <div class="blueprint-lines">
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
+            <article class="device-plane plane-tablet">
+              <div class="plane-shell">
+                <div class="screen-band"></div>
+                <div class="screen-copy">
+                  <span></span>
+                  <span></span>
+                </div>
+                <div class="screen-redact"></div>
+              </div>
+              <p class="plane-label">Tablet view</p>
+            </article>
+
+            <article class="device-plane plane-mobile">
+              <div class="mobile-notch"></div>
+              <div class="plane-shell">
+                <div class="screen-band"></div>
+                <div class="screen-copy">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              </div>
+              <p class="plane-label">Mobile view</p>
+            </article>
+
+            <article class="artifact-sheet sheet-blueprint">
+              <p class="artifact-title">Brand Blueprint</p>
+              <div class="swatch-row">
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+              <div class="artifact-lines">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </article>
+
+            <article class="artifact-sheet sheet-archive">
+              <p class="artifact-title">Archive</p>
+              <div class="archive-entry">
+                <strong>Pricing page</strong>
+                <span>Desktop · Tablet · Mobile</span>
+              </div>
+              <div class="archive-entry">
+                <strong>Landing page</strong>
+                <span>Browser export · 4 redactions</span>
+              </div>
+            </article>
           </div>
         </div>
       </section>
 
-      <section class="proof-band" data-reveal>
-        <p>The screenshot is the first act. The workflow is the product.</p>
+      <section class="statement-band" data-reveal>
+        <p>
+          The screenshot is not the product. The captured, cleaned, packaged, searchable,
+          shareable artifact is the product.
+        </p>
       </section>
 
-      <section class="pillar-section" id="product">
+      <section class="support-section" id="product">
         <div class="section-head" data-reveal>
-          <p class="kicker">Four systems</p>
-          <h2>One extension that already thinks beyond capture.</h2>
+          <p class="kicker">What ships now</p>
+          <h2>A serious capture foundation with enough truth behind the concept to present it.</h2>
         </div>
 
-        <article class="pillar-row" data-reveal>
-          <span class="pillar-index">01</span>
-          <div class="pillar-copy">
-            <h3>Flawless Capture Engine</h3>
-            <p>
-              Sticky cleanup, lazy-load preflight scrolling, retina-aware stitching, and
-              responsive capture modes set the foundation for trust. If the base artifact is
-              weak, everything built on top collapses.
-            </p>
-          </div>
-        </article>
+        <div class="support-grid">
+          <div class="support-copy" data-reveal>
+            <article class="support-row">
+              <span class="status-tag">Shipping</span>
+              <div>
+                <h3>Responsive set capture</h3>
+                <p>
+                  One action can now generate desktop, tablet, and mobile outputs from the
+                  same page and archive them as one coherent capture bundle.
+                </p>
+              </div>
+            </article>
 
-        <article class="pillar-row" data-reveal>
-          <span class="pillar-index">02</span>
-          <div class="pillar-copy">
-            <h3>Studio Layer</h3>
-            <p>
-              The right next step is not another save format. It is transformation: social
-              mockups, redaction, annotation, and packaging the capture into something that
-              is immediately useful.
-            </p>
-          </div>
-        </article>
+            <article class="support-row">
+              <span class="status-tag">Shipping</span>
+              <div>
+                <h3>Auto-redaction</h3>
+                <p>
+                  Lumen scans visible text and filled fields for emails, phone numbers, and
+                  token-like secrets, then sanitizes the exported image instead of leaving the
+                  problem to the user.
+                </p>
+              </div>
+            </article>
 
-        <article class="pillar-row" data-reveal>
-          <span class="pillar-index">03</span>
-          <div class="pillar-copy">
-            <h3>Archiver</h3>
-            <p>
-              A watched page becomes a stream of evidence. Competitor pricing, launch pages,
-              onboarding flows, and branded landing pages all become monitorable assets rather
-              than disposable screenshots.
-            </p>
+            <article class="support-row">
+              <span class="status-tag">Shipping</span>
+              <div>
+                <h3>Brand Blueprint inspector</h3>
+                <p>
+                  Color palette, typography, layout density, hero copy, CTA language, and
+                  navigation labels are extracted directly from the DOM and kept beside the
+                  capture.
+                </p>
+              </div>
+            </article>
           </div>
-        </article>
 
-        <article class="pillar-row" data-reveal>
-          <span class="pillar-index">04</span>
-          <div class="pillar-copy">
-            <h3>Inspector</h3>
-            <p>
-              Lumen now extracts a Brand Blueprint directly from the page: palette, fonts,
-              layout density, hero copy, CTA, and navigation language. That turns inspiration
-              into structured reference material.
-            </p>
+          <div class="support-visual" data-reveal>
+            <div class="support-panel support-panel-top">
+              <p class="support-label">Capture bundle</p>
+              <div class="bundle-rail">
+                <span>Desktop</span>
+                <span>Tablet</span>
+                <span>Mobile</span>
+              </div>
+              <div class="bundle-preview">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+
+            <div class="support-panel support-panel-bottom">
+              <p class="support-label">Inspector + archive</p>
+              <div class="support-metrics">
+                <div>
+                  <strong>6</strong>
+                  <span>palette colors</span>
+                </div>
+                <div>
+                  <strong>3</strong>
+                  <span>responsive views</span>
+                </div>
+                <div>
+                  <strong>4</strong>
+                  <span>redactions</span>
+                </div>
+              </div>
+            </div>
           </div>
-        </article>
+        </div>
       </section>
 
       <section class="workflow-section" id="workflow">
-        <div class="workflow-copy">
-          <div class="section-head" data-reveal>
-            <p class="kicker">Workflow</p>
-            <h2>From page to artifact to action.</h2>
-          </div>
+        <div class="workflow-sticky" data-reveal>
+          <div class="workflow-visual" data-active-step="capture">
+            <div class="workflow-monitor">
+              <div class="monitor-head">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
 
-          <div class="workflow-steps">
-            <article class="workflow-step is-active" data-step="capture" data-reveal>
-              <span>Capture</span>
-              <h3>Clean the page before it is stitched.</h3>
-              <p>
-                Lumen removes floating interference, wakes deferred content, and captures the
-                page in slices that hold up on retina displays.
-              </p>
-            </article>
-
-            <article class="workflow-step" data-step="inspect" data-reveal>
-              <span>Inspect</span>
-              <h3>Extract the page system, not just the bitmap.</h3>
-              <p>
-                Palette, typography, layout density, headline shape, navigation labels, and
-                CTA language are promoted into a reusable blueprint.
-              </p>
-            </article>
-
-            <article class="workflow-step" data-step="studio" data-reveal>
-              <span>Studio</span>
-              <h3>Turn evidence into a presentable asset.</h3>
-              <p>
-                The next layer packages the capture into browser frames, mobile mockups,
-                annotated explainers, and redacted client-safe exports.
-              </p>
-            </article>
-
-            <article class="workflow-step" data-step="archive" data-reveal>
-              <span>Archive</span>
-              <h3>Keep a timeline, not a folder of dead PNGs.</h3>
-              <p>
-                Sync, scheduled watchlists, and visual diffing move Lumen toward the real
-                SaaS product: a system of monitored web surfaces.
-              </p>
-            </article>
+              <div class="workflow-layer layer-capture">
+                <p>Clean capture</p>
+              </div>
+              <div class="workflow-layer layer-responsive">
+                <p>Desktop / Tablet / Mobile</p>
+              </div>
+              <div class="workflow-layer layer-redact">
+                <p>Sensitive fields sanitized</p>
+              </div>
+              <div class="workflow-layer layer-inspect">
+                <p>Brand Blueprint extracted</p>
+              </div>
+              <div class="workflow-layer layer-archive">
+                <p>Archived for reuse and watchlists</p>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="workflow-visual" data-active-step="capture">
-          <div class="workflow-screen">
-            <div class="workflow-stage stage-capture"></div>
-            <div class="workflow-stage stage-inspect"></div>
-            <div class="workflow-stage stage-studio"></div>
-            <div class="workflow-stage stage-archive"></div>
+        <div class="workflow-rail">
+          <div class="section-head" data-reveal>
+            <p class="kicker">Workflow</p>
+            <h2>From messy webpage to ready-to-use evidence.</h2>
           </div>
+
+          <article class="workflow-step is-active" data-step="capture" data-reveal>
+            <span>Capture</span>
+            <h3>Remove the page noise before the first pixel is saved.</h3>
+            <p>
+              Sticky layers, floating widgets, lazy-loaded media, and nested scroll surfaces
+              are handled as part of capture, not as cleanup after the fact.
+            </p>
+          </article>
+
+          <article class="workflow-step" data-step="responsive" data-reveal>
+            <span>Responsive Snap</span>
+            <h3>Generate the layout set, not just one lucky viewport.</h3>
+            <p>
+              Lumen can produce a presentable desktop, tablet, and mobile bundle from one
+              page so reviews do not depend on whoever happened to be on the right screen
+              size.
+            </p>
+          </article>
+
+          <article class="workflow-step" data-step="redact" data-reveal>
+            <span>Redact</span>
+            <h3>Protect the export before it leaves the browser.</h3>
+            <p>
+              Emails, phone numbers, token-like secrets, and sensitive filled fields can be
+              sanitized directly in the export pipeline so the artifact is safer by default.
+            </p>
+          </article>
+
+          <article class="workflow-step" data-step="inspect" data-reveal>
+            <span>Inspect</span>
+            <h3>Extract the page system alongside the bitmap.</h3>
+            <p>
+              The capture is packaged with palette, typography, layout density, hero line,
+              CTA language, and navigation signals so inspiration becomes structured reference.
+            </p>
+          </article>
+
+          <article class="workflow-step" data-step="archive" data-reveal>
+            <span>Archive</span>
+            <h3>Keep a timeline of useful artifacts instead of dead PNGs.</h3>
+            <p>
+              The local-first backend slice already stores capture history. That creates a
+              direct path into sync, scheduled watchlists, and visual diffing.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="mechanics-section" id="mechanics">
+        <div class="section-head" data-reveal>
+          <p class="kicker">Mechanics</p>
+          <h2>The details that make the demo honest.</h2>
+        </div>
+
+        <div class="mechanics-grid">
+          <article class="mechanic-row" data-reveal>
+            <strong>DOM cleanup</strong>
+            <p>Fixed, sticky, and high-z layers are hidden before the stitched pass and restored afterward.</p>
+          </article>
+
+          <article class="mechanic-row" data-reveal>
+            <strong>Lazy-load preflight</strong>
+            <p>The page is force-scrolled before capture so deferred media is present when the slices are taken.</p>
+          </article>
+
+          <article class="mechanic-row" data-reveal>
+            <strong>Nested scroll support</strong>
+            <p>Lumen detects custom scroll containers and captures against the active scroll root instead of assuming the whole document.</p>
+          </article>
+
+          <article class="mechanic-row" data-reveal>
+            <strong>Retina stitcher with tile fallback</strong>
+            <p>Offscreen compositing respects device pixel ratio and falls back to tiled raw exports on very tall pages.</p>
+          </article>
+
+          <article class="mechanic-row" data-reveal>
+            <strong>Responsive capture bundle</strong>
+            <p>Desktop, tablet, and mobile viewports can now be generated in one run and archived together.</p>
+          </article>
+
+          <article class="mechanic-row" data-reveal>
+            <strong>Local-first backend slice</strong>
+            <p>Demo session state and capture history already exist, which means the road to a real SaaS product is implementation, not invention.</p>
+          </article>
         </div>
       </section>
 
       <section class="audience-section">
         <div class="section-head" data-reveal>
           <p class="kicker">Who pays</p>
-          <h2>The value is strongest where capture is tied to a downstream decision.</h2>
+          <h2>This is strongest wherever capture feeds a real decision.</h2>
         </div>
 
-        <div class="audience-rows">
+        <div class="audience-list">
           <article class="audience-row" data-reveal>
-            <h3>Design teams and agencies</h3>
-            <p>
-              They need clean references, mood boards, and structured brand cues. Blueprint
-              extraction and studio exports make the screenshot usable immediately.
-            </p>
-          </article>
-
-          <article class="audience-row" data-reveal>
-            <h3>Marketers and copywriters</h3>
-            <p>
-              They build swipe files and campaign archives. Clean capture plus sync and watch
-              automation becomes a repeatable research system.
-            </p>
-          </article>
-
-          <article class="audience-row" data-reveal>
-            <h3>Founders and product operators</h3>
-            <p>
-              They care about changes in competitor positioning and pricing. The monitor
-              product is the premium tier, not the screenshot itself.
-            </p>
+            <h3>Design teams</h3>
+            <p>They need clean references, responsive comparisons, and structured brand cues for mood boards and audits.</p>
           </article>
 
           <article class="audience-row" data-reveal>
             <h3>QA and developers</h3>
-            <p>
-              They need fast evidence, redaction, and issue-ready exports. Lumen is strongest
-              when it shortens the path from bug report to action.
-            </p>
+            <p>They need issue-ready exports, responsive evidence, and safer screenshots when environments include real user data.</p>
+          </article>
+
+          <article class="audience-row" data-reveal>
+            <h3>Marketers and copywriters</h3>
+            <p>They need swipe files and campaign archives that are easier to search, sort, and present than raw image folders.</p>
+          </article>
+
+          <article class="audience-row" data-reveal>
+            <h3>Founders and product operators</h3>
+            <p>They care about what changed, what a competitor shipped, and how positioning evolved across real pages.</p>
           </article>
         </div>
       </section>
@@ -282,70 +417,72 @@
       <section class="pricing-section" id="pricing">
         <div class="section-head" data-reveal>
           <p class="kicker">Pricing shape</p>
-          <h2>Three tiers, each justified by a different job.</h2>
+          <h2>Charge for the workflow, not the screenshot.</h2>
         </div>
 
-        <div class="pricing-rail">
+        <div class="pricing-list">
           <article class="pricing-row" data-reveal>
+            <p class="pricing-label">Free</p>
             <div>
-              <p class="pricing-label">Free</p>
               <h3>Capture engine</h3>
+              <p>Full-page stitching, cleanup, responsive set capture, and archive basics that make the extension useful enough to spread.</p>
             </div>
-            <p class="pricing-price">$0</p>
-            <p class="pricing-copy">
-              Unlimited full-page capture, cleanup toggles, and core stitching. Enough to win
-              distribution and store ranking.
-            </p>
+            <strong class="pricing-price">$0</strong>
           </article>
 
           <article class="pricing-row" data-reveal>
+            <p class="pricing-label">Pro</p>
             <div>
-              <p class="pricing-label">Pro</p>
               <h3>Studio workflow</h3>
+              <p>Mockup exports, annotations, advanced redaction, sync, and the polished outputs people actually present to clients and teams.</p>
             </div>
-            <p class="pricing-price">$4.99/mo</p>
-            <p class="pricing-copy">
-              Beautify exports, annotations, redaction, sync, and unlimited workflow polish.
-              This is the prosumer conversion layer.
-            </p>
+            <strong class="pricing-price">$4.99/mo</strong>
           </article>
 
           <article class="pricing-row" data-reveal>
+            <p class="pricing-label">Monitor</p>
             <div>
-              <p class="pricing-label">Monitor</p>
               <h3>Competitive watch</h3>
+              <p>Scheduled capture, visual diffing, alerts, and team archives for organizations that need vigilance rather than screenshots.</p>
             </div>
-            <p class="pricing-price">$29–99/mo</p>
-            <p class="pricing-copy">
-              Scheduled capture, visual diffing, alerts, and team archives. This is the
-              highest-value product because it automates vigilance.
-            </p>
+            <strong class="pricing-price">$29–99/mo</strong>
           </article>
         </div>
       </section>
 
       <section class="cta-section" data-reveal>
         <p class="kicker">Current state</p>
-        <h2>The foundation is real. The workflow layer is the next frontier.</h2>
+        <h2>The foundation is strong enough to present. The next work is product deepening, not wishful thinking.</h2>
         <p>
-          The public repo now contains the extension foundation, the Brand Blueprint inspector,
-          and this GitHub Pages-ready site. The next serious push should be studio exports,
-          nested scroll-container support, and the first SaaS backend slice.
+          Lumen already has a credible capture engine, responsive set output, auto-redaction,
+          a Brand Blueprint inspector, capture history, and a real public repo. The next
+          serious layer is annotations, sync, billing, and watch automation.
         </p>
-        <a
-          class="primary-link"
-          href="https://github.com/CaptainFredric/lumen-extension"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Explore the code on GitHub
-        </a>
+
+        <div class="cta-actions">
+          <a
+            class="primary-link"
+            href="https://github.com/CaptainFredric/lumen-extension"
+            target="_blank"
+            rel="noreferrer"
+          >
+            View the code
+          </a>
+          <a
+            class="secondary-link"
+            href="https://github.com/CaptainFredric"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Follow Dan DeBugger
+          </a>
+        </div>
       </section>
     </main>
 
     <footer class="site-footer">
       <p>Lumen</p>
-      <span>Browser capture for designers, marketers, and product teams.</span>
+      <span>Browser capture for design, QA, product, and marketing work.</span>
     </footer>
 
     <script src="script.js"></script>
