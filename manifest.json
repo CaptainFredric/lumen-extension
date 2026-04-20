@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Lumen",
+  "version": "0.1.0",
+  "description": "A premium web capture and workflow foundation for clean full-page screenshots, studio polish, and future SaaS sync.",
+  "minimum_chrome_version": "109",
+  "permissions": [
+    "activeTab",
+    "downloads",
+    "offscreen",
+    "scripting",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Lumen",
+    "default_popup": "popup.html"
+  }
+}

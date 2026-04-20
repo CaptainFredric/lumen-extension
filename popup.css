@@ -1,0 +1,454 @@
+:root {
+  color-scheme: dark;
+  font-family: "SF Pro Display", "Segoe UI Variable Display", "IBM Plex Sans", sans-serif;
+  --bg: #070b14;
+  --surface: rgba(13, 18, 30, 0.76);
+  --surface-strong: rgba(18, 24, 40, 0.94);
+  --surface-border: rgba(255, 255, 255, 0.1);
+  --text-primary: #f3f6ff;
+  --text-secondary: rgba(235, 241, 255, 0.72);
+  --text-tertiary: rgba(235, 241, 255, 0.48);
+  --accent: #7dd3fc;
+  --accent-strong: #40b7ff;
+  --accent-soft: rgba(125, 211, 252, 0.16);
+  --danger: #ff8d8d;
+  --success: #7af0bc;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.42);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 400px;
+  min-height: 640px;
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(64, 183, 255, 0.16), transparent 36%),
+    radial-gradient(circle at bottom right, rgba(22, 163, 74, 0.1), transparent 38%),
+    linear-gradient(180deg, #060912 0%, #05070d 100%);
+  color: var(--text-primary);
+}
+
+body {
+  position: relative;
+  overflow: hidden;
+}
+
+.shell {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  min-height: 100%;
+  padding: 18px;
+}
+
+.ambient {
+  position: absolute;
+  inset: auto;
+  border-radius: 999px;
+  filter: blur(56px);
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.ambient-one {
+  top: -40px;
+  right: -70px;
+  width: 180px;
+  height: 180px;
+  background: rgba(64, 183, 255, 0.22);
+}
+
+.ambient-two {
+  left: -40px;
+  bottom: 70px;
+  width: 150px;
+  height: 150px;
+  background: rgba(80, 200, 120, 0.18);
+}
+
+.hero,
+.panel {
+  position: relative;
+  border: 1px solid var(--surface-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 32%), var(--surface);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.hero {
+  padding: 18px 18px 16px;
+  border-radius: 22px;
+}
+
+.panel {
+  padding: 16px;
+  border-radius: 20px;
+}
+
+.brand-row,
+.panel-head,
+.toggle-row,
+.device-block,
+.feature-row,
+.auth-actions {
+  display: flex;
+  align-items: center;
+}
+
+.brand-row,
+.panel-head {
+  justify-content: space-between;
+}
+
+.brand-row {
+  gap: 12px;
+}
+
+.brand-copy {
+  flex: 1;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(125, 211, 252, 0.42), rgba(64, 183, 255, 0.12));
+  border: 1px solid rgba(125, 211, 252, 0.32);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.eyebrow,
+.sub-eyebrow,
+.section-label,
+.tiny-note,
+.pill,
+.status-badge {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.66rem;
+}
+
+.eyebrow,
+.section-label {
+  color: var(--accent);
+}
+
+.sub-eyebrow,
+.tiny-note,
+.status-badge {
+  color: var(--text-tertiary);
+}
+
+.pill,
+.tiny-note,
+.status-badge {
+  padding: 6px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  margin-top: 16px;
+  font-size: 1.6rem;
+  line-height: 1.06;
+  letter-spacing: -0.04em;
+}
+
+h2 {
+  font-size: 1rem;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+h3 {
+  font-size: 0.98rem;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.hero-copy,
+.status-detail,
+.auth-copy p,
+.toggle-row small,
+.device-copy small {
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.hero-copy {
+  margin-top: 10px;
+  max-width: 32ch;
+  font-size: 0.92rem;
+}
+
+.panel-head {
+  margin-bottom: 14px;
+}
+
+.panel-head.compact {
+  margin-bottom: 10px;
+}
+
+.controls-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.toggle-row {
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.toggle-row:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.toggle-row span:first-child,
+.device-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.toggle-row strong,
+.device-copy strong {
+  font-size: 0.9rem;
+}
+
+.toggle-row input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toggle-shell {
+  position: relative;
+  flex-shrink: 0;
+  width: 48px;
+  height: 28px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.toggle-knob {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffffff, #d4d9e4);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.26);
+  transition: transform 160ms ease;
+}
+
+.toggle-row input:checked + .toggle-shell {
+  background: rgba(64, 183, 255, 0.34);
+  border-color: rgba(125, 211, 252, 0.48);
+}
+
+.toggle-row input:checked + .toggle-shell .toggle-knob {
+  transform: translateX(20px);
+}
+
+.device-block {
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 6px;
+}
+
+.segmented-control {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.segment,
+.capture-button,
+.feature-chip,
+.secondary-button,
+.ghost-button {
+  border: 0;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition:
+    transform 140ms ease,
+    background 140ms ease,
+    border-color 140ms ease,
+    opacity 140ms ease;
+}
+
+.segment {
+  min-width: 86px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: transparent;
+  font-size: 0.82rem;
+}
+
+.segment.is-active {
+  background: linear-gradient(180deg, rgba(64, 183, 255, 0.26), rgba(64, 183, 255, 0.14));
+  border: 1px solid rgba(125, 211, 252, 0.22);
+}
+
+.capture-button {
+  margin-top: 8px;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(125, 211, 252, 0.92), rgba(64, 183, 255, 0.88));
+  color: #05101a;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  box-shadow: 0 16px 36px rgba(64, 183, 255, 0.24);
+}
+
+.capture-button:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.status-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.status-panel.is-hidden {
+  display: none;
+}
+
+.status-panel[data-tone="error"] .status-badge {
+  color: var(--danger);
+  border-color: rgba(255, 141, 141, 0.18);
+  background: rgba(255, 141, 141, 0.08);
+}
+
+.status-panel[data-tone="success"] .status-badge {
+  color: var(--success);
+  border-color: rgba(122, 240, 188, 0.18);
+  background: rgba(122, 240, 188, 0.08);
+}
+
+.progress-track {
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.progress-fill {
+  width: 4%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(125, 211, 252, 0.7), rgba(64, 183, 255, 1));
+  transition: width 180ms ease;
+}
+
+.studio-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.feature-row {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.feature-chip {
+  padding: 10px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.78rem;
+}
+
+.feature-chip.is-locked::after {
+  content: "Pro";
+  margin-left: 8px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--accent);
+  font-size: 0.63rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.auth-shell {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.auth-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.auth-actions {
+  gap: 10px;
+}
+
+.secondary-button,
+.ghost-button {
+  flex: 1;
+  min-height: 42px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 0.82rem;
+}
+
+.secondary-button {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.ghost-button {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+}
+
+.ghost-button:disabled {
+  opacity: 0.36;
+  cursor: not-allowed;
+}
+
+.segment:hover,
+.feature-chip:hover,
+.secondary-button:hover,
+.ghost-button:hover,
+.capture-button:hover {
+  transform: translateY(-1px);
+}

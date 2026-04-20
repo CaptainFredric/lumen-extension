@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lumen</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <div class="ambient ambient-one"></div>
+      <div class="ambient ambient-two"></div>
+
+      <header class="hero">
+        <div class="brand-row">
+          <div class="brand-mark">L</div>
+          <div class="brand-copy">
+            <p class="eyebrow">Lumen</p>
+            <p class="sub-eyebrow">Intelligent Web Canvas</p>
+          </div>
+          <span class="pill">MV3</span>
+        </div>
+
+        <h1>Capture pages cleanly, then route the workflow.</h1>
+        <p class="hero-copy">
+          Full-page stitching with sticky-header cleanup, lazy-load forcing, and a
+          Studio-ready foundation for Pro workflows.
+        </p>
+      </header>
+
+      <section class="panel controls-panel">
+        <div class="panel-head">
+          <div>
+            <p class="section-label">Capture Engine</p>
+            <h2>Full-page controls</h2>
+          </div>
+          <span class="tiny-note">Retina aware</span>
+        </div>
+
+        <label class="toggle-row">
+          <span>
+            <strong>Remove sticky headers</strong>
+            <small>Hides fixed, sticky, and high-layer UI before stitching.</small>
+          </span>
+          <input id="removeStickyHeaders" type="checkbox" />
+          <span class="toggle-shell"><span class="toggle-knob"></span></span>
+        </label>
+
+        <label class="toggle-row">
+          <span>
+            <strong>Force lazy load</strong>
+            <small>Runs a fast pre-flight scroll to wake images and embeds up.</small>
+          </span>
+          <input id="forceLazyLoad" type="checkbox" />
+          <span class="toggle-shell"><span class="toggle-knob"></span></span>
+        </label>
+
+        <div class="device-block">
+          <div class="device-copy">
+            <strong>Capture device</strong>
+            <small>Desktop uses the live tab. Mobile spins up a temporary narrow window.</small>
+          </div>
+          <div class="segmented-control" id="devicePreset">
+            <button type="button" class="segment is-active" data-device="desktop">Desktop</button>
+            <button type="button" class="segment" data-device="mobile">Mobile</button>
+          </div>
+        </div>
+
+        <button id="captureButton" class="capture-button" type="button">
+          Capture Full Page
+        </button>
+      </section>
+
+      <section id="statusPanel" class="panel status-panel is-hidden" aria-live="polite">
+        <div class="panel-head compact">
+          <div>
+            <p id="statusEyebrow" class="section-label">Status</p>
+            <h2 id="statusTitle">Ready</h2>
+          </div>
+          <span id="statusBadge" class="status-badge">Idle</span>
+        </div>
+
+        <p id="statusDetail" class="status-detail"></p>
+
+        <div class="progress-track">
+          <div id="progressFill" class="progress-fill"></div>
+        </div>
+      </section>
+
+      <section class="panel studio-panel">
+        <div class="panel-head">
+          <div>
+            <p class="section-label">Studio & SaaS</p>
+            <h2>Pro workflow shell</h2>
+          </div>
+          <span class="tiny-note">Mock auth</span>
+        </div>
+
+        <div class="feature-row">
+          <button class="feature-chip" data-pro-feature="beautify" type="button">
+            Beautify for socials
+          </button>
+          <button class="feature-chip" data-pro-feature="autoRedact" type="button">
+            Auto-redact
+          </button>
+          <button class="feature-chip" data-pro-feature="cloudSync" type="button">
+            Cloud sync
+          </button>
+        </div>
+
+        <div class="auth-shell">
+          <div class="auth-copy">
+            <p class="section-label">Account</p>
+            <h3>Sign in to unlock Pro features.</h3>
+            <p>
+              Keep this mock shell in the popup now, then wire it to your session and
+              billing APIs once the SaaS backend is live.
+            </p>
+          </div>
+
+          <div class="auth-actions">
+            <button id="signInButton" class="secondary-button" type="button">
+              Continue with Google
+            </button>
+            <button id="billingButton" class="ghost-button" type="button">
+              Billing portal
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
