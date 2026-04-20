@@ -8,8 +8,10 @@ import {
 const OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
 const OFFSCREEN_REASON = "BLOBS";
 const CAPTURE_PROGRESS_EVENT = "LUMEN_CAPTURE_PROGRESS";
+const BLUEPRINT_UPDATE_EVENT = "LUMEN_BLUEPRINT_UPDATED";
 
 let captureInFlight = false;
+let analyzeInFlight = false;
 let offscreenCreationPromise = null;
 
 chrome.runtime.onInstalled.addListener(async () => {
@@ -42,6 +44,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }))
       .finally(() => {
         captureInFlight = false;
+      });
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_ANALYZE_PAGE") {
+    if (captureInFlight || analyzeInFlight) {
+      sendResponse({
+        ok: false,
+        error: createFriendlyError(
+          "Lumen Is Busy",
+          "Wait for the current capture or analysis to finish before starting another pass."
+        )
+      });
+      return;
+    }
+
+    analyzeInFlight = true;
+
+    runBlueprintFlow()
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }))
+      .finally(() => {
+        analyzeInFlight = false;
       });
 
     return true;
@@ -95,6 +121,8 @@ async function runCaptureFlow(options = getDefaultSettings()) {
 
     const page = prepareResult.page;
     const sessionId = crypto.randomUUID();
+
+    await maybeExtractBlueprint(target.tab.id);
 
     await initializeStitchSession({
       sessionId,
@@ -159,6 +187,37 @@ async function runCaptureFlow(options = getDefaultSettings()) {
       await closeWindowSafely(target.windowId);
     }
   }
+}
+
+async function runBlueprintFlow() {
+  const sourceTab = await getCurrentTab();
+
+  if (!sourceTab?.id || !sourceTab.url) {
+    throw createFriendlyError(
+      "No Active Page",
+      "Open a normal browser tab, then run the page analysis again."
+    );
+  }
+
+  if (isRestrictedCaptureUrl(sourceTab.url)) {
+    throw createFriendlyError(
+      "This Page Cannot Be Inspected",
+      "Chrome blocks script injection on internal and protected pages."
+    );
+  }
+
+  broadcastProgress({
+    stage: "inspect",
+    title: "Reading brand blueprint",
+    detail: "Extracting color, typography, layout, and CTA signals from the active page."
+  });
+
+  await ensureContentScript(sourceTab.id);
+
+  const blueprint = await requestBrandBlueprint(sourceTab.id);
+  await persistLatestBlueprint(blueprint);
+
+  return { blueprint };
 }
 
 async function capturePageSegments(target, page, sessionId) {
@@ -283,6 +342,21 @@ async function ensureContentScript(tabId) {
   });
 }
 
+async function maybeExtractBlueprint(tabId) {
+  try {
+    broadcastProgress({
+      stage: "inspect",
+      title: "Extracting brand blueprint",
+      detail: "Reading colors, fonts, layout density, and hero signals while the page is prepared."
+    });
+
+    const blueprint = await requestBrandBlueprint(tabId);
+    await persistLatestBlueprint(blueprint);
+  } catch (error) {
+    console.debug("Lumen blueprint extraction skipped:", error);
+  }
+}
+
 async function restoreTabState(tabId) {
   try {
     await chrome.tabs.sendMessage(tabId, {
@@ -305,6 +379,29 @@ async function initializeStitchSession(payload) {
   if (!response?.ok) {
     throw new Error("Offscreen stitch session could not start.");
   }
+}
+
+async function requestBrandBlueprint(tabId) {
+  const response = await chrome.tabs.sendMessage(tabId, {
+    type: "LUMEN_EXTRACT_BLUEPRINT"
+  });
+
+  if (!response?.ok || !response.blueprint) {
+    throw new Error(response?.error || "Brand blueprint extraction failed.");
+  }
+
+  return response.blueprint;
+}
+
+async function persistLatestBlueprint(blueprint) {
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.latestBlueprint]: blueprint
+  });
+
+  chrome.runtime.sendMessage({
+    type: BLUEPRINT_UPDATE_EVENT,
+    payload: blueprint
+  }).catch(() => {});
 }
 
 async function appendCaptureSegment(payload) {

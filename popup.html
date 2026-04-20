@@ -21,11 +21,17 @@
           <span class="pill">MV3</span>
         </div>
 
-        <h1>Capture pages cleanly, then route the workflow.</h1>
+        <h1>Capture the page. Keep the work.</h1>
         <p class="hero-copy">
-          Full-page stitching with sticky-header cleanup, lazy-load forcing, and a
-          Studio-ready foundation for Pro workflows.
+          Full-page capture, page cleanup, and brand blueprint extraction in one control
+          surface.
         </p>
+
+        <div class="hero-ribbon">
+          <span>Sticky cleanup</span>
+          <span>Retina stitch</span>
+          <span>Brand blueprint</span>
+        </div>
       </header>
 
       <section class="panel controls-panel">
@@ -34,13 +40,13 @@
             <p class="section-label">Capture Engine</p>
             <h2>Full-page controls</h2>
           </div>
-          <span class="tiny-note">Retina aware</span>
+          <span class="tiny-note">Downloads to Lumen/</span>
         </div>
 
         <label class="toggle-row">
           <span>
             <strong>Remove sticky headers</strong>
-            <small>Hides fixed, sticky, and high-layer UI before stitching.</small>
+            <small>Hide fixed, sticky, and high-layer UI before each stitched pass.</small>
           </span>
           <input id="removeStickyHeaders" type="checkbox" />
           <span class="toggle-shell"><span class="toggle-knob"></span></span>
@@ -49,7 +55,7 @@
         <label class="toggle-row">
           <span>
             <strong>Force lazy load</strong>
-            <small>Runs a fast pre-flight scroll to wake images and embeds up.</small>
+            <small>Run a fast pre-flight scroll to wake images, embeds, and deferred media.</small>
           </span>
           <input id="forceLazyLoad" type="checkbox" />
           <span class="toggle-shell"><span class="toggle-knob"></span></span>
@@ -58,7 +64,7 @@
         <div class="device-block">
           <div class="device-copy">
             <strong>Capture device</strong>
-            <small>Desktop uses the live tab. Mobile spins up a temporary narrow window.</small>
+            <small>Desktop uses the active tab. Mobile spins up a temporary narrow window.</small>
           </div>
           <div class="segmented-control" id="devicePreset">
             <button type="button" class="segment is-active" data-device="desktop">Desktop</button>
@@ -66,9 +72,14 @@
           </div>
         </div>
 
-        <button id="captureButton" class="capture-button" type="button">
-          Capture Full Page
-        </button>
+        <div class="action-row">
+          <button id="captureButton" class="capture-button" type="button">
+            Capture Full Page
+          </button>
+          <button id="analyzeButton" class="secondary-action" type="button">
+            Analyze Page
+          </button>
+        </div>
       </section>
 
       <section id="statusPanel" class="panel status-panel is-hidden" aria-live="polite">
@@ -87,13 +98,93 @@
         </div>
       </section>
 
+      <section class="panel inspector-panel">
+        <div class="panel-head">
+          <div>
+            <p class="section-label">Inspector</p>
+            <h2>Latest Brand Blueprint</h2>
+          </div>
+          <span id="blueprintTimestamp" class="tiny-note">No analysis yet</span>
+        </div>
+
+        <div id="blueprintEmpty" class="empty-state">
+          Run analysis or capture a page. Lumen will extract the palette, fonts, layout,
+          headline, and CTA signals here.
+        </div>
+
+        <div id="blueprintContent" class="blueprint-shell is-hidden">
+          <div class="blueprint-summary">
+            <p id="blueprintHost" class="section-label">Host</p>
+            <h3 id="blueprintTitle">Untitled page</h3>
+            <p id="blueprintDescription" class="blueprint-copy"></p>
+          </div>
+
+          <div class="metric-grid">
+            <div class="metric-item">
+              <span>Sections</span>
+              <strong id="metricSections">0</strong>
+            </div>
+            <div class="metric-item">
+              <span>Headings</span>
+              <strong id="metricHeadings">0</strong>
+            </div>
+            <div class="metric-item">
+              <span>Buttons</span>
+              <strong id="metricButtons">0</strong>
+            </div>
+            <div class="metric-item">
+              <span>Forms</span>
+              <strong id="metricForms">0</strong>
+            </div>
+            <div class="metric-item">
+              <span>Visuals</span>
+              <strong id="metricVisuals">0</strong>
+            </div>
+            <div class="metric-item">
+              <span>Words</span>
+              <strong id="metricWords">0</strong>
+            </div>
+          </div>
+
+          <div class="signal-grid">
+            <div class="signal-block">
+              <p class="field-label">Site type</p>
+              <p id="blueprintSiteType" class="signal-copy">Unknown</p>
+            </div>
+            <div class="signal-block">
+              <p class="field-label">Hero line</p>
+              <p id="blueprintHeadline" class="signal-copy">No hero headline detected.</p>
+            </div>
+            <div class="signal-block">
+              <p class="field-label">Primary CTA</p>
+              <p id="blueprintCta" class="signal-copy">No primary CTA detected.</p>
+            </div>
+          </div>
+
+          <div class="signal-block">
+            <p class="field-label">Navigation</p>
+            <p id="blueprintNav" class="signal-copy">No visible navigation labels detected.</p>
+          </div>
+
+          <div>
+            <p class="field-label">Palette</p>
+            <div id="colorStrip" class="color-strip"></div>
+          </div>
+
+          <div>
+            <p class="field-label">Typography</p>
+            <div id="fontStrip" class="font-strip"></div>
+          </div>
+        </div>
+      </section>
+
       <section class="panel studio-panel">
         <div class="panel-head">
           <div>
             <p class="section-label">Studio & SaaS</p>
             <h2>Pro workflow shell</h2>
           </div>
-          <span class="tiny-note">Mock auth</span>
+          <span class="tiny-note">Auth mocked</span>
         </div>
 
         <div class="feature-row">
@@ -111,10 +202,10 @@
         <div class="auth-shell">
           <div class="auth-copy">
             <p class="section-label">Account</p>
-            <h3>Sign in to unlock Pro features.</h3>
+            <h3>Sign in to unlock the workflow layer.</h3>
             <p>
-              Keep this mock shell in the popup now, then wire it to your session and
-              billing APIs once the SaaS backend is live.
+              Replace this shell with your real session bootstrap, billing state, and
+              destination sync controls.
             </p>
           </div>
 

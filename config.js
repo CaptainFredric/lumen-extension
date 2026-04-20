@@ -34,7 +34,8 @@ export const LUMEN_CONFIG = {
 };
 
 export const STORAGE_KEYS = {
-  settings: "lumen.capture.settings"
+  settings: "lumen.capture.settings",
+  latestBlueprint: "lumen.inspector.latestBlueprint"
 };
 
 export function isRestrictedCaptureUrl(url = "") {
