@@ -87,7 +87,7 @@
     <main>
       <section class="hero" id="top">
         <div class="hero-copy" data-reveal>
-          <p class="kicker">Current prototype</p>
+          <p class="kicker">Implemented now</p>
           <p class="maker-line">
             Built publicly by
             <a href="https://github.com/CaptainFredric" target="_blank" rel="noreferrer">
@@ -124,149 +124,108 @@
         <div class="hero-stage" data-tilt data-reveal>
           <div class="evidence-board">
             <div class="evidence-head">
-              <p class="support-label">Representative prototype output</p>
-              <span class="evidence-domain">landing-page-audit.com</span>
+              <p class="support-label">Current output</p>
+              <span class="evidence-domain">proof.lumen.test</span>
             </div>
 
-            <div class="evidence-grid">
-              <article class="evidence-card evidence-card-capture">
-                <div class="card-head">
+            <div class="evidence-layout">
+              <figure class="artifact-surface artifact-surface-primary">
+                <img
+                  class="artifact-image"
+                  src="assets/proof-run-desktop.png"
+                  alt="Real cleaned desktop capture from the current Lumen proof run."
+                />
+                <figcaption class="artifact-caption">
                   <div>
-                    <p class="artifact-title">Capture bundle</p>
-                    <h3>Three responsive exports from one page</h3>
+                    <p class="artifact-title">Cleaned capture</p>
+                    <h3>Desktop export after page cleanup</h3>
                   </div>
-                  <span class="evidence-badge">3 views</span>
+                  <span class="evidence-badge">3 layers hidden</span>
+                </figcaption>
+                <div class="artifact-thumb-row">
+                  <figure class="artifact-thumb">
+                    <img
+                      class="artifact-thumb-image"
+                      src="assets/proof-run-tablet.png"
+                      alt="Real tablet export from the current Lumen proof run."
+                    />
+                    <figcaption>Tablet export</figcaption>
+                  </figure>
+                  <figure class="artifact-thumb">
+                    <img
+                      class="artifact-thumb-image"
+                      src="assets/proof-run-mobile.png"
+                      alt="Real mobile export from the current Lumen proof run."
+                    />
+                    <figcaption>Mobile export</figcaption>
+                  </figure>
                 </div>
+              </figure>
 
-                <div class="preview-stack">
-                  <div class="preview-frame preview-frame-desktop">
-                    <div class="preview-chrome">
-                      <span></span>
-                      <span></span>
-                      <span></span>
+              <div class="artifact-column">
+                <figure class="artifact-surface artifact-surface-compact">
+                  <img
+                    class="artifact-image artifact-image-redacted"
+                    src="assets/proof-run-redacted.png"
+                    alt="Real redaction example from the current Lumen proof run."
+                  />
+                  <figcaption class="artifact-copy">
+                    <div class="card-head">
+                      <div>
+                        <p class="artifact-title">Redaction example</p>
+                        <h3>Visible text and filled inputs blurred</h3>
+                      </div>
+                      <span class="evidence-badge">4 found</span>
                     </div>
-                    <div class="preview-screen">
-                      <div class="preview-band"></div>
-                      <div class="preview-lines">
-                        <span></span>
-                        <span></span>
-                        <span></span>
+                    <p class="card-note">
+                      Current redaction covers visible text and filled inputs during export and
+                      should be reviewed before external sharing.
+                    </p>
+                  </figcaption>
+                </figure>
+
+                <figure class="artifact-surface artifact-surface-compact">
+                  <img
+                    class="artifact-image"
+                    src="assets/proof-run-signals.png"
+                    alt="Extracted signals panel rendered from the current Lumen proof run."
+                  />
+                  <figcaption class="artifact-copy">
+                    <div class="card-head">
+                      <div>
+                        <p class="artifact-title">Signals panel</p>
+                        <h3>Extracted from the proof page</h3>
                       </div>
-                      <div class="preview-grid">
-                        <span></span>
-                        <span></span>
-                      </div>
+                      <span class="evidence-badge">JSON</span>
                     </div>
-                    <div class="preview-meta">
-                      <strong>Desktop</strong>
-                      <span>full page · stitched</span>
+                    <p class="card-note">
+                      Headline, CTA, palette, and typography come from the prototype extraction
+                      pass, not a hand-written mock.
+                    </p>
+                  </figcaption>
+                </figure>
+
+                <figure class="artifact-surface artifact-surface-compact">
+                  <img
+                    class="artifact-image artifact-image-history"
+                    src="assets/proof-run-history.png"
+                    alt="Local history item rendered from the current Lumen proof run."
+                  />
+                  <figcaption class="artifact-copy">
+                    <div class="card-head">
+                      <div>
+                        <p class="artifact-title">Local history item</p>
+                        <h3>Written after the run</h3>
+                      </div>
+                      <span class="evidence-badge">3 files</span>
                     </div>
-                  </div>
-
-                  <div class="preview-row">
-                    <div class="preview-frame preview-frame-tablet">
-                      <div class="preview-screen preview-screen-simple">
-                        <div class="preview-band"></div>
-                        <div class="preview-lines">
-                          <span></span>
-                          <span></span>
-                        </div>
-                      </div>
-                      <div class="preview-meta">
-                        <strong>Tablet</strong>
-                        <span>responsive export</span>
-                      </div>
-                    </div>
-
-                    <div class="preview-frame preview-frame-mobile">
-                      <div class="mobile-notch"></div>
-                      <div class="preview-screen preview-screen-simple">
-                        <div class="preview-band"></div>
-                        <div class="preview-lines">
-                          <span></span>
-                          <span></span>
-                        </div>
-                      </div>
-                      <div class="preview-meta">
-                        <strong>Mobile</strong>
-                        <span>responsive export</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <ul class="evidence-list">
-                  <li>Full page capture with device-pixel-ratio aware stitching</li>
-                  <li>Single run output grouped into one capture set</li>
-                  <li>File history stored locally with bundle metadata</li>
-                </ul>
-              </article>
-
-              <article class="evidence-card">
-                <div class="card-head">
-                  <div>
-                    <p class="artifact-title">Page cleanup</p>
-                    <h3>Remove the capture noise first</h3>
-                  </div>
-                  <span class="evidence-badge">4 hidden</span>
-                </div>
-                <ul class="evidence-list evidence-list-compact">
-                  <li>Sticky header hidden during scroll capture</li>
-                  <li>Cookie banner suppressed</li>
-                  <li>Chat widget suppressed</li>
-                  <li>Lazy media forced before capture</li>
-                </ul>
-              </article>
-
-              <article class="evidence-card">
-                <div class="card-head">
-                  <div>
-                    <p class="artifact-title">Export safety</p>
-                    <h3>Redact before the file leaves the browser</h3>
-                  </div>
-                  <span class="evidence-badge">4 blurred</span>
-                </div>
-                <div class="redaction-strip">
-                  <span>Email</span>
-                  <span>Phone</span>
-                  <span>Token</span>
-                  <span>Filled field</span>
-                </div>
-                <p class="card-note">
-                  The current build scans visible text and inputs, then applies blur regions in the
-                  export pipeline.
-                </p>
-              </article>
-
-              <article class="evidence-card">
-                <div class="card-head">
-                  <div>
-                    <p class="artifact-title">Page signals</p>
-                    <h3>Keep the useful context beside the image</h3>
-                  </div>
-                  <span class="evidence-badge">4 extracted</span>
-                </div>
-                <div class="swatch-row">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-                <dl class="signal-list">
-                  <div>
-                    <dt>Fonts</dt>
-                    <dd>Space Grotesk, Instrument Serif</dd>
-                  </div>
-                  <div>
-                    <dt>CTA</dt>
-                    <dd>Request access</dd>
-                  </div>
-                  <div>
-                    <dt>Nav</dt>
-                    <dd>Product, Workflow, Scope</dd>
-                  </div>
-                </dl>
-              </article>
+                    <p class="card-note">
+                      The current history entry tracks host, timestamp, views, files, redactions,
+                      and site type.
+                    </p>
+                  </figcaption>
+                </figure>
+              </div>
             </div>
           </div>
         </div>
@@ -279,20 +238,53 @@
         </p>
       </section>
 
+      <section class="proof-block" data-reveal>
+        <div class="section-head">
+          <p class="kicker">Implemented now</p>
+          <h2>One local run creates a concrete bundle.</h2>
+        </div>
+
+        <div class="proof-block-grid">
+          <div class="proof-block-copy">
+            <p class="proof-label">Artifact structure</p>
+            <ul class="proof-list">
+              <li>3 image exports: <code>proof-run-desktop.png</code>, <code>proof-run-tablet.png</code>, <code>proof-run-mobile.png</code></li>
+              <li>1 signals JSON: <code>proof-run-signals.json</code></li>
+              <li>4 redactions found in the sensitive-data example</li>
+              <li>1 local history item created for <code>Orbit Release Manager</code></li>
+            </ul>
+          </div>
+
+          <div class="proof-block-panel">
+            <p class="proof-label">Last local run</p>
+            <div class="proof-file-list">
+              <span>proof-run-desktop.png</span>
+              <span>proof-run-tablet.png</span>
+              <span>proof-run-mobile.png</span>
+              <span>proof-run-signals.json</span>
+            </div>
+            <p class="proof-inline-note">
+              Generated from the current prototype using the content-script cleanup, redaction scan,
+              and signal extraction logic.
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section class="support-section" id="product">
         <div class="section-head" data-reveal>
-          <p class="kicker">What works today</p>
-          <h2>The current build proves a narrow workflow with clear value.</h2>
+          <p class="kicker">Implemented now</p>
+          <h2>What the prototype does today.</h2>
           <p class="section-body">
-            The wedge is straightforward: capture cleaner evidence, keep responsive context, and
-            reduce the cleanup work that usually happens after the screenshot.
+            The current prototype already handles page cleanup, responsive capture, export
+            redaction, and page-signal extraction for review work.
           </p>
         </div>
 
         <div class="support-grid">
           <div class="support-copy" data-reveal>
             <article class="support-row">
-              <span class="status-tag">Shipping</span>
+              <span class="status-tag">Implemented</span>
               <div>
                 <h3>Clean the page before capture</h3>
                 <p>
@@ -303,7 +295,7 @@
             </article>
 
             <article class="support-row">
-              <span class="status-tag">Shipping</span>
+              <span class="status-tag">Implemented</span>
               <div>
                 <h3>Capture the responsive set</h3>
                 <p>
@@ -314,18 +306,19 @@
             </article>
 
             <article class="support-row">
-              <span class="status-tag">Shipping</span>
+              <span class="status-tag">Implemented</span>
               <div>
                 <h3>Sanitize the export</h3>
                 <p>
                   Emails, phone numbers, token-like strings, and filled fields can be blurred as
-                  part of export, which makes issue sharing safer.
+                  part of export. Current redaction covers visible text and filled inputs during
+                  export and should be reviewed before external sharing.
                 </p>
               </div>
             </article>
 
             <article class="support-row">
-              <span class="status-tag">Shipping</span>
+              <span class="status-tag">Implemented</span>
               <div>
                 <h3>Keep useful page signals</h3>
                 <p>
@@ -338,29 +331,29 @@
 
           <div class="support-visual" data-reveal>
             <div class="support-panel support-panel-top">
-              <p class="support-label">Bundle contents</p>
+              <p class="support-label">Last local run</p>
               <div class="file-list">
                 <div>
-                  <strong>homepage.desktop.png</strong>
+                  <strong>proof-run-desktop.png</strong>
                   <span>full-page desktop export</span>
                 </div>
                 <div>
-                  <strong>homepage.tablet.png</strong>
+                  <strong>proof-run-tablet.png</strong>
                   <span>responsive tablet export</span>
                 </div>
                 <div>
-                  <strong>homepage.mobile.png</strong>
+                  <strong>proof-run-mobile.png</strong>
                   <span>responsive mobile export</span>
                 </div>
                 <div>
-                  <strong>homepage.signals.json</strong>
+                  <strong>proof-run-signals.json</strong>
                   <span>palette, fonts, CTA, nav</span>
                 </div>
               </div>
             </div>
 
             <div class="support-panel support-panel-bottom">
-              <p class="support-label">Bundle summary</p>
+              <p class="support-label">Run summary</p>
               <div class="support-metrics">
                 <div>
                   <strong>3</strong>
@@ -471,8 +464,8 @@
             <span>Sanitize</span>
             <h3>Protect the export before it is passed around.</h3>
             <p>
-              Sensitive visible text and filled fields can be blurred in the export pipeline so
-              screenshots are safer to share with engineering, product, or clients.
+              Sensitive visible text and filled fields can be blurred in the export pipeline.
+              Current redaction should be reviewed before external sharing.
             </p>
           </article>
 
@@ -595,8 +588,9 @@
           <p class="kicker">Current scope</p>
           <h2>Separate present proof from later product layers.</h2>
           <p class="section-body">
-            The current prototype already supports a credible capture wedge. The next paid layer is
-            most likely studio output and team handoff, not a broad monitoring suite.
+            The current prototype already supports the capture workflow described on this page. The
+            next paid layer is most likely studio output and team handoff, not a broad monitoring
+            suite.
           </p>
         </div>
 
@@ -627,10 +621,10 @@
       </section>
 
       <section class="cta-section" data-reveal>
-        <p class="kicker">Review the build</p>
-        <h2>Lumen is early, but the capture wedge is real.</h2>
+        <p class="kicker">Implemented now</p>
+        <h2>Lumen is early. The prototype already handles cleanup, capture, redaction, signals, and local history.</h2>
         <p>
-          The repository already proves page cleanup, responsive capture bundles, export redaction,
+          The repository already covers page cleanup, responsive capture bundles, export redaction,
           page-signal extraction, and local history. The next work is annotation, sync, auth, and
           billing.
         </p>

@@ -5,6 +5,10 @@
   "type": "module",
   "scripts": {
     "check": "node --check background.js && node --check content.js && node --check popup.js && node --check offscreen.js && node --check docs/script.js && node --check backend/server.mjs",
-    "api": "node backend/server.mjs"
+    "api": "node backend/server.mjs",
+    "proof:assets": "node scripts/generate-proof-artifacts.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.59.1"
   }
 }

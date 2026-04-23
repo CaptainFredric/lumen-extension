@@ -1,0 +1,99 @@
+{
+  "generatedAt": "2026-04-23T04:21:16.957Z",
+  "source": "Prototype proof page rendered with Lumen content-script cleanup, scan, and extraction logic.",
+  "files": [
+    "proof-run-desktop.png",
+    "proof-run-tablet.png",
+    "proof-run-mobile.png",
+    "proof-run-signals.json"
+  ],
+  "hiddenCount": 3,
+  "redactionCount": 4,
+  "blueprint": {
+    "generatedAt": "2026-04-23T04:21:10.692Z",
+    "page": {
+      "title": "Orbit Release Manager",
+      "url": "http://proof.lumen.test/",
+      "host": "proof.lumen.test",
+      "description": "Ship product updates with cleaner planning, calmer launches, and clearer status reviews.",
+      "scrollMode": "document",
+      "scrollContainer": "document"
+    },
+    "identity": {
+      "siteType": "Brochure site",
+      "heroHeadline": "Ship product updates without shipping chaos.",
+      "primaryCta": "Request access",
+      "navLabels": []
+    },
+    "colors": [
+      {
+        "hex": "#112233",
+        "weight": 188.1
+      },
+      {
+        "hex": "#ffffff",
+        "weight": 12.78
+      },
+      {
+        "hex": "#3377ff",
+        "weight": 11.5
+      },
+      {
+        "hex": "#111133",
+        "weight": 8
+      },
+      {
+        "hex": "#eeeeff",
+        "weight": 0.6
+      }
+    ],
+    "typography": {
+      "headingFont": "Instrument Serif",
+      "bodyFont": "Space Grotesk",
+      "families": [
+        {
+          "family": "Space Grotesk",
+          "weight": 228.37
+        },
+        {
+          "family": "Instrument Serif",
+          "weight": 43
+        }
+      ]
+    },
+    "layout": {
+      "sections": 2,
+      "headings": 4,
+      "buttons": 2,
+      "forms": 0,
+      "navs": 1,
+      "visuals": 0,
+      "words": 146,
+      "viewportWidth": 1280,
+      "viewportHeight": 920
+    },
+    "structure": [
+      {
+        "level": "h1",
+        "text": "Ship product updates without shipping chaos."
+      },
+      {
+        "level": "h2",
+        "text": "Daily release pulse"
+      },
+      {
+        "level": "h2",
+        "text": "Track the page, the message, and the release state together."
+      },
+      {
+        "level": "h3",
+        "text": "Review handoff details"
+      }
+    ]
+  },
+  "historyItem": {
+    "title": "Orbit Release Manager",
+    "exportPreset": "raw",
+    "metaLine": "proof.lumen.test · Apr 22, 11:21 PM · 3 views · 3 files · 4 redactions · Brochure site"
+  }
+}
