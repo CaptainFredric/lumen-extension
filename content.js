@@ -432,10 +432,28 @@
   }
 
   function getNavLabels() {
+    const visibleLabels = collectNavLabels(false);
+
+    if (visibleLabels.length) {
+      return visibleLabels;
+    }
+
+    return collectNavLabels(true);
+  }
+
+  function collectNavLabels(includePreparedHidden) {
     const labels = [];
 
     for (const node of document.querySelectorAll("nav a, header a")) {
-      if (!(node instanceof HTMLElement) || !isElementVisible(node)) {
+      if (!(node instanceof HTMLElement)) {
+        continue;
+      }
+
+      if (!includePreparedHidden && !isElementVisible(node)) {
+        continue;
+      }
+
+      if (includePreparedHidden && !canExtractPreparedHiddenLabel(node)) {
         continue;
       }
 
@@ -453,6 +471,25 @@
     }
 
     return labels;
+  }
+
+  function canExtractPreparedHiddenLabel(node) {
+    if (!(node instanceof HTMLElement)) {
+      return false;
+    }
+
+    if (node.closest("[hidden], [aria-hidden='true'], dialog, details:not([open])")) {
+      return false;
+    }
+
+    const preparedHiddenAncestor = node.closest("[data-lumen-hidden='true']");
+
+    if (preparedHiddenAncestor) {
+      return true;
+    }
+
+    const style = window.getComputedStyle(node);
+    return style.display !== "none" && style.visibility !== "hidden";
   }
 
   function findPrimaryCta() {

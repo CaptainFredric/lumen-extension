@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-23T04:21:10.692Z",
+  "generatedAt": "2026-04-23T04:37:48.042Z",
   "page": {
     "title": "Orbit Release Manager",
     "url": "http://proof.lumen.test/",
@@ -12,7 +12,12 @@
     "siteType": "Brochure site",
     "heroHeadline": "Ship product updates without shipping chaos.",
     "primaryCta": "Request access",
-    "navLabels": []
+    "navLabels": [
+      "Product",
+      "Workflow",
+      "Security",
+      "Contact"
+    ]
   },
   "colors": [
     {

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Lumen",
   "version": "0.2.0",
-  "description": "A premium web capture and workflow foundation for clean full-page screenshots, studio polish, and future SaaS sync.",
+  "description": "Clean browser capture for design review, QA, and product work. Removes page chrome, captures responsive sets, redacts sensitive data, and extracts page signals.",
   "minimum_chrome_version": "109",
   "permissions": [
     "activeTab",

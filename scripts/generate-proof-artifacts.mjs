@@ -16,6 +16,7 @@ const OUTPUT_FILES = {
   redacted: "proof-run-redacted.png",
   signalsPanel: "proof-run-signals.png",
   historyPanel: "proof-run-history.png",
+  socialCard: "proof-social-card.png",
   signalsJson: "proof-run-signals.json",
   summaryJson: "proof-run-summary.json"
 };
@@ -551,6 +552,7 @@ async function main() {
 
     const historyItem = buildHistoryItem(desktopRun);
     await renderHistoryPanel(browser, historyItem, path.join(assetDir, OUTPUT_FILES.historyPanel));
+    await renderSocialCard(browser, path.join(assetDir, OUTPUT_FILES.socialCard));
 
     const summary = {
       generatedAt: new Date().toISOString(),
@@ -563,6 +565,7 @@ async function main() {
       ],
       hiddenCount: desktopRun.prepareResult.page.hiddenCount,
       redactionCount: desktopRun.redactions.count,
+      navLabelCount: desktopRun.blueprint.identity?.navLabels?.length || 0,
       blueprint: desktopRun.blueprint,
       historyItem
     };
@@ -719,6 +722,10 @@ async function renderSignalsPanel(browser, blueprint, outputPath) {
         value: blueprint.identity?.primaryCta || "None"
       },
       {
+        label: "Navigation",
+        value: (blueprint.identity?.navLabels || []).join(" · ") || "None"
+      },
+      {
         label: "Layout",
         value: `${blueprint.layout?.sections || 0} sections · ${blueprint.layout?.headings || 0} headings`
       }
@@ -862,6 +869,195 @@ async function renderHistoryPanel(browser, historyItem, outputPath) {
   }
 }
 
+async function renderSocialCard(browser, outputPath) {
+  const page = await browser.newPage({
+    viewport: {
+      width: 1200,
+      height: 630
+    }
+  });
+
+  try {
+    const [desktopSrc, redactedSrc, signalsSrc] = await Promise.all([
+      toDataUri(path.join(assetDir, OUTPUT_FILES.desktop)),
+      toDataUri(path.join(assetDir, OUTPUT_FILES.redacted)),
+      toDataUri(path.join(assetDir, OUTPUT_FILES.signalsPanel))
+    ]);
+
+    await page.setContent(
+      `<!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8" />
+          <link rel="preconnect" href="https://fonts.googleapis.com" />
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+          <link
+            href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;700&display=swap"
+            rel="stylesheet"
+          />
+          <style>
+            body {
+              margin: 0;
+              font-family: "Space Grotesk", sans-serif;
+              background:
+                radial-gradient(circle at 14% 14%, rgba(137, 241, 209, 0.14), transparent 24%),
+                radial-gradient(circle at 84% 12%, rgba(119, 183, 255, 0.16), transparent 26%),
+                linear-gradient(180deg, #041019 0%, #07111c 100%);
+              color: #f5f8fc;
+            }
+            .frame {
+              width: 1200px;
+              height: 630px;
+              display: grid;
+              grid-template-columns: 430px 1fr;
+              gap: 28px;
+              padding: 34px 36px;
+              box-sizing: border-box;
+            }
+            .copy {
+              display: grid;
+              align-content: start;
+              gap: 18px;
+            }
+            .eyebrow {
+              color: #89f1d1;
+              font-size: 0.78rem;
+              letter-spacing: 0.18em;
+              text-transform: uppercase;
+            }
+            h1 {
+              margin: 0;
+              font-family: "Instrument Serif", serif;
+              font-weight: 400;
+              letter-spacing: -0.05em;
+              line-height: 0.94;
+              font-size: 5.1rem;
+            }
+            p {
+              margin: 0;
+              color: rgba(245, 248, 252, 0.76);
+              line-height: 1.6;
+              font-size: 1.03rem;
+            }
+            .chips {
+              display: flex;
+              gap: 10px;
+              flex-wrap: wrap;
+            }
+            .chips span {
+              padding: 10px 12px;
+              border-radius: 999px;
+              border: 1px solid rgba(255,255,255,0.1);
+              background: rgba(255,255,255,0.04);
+              color: rgba(245,248,252,0.72);
+              font-size: 0.74rem;
+              letter-spacing: 0.12em;
+              text-transform: uppercase;
+            }
+            .stack {
+              display: grid;
+              grid-template-columns: minmax(0, 1fr) 280px;
+              gap: 18px;
+              align-items: start;
+            }
+            .panel,
+            .side-panel {
+              border: 1px solid rgba(255,255,255,0.08);
+              background:
+                linear-gradient(180deg, rgba(255,255,255,0.08), transparent 34%),
+                rgba(9,17,28,0.9);
+              box-shadow: 0 30px 90px rgba(0,0,0,0.28);
+              border-radius: 28px;
+            }
+            .panel {
+              display: grid;
+              gap: 12px;
+              padding: 18px;
+            }
+            .panel img,
+            .side-panel img {
+              display: block;
+              width: 100%;
+              height: auto;
+              border-radius: 18px;
+              border: 1px solid rgba(255,255,255,0.08);
+            }
+            .panel h2,
+            .side-panel h2 {
+              margin: 0;
+              font-size: 1.05rem;
+            }
+            .panel small,
+            .side-panel small {
+              color: rgba(245,248,252,0.62);
+            }
+            .side-column {
+              display: grid;
+              gap: 18px;
+            }
+            .side-panel {
+              display: grid;
+              gap: 12px;
+              padding: 14px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="frame">
+            <section class="copy">
+              <span class="eyebrow">Lumen</span>
+              <h1>Clean browser capture for review work.</h1>
+              <p>
+                Removes sticky page chrome before capture, saves desktop, tablet, and mobile views
+                together, redacts sensitive fields, and keeps useful page signals attached.
+              </p>
+              <div class="chips">
+                <span>Page cleanup</span>
+                <span>Responsive set</span>
+                <span>Safer export</span>
+                <span>Signals attached</span>
+              </div>
+            </section>
+
+            <section class="stack">
+              <article class="panel">
+                <img src="${desktopSrc}" alt="" />
+                <div>
+                  <h2>Current output</h2>
+                  <small>Real cleaned capture from the proof run</small>
+                </div>
+              </article>
+
+              <div class="side-column">
+                <article class="side-panel">
+                  <img src="${redactedSrc}" alt="" />
+                  <div>
+                    <h2>Redaction</h2>
+                    <small>Visible text and filled inputs blurred</small>
+                  </div>
+                </article>
+
+                <article class="side-panel">
+                  <img src="${signalsSrc}" alt="" />
+                  <div>
+                    <h2>Signals</h2>
+                    <small>Headline, CTA, navigation, palette, type</small>
+                  </div>
+                </article>
+              </div>
+            </section>
+          </div>
+        </body>
+      </html>`,
+      { waitUntil: "load" }
+    );
+
+    await page.screenshot({ path: outputPath });
+  } finally {
+    await page.close();
+  }
+}
+
 function buildHistoryItem(desktopRun) {
   const timestamp = new Intl.DateTimeFormat("en-US", {
     month: "short",
@@ -907,6 +1103,13 @@ async function openProofPage(browser, contentScript, device) {
   await page.waitForTimeout(100);
 
   return page;
+}
+
+async function toDataUri(filePath) {
+  const extension = path.extname(filePath).toLowerCase();
+  const mimeType = extension === ".png" ? "image/png" : "application/octet-stream";
+  const buffer = await fs.readFile(filePath);
+  return `data:${mimeType};base64,${buffer.toString("base64")}`;
 }
 
 function escapeHtml(value = "") {

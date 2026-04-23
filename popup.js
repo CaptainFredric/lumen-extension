@@ -270,7 +270,7 @@ async function handleAnalyzeClick() {
     tone: "neutral",
     eyebrow: "Inspect",
     title: "Analyzing current page",
-    detail: "Lumen is extracting colors, typography, layout density, and CTA signals.",
+    detail: "Lumen is extracting colors, typography, layout density, CTA, and navigation signals.",
     badge: "Inspect",
     progress: 0.08
   });
@@ -289,7 +289,7 @@ async function handleAnalyzeClick() {
     showStatus({
       tone: "success",
       eyebrow: "Inspect",
-      title: "Brand Blueprint ready",
+      title: "Page signals ready",
       detail: `${response.blueprint.colors.length} palette colors and ${response.blueprint.typography.families.length} type families extracted.`,
       badge: "Ready",
       progress: 1
@@ -414,8 +414,8 @@ function handleBillingClick() {
   showStatus({
     tone: "neutral",
     eyebrow: "Billing",
-    title: "Billing endpoint reserved",
-    detail: "The UI contract is in place, but the demo backend does not implement a billing portal yet.",
+    title: "Billing hook reserved",
+    detail: "The UI hook is in place, but the demo backend does not implement billing yet.",
     badge: "Soon",
     progress: 0.12
   });
@@ -436,7 +436,7 @@ function renderSession(session) {
     ? backendReachable
       ? "Session is connected to the backend slice. New captures can sync into history."
       : "Session is active, but the backend was not reachable. Lumen keeps state locally and will still archive captures in this browser."
-    : "Start a demo session to unlock the first backend slice: session state and capture history sync when an API is reachable.";
+    : "Start a demo session to test session state and history sync when a backend is reachable.";
   ui.accountPlan.textContent = plan.replace(/-/g, " ");
   ui.accountSource.textContent = source;
   ui.backendBadge.textContent = backendReachable ? "Backend reachable" : "Local-first";

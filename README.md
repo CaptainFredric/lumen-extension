@@ -1,161 +1,143 @@
 # Lumen
 
-Lumen is a Manifest V3 Chrome extension foundation for premium web capture workflows. It is designed as the technical base for a freemium SaaS product where the screenshot is only the entry point and the monetized value comes from cleanup, polish, archiving, sync, and analysis.
+Lumen is a Manifest V3 Chrome extension for clean, responsive, safer evidence capture.
 
-## Current Foundation
+The current wedge is narrow on purpose:
 
-The current product foundation already includes:
+1. clean the page before capture
+2. capture desktop, tablet, and mobile views together
+3. redact sensitive visible data during export
+4. attach useful page signals beside the image
 
-1. A service-worker driven capture pipeline in `background.js`
-2. A content-script preparation pass in `content.js` for sticky-layer cleanup and lazy-load preflight scrolling
-3. An offscreen document stitcher in `offscreen.js` that composes retina-aware full-page captures
-4. A Brand Blueprint inspector that extracts palette, fonts, layout, headline, CTA, and navigation signals from the active page
-5. Responsive set capture that can generate desktop, tablet, and mobile outputs from one action
-6. Auto-redaction that can detect emails, phone numbers, tokens, and filled fields before export
-7. Studio export presets that can package captures into browser and phone poster mockups
-8. A polished popup UI in `popup.html`, `popup.css`, and `popup.js`
-9. A local-first backend slice for demo auth and capture history sync in `backend/`
-10. A GitHub Pages workflow in `.github/workflows/pages.yml`
-11. A GitHub Pages-ready landing site in `docs/`, plus a root fallback so misconfigured branch-root Pages still resolve to the product page
-12. A simple SaaS gating surface in `config.js` through `isProUser` and per-feature access flags
-13. A lower-friction permission model where desktop capture uses `activeTab`, while viewport-based tablet, mobile, and responsive set capture request only the active site origin on demand
+It is aimed at design review, QA, and product work. It is not presented here as a broad platform or finished SaaS product.
+
+## What Works Now
+
+The current build includes:
+
+1. sticky, fixed, and high-z cleanup before capture
+2. lazy-load preflight scrolling
+3. full-page stitching with offscreen composition
+4. desktop, tablet, mobile, and responsive-set capture modes
+5. export-time redaction for emails, phone numbers, token-like strings, and filled inputs
+6. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
+7. local capture history with file and summary metadata
+8. a local backend slice for demo session state and history sync when an API is reachable
+9. a GitHub Pages landing site in `docs/`
+
+## Current Limits
+
+These limits are important:
+
+1. redaction currently covers visible text and filled inputs during export and should be reviewed before external sharing
+2. cloud sync, billing, annotations, and scheduled monitoring are not implemented as product-ready features
+3. highly dynamic sites with virtualization or unusual scroll behavior can still need site-specific fallback work
+4. the local backend slice is a small demo path, not a production account system
 
 ## Architecture
 
-### Capture Engine
+### Capture Flow
 
-The current flow is:
+The current capture flow is:
 
-1. Popup sends the capture request and the selected options to the background worker
-2. Background validates the tab, injects the content script, and prepares the page
-3. Content script freezes motion, optionally forces lazy-loaded content to render, and hides fixed, sticky, or high-z UI
-4. Background scrolls the page in slices, respects Chrome capture throttling, and sends each viewport image to the offscreen document
-5. While the page is prepared, Lumen can also extract a Brand Blueprint from the live DOM
-6. If responsive set capture is selected, Lumen repeats the pipeline for desktop, tablet, and mobile viewports and archives the outputs together
-7. If auto-redaction is enabled, the content script scans for sensitive text regions and filled fields before the final render
-8. Offscreen can return raw stitched files or transform the output into browser and phone poster exports
-9. If a page exceeds safe canvas limits, Lumen falls back to tiled raw exports instead of failing
-10. Background downloads the final capture set, persists the latest blueprint, writes capture history, and restores the page state
+1. popup sends the selected capture options to the background worker
+2. background injects the content script and prepares the page
+3. content script freezes motion, runs the preflight scroll when enabled, and hides sticky or high-layer UI when enabled
+4. background scrolls the page in slices and sends each visible segment to the offscreen document
+5. offscreen stitches the final output using device-pixel-ratio aware composition
+6. if the page is too large for one safe canvas, the export falls back to tiled raw output
+7. background downloads the files, writes local history, and restores the page
 
-### Inspector
+### Page Signals
 
-The inspector is the first real workflow differentiator in the repo today. It currently extracts:
+The current signal extraction reads:
 
-1. the page title, host, description, and visible hero headline
-2. primary CTA text and top navigation labels
-3. quantized dominant colors
-4. most-used typography families
-5. layout density metrics such as sections, visuals, forms, buttons, and words
+1. title, host, description, and hero headline
+2. primary CTA text
+3. navigation labels
+4. dominant palette colors
+5. most-used type families
+6. layout counts such as sections, headings, buttons, forms, visuals, and words
 
-### Backend Slice
-
-The backend slice is intentionally small, but it is real:
-
-1. it can create a demo session
-2. it can return the active session
-3. it can accept capture history records
-4. it can return the capture history for that session
-
-This keeps the extension usable in a purely local mode while allowing the first remote sync path when a backend is reachable.
-
-### SaaS Hooks
-
-The first planned integration points are already marked in code comments:
-
-1. Session bootstrap and billing state in `popup.js`
-2. Capture metadata upload in `background.js`
-3. Studio transforms such as annotation layers and richer social layouts in `offscreen.js`
+The proof generator uses the same content-script extraction path. If the proof assets do not show a signal, the product copy should not pretend that signal is reliable.
 
 ## Local Development
 
-### Load the extension
+### Load The Extension
 
 1. Open `chrome://extensions`
 2. Enable Developer mode
 3. Click `Load unpacked`
 4. Select this `lumen-extension` directory
 
-### Test the extension
-
-1. Open any normal `https://` page
-2. Open the Lumen popup
-3. Toggle sticky cleanup, lazy-load forcing, or auto-redaction as needed
-4. Trigger `Analyze Page` to inspect the page system
-5. Choose `Desktop`, `Tablet`, `Mobile`, or `Set` for the capture device
-6. Choose `Raw`, `Browser`, or `Phone` export mode
-7. Trigger `Capture Full Page` to save the stitched image and refresh the latest blueprint
-8. Confirm the latest capture appears in the Archive panel
-9. Confirm the image is downloaded into `Downloads/Lumen`
-
-### Run the backend slice
+### Run The Backend Slice
 
 ```bash
+npm install
 npm run api
 ```
 
 The local API listens on `http://127.0.0.1:8787`.
 
-### Publish the landing site
+### Use The Extension
 
-1. In GitHub, enable Pages to deploy through GitHub Actions
+1. Open any normal `https://` page
+2. Open the Lumen popup
+3. Choose the capture device and export mode
+4. Enable sticky cleanup, lazy-load forcing, or auto-redaction as needed
+5. Run `Analyze Page` or `Capture Full Page`
+6. Check the latest blueprint and local history in the popup
+
+## Proof Assets
+
+The landing page includes proof assets generated from the current prototype:
+
+1. `docs/assets/proof-run-desktop.png`
+2. `docs/assets/proof-run-tablet.png`
+3. `docs/assets/proof-run-mobile.png`
+4. `docs/assets/proof-run-redacted.png`
+5. `docs/assets/proof-run-signals.png`
+6. `docs/assets/proof-run-history.png`
+7. `docs/assets/proof-run-signals.json`
+8. `docs/assets/proof-run-summary.json`
+9. `docs/assets/proof-social-card.png`
+
+To regenerate them:
+
+```bash
+npm install
+npm run proof:assets
+```
+
+If Chromium is not installed for Playwright yet, run:
+
+```bash
+npm run proof:install-browser
+```
+
+The proof script depends on Playwright and a local Chromium install. It is reproducible, but it is not a zero-dependency step.
+
+## Publish The Landing Site
+
+1. Enable GitHub Pages to deploy through GitHub Actions
 2. Push changes to `main`
 3. Wait for the `Deploy Pages` workflow to complete
-4. Use the generated Pages URL as the public landing site
+4. Use the generated Pages URL
 
-## Constraints To Address Next
+## Future Direction
 
-The core capture and studio foundation is real now, but the highest-leverage next tasks are still clear:
+These are future layers, not present-day proof:
 
-1. Replace the demo session with a true OAuth flow and billing check
-2. Add cloud sync destinations and a production capture-history backend
-3. Add annotation composition and editor controls inside the offscreen studio
-4. Add site-specific fallbacks for highly dynamic apps with virtualization or shadow-root heavy layouts
-5. Add branded icons, store screenshots, and packaging for launch
+1. manual annotation tools
+2. cloud sync destinations
+3. auth and billing
+4. scheduled monitoring
+5. visual diffs and alerts
 
-## Suggested Product Roadmap
+## Next Work
 
-### Milestone 1
+The highest-leverage next steps are:
 
-Ship the cleanest possible capture experience:
-
-1. sticky cleanup
-2. lazy-load forcing
-3. reliable full-page stitching
-4. responsive capture
-
-### Milestone 2
-
-Ship the first monetizable Studio layer:
-
-1. browser and device frames
-2. annotation overlays
-3. redaction
-4. export presets for social sharing
-
-### Milestone 3
-
-Ship the SaaS backend:
-
-1. auth
-2. billing
-3. capture history
-4. cloud sync integrations
-
-### Milestone 4
-
-Ship the higher-ticket workflow product:
-
-1. scheduled competitor watch
-2. visual diffing
-3. alerts
-4. team workspaces
-5. brand blueprint extraction
-
-## Repository Notes
-
-This repository is ready for:
-
-1. local git history
-2. extension loading in Chrome
-3. GitHub Pages deployment from `docs/`
-4. iterative feature work
+1. improve capture reliability on difficult real-world sites
+2. add annotation and manual redaction tools
+3. tighten the backend from demo session state into a real account path

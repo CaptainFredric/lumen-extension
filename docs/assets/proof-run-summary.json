@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-23T04:21:16.957Z",
+  "generatedAt": "2026-04-23T04:37:55.104Z",
   "source": "Prototype proof page rendered with Lumen content-script cleanup, scan, and extraction logic.",
   "files": [
     "proof-run-desktop.png",
@@ -9,8 +9,9 @@
   ],
   "hiddenCount": 3,
   "redactionCount": 4,
+  "navLabelCount": 4,
   "blueprint": {
-    "generatedAt": "2026-04-23T04:21:10.692Z",
+    "generatedAt": "2026-04-23T04:37:48.042Z",
     "page": {
       "title": "Orbit Release Manager",
       "url": "http://proof.lumen.test/",
@@ -23,7 +24,12 @@
       "siteType": "Brochure site",
       "heroHeadline": "Ship product updates without shipping chaos.",
       "primaryCta": "Request access",
-      "navLabels": []
+      "navLabels": [
+        "Product",
+        "Workflow",
+        "Security",
+        "Contact"
+      ]
     },
     "colors": [
       {
@@ -94,6 +100,6 @@
   "historyItem": {
     "title": "Orbit Release Manager",
     "exportPreset": "raw",
-    "metaLine": "proof.lumen.test · Apr 22, 11:21 PM · 3 views · 3 files · 4 redactions · Brochure site"
+    "metaLine": "proof.lumen.test · Apr 22, 11:37 PM · 3 views · 3 files · 4 redactions · Brochure site"
   }
 }
