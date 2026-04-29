@@ -17,6 +17,7 @@ const OUTPUT_FILES = {
   signalsPanel: "proof-run-signals.png",
   historyPanel: "proof-run-history.png",
   socialCard: "proof-social-card.png",
+  bundleJson: "proof-run-bundle.json",
   signalsJson: "proof-run-signals.json",
   summaryJson: "proof-run-summary.json"
 };
@@ -548,6 +549,13 @@ async function main() {
     const signalsJsonPath = path.join(assetDir, OUTPUT_FILES.signalsJson);
     await fs.writeFile(signalsJsonPath, `${JSON.stringify(desktopRun.blueprint, null, 2)}\n`, "utf8");
 
+    const bundleManifest = buildBundleManifest(desktopRun);
+    await fs.writeFile(
+      path.join(assetDir, OUTPUT_FILES.bundleJson),
+      `${JSON.stringify(bundleManifest, null, 2)}\n`,
+      "utf8"
+    );
+
     await renderSignalsPanel(browser, desktopRun.blueprint, path.join(assetDir, OUTPUT_FILES.signalsPanel));
 
     const historyItem = buildHistoryItem(desktopRun);
@@ -561,6 +569,7 @@ async function main() {
         OUTPUT_FILES.desktop,
         OUTPUT_FILES.tablet,
         OUTPUT_FILES.mobile,
+        OUTPUT_FILES.bundleJson,
         OUTPUT_FILES.signalsJson
       ],
       hiddenCount: desktopRun.prepareResult.page.hiddenCount,
@@ -1073,10 +1082,42 @@ function buildHistoryItem(desktopRun) {
       "proof.lumen.test",
       timestamp,
       "3 views",
-      "3 files",
+      "4 files",
       `${desktopRun.redactions.count} redactions`,
       desktopRun.blueprint.identity?.siteType || "Unknown"
     ].join(" · ")
+  };
+}
+
+function buildBundleManifest(desktopRun) {
+  return {
+    schemaVersion: 1,
+    generator: "Lumen proof asset script",
+    capturedAt: new Date().toISOString(),
+    page: {
+      title: desktopRun.blueprint.page?.title || "Untitled capture",
+      url: PROOF_PAGE_URL,
+      host: "proof.lumen.test"
+    },
+    capture: {
+      devicePreset: "responsive",
+      exportPreset: "raw",
+      responsiveViews: 3,
+      redactionCount: desktopRun.redactions.count
+    },
+    files: [
+      OUTPUT_FILES.desktop,
+      OUTPUT_FILES.tablet,
+      OUTPUT_FILES.mobile
+    ],
+    pageSignals: {
+      siteType: desktopRun.blueprint.identity?.siteType || "",
+      heroHeadline: desktopRun.blueprint.identity?.heroHeadline || "",
+      primaryCta: desktopRun.blueprint.identity?.primaryCta || "",
+      navLabels: desktopRun.blueprint.identity?.navLabels || [],
+      colors: desktopRun.blueprint.colors || [],
+      typography: desktopRun.blueprint.typography?.families || []
+    }
   };
 }
 

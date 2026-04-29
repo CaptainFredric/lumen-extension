@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "generator": "Lumen proof asset script",
+  "capturedAt": "2026-04-29T19:39:07.155Z",
+  "page": {
+    "title": "Orbit Release Manager",
+    "url": "http://proof.lumen.test/",
+    "host": "proof.lumen.test"
+  },
+  "capture": {
+    "devicePreset": "responsive",
+    "exportPreset": "raw",
+    "responsiveViews": 3,
+    "redactionCount": 4
+  },
+  "files": [
+    "proof-run-desktop.png",
+    "proof-run-tablet.png",
+    "proof-run-mobile.png"
+  ],
+  "pageSignals": {
+    "siteType": "Brochure site",
+    "heroHeadline": "Ship product updates without shipping chaos.",
+    "primaryCta": "Request access",
+    "navLabels": [
+      "Product",
+      "Workflow",
+      "Security",
+      "Contact"
+    ],
+    "colors": [
+      {
+        "hex": "#112233",
+        "weight": 188.1
+      },
+      {
+        "hex": "#ffffff",
+        "weight": 12.78
+      },
+      {
+        "hex": "#3377ff",
+        "weight": 11.5
+      },
+      {
+        "hex": "#111133",
+        "weight": 8
+      },
+      {
+        "hex": "#eeeeff",
+        "weight": 0.6
+      }
+    ],
+    "typography": [
+      {
+        "family": "Space Grotesk",
+        "weight": 228.37
+      },
+      {
+        "family": "Instrument Serif",
+        "weight": 43
+      }
+    ]
+  }
+}

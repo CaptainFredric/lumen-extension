@@ -172,7 +172,6 @@ async function runCaptureFlow(options = getDefaultSettings()) {
   }
 
   const firstResult = results[0];
-  const downloadedFiles = results.flatMap((result) => result.downloadedFiles);
   const segmentCount = results.reduce((sum, result) => sum + result.segmentCount, 0);
   const tileCount = results.reduce((sum, result) => sum + result.tileCount, 0);
   const redactionCount = results.reduce((sum, result) => sum + result.redactionCount, 0);
@@ -190,6 +189,32 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     blueprint = await getLatestBlueprint();
   }
 
+  const bundleManifest = buildCaptureBundleManifest({
+    page: firstResult.page,
+    capturedAt: new Date().toISOString(),
+    options,
+    exportPreset: firstResult.exportPreset,
+    variants: variantSummaries,
+    redactionCount,
+    segmentCount,
+    tileCount,
+    blueprint
+  });
+
+  let manifestFile = "";
+
+  if (options.exportManifest !== false) {
+    manifestFile = await downloadBundleManifest({
+      fileBaseName: buildManifestFileBaseName(firstResult.page, options, firstResult.exportPreset),
+      manifest: bundleManifest
+    });
+  }
+
+  const downloadedFiles = [
+    ...results.flatMap((result) => result.downloadedFiles),
+    ...(manifestFile ? [manifestFile] : [])
+  ];
+
   const captureHistory = await persistCaptureRecord({
     id: crypto.randomUUID(),
     title: firstResult.page.title,
@@ -201,6 +226,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     files: downloadedFiles,
     tileCount,
     redactionCount,
+    manifestFile,
     variants: variantSummaries,
     dimensions: firstResult.dimensions,
     blueprintSummary: blueprint
@@ -226,7 +252,8 @@ async function runCaptureFlow(options = getDefaultSettings()) {
       segmentCount,
       fileCount: downloadedFiles.length,
       redactionCount,
-      variantCount: variants.length
+      variantCount: variants.length,
+      manifestSaved: Boolean(manifestFile)
     }),
     progress: 1
   });
@@ -238,6 +265,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     exportPreset: firstResult.exportPreset,
     tileCount,
     redactionCount,
+    manifestFile,
     variantCount: variants.length,
     dimensions: firstResult.dimensions
   };
@@ -709,6 +737,15 @@ function buildCaptureFileBaseName({ title, url, devicePreset, exportPreset }) {
   return `${safeTitle || "capture"}-${devicePreset}-${exportPreset}-${timestamp}`;
 }
 
+function buildManifestFileBaseName(page, options, exportPreset) {
+  return buildCaptureFileBaseName({
+    title: page.title,
+    url: page.url,
+    devicePreset: options.devicePreset || "desktop",
+    exportPreset
+  }).replace(/-(raw|browser|phone)-/, "-bundle-");
+}
+
 function sanitizeSegment(input) {
   return input
     .toLowerCase()
@@ -720,7 +757,13 @@ function createFriendlyError(title, description) {
   return { title, description };
 }
 
-function buildCaptureCompletionDetail({ segmentCount, fileCount, redactionCount, variantCount }) {
+function buildCaptureCompletionDetail({
+  segmentCount,
+  fileCount,
+  redactionCount,
+  variantCount,
+  manifestSaved
+}) {
   const sliceText = `${segmentCount} slice${segmentCount === 1 ? "" : "s"} stitched`;
   const fileText = `${fileCount} file${fileCount === 1 ? "" : "s"} saved`;
   const variantText = variantCount > 1 ? `${variantCount} responsive views captured` : "";
@@ -737,6 +780,10 @@ function buildCaptureCompletionDetail({ segmentCount, fileCount, redactionCount,
 
   if (redactionCount) {
     fragments.push(`${redactionCount} sensitive region${redactionCount === 1 ? "" : "s"} sanitized`);
+  }
+
+  if (manifestSaved) {
+    fragments.push("bundle manifest saved");
   }
 
   return `${fragments.join(", ")}.`;
@@ -842,6 +889,76 @@ async function downloadRenderedOutputs(outputs, fileBaseName) {
   }
 
   return downloadedFiles;
+}
+
+async function downloadBundleManifest({ fileBaseName, manifest }) {
+  const filename = `Lumen/${fileBaseName}.json`;
+  const dataUrl = `data:application/json;charset=utf-8,${encodeURIComponent(
+    `${JSON.stringify(manifest, null, 2)}\n`
+  )}`;
+
+  await chrome.downloads.download({
+    url: dataUrl,
+    filename,
+    conflictAction: "uniquify",
+    saveAs: false
+  });
+
+  return filename;
+}
+
+function buildCaptureBundleManifest({
+  page,
+  capturedAt,
+  options,
+  exportPreset,
+  variants,
+  redactionCount,
+  segmentCount,
+  tileCount,
+  blueprint
+}) {
+  return {
+    schemaVersion: 1,
+    generator: "Lumen prototype",
+    capturedAt,
+    page: {
+      title: page.title || "",
+      url: page.url,
+      host: new URL(page.url).host
+    },
+    capture: {
+      devicePreset: options.devicePreset || "desktop",
+      exportPreset,
+      removeStickyHeaders: options.removeStickyHeaders !== false,
+      forceLazyLoad: options.forceLazyLoad !== false,
+      autoRedact: Boolean(options.autoRedact),
+      variantCount: variants.length,
+      segmentCount,
+      tileCount,
+      redactionCount
+    },
+    variants: variants.map((variant) => ({
+      id: variant.id,
+      label: variant.label,
+      exportPreset: variant.exportPreset,
+      fileCount: variant.files.length,
+      files: variant.files,
+      tileCount: variant.tileCount,
+      redactionCount: variant.redactionCount,
+      dimensions: variant.dimensions
+    })),
+    pageSignals: blueprint
+      ? {
+          siteType: blueprint.identity?.siteType || "",
+          heroHeadline: blueprint.identity?.heroHeadline || "",
+          primaryCta: blueprint.identity?.primaryCta || "",
+          navLabels: blueprint.identity?.navLabels || [],
+          colors: blueprint.colors || [],
+          typography: blueprint.typography?.families || []
+        }
+      : null
+  };
 }
 
 async function getLatestBlueprint() {

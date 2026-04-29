@@ -15,6 +15,7 @@ const ui = {
   removeStickyHeaders: document.querySelector("#removeStickyHeaders"),
   forceLazyLoad: document.querySelector("#forceLazyLoad"),
   autoRedact: document.querySelector("#autoRedact"),
+  exportManifest: document.querySelector("#exportManifest"),
   deviceButtons: [...document.querySelectorAll("[data-device]")],
   exportButtons: [...document.querySelectorAll("[data-export]")],
   statusPanel: document.querySelector("#statusPanel"),
@@ -113,6 +114,7 @@ function bindEvents() {
   ui.removeStickyHeaders.addEventListener("change", persistCurrentSettings);
   ui.forceLazyLoad.addEventListener("change", persistCurrentSettings);
   ui.autoRedact.addEventListener("change", persistCurrentSettings);
+  ui.exportManifest.addEventListener("change", persistCurrentSettings);
 
   for (const button of ui.deviceButtons) {
     button.addEventListener("click", () => {
@@ -147,6 +149,7 @@ async function restoreSettings() {
   ui.removeStickyHeaders.checked = Boolean(currentSettings.removeStickyHeaders);
   ui.forceLazyLoad.checked = Boolean(currentSettings.forceLazyLoad);
   ui.autoRedact.checked = Boolean(currentSettings.autoRedact);
+  ui.exportManifest.checked = Boolean(currentSettings.exportManifest);
   updateDeviceButtons();
   updateExportButtons();
 }
@@ -173,6 +176,7 @@ async function persistCurrentSettings() {
     removeStickyHeaders: ui.removeStickyHeaders.checked,
     forceLazyLoad: ui.forceLazyLoad.checked,
     autoRedact: ui.autoRedact.checked,
+    exportManifest: ui.exportManifest.checked,
     devicePreset: currentSettings.devicePreset,
     exportPreset: currentSettings.exportPreset
   };
@@ -639,12 +643,15 @@ function formatTimestamp(rawValue) {
 function buildCaptureSuccessMessage(response, devicePreset) {
   const fileText = `${response.files.length} file${response.files.length === 1 ? "" : "s"} saved using ${response.exportPreset} export mode`;
   const variantCount = response.variantCount || getCaptureVariants(devicePreset).length;
+  const manifestText = response.manifestFile ? " Bundle manifest saved." : "";
 
   if (!response.redactionCount) {
-    return variantCount > 1 ? `${fileText}. ${variantCount} responsive views captured.` : `${fileText}.`;
+    return variantCount > 1
+      ? `${fileText}. ${variantCount} responsive views captured.${manifestText}`
+      : `${fileText}.${manifestText}`;
   }
 
-  return `${fileText}. ${variantCount > 1 ? `${variantCount} responsive views captured. ` : ""}${response.redactionCount} sensitive region${response.redactionCount === 1 ? "" : "s"} sanitized.`;
+  return `${fileText}. ${variantCount > 1 ? `${variantCount} responsive views captured. ` : ""}${response.redactionCount} sensitive region${response.redactionCount === 1 ? "" : "s"} sanitized.${manifestText}`;
 }
 
 function formatCompactNumber(value) {

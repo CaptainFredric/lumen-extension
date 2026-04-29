@@ -119,6 +119,11 @@
             <span>Sensitive fields blurred</span>
             <span>Palette, type, and CTA signals</span>
           </div>
+
+          <p class="hero-inline-note">
+            Current bundle: 3 image exports, 1 bundle manifest JSON, local history entry, and
+            page signals attached to the run.
+          </p>
         </div>
 
         <div class="hero-stage" data-tilt data-reveal>
@@ -249,7 +254,7 @@
             <p class="proof-label">Artifact structure</p>
             <ul class="proof-list">
               <li>3 image exports: <code>proof-run-desktop.png</code>, <code>proof-run-tablet.png</code>, <code>proof-run-mobile.png</code></li>
-              <li>1 signals JSON: <code>proof-run-signals.json</code></li>
+              <li>1 bundle manifest: <code>proof-run-bundle.json</code></li>
               <li>4 redactions found in the sensitive-data example</li>
               <li>1 local history item created for <code>Orbit Release Manager</code></li>
             </ul>
@@ -261,7 +266,7 @@
               <span>proof-run-desktop.png</span>
               <span>proof-run-tablet.png</span>
               <span>proof-run-mobile.png</span>
-              <span>proof-run-signals.json</span>
+              <span>proof-run-bundle.json</span>
             </div>
             <p class="proof-inline-note">
               Generated from the current prototype using the content-script cleanup, redaction scan,
@@ -346,8 +351,8 @@
                   <span>responsive mobile export</span>
                 </div>
                 <div>
-                  <strong>proof-run-signals.json</strong>
-                  <span>palette, fonts, CTA, nav</span>
+                  <strong>proof-run-bundle.json</strong>
+                  <span>views, redactions, and page signals</span>
                 </div>
               </div>
             </div>
@@ -606,9 +611,9 @@
         <div class="section-head" data-reveal>
           <p class="kicker">Current scope</p>
           <h2>Separate present proof from later product layers.</h2>
-          <p class="section-body">
-            The current prototype already supports the capture workflow described on this page. The
-            next paid layer is most likely studio output and team handoff, not a broad monitoring
+            <p class="section-body">
+              The current prototype already supports the capture workflow described on this page. The
+            next product layer is most likely studio output and team handoff, not a broad monitoring
             suite.
           </p>
         </div>
@@ -641,11 +646,11 @@
 
       <section class="cta-section" data-reveal>
         <p class="kicker">Implemented now</p>
-        <h2>Lumen is early. The prototype already handles cleanup, capture, redaction, signals, and local history.</h2>
+        <h2>Lumen is early. The current build already handles cleanup, capture, redaction, signals, and a portable bundle manifest.</h2>
         <p>
           The repository already covers page cleanup, responsive capture bundles, export redaction,
-          page-signal extraction, and local history. The next work is annotation, sync, auth, and
-          billing.
+          page-signal extraction, bundle metadata, and local history. The next work is annotation,
+          sync, auth, and billing.
         </p>
 
         <div class="cta-actions">

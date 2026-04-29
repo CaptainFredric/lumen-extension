@@ -8,6 +8,7 @@ The current wedge is narrow on purpose:
 2. capture desktop, tablet, and mobile views together
 3. redact sensitive visible data during export
 4. attach useful page signals beside the image
+5. save a bundle manifest so the capture can travel with its context
 
 It is aimed at design review, QA, and product work. It is not presented here as a broad platform or finished SaaS product.
 
@@ -21,9 +22,10 @@ The current build includes:
 4. desktop, tablet, mobile, and responsive-set capture modes
 5. export-time redaction for emails, phone numbers, token-like strings, and filled inputs
 6. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
-7. local capture history with file and summary metadata
-8. a local backend slice for demo session state and history sync when an API is reachable
-9. a GitHub Pages landing site in `docs/`
+7. bundle-manifest JSON exports with view, redaction, and signal metadata
+8. local capture history with file and summary metadata
+9. a local backend slice for demo session state and history sync when an API is reachable
+10. a GitHub Pages landing site in `docs/`
 
 ## Current Limits
 
@@ -46,7 +48,7 @@ The current capture flow is:
 4. background scrolls the page in slices and sends each visible segment to the offscreen document
 5. offscreen stitches the final output using device-pixel-ratio aware composition
 6. if the page is too large for one safe canvas, the export falls back to tiled raw output
-7. background downloads the files, writes local history, and restores the page
+7. background downloads the files, writes the bundle manifest, writes local history, and restores the page
 
 ### Page Signals
 
@@ -94,8 +96,9 @@ The public landing page will be available at `http://127.0.0.1:3000/`.
 2. Open the Lumen popup
 3. Choose the capture device and export mode
 4. Enable sticky cleanup, lazy-load forcing, or auto-redaction as needed
-5. Run `Analyze Page` or `Capture Full Page`
-6. Check the latest blueprint and local history in the popup
+5. Keep `Save bundle manifest` enabled if you want a portable JSON sidecar next to the capture files
+6. Run `Analyze Page` or `Capture Full Page`
+7. Check the latest blueprint and local history in the popup
 
 ## Proof Assets
 
@@ -107,9 +110,10 @@ The landing page includes proof assets generated from the current prototype:
 4. `docs/assets/proof-run-redacted.png`
 5. `docs/assets/proof-run-signals.png`
 6. `docs/assets/proof-run-history.png`
-7. `docs/assets/proof-run-signals.json`
-8. `docs/assets/proof-run-summary.json`
-9. `docs/assets/proof-social-card.png`
+7. `docs/assets/proof-run-bundle.json`
+8. `docs/assets/proof-run-signals.json`
+9. `docs/assets/proof-run-summary.json`
+10. `docs/assets/proof-social-card.png`
 
 To regenerate them:
 

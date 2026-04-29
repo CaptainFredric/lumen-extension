@@ -188,16 +188,17 @@ main,
 }
 
 section {
-  padding: 110px 0;
+  padding: 84px 0;
 }
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 0.98fr) minmax(340px, 1.08fr);
-  gap: 56px;
-  align-items: center;
-  min-height: calc(100svh - 84px);
-  padding-top: 36px;
+  grid-template-columns: minmax(0, 0.92fr) minmax(360px, 1.08fr);
+  gap: 40px;
+  align-items: start;
+  min-height: auto;
+  padding-top: 28px;
+  padding-bottom: 48px;
 }
 
 .kicker,
@@ -230,9 +231,9 @@ h2,
 }
 
 h1 {
-  max-width: 11ch;
+  max-width: 12ch;
   margin-top: 18px;
-  font-size: clamp(3.8rem, 7.4vw, 7rem);
+  font-size: clamp(3.1rem, 6vw, 5.6rem);
 }
 
 h2 {
@@ -264,9 +265,9 @@ h3 {
 }
 
 .hero-body {
-  max-width: 35ch;
+  max-width: 38ch;
   margin-top: 18px;
-  font-size: 1.03rem;
+  font-size: 1rem;
 }
 
 .section-body {
@@ -298,6 +299,14 @@ h3 {
 
 .hero-actions {
   margin-top: 30px;
+}
+
+.hero-inline-note {
+  max-width: 48ch;
+  margin-top: 16px;
+  color: var(--text-tertiary);
+  font-size: 0.88rem;
+  line-height: 1.6;
 }
 
 .primary-link,
@@ -704,14 +713,14 @@ h3 {
 }
 
 .statement-band {
-  padding: 34px 0 10px;
+  padding: 22px 0 6px;
 }
 
 .statement-band p {
-  max-width: 34ch;
-  font-size: clamp(1.4rem, 2.5vw, 2.05rem);
+  max-width: 38ch;
+  font-size: clamp(1.24rem, 2vw, 1.75rem);
   font-family: "Instrument Serif", serif;
-  line-height: 1.08;
+  line-height: 1.14;
 }
 
 .proof-block,
@@ -721,7 +730,7 @@ h3 {
 }
 
 .proof-block {
-  padding: 42px 0 26px;
+  padding: 28px 0 18px;
 }
 
 .proof-block-grid {
@@ -787,20 +796,20 @@ h3 {
 .support-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(300px, 460px);
-  gap: 44px;
-  margin-top: 42px;
+  gap: 32px;
+  margin-top: 30px;
 }
 
 .support-copy {
   display: grid;
-  gap: 26px;
+  gap: 18px;
 }
 
 .support-row {
   display: flex;
   align-items: flex-start;
   gap: 18px;
-  padding-top: 18px;
+  padding-top: 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
