@@ -11,6 +11,8 @@
   const MAX_NAV_LABELS = 6;
   const MAX_STRUCTURE_HEADINGS = 4;
   const MAX_REDACTION_REGIONS = 80;
+  const PAGE_READY_TIMEOUT_MS = 2200;
+  const OVERLAY_SETTLE_MS = 140;
   const SENSITIVE_TEXT_PATTERNS = [
     {
       kind: "email",
@@ -43,6 +45,7 @@
     originalScrollX: 0,
     originalScrollY: 0,
     freezeStyleNode: null,
+    overlayObserver: null,
     prepared: false,
     scrollRoot: null,
     scrollContext: null
@@ -98,6 +101,7 @@
     captureState.originalScrollY = getScrollTop();
 
     freezeAnimationsAndSmoothScroll();
+    primeLazyMedia(document);
 
     if (options.forceLazyLoad) {
       await runPreflightScroll();
@@ -106,9 +110,14 @@
       await settleFrames(2);
     }
 
+    await waitForPageReady();
+
     let hiddenCount = 0;
 
     if (options.removeStickyHeaders) {
+      hiddenCount = hideAggressiveLayers();
+      startOverlayObserver();
+      await pause(OVERLAY_SETTLE_MS);
       hiddenCount = hideAggressiveLayers();
       await settleFrames(2);
     }
@@ -130,13 +139,23 @@
 
     setScrollTop(clampedTop);
     await settleFrames(2);
+    primeLazyMedia(getScrollContainerNode());
+    await waitForPageReady();
+
+    if (captureState.overlayObserver || captureState.hiddenNodes.length) {
+      hideAggressiveLayers();
+      await pause(OVERLAY_SETTLE_MS);
+    }
 
     return {
-      top: Math.round(getScrollTop())
+      top: Math.round(getScrollTop()),
+      pageHeight: getPageMetrics().pageHeight,
+      viewportHeight: getPageMetrics().viewportHeight
     };
   }
 
   async function restorePageState() {
+    stopOverlayObserver();
     restoreHiddenNodes();
     removeFreezeStyle();
 
@@ -235,13 +254,11 @@
   }
 
   function hideAggressiveLayers() {
-    restoreHiddenNodes();
-
-    const hiddenNodes = [];
     const walker = document.createTreeWalker(
       document.body || document.documentElement,
       NodeFilter.SHOW_ELEMENT
     );
+    let hiddenCount = 0;
 
     while (walker.nextNode()) {
       const node = walker.currentNode;
@@ -269,17 +286,16 @@
         continue;
       }
 
-      hiddenNodes.push({
-        node,
-        originalStyle: node.getAttribute("style")
-      });
+      if (!shouldHideAggressiveLayer(node, rect, style)) {
+        continue;
+      }
 
-      node.style.setProperty("display", "none", "important");
-      node.dataset.lumenHidden = "true";
+      if (hideNode(node)) {
+        hiddenCount += 1;
+      }
     }
 
-    captureState.hiddenNodes = hiddenNodes;
-    return hiddenNodes.length;
+    return hiddenCount;
   }
 
   function restoreHiddenNodes() {
@@ -300,6 +316,123 @@
     captureState.hiddenNodes = [];
   }
 
+  function hideNode(node) {
+    if (captureState.hiddenNodes.some((entry) => entry.node === node)) {
+      return false;
+    }
+
+    captureState.hiddenNodes.push({
+      node,
+      originalStyle: node.getAttribute("style")
+    });
+
+    node.style.setProperty("display", "none", "important");
+    node.dataset.lumenHidden = "true";
+    return true;
+  }
+
+  function shouldHideAggressiveLayer(node, rect, style) {
+    if (node.dataset.lumenHidden === "true") {
+      return false;
+    }
+
+    const numericZIndex = Number.parseInt(style.zIndex, 10);
+    const isFixedLike = style.position === "fixed" || style.position === "sticky";
+    const isHighLayer = Number.isFinite(numericZIndex) && numericZIndex > 1000;
+
+    if (!isFixedLike && !isHighLayer) {
+      return false;
+    }
+
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const area = rect.width * rect.height;
+    const viewportArea = Math.max(1, viewportWidth * viewportHeight);
+    const coversEdge =
+      rect.top <= 24 ||
+      rect.bottom >= viewportHeight - 24 ||
+      rect.left <= 24 ||
+      rect.right >= viewportWidth - 24;
+    const isOverlaySized =
+      area >= viewportArea * 0.04 ||
+      rect.height >= viewportHeight * 0.12 ||
+      rect.width >= viewportWidth * 0.52;
+    const looksLikeKnownChrome = /(cookie|consent|banner|notice|modal|drawer|toast|chat|intercom|launcher|support|help|feedback|subscribe|promo)/i
+      .test(`${node.id} ${node.className} ${node.getAttribute("aria-label") || ""}`);
+    const isTinyWidget = rect.width < 56 && rect.height < 56 && !looksLikeKnownChrome;
+
+    if (isTinyWidget) {
+      return false;
+    }
+
+    return looksLikeKnownChrome || (coversEdge && isOverlaySized) || (isHighLayer && isOverlaySized);
+  }
+
+  function startOverlayObserver() {
+    stopOverlayObserver();
+
+    const root = document.body || document.documentElement;
+    if (!root) {
+      return;
+    }
+
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const addedNode of mutation.addedNodes) {
+          if (!(addedNode instanceof HTMLElement)) {
+            continue;
+          }
+
+          scanNodeForAggressiveLayers(addedNode);
+        }
+      }
+    });
+
+    observer.observe(root, {
+      childList: true,
+      subtree: true
+    });
+
+    captureState.overlayObserver = observer;
+  }
+
+  function stopOverlayObserver() {
+    captureState.overlayObserver?.disconnect();
+    captureState.overlayObserver = null;
+  }
+
+  function scanNodeForAggressiveLayers(rootNode) {
+    if (!(rootNode instanceof HTMLElement)) {
+      return;
+    }
+
+    const queue = [rootNode];
+
+    while (queue.length) {
+      const node = queue.shift();
+      if (!(node instanceof HTMLElement)) {
+        continue;
+      }
+
+      const rect = node.getBoundingClientRect();
+      if (!isRectVisible(rect)) {
+        for (const child of node.children) {
+          queue.push(child);
+        }
+        continue;
+      }
+
+      const style = window.getComputedStyle(node);
+      if (shouldHideAggressiveLayer(node, rect, style)) {
+        hideNode(node);
+      }
+
+      for (const child of node.children) {
+        queue.push(child);
+      }
+    }
+  }
+
   async function runPreflightScroll() {
     const metrics = getPageMetrics();
     const maxScrollTop = Math.max(0, metrics.pageHeight - metrics.viewportHeight);
@@ -310,14 +443,17 @@
 
     for (let top = 0; top < maxScrollTop; top += step) {
       setScrollTop(top);
+      primeLazyMedia(getScrollContainerNode());
       await pause(36);
     }
 
     setScrollTop(maxScrollTop);
+    primeLazyMedia(getScrollContainerNode());
     await pause(120);
 
     for (let top = maxScrollTop; top > 0; top -= step) {
       setScrollTop(top);
+      primeLazyMedia(getScrollContainerNode());
       await pause(20);
     }
 
@@ -1030,6 +1166,136 @@
 
   function pause(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function waitForPageReady() {
+    await Promise.allSettled([
+      waitForFonts(),
+      waitForMedia()
+    ]);
+    await settleFrames(2);
+  }
+
+  async function waitForFonts() {
+    if (!("fonts" in document) || typeof document.fonts?.ready?.then !== "function") {
+      return;
+    }
+
+    await Promise.race([
+      document.fonts.ready,
+      pause(PAGE_READY_TIMEOUT_MS)
+    ]);
+  }
+
+  async function waitForMedia() {
+    const container = getScrollContainerNode();
+    const mediaNodes = [
+      ...container.querySelectorAll("img, iframe, video")
+    ]
+      .filter((node) => node instanceof HTMLElement && isElementVisible(node))
+      .slice(0, 28);
+
+    if (!mediaNodes.length) {
+      return;
+    }
+
+    await Promise.race([
+      Promise.allSettled(mediaNodes.map((node) => waitForMediaNode(node))),
+      pause(PAGE_READY_TIMEOUT_MS)
+    ]);
+  }
+
+  function primeLazyMedia(root) {
+    const scope = root instanceof HTMLElement ? root : document;
+    const lazyCandidates = scope.querySelectorAll("img[loading='lazy'], iframe[loading='lazy'], video[preload='none'], [data-src], [data-srcset]");
+
+    for (const node of lazyCandidates) {
+      if (!(node instanceof HTMLElement)) {
+        continue;
+      }
+
+      if (node instanceof HTMLImageElement || node instanceof HTMLIFrameElement) {
+        node.loading = "eager";
+      }
+
+      if (node instanceof HTMLVideoElement) {
+        node.preload = "auto";
+      }
+
+      hydrateDeferredAttributes(node);
+    }
+  }
+
+  function hydrateDeferredAttributes(node) {
+    const attrMap = [
+      ["data-src", "src"],
+      ["data-srcset", "srcset"],
+      ["data-lazy-src", "src"],
+      ["data-original", "src"]
+    ];
+
+    for (const [from, to] of attrMap) {
+      const value = node.getAttribute(from);
+      if (value && !node.getAttribute(to)) {
+        node.setAttribute(to, value);
+      }
+    }
+  }
+
+  function getScrollContainerNode() {
+    const context = captureState.scrollContext || detectScrollContext();
+    return context.isDocument ? document : context.node;
+  }
+
+  function waitForMediaNode(node) {
+    if (node instanceof HTMLImageElement) {
+      if (node.complete && node.naturalWidth > 0) {
+        return Promise.resolve();
+      }
+
+      return new Promise((resolve) => {
+        const done = () => {
+          node.removeEventListener("load", done);
+          node.removeEventListener("error", done);
+          resolve();
+        };
+
+        node.addEventListener("load", done, { once: true });
+        node.addEventListener("error", done, { once: true });
+      });
+    }
+
+    if (node instanceof HTMLIFrameElement) {
+      return new Promise((resolve) => {
+        const done = () => {
+          node.removeEventListener("load", done);
+          node.removeEventListener("error", done);
+          resolve();
+        };
+
+        node.addEventListener("load", done, { once: true });
+        node.addEventListener("error", done, { once: true });
+      });
+    }
+
+    if (node instanceof HTMLVideoElement) {
+      if (node.readyState >= 2) {
+        return Promise.resolve();
+      }
+
+      return new Promise((resolve) => {
+        const done = () => {
+          node.removeEventListener("loadeddata", done);
+          node.removeEventListener("error", done);
+          resolve();
+        };
+
+        node.addEventListener("loadeddata", done, { once: true });
+        node.addEventListener("error", done, { once: true });
+      });
+    }
+
+    return Promise.resolve();
   }
 
   async function settleFrames(frameCount) {

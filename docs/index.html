@@ -371,6 +371,7 @@
               <ul class="support-notes">
                 <li>Sticky header and chat widget hidden during capture</li>
                 <li>Lazy-loaded media forced before export</li>
+                <li>Page height can grow during capture and the loop keeps following it</li>
                 <li>Capture history persisted locally for later review</li>
               </ul>
             </div>
@@ -390,13 +391,14 @@
 
               <div class="workflow-layer layer-clean">
                 <p class="workflow-caption">Before capture</p>
-                <ul class="workflow-points">
-                  <li>Sticky header hidden</li>
-                  <li>Cookie banner suppressed</li>
-                  <li>Chat widget suppressed</li>
-                  <li>Lazy media forced</li>
-                </ul>
-              </div>
+              <ul class="workflow-points">
+                <li>Sticky header hidden</li>
+                <li>Cookie banner suppressed</li>
+                <li>Chat widget suppressed</li>
+                <li>Lazy media forced</li>
+                <li>Late overlays checked again after scroll</li>
+              </ul>
+            </div>
 
               <div class="workflow-layer layer-responsive">
                 <p class="workflow-caption">Responsive set</p>
@@ -447,7 +449,8 @@
             <h3>Remove page chrome before the first pixel is saved.</h3>
             <p>
               Sticky layers, floating widgets, lazy-loaded media, and custom scroll roots are
-              handled as part of capture rather than cleanup afterward.
+              handled as part of capture. New overlays inserted after initial cleanup are checked
+              again before slices are saved.
             </p>
           </article>
 
@@ -494,16 +497,24 @@
           <article class="mechanic-row" data-reveal>
             <strong>DOM cleanup</strong>
             <p>
-              Fixed, sticky, and high-z layers are hidden before the stitched pass and restored
-              afterward.
+              Fixed, sticky, and high-z layers are hidden before the stitched pass, tracked during
+              capture, and restored afterward.
+            </p>
+          </article>
+
+          <article class="mechanic-row" data-reveal>
+            <strong>Late overlay suppression</strong>
+            <p>
+              A mutation observer watches for cookie banners, chat launchers, and other high-layer
+              UI that appears after the first cleanup pass.
             </p>
           </article>
 
           <article class="mechanic-row" data-reveal>
             <strong>Lazy-load preflight</strong>
             <p>
-              The page is force-scrolled before capture so deferred media is present when slices are
-              taken.
+              The page is force-scrolled before capture, lazy media is nudged toward eager loading,
+              and visible assets are given a short settle window before slices are taken.
             </p>
           </article>
 
@@ -512,6 +523,14 @@
             <p>
               Lumen detects custom scroll containers and captures against the active scroll root
               instead of assuming the entire document.
+            </p>
+          </article>
+
+          <article class="mechanic-row" data-reveal>
+            <strong>Adaptive page height</strong>
+            <p>
+              The capture loop updates page height while it scrolls, so late-loading content can
+              extend the document without being clipped from the final export.
             </p>
           </article>
 

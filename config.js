@@ -4,6 +4,8 @@ export const LUMEN_CONFIG = {
     maxSegments: 30,
     captureThrottleMs: 550,
     historyLimit: 12,
+    lateOverlaySettleMs: 140,
+    mediaSettleTimeoutMs: 2200,
     preflightStepFactor: 0.82,
     preflightPauseMs: 36,
     segmentSettleMs: 180,

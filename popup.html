@@ -29,6 +29,7 @@
 
         <div class="hero-ribbon">
           <span>Sticky cleanup</span>
+          <span>Late overlay watch</span>
           <span>Retina stitch</span>
           <span>Responsive set</span>
           <span>Page signals</span>
@@ -48,7 +49,7 @@
         <label class="toggle-row">
           <span>
             <strong>Remove sticky headers</strong>
-            <small>Hide fixed, sticky, and high-layer UI before each stitched pass.</small>
+            <small>Hide fixed, sticky, and high-layer UI before capture, then recheck for late overlays while the page scrolls.</small>
           </span>
           <input id="removeStickyHeaders" type="checkbox" />
           <span class="toggle-shell"><span class="toggle-knob"></span></span>
@@ -57,7 +58,7 @@
         <label class="toggle-row">
           <span>
             <strong>Force lazy load</strong>
-            <small>Run a fast pre-flight scroll to wake images, embeds, and deferred media.</small>
+            <small>Run a fast pre-flight scroll, nudge lazy assets toward eager loading, and give visible media a short settle window.</small>
           </span>
           <input id="forceLazyLoad" type="checkbox" />
           <span class="toggle-shell"><span class="toggle-knob"></span></span>

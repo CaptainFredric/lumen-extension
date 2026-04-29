@@ -395,6 +395,8 @@ async function capturePageSegments(target, page, sessionId, variant) {
     });
 
     const actualTop = scrollResult?.top ?? 0;
+    page.pageHeight = Math.max(page.pageHeight, scrollResult?.pageHeight ?? page.pageHeight);
+    page.viewportHeight = scrollResult?.viewportHeight ?? page.viewportHeight;
 
     await sleep(LUMEN_CONFIG.capture.segmentSettleMs);
     lastCaptureTimestamp = await waitForCaptureWindow(lastCaptureTimestamp);
