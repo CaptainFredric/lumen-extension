@@ -79,6 +79,15 @@ npm run api
 
 The local API listens on `http://127.0.0.1:8787`.
 
+### Run The Landing Site Locally
+
+```bash
+npm install
+npm run site
+```
+
+The public landing page will be available at `http://127.0.0.1:3000/`.
+
 ### Use The Extension
 
 1. Open any normal `https://` page

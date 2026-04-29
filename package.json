@@ -6,6 +6,7 @@
   "scripts": {
     "check": "node --check background.js && node --check content.js && node --check popup.js && node --check offscreen.js && node --check docs/script.js && node --check backend/server.mjs",
     "api": "node backend/server.mjs",
+    "site": "node scripts/site-server.mjs",
     "proof:assets": "node scripts/generate-proof-artifacts.mjs",
     "proof:install-browser": "playwright install chromium"
   },
