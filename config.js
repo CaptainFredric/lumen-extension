@@ -51,10 +51,20 @@ export const LUMEN_CONFIG = {
     forceLazyLoad: true,
     autoRedact: false,
     exportManifest: true,
+    annotationEnabled: false,
+    annotationText: "",
+    annotationPosition: "top-right",
     devicePreset: "desktop",
     exportPreset: "raw"
   }
 };
+
+const CAPTURE_NOTE_POSITIONS = new Set([
+  "top-left",
+  "top-right",
+  "bottom-left",
+  "bottom-right"
+]);
 
 export const STORAGE_KEYS = {
   settings: "lumen.capture.settings",
@@ -83,6 +93,21 @@ export function buildOriginPattern(rawUrl) {
 
 export function getDefaultSettings() {
   return structuredClone(LUMEN_CONFIG.defaults);
+}
+
+export function normalizeCaptureNoteOptions(settings = {}) {
+  const text = typeof settings.annotationText === "string"
+    ? settings.annotationText.trim().replace(/\s+/g, " ").slice(0, 180)
+    : "";
+  const position = CAPTURE_NOTE_POSITIONS.has(settings.annotationPosition)
+    ? settings.annotationPosition
+    : LUMEN_CONFIG.defaults.annotationPosition;
+
+  return {
+    enabled: Boolean(settings.annotationEnabled),
+    text,
+    position
+  };
 }
 
 export function isOriginPermissionSupported(rawUrl = "") {

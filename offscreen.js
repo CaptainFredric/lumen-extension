@@ -1,4 +1,4 @@
-import { LUMEN_CONFIG } from "./config.js";
+import { LUMEN_CONFIG, normalizeCaptureNoteOptions } from "./config.js";
 
 const MAX_CANVAS_EDGE = 16384;
 const MAX_CANVAS_AREA = 268435456;
@@ -102,7 +102,18 @@ async function renderSession(session) {
     height: renderModel.canvasHeight,
     pixelRatio: renderModel.effectiveScale,
     appliedPreset,
-    redactionCount: renderModel.redactions.length
+    redactionCount: renderModel.redactions.length,
+    annotation: renderModel.annotation
+      ? {
+          enabled: true,
+          position: renderModel.annotation.position,
+          text: renderModel.annotation.text
+        }
+      : {
+          enabled: false,
+          position: "",
+          text: ""
+        }
   };
 }
 
@@ -128,11 +139,18 @@ async function buildRenderModel(session) {
     firstImage.naturalWidth / session.page.viewportWidth || session.page.devicePixelRatio || 1;
   const canvasWidth = Math.max(1, Math.round(session.page.viewportWidth * effectiveScale));
   const canvasHeight = Math.max(1, Math.round(session.page.pageHeight * effectiveScale));
+  const annotation = buildCaptureAnnotation({
+    canvasWidth,
+    canvasHeight,
+    effectiveScale,
+    note: normalizeCaptureNoteOptions(session.options)
+  });
 
   return {
     canvasWidth,
     canvasHeight,
     effectiveScale,
+    annotation,
     redactions: (session.redactions || []).map((region) => ({
       ...region,
       left: Math.max(0, Math.round(region.left * effectiveScale)),
@@ -222,6 +240,7 @@ function renderSliceCanvas(renderModel, sliceStart, sliceEnd) {
   }
 
   applyRedactionRegions(canvas, context, renderModel.redactions, sliceStart, sliceEnd);
+  applyCaptureAnnotation(context, renderModel.annotation, sliceStart, sliceEnd);
 
   return canvas;
 }
@@ -417,6 +436,21 @@ function applyRedactionRegions(canvas, context, redactions, sliceStart, sliceEnd
   }
 }
 
+function applyCaptureAnnotation(context, annotation, sliceStart, sliceEnd) {
+  if (!annotation) {
+    return;
+  }
+
+  const drawStart = Math.max(sliceStart, annotation.top);
+  const drawEnd = Math.min(sliceEnd, annotation.top + annotation.height);
+
+  if (drawEnd <= drawStart) {
+    return;
+  }
+
+  drawCaptureAnnotation(context, annotation, sliceStart);
+}
+
 function pixelateRegion(canvas, context, x, y, width, height) {
   const sourceCanvas = document.createElement("canvas");
   sourceCanvas.width = width;
@@ -477,6 +511,207 @@ function drawRedactionShell(context, x, y, width, height, kind) {
   }
 
   context.restore();
+}
+
+function buildCaptureAnnotation({ canvasWidth, canvasHeight, effectiveScale, note }) {
+  if (!note.enabled || !note.text) {
+    return null;
+  }
+
+  const measureCanvas = document.createElement("canvas");
+  const measureContext = measureCanvas.getContext("2d");
+
+  if (!measureContext) {
+    return null;
+  }
+
+  const margin = Math.max(28, Math.round(30 * effectiveScale));
+  const horizontalPadding = Math.max(18, Math.round(20 * effectiveScale));
+  const verticalPadding = Math.max(16, Math.round(18 * effectiveScale));
+  const labelFontSize = Math.max(10, Math.round(11 * effectiveScale));
+  const bodyFontSize = Math.max(14, Math.round(15 * effectiveScale));
+  const labelLineHeight = Math.round(labelFontSize * 1.35);
+  const bodyLineHeight = Math.round(bodyFontSize * 1.45);
+  const labelGap = Math.max(8, Math.round(8 * effectiveScale));
+  const availableWidth = canvasWidth - margin * 2;
+
+  if (availableWidth <= horizontalPadding * 2 + 40) {
+    return null;
+  }
+
+  const maxWidth = Math.max(
+    Math.round(Math.min(availableWidth, 220 * effectiveScale)),
+    Math.min(
+      availableWidth,
+      Math.round(canvasWidth * 0.42),
+      Math.round(410 * effectiveScale)
+    )
+  );
+
+  measureContext.font = `600 ${bodyFontSize}px "SF Pro Display", "IBM Plex Sans", sans-serif`;
+  const lines = wrapTextLines(measureContext, note.text, maxWidth - horizontalPadding * 2, 5);
+  const contentHeight = labelLineHeight + labelGap + lines.length * bodyLineHeight;
+  const height = contentHeight + verticalPadding * 2;
+  const radius = Math.max(18, Math.round(20 * effectiveScale));
+  const x = note.position.includes("left")
+    ? margin
+    : Math.max(margin, canvasWidth - margin - maxWidth);
+  const y = note.position.includes("top")
+    ? margin
+    : Math.max(margin, canvasHeight - margin - height);
+
+  return {
+    text: note.text,
+    position: note.position,
+    left: x,
+    top: y,
+    width: maxWidth,
+    height,
+    radius,
+    horizontalPadding,
+    verticalPadding,
+    labelFontSize,
+    bodyFontSize,
+    labelLineHeight,
+    bodyLineHeight,
+    labelGap,
+    lines
+  };
+}
+
+function drawCaptureAnnotation(context, annotation, sliceStart) {
+  const localTop = annotation.top - sliceStart;
+  const labelY = localTop + annotation.verticalPadding + annotation.labelLineHeight - 2;
+  const textStartY = localTop + annotation.verticalPadding + annotation.labelLineHeight + annotation.labelGap;
+
+  context.save();
+  context.shadowColor = "rgba(4, 10, 18, 0.36)";
+  context.shadowBlur = 28;
+  context.shadowOffsetY = 14;
+  drawRoundedRect(
+    context,
+    annotation.left,
+    localTop,
+    annotation.width,
+    annotation.height,
+    annotation.radius,
+    "rgba(8, 13, 24, 0.84)"
+  );
+  context.restore();
+
+  context.save();
+  roundPath(context, annotation.left, localTop, annotation.width, annotation.height, annotation.radius);
+  context.clip();
+
+  const fill = context.createLinearGradient(
+    annotation.left,
+    localTop,
+    annotation.left + annotation.width,
+    localTop + annotation.height
+  );
+  fill.addColorStop(0, "rgba(16, 24, 38, 0.96)");
+  fill.addColorStop(1, "rgba(8, 12, 22, 0.92)");
+  context.fillStyle = fill;
+  context.fillRect(annotation.left, localTop, annotation.width, annotation.height);
+
+  context.fillStyle = "rgba(134, 221, 255, 0.14)";
+  context.fillRect(annotation.left, localTop, annotation.width, Math.max(18, Math.round(annotation.height * 0.18)));
+  context.restore();
+
+  context.save();
+  roundPath(context, annotation.left, localTop, annotation.width, annotation.height, annotation.radius);
+  context.strokeStyle = "rgba(134, 221, 255, 0.26)";
+  context.lineWidth = Math.max(1, Math.round(annotation.bodyFontSize / 12));
+  context.stroke();
+
+  context.fillStyle = "#86ddff";
+  context.font = `700 ${annotation.labelFontSize}px "SF Pro Display", "IBM Plex Sans", sans-serif`;
+  context.textBaseline = "alphabetic";
+  context.fillText("CAPTURE NOTE", annotation.left + annotation.horizontalPadding, labelY);
+
+  context.fillStyle = "rgba(244, 247, 255, 0.92)";
+  context.font = `600 ${annotation.bodyFontSize}px "SF Pro Display", "IBM Plex Sans", sans-serif`;
+
+  annotation.lines.forEach((line, index) => {
+    context.fillText(
+      line,
+      annotation.left + annotation.horizontalPadding,
+      textStartY + annotation.bodyLineHeight * (index + 0.92)
+    );
+  });
+
+  const accentY = annotation.position.includes("top")
+    ? localTop + annotation.height - Math.max(20, Math.round(annotation.bodyFontSize * 1.3))
+    : localTop + Math.max(18, Math.round(annotation.bodyFontSize * 1.1));
+
+  context.strokeStyle = "rgba(134, 221, 255, 0.28)";
+  context.lineWidth = Math.max(2, Math.round(annotation.bodyFontSize / 7));
+  context.beginPath();
+
+  if (annotation.position.includes("left")) {
+    context.moveTo(annotation.left + 16, accentY);
+    context.lineTo(annotation.left + Math.min(annotation.width * 0.28, 72), accentY);
+  } else {
+    context.moveTo(annotation.left + annotation.width - 16, accentY);
+    context.lineTo(annotation.left + annotation.width - Math.min(annotation.width * 0.28, 72), accentY);
+  }
+
+  context.stroke();
+  context.restore();
+}
+
+function wrapTextLines(context, text, maxWidth, maxLines) {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines = [];
+  let currentLine = "";
+
+  for (const word of words) {
+    const candidate = currentLine ? `${currentLine} ${word}` : word;
+
+    if (!currentLine || context.measureText(candidate).width <= maxWidth) {
+      currentLine = candidate;
+      continue;
+    }
+
+    lines.push(currentLine);
+
+    if (lines.length === maxLines - 1) {
+      currentLine = truncateLine(context, word, maxWidth);
+      break;
+    }
+
+    currentLine = word;
+  }
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  if (lines.length > maxLines) {
+    return lines.slice(0, maxLines);
+  }
+
+  if (lines.length === maxLines) {
+    lines[maxLines - 1] = truncateLine(context, lines[maxLines - 1], maxWidth);
+  }
+
+  return lines;
+}
+
+function truncateLine(context, text, maxWidth) {
+  const ellipsis = "...";
+
+  if (context.measureText(text).width <= maxWidth) {
+    return text;
+  }
+
+  let result = text;
+
+  while (result.length > 1 && context.measureText(`${result}${ellipsis}`).width > maxWidth) {
+    result = result.slice(0, -1).trimEnd();
+  }
+
+  return `${result}${ellipsis}`;
 }
 
 function formatRedactionLabel(kind) {

@@ -22,20 +22,22 @@ The current build includes:
 4. full-page stitching with offscreen composition
 5. desktop, tablet, mobile, and responsive-set capture modes
 6. export-time redaction for emails, phone numbers, token-like strings, and filled inputs
-7. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
-8. bundle-manifest JSON exports with view, redaction, and signal metadata
-9. local capture history with file and summary metadata
-10. a local backend slice for demo session state and history sync when an API is reachable
-11. a GitHub Pages landing site in `docs/`
+7. anchored capture notes rendered into the exported image
+8. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
+9. bundle-manifest JSON exports with view, redaction, signal, and note metadata
+10. local capture history with file and summary metadata
+11. a local backend slice for demo session state and history sync when an API is reachable
+12. a GitHub Pages landing site in `docs/`
 
 ## Current Limits
 
 These limits are important:
 
 1. redaction currently covers visible text and filled inputs during export and should be reviewed before external sharing
-2. cloud sync, billing, annotations, and scheduled monitoring are not implemented as product-ready features
-3. highly dynamic sites with virtualization or unusual scroll behavior can still need site-specific fallback work
-4. the local backend slice is a small demo path, not a production account system
+2. the current annotation pass is one anchored capture note, not a freeform annotation editor
+3. cloud sync, billing, scheduled monitoring, and visual diffs are not implemented as product-ready features
+4. highly dynamic sites with virtualization or unusual scroll behavior can still need site-specific fallback work
+5. the local backend slice is a small demo path, not a production account system
 
 ## Architecture
 
@@ -48,7 +50,7 @@ The current capture flow is:
 3. content script freezes motion, runs the preflight scroll when enabled, and hides sticky or high-layer UI when enabled
 4. background scrolls the page in slices, remeasures the tail when the document grows, and retries a few stalled scrolls before failing
 5. background sends each visible segment to the offscreen document
-6. offscreen stitches the final output using device-pixel-ratio aware composition
+6. offscreen stitches the final output using device-pixel-ratio aware composition and can render one anchored capture note into the artifact
 7. if the page is too large for one safe canvas, the export falls back to tiled raw output
 8. background downloads the files, writes the bundle manifest, writes local history, and restores the page
 
@@ -98,9 +100,10 @@ The public landing page will be available at `http://127.0.0.1:3000/`.
 2. Open the Lumen popup
 3. Choose the capture device and export mode
 4. Enable sticky cleanup, lazy-load forcing, or auto-redaction as needed
-5. Keep `Save bundle manifest` enabled if you want a portable JSON sidecar next to the capture files
-6. Run `Analyze Page` or `Capture Full Page`
-7. Check the latest blueprint and local history in the popup
+5. Add a capture note if you want the export to carry a review comment
+6. Keep `Save bundle manifest` enabled if you want a portable JSON sidecar next to the capture files
+7. Run `Analyze Page` or `Capture Full Page`
+8. Check the latest blueprint and local history in the popup
 
 ## Proof Assets
 
@@ -146,7 +149,7 @@ The script also tries to create `docs/assets/proof-run-bundle.zip` with the syst
 
 These are future layers, not present-day proof:
 
-1. manual annotation tools
+1. freeform annotation tools
 2. cloud sync destinations
 3. auth and billing
 4. scheduled monitoring
@@ -157,5 +160,5 @@ These are future layers, not present-day proof:
 The highest-leverage next steps are:
 
 1. improve capture reliability on difficult real-world sites
-2. add annotation and manual redaction tools
+2. expand the first-pass capture note into freeform annotation and manual redaction tools
 3. tighten the backend from demo session state into a real account path

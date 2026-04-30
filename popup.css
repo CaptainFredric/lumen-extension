@@ -253,6 +253,10 @@ h3 {
   padding-top: 0;
 }
 
+.toggle-row-tight {
+  padding-bottom: 10px;
+}
+
 .toggle-row span:first-child,
 .device-copy {
   display: grid;
@@ -306,6 +310,56 @@ h3 {
   justify-content: space-between;
   gap: 12px;
   padding-top: 6px;
+}
+
+.annotation-panel {
+  display: grid;
+  gap: 10px;
+  padding-top: 6px;
+}
+
+.annotation-block {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: opacity 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.annotation-block.is-disabled {
+  opacity: 0.52;
+}
+
+.annotation-toolbar {
+  display: grid;
+  gap: 8px;
+}
+
+.segmented-control-note {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#annotationText {
+  width: 100%;
+  resize: vertical;
+  min-height: 74px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(5, 11, 20, 0.7);
+  color: var(--text-primary);
+  font: inherit;
+  line-height: 1.45;
+}
+
+#annotationText::placeholder {
+  color: var(--text-tertiary);
+}
+
+#annotationText:disabled {
+  cursor: not-allowed;
 }
 
 .segmented-control {
@@ -648,4 +702,16 @@ h3 {
 .secondary-button:hover,
 .ghost-button:hover {
   transform: translateY(-1px);
+}
+
+.segment:focus-visible,
+.capture-button:focus-visible,
+.secondary-action:focus-visible,
+.feature-chip:focus-visible,
+.secondary-button:focus-visible,
+.ghost-button:focus-visible,
+#annotationText:focus-visible,
+.toggle-row input:focus-visible + .toggle-shell {
+  outline: 2px solid rgba(134, 221, 255, 0.9);
+  outline-offset: 2px;
 }

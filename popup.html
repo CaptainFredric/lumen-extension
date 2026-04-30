@@ -84,6 +84,37 @@
           <span class="toggle-shell"><span class="toggle-knob"></span></span>
         </label>
 
+        <div class="annotation-panel">
+          <label class="toggle-row toggle-row-tight">
+            <span>
+              <strong>Add capture note</strong>
+              <small>Render one anchored review note into the exported image so the capture can carry context with it.</small>
+            </span>
+            <input id="annotationEnabled" type="checkbox" />
+            <span class="toggle-shell"><span class="toggle-knob"></span></span>
+          </label>
+
+          <div id="annotationBlock" class="annotation-block is-disabled">
+            <label class="field-label" for="annotationText">Note text</label>
+            <textarea
+              id="annotationText"
+              rows="3"
+              maxlength="180"
+              placeholder="Example: Pricing hero shifts under the sticky nav after the first scroll."
+            ></textarea>
+
+            <div class="annotation-toolbar">
+              <span class="field-label">Position</span>
+              <div class="segmented-control segmented-control-note" id="annotationPosition">
+                <button type="button" class="segment is-active" data-annotation-position="top-right">Top right</button>
+                <button type="button" class="segment" data-annotation-position="top-left">Top left</button>
+                <button type="button" class="segment" data-annotation-position="bottom-right">Bottom right</button>
+                <button type="button" class="segment" data-annotation-position="bottom-left">Bottom left</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="device-block">
           <div class="device-copy">
             <strong>Capture device</strong>

@@ -6,6 +6,7 @@ import {
   getFeatureAccess,
   getCaptureVariants,
   isOriginPermissionSupported,
+  normalizeCaptureNoteOptions,
   requiresOriginPermission
 } from "./config.js";
 
@@ -16,6 +17,10 @@ const ui = {
   forceLazyLoad: document.querySelector("#forceLazyLoad"),
   autoRedact: document.querySelector("#autoRedact"),
   exportManifest: document.querySelector("#exportManifest"),
+  annotationEnabled: document.querySelector("#annotationEnabled"),
+  annotationBlock: document.querySelector("#annotationBlock"),
+  annotationText: document.querySelector("#annotationText"),
+  annotationPositionButtons: [...document.querySelectorAll("[data-annotation-position]")],
   deviceButtons: [...document.querySelectorAll("[data-device]")],
   exportButtons: [...document.querySelectorAll("[data-export]")],
   statusPanel: document.querySelector("#statusPanel"),
@@ -115,6 +120,11 @@ function bindEvents() {
   ui.forceLazyLoad.addEventListener("change", persistCurrentSettings);
   ui.autoRedact.addEventListener("change", persistCurrentSettings);
   ui.exportManifest.addEventListener("change", persistCurrentSettings);
+  ui.annotationEnabled.addEventListener("change", () => {
+    updateAnnotationControls();
+    persistCurrentSettings();
+  });
+  ui.annotationText.addEventListener("input", persistCurrentSettings);
 
   for (const button of ui.deviceButtons) {
     button.addEventListener("click", () => {
@@ -132,6 +142,14 @@ function bindEvents() {
     });
   }
 
+  for (const button of ui.annotationPositionButtons) {
+    button.addEventListener("click", () => {
+      currentSettings.annotationPosition = button.dataset.annotationPosition;
+      updateAnnotationControls();
+      persistCurrentSettings();
+    });
+  }
+
   ui.captureButton.addEventListener("click", handleCaptureClick);
   ui.analyzeButton.addEventListener("click", handleAnalyzeClick);
   ui.signInButton.addEventListener("click", handleSignIn);
@@ -145,13 +163,20 @@ async function restoreSettings() {
     ...getDefaultSettings(),
     ...(stored[STORAGE_KEYS.settings] || {})
   };
+  const captureNote = normalizeCaptureNoteOptions(currentSettings);
+  currentSettings.annotationEnabled = captureNote.enabled;
+  currentSettings.annotationText = captureNote.text;
+  currentSettings.annotationPosition = captureNote.position;
 
   ui.removeStickyHeaders.checked = Boolean(currentSettings.removeStickyHeaders);
   ui.forceLazyLoad.checked = Boolean(currentSettings.forceLazyLoad);
   ui.autoRedact.checked = Boolean(currentSettings.autoRedact);
   ui.exportManifest.checked = Boolean(currentSettings.exportManifest);
+  ui.annotationEnabled.checked = Boolean(currentSettings.annotationEnabled);
+  ui.annotationText.value = currentSettings.annotationText || "";
   updateDeviceButtons();
   updateExportButtons();
+  updateAnnotationControls();
 }
 
 async function restoreAppState() {
@@ -177,9 +202,19 @@ async function persistCurrentSettings() {
     forceLazyLoad: ui.forceLazyLoad.checked,
     autoRedact: ui.autoRedact.checked,
     exportManifest: ui.exportManifest.checked,
+    annotationEnabled: ui.annotationEnabled.checked,
+    annotationText: ui.annotationText.value,
+    annotationPosition: currentSettings.annotationPosition,
     devicePreset: currentSettings.devicePreset,
     exportPreset: currentSettings.exportPreset
   };
+
+  const captureNote = normalizeCaptureNoteOptions(currentSettings);
+  currentSettings.annotationEnabled = captureNote.enabled;
+  currentSettings.annotationText = captureNote.text;
+  currentSettings.annotationPosition = captureNote.position;
+  ui.annotationEnabled.checked = captureNote.enabled;
+  updateAnnotationControls();
 
   await chrome.storage.sync.set({
     [STORAGE_KEYS.settings]: currentSettings
@@ -195,6 +230,22 @@ function updateDeviceButtons() {
 function updateExportButtons() {
   for (const button of ui.exportButtons) {
     button.classList.toggle("is-active", button.dataset.export === currentSettings.exportPreset);
+  }
+}
+
+function updateAnnotationControls() {
+  const captureNote = normalizeCaptureNoteOptions(currentSettings);
+  const enabled = Boolean(ui.annotationEnabled.checked);
+
+  currentSettings.annotationEnabled = enabled;
+  currentSettings.annotationPosition = captureNote.position;
+  ui.annotationBlock.classList.toggle("is-disabled", !enabled);
+  ui.annotationText.disabled = !enabled;
+
+  for (const button of ui.annotationPositionButtons) {
+    const isActive = button.dataset.annotationPosition === captureNote.position;
+    button.classList.toggle("is-active", isActive);
+    button.disabled = !enabled;
   }
 }
 
@@ -245,7 +296,7 @@ async function handleCaptureClick() {
       tone: "success",
       eyebrow: "Saved",
       title: "Capture complete",
-      detail: buildCaptureSuccessMessage(response, currentSettings.devicePreset),
+      detail: buildCaptureSuccessMessage(response, currentSettings),
       badge: "Ready",
       progress: 1
     });
@@ -487,6 +538,7 @@ function renderHistory(history) {
       item.variants?.length ? `${item.variants.length} view${item.variants.length === 1 ? "" : "s"}` : "",
       `${item.files?.length || 0} file${item.files?.length === 1 ? "" : "s"}`,
       item.manifestFile ? "manifest saved" : "",
+      item.annotation?.text ? "note added" : "",
       item.redactionCount ? `${item.redactionCount} redaction${item.redactionCount === 1 ? "" : "s"}` : "",
       item.blueprintSummary?.siteType || ""
     ]
@@ -494,6 +546,14 @@ function renderHistory(history) {
       .join(" · ");
 
     row.append(topRow, meta);
+
+    if (item.annotation?.text) {
+      const note = document.createElement("p");
+      note.className = "history-meta";
+      note.textContent = `Note: ${item.annotation.text}`;
+      row.append(note);
+    }
+
     ui.historyList.appendChild(row);
   }
 }
@@ -641,18 +701,20 @@ function formatTimestamp(rawValue) {
   }).format(date);
 }
 
-function buildCaptureSuccessMessage(response, devicePreset) {
+function buildCaptureSuccessMessage(response, settings) {
   const fileText = `${response.files.length} file${response.files.length === 1 ? "" : "s"} saved using ${response.exportPreset} export mode`;
-  const variantCount = response.variantCount || getCaptureVariants(devicePreset).length;
+  const variantCount = response.variantCount || getCaptureVariants(settings.devicePreset).length;
   const manifestText = response.manifestFile ? " Bundle manifest saved." : "";
+  const captureNote = normalizeCaptureNoteOptions(settings);
+  const noteText = response.annotation?.enabled || captureNote.enabled ? " Capture note added." : "";
 
   if (!response.redactionCount) {
     return variantCount > 1
-      ? `${fileText}. ${variantCount} responsive views captured.${manifestText}`
-      : `${fileText}.${manifestText}`;
+      ? `${fileText}. ${variantCount} responsive views captured.${manifestText}${noteText}`
+      : `${fileText}.${manifestText}${noteText}`;
   }
 
-  return `${fileText}. ${variantCount > 1 ? `${variantCount} responsive views captured. ` : ""}${response.redactionCount} sensitive region${response.redactionCount === 1 ? "" : "s"} sanitized.${manifestText}`;
+  return `${fileText}. ${variantCount > 1 ? `${variantCount} responsive views captured. ` : ""}${response.redactionCount} sensitive region${response.redactionCount === 1 ? "" : "s"} sanitized.${manifestText}${noteText}`;
 }
 
 function formatCompactNumber(value) {

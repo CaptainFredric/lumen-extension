@@ -3,7 +3,8 @@ import {
   STORAGE_KEYS,
   getDefaultSettings,
   getCaptureVariants,
-  isRestrictedCaptureUrl
+  isRestrictedCaptureUrl,
+  normalizeCaptureNoteOptions
 } from "./config.js";
 import {
   bootstrapAppState,
@@ -139,6 +140,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function runCaptureFlow(options = getDefaultSettings()) {
+  const captureNote = normalizeCaptureNoteOptions(options);
   const sourceTab = await getCurrentTab();
 
   if (!sourceTab?.id || !sourceTab.url) {
@@ -193,6 +195,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     page: firstResult.page,
     capturedAt: new Date().toISOString(),
     options,
+    annotation: captureNote.enabled && captureNote.text ? captureNote : null,
     exportPreset: firstResult.exportPreset,
     variants: variantSummaries,
     redactionCount,
@@ -227,6 +230,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     tileCount,
     redactionCount,
     manifestFile,
+    annotation: captureNote.enabled && captureNote.text ? captureNote : null,
     variants: variantSummaries,
     dimensions: firstResult.dimensions,
     blueprintSummary: blueprint
@@ -253,7 +257,8 @@ async function runCaptureFlow(options = getDefaultSettings()) {
       fileCount: downloadedFiles.length,
       redactionCount,
       variantCount: variants.length,
-      manifestSaved: Boolean(manifestFile)
+      manifestSaved: Boolean(manifestFile),
+      annotationAdded: Boolean(captureNote.enabled && captureNote.text)
     }),
     progress: 1
   });
@@ -266,6 +271,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     tileCount,
     redactionCount,
     manifestFile,
+    annotation: captureNote.enabled && captureNote.text ? captureNote : null,
     variantCount: variants.length,
     dimensions: firstResult.dimensions
   };
@@ -808,13 +814,14 @@ function buildCaptureCompletionDetail({
   fileCount,
   redactionCount,
   variantCount,
-  manifestSaved
+  manifestSaved,
+  annotationAdded
 }) {
   const sliceText = `${segmentCount} slice${segmentCount === 1 ? "" : "s"} stitched`;
   const fileText = `${fileCount} file${fileCount === 1 ? "" : "s"} saved`;
   const variantText = variantCount > 1 ? `${variantCount} responsive views captured` : "";
 
-  if (!redactionCount && !variantText) {
+  if (!redactionCount && !variantText && !manifestSaved && !annotationAdded) {
     return `${sliceText} and ${fileText} successfully.`;
   }
 
@@ -830,6 +837,10 @@ function buildCaptureCompletionDetail({
 
   if (manifestSaved) {
     fragments.push("bundle manifest saved");
+  }
+
+  if (annotationAdded) {
+    fragments.push("capture note added");
   }
 
   return `${fragments.join(", ")}.`;
@@ -957,6 +968,7 @@ function buildCaptureBundleManifest({
   page,
   capturedAt,
   options,
+  annotation,
   exportPreset,
   variants,
   redactionCount,
@@ -982,7 +994,8 @@ function buildCaptureBundleManifest({
       variantCount: variants.length,
       segmentCount,
       tileCount,
-      redactionCount
+      redactionCount,
+      annotation
     },
     variants: variants.map((variant) => ({
       id: variant.id,
