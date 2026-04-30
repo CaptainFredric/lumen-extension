@@ -76,6 +76,29 @@ a:focus-visible {
   box-shadow: 0 0 0 1px rgba(7, 17, 28, 0.98), 0 0 0 4px var(--focus-ring);
 }
 
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px rgba(7, 17, 28, 0.98), 0 0 0 4px var(--focus-ring);
+}
+
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -44px;
+  z-index: 200;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--surface-border);
+  background: rgba(3, 10, 18, 0.96);
+  color: var(--text-primary);
+}
+
+.skip-link:focus-visible {
+  top: 10px;
+}
+
 h1,
 h2,
 h3,
@@ -182,12 +205,26 @@ main,
 .nav-link {
   display: inline-flex;
   align-items: center;
+  gap: 10px;
   min-height: 40px;
   padding: 0 18px;
   border-radius: 6px;
   border: 1px solid var(--surface-border);
   background: rgba(255, 255, 255, 0.04);
   transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
+}
+
+.nav-link-split {
+  padding-right: 8px;
+}
+
+.nav-link-chip {
+  padding: 6px 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .nav-link-strong {
@@ -398,6 +435,20 @@ h3 {
 .site-nav a:hover,
 .workflow-step.is-active {
   transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 .hero-proof {

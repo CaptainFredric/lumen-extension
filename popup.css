@@ -132,7 +132,8 @@ body {
 .tiny-note,
 .pill,
 .status-badge,
-.field-label {
+.field-label,
+.field-meta {
   margin: 0;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -147,8 +148,16 @@ body {
 
 .sub-eyebrow,
 .tiny-note,
-.status-badge {
+.status-badge,
+.field-meta {
   color: var(--text-tertiary);
+}
+
+.field-meta {
+  margin-top: 6px;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-align: right;
 }
 
 .pill,
