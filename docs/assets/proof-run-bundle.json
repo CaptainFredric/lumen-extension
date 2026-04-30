@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generator": "Lumen proof asset script",
-  "capturedAt": "2026-04-30T00:42:21.279Z",
+  "capturedAt": "2026-04-30T23:35:44.279Z",
   "page": {
     "title": "Orbit Release Manager",
     "url": "http://proof.lumen.test/",
@@ -11,7 +11,15 @@
     "devicePreset": "responsive",
     "exportPreset": "raw",
     "responsiveViews": 3,
-    "redactionCount": 4
+    "redactionCount": 4,
+    "redactionBreakdown": {
+      "total": 4,
+      "byKind": {
+        "email": 2,
+        "phone": 1,
+        "secret": 1
+      }
+    }
   },
   "files": [
     "proof-run-desktop.png",

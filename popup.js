@@ -17,8 +17,10 @@ const ui = {
   forceLazyLoad: document.querySelector("#forceLazyLoad"),
   autoRedact: document.querySelector("#autoRedact"),
   manualRedactionCount: document.querySelector("#manualRedactionCount"),
+  previewRedactionsButton: document.querySelector("#previewRedactionsButton"),
   startRedactionPickerButton: document.querySelector("#startRedactionPickerButton"),
   clearManualRedactionsButton: document.querySelector("#clearManualRedactionsButton"),
+  redactionPreviewSummary: document.querySelector("#redactionPreviewSummary"),
   exportManifest: document.querySelector("#exportManifest"),
   annotationEnabled: document.querySelector("#annotationEnabled"),
   annotationBlock: document.querySelector("#annotationBlock"),
@@ -135,6 +137,7 @@ function bindEvents() {
     persistCurrentSettings();
   });
   ui.annotationText.addEventListener("input", persistCurrentSettings);
+  ui.previewRedactionsButton.addEventListener("click", handlePreviewRedactions);
   ui.startRedactionPickerButton.addEventListener("click", handleStartRedactionPicker);
   ui.clearManualRedactionsButton.addEventListener("click", handleClearManualRedactions);
 
@@ -368,6 +371,55 @@ async function handleAnalyzeClick() {
       tone: "error",
       eyebrow: "Inspect",
       title: "Analysis failed",
+      detail: error.message,
+      badge: "Failed",
+      progress: 0.12
+    });
+  } finally {
+    setActionBusy(false);
+  }
+}
+
+async function handlePreviewRedactions() {
+  if (actionBusy) {
+    return;
+  }
+
+  setActionBusy(true);
+
+  showStatus({
+    tone: "neutral",
+    eyebrow: "Redact",
+    title: "Scanning current page",
+    detail: "Checking the current DOM for emails, phone numbers, token-like strings, filled fields, and manual boxes.",
+    badge: "Scan",
+    progress: 0.1
+  });
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "LUMEN_PREVIEW_REDACTIONS"
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error?.description || "Redaction scan could not run.");
+    }
+
+    renderRedactionPreview(response);
+
+    showStatus({
+      tone: "success",
+      eyebrow: "Redact",
+      title: "Redaction scan complete",
+      detail: buildRedactionPreviewText(response),
+      badge: "Ready",
+      progress: 1
+    });
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Redact",
+      title: "Scan failed",
       detail: error.message,
       badge: "Failed",
       progress: 0.12
@@ -672,6 +724,10 @@ function renderManualRedactions(record) {
   ui.clearManualRedactionsButton.disabled = count === 0 || actionBusy;
 }
 
+function renderRedactionPreview(preview) {
+  ui.redactionPreviewSummary.textContent = buildRedactionPreviewText(preview);
+}
+
 function renderBlueprint(blueprint) {
   if (!blueprint) {
     ui.blueprintTimestamp.textContent = "No analysis yet";
@@ -761,6 +817,7 @@ function setActionBusy(isBusy) {
   actionBusy = isBusy;
   ui.captureButton.disabled = isBusy;
   ui.analyzeButton.disabled = isBusy;
+  ui.previewRedactionsButton.disabled = isBusy;
   ui.startRedactionPickerButton.disabled = isBusy;
   ui.clearManualRedactionsButton.disabled = isBusy || !(manualRedactionRecord.regions?.length);
 }
@@ -834,6 +891,26 @@ function buildCaptureSuccessMessage(response, settings) {
   }
 
   return `${fileText}. ${variantCount > 1 ? `${variantCount} responsive views captured. ` : ""}${response.redactionCount} redaction region${response.redactionCount === 1 ? "" : "s"} sanitized.${manifestText}${noteText}${manualText}`;
+}
+
+function buildRedactionPreviewText(preview) {
+  const autoCount = preview?.autoRedactionCount || 0;
+  const manualCount = preview?.manualRedactionCount || 0;
+  const total = preview?.redactionCount ?? autoCount + manualCount;
+  const kinds = formatRedactionKinds(preview?.redactionBreakdown?.byKind);
+
+  if (!total) {
+    return "No sensitive regions detected in the current DOM. Review the page before external sharing.";
+  }
+
+  return `${total} region${total === 1 ? "" : "s"} found: ${autoCount} auto, ${manualCount} manual${kinds ? ` (${kinds})` : ""}.`;
+}
+
+function formatRedactionKinds(byKind = {}) {
+  return Object.entries(byKind)
+    .filter(([, count]) => count > 0)
+    .map(([kind, count]) => `${count} ${kind}`)
+    .join(", ");
 }
 
 async function refreshManualRedactions() {

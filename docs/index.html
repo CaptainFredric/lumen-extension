@@ -165,6 +165,7 @@
   "views": 3,
   "files": 4,
   "redactions": 4,
+  "breakdown": {"email": 2, "phone": 1, "secret": 1},
   "signals": ["palette", "fonts", "cta", "nav"]
 }</code></pre>
               </figure>
@@ -278,6 +279,7 @@
                   <li>Lazy-load forcing</li>
                   <li>Responsive capture sets</li>
                   <li>Auto-redaction on export</li>
+                  <li>Popup redaction preview</li>
                   <li>Manual redaction boxes</li>
                   <li>Anchored capture note</li>
                   <li>Signals extraction</li>
@@ -551,7 +553,7 @@
             <ul class="scope-list">
               <li>Clean sticky, fixed, and overlay page chrome before capture</li>
               <li>Generate desktop, tablet, and mobile bundles in one run</li>
-              <li>Blur sensitive visible text and filled fields in exports</li>
+              <li>Preview and blur sensitive text and filled fields in exports</li>
               <li>Mark manual redaction boxes on the active desktop layout</li>
               <li>Add one anchored capture note into the export</li>
               <li>Extract palette, font, hero, CTA, and navigation signals</li>
@@ -574,12 +576,12 @@
 
       <section class="cta-section" id="docs" data-reveal>
         <p class="kicker">Implemented now</p>
-        <h2>Lumen is early. The current build already handles cleanup, capture, redaction, manual boxes, anchored notes, signals, and a portable bundle manifest.</h2>
+        <h2>Lumen is early. The current build already handles cleanup, capture, redaction preview, manual boxes, anchored notes, signals, and a portable bundle manifest.</h2>
         <p>
-          The repository already covers page cleanup, responsive capture bundles, export redaction,
-          manual desktop redaction boxes, capture notes, page-signal extraction, bundle metadata,
-          and local history. The next work is responsive redaction mapping, freeform annotation,
-          sync, auth, and billing.
+          The repository already covers page cleanup, responsive capture bundles, redaction preview,
+          export redaction, manual desktop redaction boxes, capture notes, page-signal extraction,
+          bundle metadata, and local history. The next work is responsive redaction mapping,
+          freeform annotation, sync, auth, and billing.
         </p>
 
         <div class="cta-actions">

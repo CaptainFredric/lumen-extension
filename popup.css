@@ -348,6 +348,12 @@ h3 {
   margin-right: auto;
 }
 
+.redaction-preview-summary {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
 .annotation-panel {
   display: grid;
   gap: 10px;

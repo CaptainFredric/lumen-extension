@@ -21,20 +21,21 @@ The current build includes:
 3. tail remeasurement and stalled-scroll retries for late-growing pages
 4. full-page stitching with offscreen composition
 5. desktop, tablet, mobile, and responsive-set capture modes
-6. export-time redaction for emails, phone numbers, token-like strings, and filled inputs
-7. manual redaction boxes for areas the scanner cannot infer on the active desktop layout
-8. anchored capture notes rendered into the exported image
-9. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
-10. bundle-manifest JSON exports with view, redaction, signal, and note metadata
-11. local capture history with file and summary metadata
-12. a local backend slice for demo session state and history sync when an API is reachable
-13. a GitHub Pages landing site in `docs/`
+6. export-time redaction for emails, phone numbers, token-like strings, and filled inputs across the current DOM
+7. redaction preview from the popup before export
+8. manual redaction boxes for areas the scanner cannot infer on the active desktop layout
+9. anchored capture notes rendered into the exported image
+10. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
+11. bundle-manifest JSON exports with view, redaction, signal, breakdown, and note metadata
+12. local capture history with file and summary metadata
+13. a local backend slice for demo session state and history sync when an API is reachable
+14. a GitHub Pages landing site in `docs/`
 
 ## Current Limits
 
 These limits are important:
 
-1. redaction currently covers visible text and filled inputs during export and should be reviewed before external sharing
+1. redaction currently covers text and filled inputs present in the current DOM during export and should be reviewed before external sharing
 2. manual redaction boxes currently apply to the active desktop layout only
 3. the current annotation pass is one anchored capture note
 4. cloud sync, billing, scheduled monitoring, and visual diffs remain future work
@@ -102,11 +103,12 @@ The public landing page will be available at `http://127.0.0.1:3000/`.
 2. Open the Lumen popup
 3. Choose the capture device and export mode
 4. Enable sticky cleanup, lazy-load forcing, or auto-redaction as needed
-5. Use `Mark boxes` if you need manual desktop redactions before capture
-6. Add a capture note if you want the export to carry a review comment
-7. Keep `Save bundle manifest` enabled if you want a portable JSON sidecar next to the capture files
-8. Run `Analyze Page` or `Capture Full Page`
-9. Check the latest blueprint and local history in the popup
+5. Use `Scan` to preview detected redaction regions before export
+6. Use `Mark boxes` if you need manual desktop redactions before capture
+7. Add a capture note if you want the export to carry a review comment
+8. Keep `Save bundle manifest` enabled if you want a portable JSON sidecar next to the capture files
+9. Run `Analyze Page` or `Capture Full Page`
+10. Check the latest blueprint and local history in the popup
 
 ## Proof Assets
 

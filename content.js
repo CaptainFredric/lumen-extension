@@ -257,7 +257,8 @@
 
     return {
       count: regions.length,
-      regions
+      regions,
+      breakdown: buildRedactionBreakdown(regions)
     };
   }
 
@@ -1186,7 +1187,7 @@
       const parent = node.parentElement;
       const rawText = node.nodeValue || "";
 
-      if (!parent || !rawText.trim() || shouldSkipSensitiveScan(parent) || !isElementVisible(parent)) {
+      if (!parent || !rawText.trim() || shouldSkipSensitiveScan(parent) || !isElementScannable(parent)) {
         continue;
       }
 
@@ -1221,7 +1222,7 @@
     const regions = [];
 
     for (const node of document.querySelectorAll("input, textarea, [contenteditable='true'], a[href^='mailto:'], a[href^='tel:']")) {
-      if (!(node instanceof HTMLElement) || !isElementVisible(node) || shouldSkipSensitiveScan(node)) {
+      if (!(node instanceof HTMLElement) || !isElementScannable(node) || shouldSkipSensitiveScan(node)) {
         continue;
       }
 
@@ -1365,6 +1366,18 @@
     return merged;
   }
 
+  function buildRedactionBreakdown(regions) {
+    return regions.reduce((breakdown, region) => {
+      const kind = region.kind || "sensitive";
+      breakdown.total += 1;
+      breakdown.byKind[kind] = (breakdown.byKind[kind] || 0) + 1;
+      return breakdown;
+    }, {
+      total: 0,
+      byKind: {}
+    });
+  }
+
   function canMergeSensitiveRegion(left, right) {
     const horizontalGap = right.left - (left.left + left.width);
     const verticalGap = right.top - (left.top + left.height);
@@ -1384,6 +1397,17 @@
     return Boolean(
       node.closest("script, style, noscript, svg, canvas, [aria-hidden='true'], [hidden]")
     );
+  }
+
+  function isElementScannable(node) {
+    const rect = node.getBoundingClientRect();
+
+    if (rect.width <= 0 || rect.height <= 0) {
+      return false;
+    }
+
+    const style = window.getComputedStyle(node);
+    return style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
   }
 
   function isElementVisible(node) {

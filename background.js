@@ -111,6 +111,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "LUMEN_PREVIEW_REDACTIONS") {
+    if (captureInFlight || analyzeInFlight) {
+      sendResponse({
+        ok: false,
+        error: createFriendlyError(
+          "Lumen Is Busy",
+          "Wait for the current capture or analysis to finish before scanning redactions."
+        )
+      });
+      return;
+    }
+
+    runRedactionPreviewFlow()
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
   if (message?.type === "LUMEN_START_REDACTION_PICKER") {
     runManualRedactionPicker()
       .then((result) => sendResponse({ ok: true, ...result }))
@@ -213,6 +232,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
   const tileCount = results.reduce((sum, result) => sum + result.tileCount, 0);
   const redactionCount = results.reduce((sum, result) => sum + result.redactionCount, 0);
   const manualRedactionCount = results.reduce((sum, result) => sum + result.manualRedactionCount, 0);
+  const redactionBreakdown = mergeRedactionBreakdowns(results.map((result) => result.redactionBreakdown));
   const variantSummaries = results.map((result) => ({
     id: result.variant.id,
     label: result.variant.label,
@@ -221,6 +241,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     tileCount: result.tileCount,
     redactionCount: result.redactionCount,
     manualRedactionCount: result.manualRedactionCount,
+    redactionBreakdown: result.redactionBreakdown,
     dimensions: result.dimensions
   }));
 
@@ -237,6 +258,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     variants: variantSummaries,
     redactionCount,
     manualRedactionCount,
+    redactionBreakdown,
     segmentCount,
     tileCount,
     blueprint
@@ -268,6 +290,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     tileCount,
     redactionCount,
     manualRedactionCount,
+    redactionBreakdown,
     manifestFile,
     annotation: captureNote.enabled && captureNote.text ? captureNote : null,
     variants: variantSummaries,
@@ -351,6 +374,49 @@ async function runBlueprintFlow() {
     blueprint,
     captureHistory: localState.captureHistory,
     session: localState.session
+  };
+}
+
+async function runRedactionPreviewFlow() {
+  const sourceTab = await getCurrentTab();
+
+  if (!sourceTab?.id || !sourceTab.url) {
+    throw createFriendlyError(
+      "No Active Page",
+      "Open a normal browser tab, then scan redactions again."
+    );
+  }
+
+  if (isRestrictedCaptureUrl(sourceTab.url)) {
+    throw createFriendlyError(
+      "This Page Cannot Be Scanned",
+      "Chrome blocks script injection on internal and protected pages."
+    );
+  }
+
+  await ensureContentScript(sourceTab.id);
+
+  const [autoScan, manualRecord] = await Promise.all([
+    requestRedactionScan(sourceTab.id),
+    getManualRedactionsForTab(sourceTab)
+  ]);
+  const manualRegions = normalizeManualRedactionRegions(manualRecord.regions);
+  const combinedBreakdown = mergeRedactionBreakdowns([
+    autoScan.breakdown || buildRedactionBreakdown(autoScan.regions),
+    buildRedactionBreakdown(manualRegions)
+  ]);
+
+  return {
+    page: {
+      title: sourceTab.title || "",
+      url: sourceTab.url,
+      host: new URL(sourceTab.url).host
+    },
+    autoRedactionCount: autoScan.regions.length,
+    manualRedactionCount: manualRegions.length,
+    redactionCount: autoScan.regions.length + manualRegions.length,
+    redactionBreakdown: combinedBreakdown,
+    scope: "current DOM"
   };
 }
 
@@ -511,6 +577,41 @@ function normalizeManualRedactionRegions(regions) {
     .slice(0, LUMEN_CONFIG.capture.manualRedactionLimit || 24);
 }
 
+function buildRedactionBreakdown(regions) {
+  return (Array.isArray(regions) ? regions : []).reduce((breakdown, region) => {
+    const kind = region.kind || "sensitive";
+    breakdown.total += 1;
+    breakdown.byKind[kind] = (breakdown.byKind[kind] || 0) + 1;
+    return breakdown;
+  }, {
+    total: 0,
+    byKind: {}
+  });
+}
+
+function mergeRedactionBreakdowns(breakdowns) {
+  return (Array.isArray(breakdowns) ? breakdowns : []).reduce((merged, breakdown) => {
+    if (!breakdown) {
+      return merged;
+    }
+
+    for (const [kind, count] of Object.entries(breakdown.byKind || {})) {
+      const safeCount = Number.isFinite(count) ? count : 0;
+      merged.byKind[kind] = (merged.byKind[kind] || 0) + safeCount;
+      merged.total += safeCount;
+    }
+
+    if (!Object.keys(breakdown.byKind || {}).length && Number.isFinite(breakdown.total)) {
+      merged.total += breakdown.total;
+    }
+
+    return merged;
+  }, {
+    total: 0,
+    byKind: {}
+  });
+}
+
 async function readManualRedactionStore() {
   const stored = await chrome.storage.local.get(STORAGE_KEYS.manualRedactions);
   const value = stored[STORAGE_KEYS.manualRedactions];
@@ -636,6 +737,7 @@ async function captureVariant({ sourceTab, variant, options, manualRedactions, e
       tileCount: stitched.outputs.length,
       redactionCount: stitched.redactionCount,
       manualRedactionCount: manualRegions.length,
+      redactionBreakdown: buildRedactionBreakdown(combinedRedactions),
       exportPreset: stitched.appliedPreset,
       dimensions: {
         width: stitched.width,
@@ -1231,6 +1333,7 @@ function buildCaptureBundleManifest({
   variants,
   redactionCount,
   manualRedactionCount,
+  redactionBreakdown,
   segmentCount,
   tileCount,
   blueprint
@@ -1255,6 +1358,7 @@ function buildCaptureBundleManifest({
       tileCount,
       redactionCount,
       manualRedactionCount,
+      redactionBreakdown,
       annotation
     },
     variants: variants.map((variant) => ({
@@ -1266,6 +1370,7 @@ function buildCaptureBundleManifest({
       tileCount: variant.tileCount,
       redactionCount: variant.redactionCount,
       manualRedactionCount: variant.manualRedactionCount || 0,
+      redactionBreakdown: variant.redactionBreakdown || buildRedactionBreakdown([]),
       dimensions: variant.dimensions
     })),
     pageSignals: blueprint
