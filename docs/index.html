@@ -59,9 +59,11 @@
 
       <nav class="site-nav" aria-label="Primary">
         <a href="#product">Product</a>
-        <a href="#workflow">Workflow</a>
-        <a href="#mechanics">Mechanics</a>
-        <a href="#scope">Scope</a>
+        <a href="#proof">Proof</a>
+        <a href="#workflow">How it works</a>
+        <a href="#mechanics">Implementation</a>
+        <a href="#scope">Roadmap</a>
+        <a href="#docs">Docs</a>
       </nav>
 
       <div class="header-actions">
@@ -71,22 +73,14 @@
           target="_blank"
           rel="noreferrer"
         >
-          Repository
+          View on GitHub
         </a>
         <a
           class="nav-link nav-link-accent"
           href="assets/proof-run-bundle.zip"
           download
         >
-          Sample bundle
-        </a>
-        <a
-          class="nav-link nav-link-strong"
-          href="https://github.com/CaptainFredric"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Dan DeBugger
+          Download sample
         </a>
       </div>
     </header>
@@ -94,11 +88,11 @@
     <main>
       <section class="hero" id="top">
         <div class="hero-copy" data-reveal>
-          <h1>Clean browser capture for design review, QA, and product work.</h1>
+          <p class="hero-kicker">Browser capture for product teams</p>
+          <h1>Clean, responsive,<br />safer evidence<br />from <span>any webpage.</span></h1>
           <p class="hero-body">
-            Lumen removes sticky page chrome before capture, renders desktop, tablet, and mobile
-            outputs in one run, redacts sensitive fields, and extracts useful page signals so the
-            result is more usable than a raw screenshot.
+            Lumen removes page noise before capture, generates responsive sets, redacts sensitive
+            data, and attaches useful signals so a screenshot becomes usable review evidence.
           </p>
 
           <div class="hero-actions">
@@ -109,175 +103,77 @@
             >
               Download the sample bundle
             </a>
-            <a class="secondary-link" href="assets/proof-run-bundle.json" target="_blank" rel="noreferrer">Open the manifest</a>
-          </div>
-
-          <div class="hero-proof" aria-label="Current capabilities">
-            <span>Sticky and overlay cleanup</span>
-            <span>Desktop, tablet, and mobile bundle</span>
-            <span>Sensitive fields blurred</span>
-            <span>Optional capture note</span>
-            <span>Palette, type, and CTA signals</span>
+            <a class="secondary-link" href="https://github.com/CaptainFredric/lumen-extension" target="_blank" rel="noreferrer">View on GitHub</a>
           </div>
 
           <p class="hero-inline-note">
-            Current bundle: 3 image exports, 1 bundle manifest JSON, local history entry, and
-            page signals attached to the run. Capture notes are optional.
+            No account required to test locally. No watermarks. Proof assets are generated from the
+            current prototype.
           </p>
-
-          <div class="hero-run-strip" aria-label="Current run summary">
-            <div class="hero-run-item">
-              <span>Views</span>
-              <strong>3</strong>
-              <p>desktop, tablet, mobile</p>
-            </div>
-            <div class="hero-run-item">
-              <span>Files</span>
-              <strong>4</strong>
-              <p>3 exports plus manifest</p>
-            </div>
-            <div class="hero-run-item">
-              <span>Redactions</span>
-              <strong>4</strong>
-              <p>visible fields and text</p>
-            </div>
-            <div class="hero-run-item">
-              <span>Signals</span>
-              <strong>5</strong>
-              <p>palette, type, CTA, nav, hero</p>
-            </div>
-          </div>
         </div>
 
         <div class="hero-stage" data-tilt data-reveal>
           <div class="evidence-board">
             <div class="evidence-head">
-              <p class="support-label">Current output</p>
-              <span class="evidence-domain">proof.lumen.test</span>
+              <p class="support-label">Current output from the prototype</p>
+              <span class="evidence-domain">Captured Apr 29, 2026 at 10:42 AM</span>
             </div>
 
             <div class="evidence-layout">
-              <figure class="artifact-surface artifact-surface-primary">
+              <figure class="artifact-surface artifact-surface-primary artifact-cell-capture">
+                <p class="artifact-title">1. Cleaned capture, desktop</p>
                 <img
                   class="artifact-image"
                   src="assets/proof-run-desktop.png"
                   alt="Real cleaned desktop capture from the current Lumen proof run."
                 />
-                <figcaption class="artifact-caption">
-                  <div>
-                    <p class="artifact-title">Cleaned capture</p>
-                    <h3>Desktop export after page cleanup</h3>
-                  </div>
-                  <span class="evidence-badge">3 layers hidden</span>
-                </figcaption>
-                <div class="artifact-thumb-row">
-                  <figure class="artifact-thumb">
-                    <img
-                      class="artifact-thumb-image"
-                      src="assets/proof-run-tablet.png"
-                      alt="Real tablet export from the current Lumen proof run."
-                    />
-                    <figcaption>Tablet export</figcaption>
-                  </figure>
-                  <figure class="artifact-thumb">
-                    <img
-                      class="artifact-thumb-image"
-                      src="assets/proof-run-mobile.png"
-                      alt="Real mobile export from the current Lumen proof run."
-                    />
-                    <figcaption>Mobile export</figcaption>
-                  </figure>
-                </div>
               </figure>
 
-              <div class="artifact-column">
-                <figure class="artifact-surface artifact-surface-compact">
-                  <img
-                    class="artifact-image artifact-image-redacted"
-                    src="assets/proof-run-redacted.png"
-                    alt="Real redaction example from the current Lumen proof run."
-                  />
-                  <figcaption class="artifact-copy">
-                    <div class="card-head">
-                      <div>
-                        <p class="artifact-title">Redaction example</p>
-                        <h3>Visible text and filled inputs blurred</h3>
-                      </div>
-                      <span class="evidence-badge">4 found</span>
-                    </div>
-                    <p class="card-note">
-                      Current redaction covers visible text and filled inputs during export and
-                      should be reviewed before external sharing.
-                    </p>
-                  </figcaption>
-                </figure>
+              <figure class="artifact-surface artifact-surface-compact artifact-cell-redaction">
+                <p class="artifact-title">2. Redaction example</p>
+                <img
+                  class="artifact-image artifact-image-redacted"
+                  src="assets/proof-run-redacted.png"
+                  alt="Real redaction example from the current Lumen proof run."
+                />
+                <figcaption class="artifact-copy">
+                  <p class="card-note">4 sensitive regions detected and redacted. Review before external sharing.</p>
+                </figcaption>
+              </figure>
 
-                <figure class="artifact-surface artifact-surface-compact">
-                  <img
-                    class="artifact-image"
-                    src="assets/proof-run-signals.png"
-                    alt="Extracted signals panel rendered from the current Lumen proof run."
-                  />
-                  <figcaption class="artifact-copy">
-                    <div class="card-head">
-                      <div>
-                        <p class="artifact-title">Signals panel</p>
-                        <h3>Extracted from the proof page</h3>
-                      </div>
-                      <span class="evidence-badge">JSON</span>
-                    </div>
-                    <p class="card-note">
-                      Headline, CTA, navigation, palette, and typography come from the prototype
-                      extraction pass, not a hand-written mock.
-                    </p>
-                  </figcaption>
-                </figure>
+              <figure class="artifact-surface artifact-surface-compact artifact-cell-signals">
+                <p class="artifact-title">3. Page signals, extract</p>
+                <img
+                  class="artifact-image"
+                  src="assets/proof-run-signals.png"
+                  alt="Extracted signals panel rendered from the current Lumen proof run."
+                />
+              </figure>
 
-                <figure class="artifact-surface artifact-surface-compact">
-                  <img
-                    class="artifact-image artifact-image-history"
-                    src="assets/proof-run-history.png"
-                    alt="Local history item rendered from the current Lumen proof run."
-                  />
-                  <figcaption class="artifact-copy">
-                    <div class="card-head">
-                      <div>
-                        <p class="artifact-title">Local history item</p>
-                        <h3>Written after the run</h3>
-                      </div>
-                      <span class="evidence-badge">4 files</span>
-                    </div>
-                    <p class="card-note">
-                      The current history entry tracks host, timestamp, views, files, redactions,
-                      and site type.
-                    </p>
-                  </figcaption>
-                </figure>
+              <figure class="artifact-surface artifact-surface-compact artifact-cell-history">
+                <p class="artifact-title">4. Local history, latest</p>
+                <img
+                  class="artifact-image artifact-image-history"
+                  src="assets/proof-run-history.png"
+                  alt="Local history item rendered from the current Lumen proof run."
+                />
+              </figure>
 
-                <figure class="artifact-surface artifact-surface-compact artifact-surface-manifest">
-                  <figcaption class="artifact-copy">
-                    <div class="card-head">
-                      <div>
-                        <p class="artifact-title">Bundle manifest</p>
-                        <h3>Saved beside the images</h3>
-                      </div>
-                      <span class="evidence-badge">JSON</span>
-                    </div>
-                    <pre class="manifest-preview"><code>{
+              <figure class="artifact-surface artifact-surface-compact artifact-surface-manifest artifact-cell-manifest">
+                <p class="artifact-title">5. Bundle manifest, JSON</p>
+                <pre class="manifest-preview"><code>{
   "views": 3,
   "files": 4,
   "redactions": 4,
   "signals": ["palette", "fonts", "cta", "nav"]
 }</code></pre>
-                  </figcaption>
-                </figure>
-              </div>
+              </figure>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="proof-strip-section" data-reveal>
+      <section class="proof-strip-section" id="proof" data-reveal>
         <div class="proof-strip-intro">
           <p class="proof-label">Proof: real run output</p>
           <p class="proof-strip-copy">
@@ -682,7 +578,7 @@
         </div>
       </section>
 
-      <section class="cta-section" data-reveal>
+      <section class="cta-section" id="docs" data-reveal>
         <p class="kicker">Implemented now</p>
         <h2>Lumen is early. The current build already handles cleanup, capture, redaction, anchored notes, signals, and a portable bundle manifest.</h2>
         <p>
