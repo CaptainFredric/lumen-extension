@@ -486,6 +486,7 @@ function renderHistory(history) {
       formatTimestamp(item.capturedAt),
       item.variants?.length ? `${item.variants.length} view${item.variants.length === 1 ? "" : "s"}` : "",
       `${item.files?.length || 0} file${item.files?.length === 1 ? "" : "s"}`,
+      item.manifestFile ? "manifest saved" : "",
       item.redactionCount ? `${item.redactionCount} redaction${item.redactionCount === 1 ? "" : "s"}` : "",
       item.blueprintSummary?.siteType || ""
     ]

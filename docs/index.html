@@ -87,13 +87,6 @@
     <main>
       <section class="hero" id="top">
         <div class="hero-copy" data-reveal>
-          <p class="kicker">Implemented now</p>
-          <p class="maker-line">
-            Built publicly by
-            <a href="https://github.com/CaptainFredric" target="_blank" rel="noreferrer">
-              Dan DeBugger
-            </a>
-          </p>
           <h1>Clean browser capture for design review, QA, and product work.</h1>
           <p class="hero-body">
             Lumen removes sticky page chrome before capture, renders desktop, tablet, and mobile
@@ -124,6 +117,29 @@
             Current bundle: 3 image exports, 1 bundle manifest JSON, local history entry, and
             page signals attached to the run.
           </p>
+
+          <div class="hero-run-strip" aria-label="Current run summary">
+            <div class="hero-run-item">
+              <span>Views</span>
+              <strong>3</strong>
+              <p>desktop, tablet, mobile</p>
+            </div>
+            <div class="hero-run-item">
+              <span>Files</span>
+              <strong>4</strong>
+              <p>3 exports plus manifest</p>
+            </div>
+            <div class="hero-run-item">
+              <span>Redactions</span>
+              <strong>4</strong>
+              <p>visible fields and text</p>
+            </div>
+            <div class="hero-run-item">
+              <span>Signals</span>
+              <strong>5</strong>
+              <p>palette, type, CTA, nav, hero</p>
+            </div>
+          </div>
         </div>
 
         <div class="hero-stage" data-tilt data-reveal>
@@ -222,12 +238,30 @@
                         <p class="artifact-title">Local history item</p>
                         <h3>Written after the run</h3>
                       </div>
-                      <span class="evidence-badge">3 files</span>
+                      <span class="evidence-badge">4 files</span>
                     </div>
                     <p class="card-note">
                       The current history entry tracks host, timestamp, views, files, redactions,
                       and site type.
                     </p>
+                  </figcaption>
+                </figure>
+
+                <figure class="artifact-surface artifact-surface-compact artifact-surface-manifest">
+                  <figcaption class="artifact-copy">
+                    <div class="card-head">
+                      <div>
+                        <p class="artifact-title">Bundle manifest</p>
+                        <h3>Saved beside the images</h3>
+                      </div>
+                      <span class="evidence-badge">JSON</span>
+                    </div>
+                    <pre class="manifest-preview"><code>{
+  "views": 3,
+  "files": 4,
+  "redactions": 4,
+  "signals": ["palette", "fonts", "cta", "nav"]
+}</code></pre>
                   </figcaption>
                 </figure>
               </div>
