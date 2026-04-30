@@ -74,6 +74,13 @@
           Repository
         </a>
         <a
+          class="nav-link nav-link-accent"
+          href="assets/proof-run-bundle.zip"
+          download
+        >
+          Sample bundle
+        </a>
+        <a
           class="nav-link nav-link-strong"
           href="https://github.com/CaptainFredric"
           target="_blank"
@@ -97,13 +104,12 @@
           <div class="hero-actions">
             <a
               class="primary-link"
-              href="https://github.com/CaptainFredric/lumen-extension"
-              target="_blank"
-              rel="noreferrer"
+              href="assets/proof-run-bundle.zip"
+              download
             >
-              Read the repository
+              Download the sample bundle
             </a>
-            <a class="secondary-link" href="#workflow">See the workflow</a>
+            <a class="secondary-link" href="assets/proof-run-bundle.json" target="_blank" rel="noreferrer">Open the manifest</a>
           </div>
 
           <div class="hero-proof" aria-label="Current capabilities">
@@ -270,48 +276,66 @@
         </div>
       </section>
 
-      <section class="statement-band" data-reveal>
-        <p>
-          The screenshot is raw input. The useful artifact is the cleaned, responsive, safer
-          capture bundle with the page context still attached.
-        </p>
-      </section>
-
-      <section class="proof-block" data-reveal>
-        <div class="section-head">
-          <p class="kicker">Implemented now</p>
-          <h2>One local run creates a concrete bundle.</h2>
+      <section class="proof-strip-section" data-reveal>
+        <div class="proof-strip-intro">
+          <p class="proof-label">Proof: real run output</p>
+          <p class="proof-strip-copy">
+            The screenshot is raw input. The useful artifact is the cleaned, responsive, safer
+            capture bundle with the page context still attached.
+          </p>
         </div>
 
-        <div class="proof-block-grid">
-          <div class="proof-block-copy">
-            <p class="proof-label">Artifact structure</p>
-            <ul class="proof-list">
-              <li>3 image exports: <code>proof-run-desktop.png</code>, <code>proof-run-tablet.png</code>, <code>proof-run-mobile.png</code></li>
-              <li>1 bundle manifest: <code>proof-run-bundle.json</code></li>
-              <li>4 redactions found in the sensitive-data example</li>
-              <li>1 local history item created for <code>Orbit Release Manager</code></li>
-            </ul>
+        <div class="proof-strip-grid">
+          <div class="proof-metrics-card">
+            <div class="proof-metric">
+              <strong>3</strong>
+              <span>Image exports</span>
+              <p>Desktop, tablet, mobile</p>
+            </div>
+            <div class="proof-metric">
+              <strong>1</strong>
+              <span>Bundle manifest</span>
+              <p>JSON sidecar included</p>
+            </div>
+            <div class="proof-metric">
+              <strong>4</strong>
+              <span>Redactions applied</span>
+              <p>Visible text and inputs</p>
+            </div>
+            <div class="proof-metric">
+              <strong>1</strong>
+              <span>History entry</span>
+              <p>Stored locally</p>
+            </div>
           </div>
 
-          <div class="proof-block-panel">
-            <p class="proof-label">Last local run</p>
-            <div class="proof-file-list">
-              <span>proof-run-desktop.png</span>
-              <span>proof-run-tablet.png</span>
-              <span>proof-run-mobile.png</span>
-              <span>proof-run-bundle.json</span>
+          <div class="proof-summary-card">
+            <p class="proof-label">Run summary</p>
+            <div class="proof-summary-grid">
+              <span>URL</span>
+              <strong>proof.lumen.test</strong>
+              <span>Files</span>
+              <strong>4</strong>
+              <span>Views</span>
+              <strong>3</strong>
+              <span>Redactions</span>
+              <strong>4</strong>
             </div>
-            <p class="proof-inline-note">
-              Generated from the current prototype using the content-script cleanup, redaction scan,
-              and signal extraction logic.
+          </div>
+
+          <div class="proof-download-card">
+            <p class="proof-label">Try the artifact</p>
+            <h3>Inspect the current sample bundle.</h3>
+            <p class="card-note">
+              Download the same proof package shown on this page and inspect the images, bundle
+              manifest, and extracted signals directly.
             </p>
             <div class="proof-actions">
               <a class="proof-link proof-link-strong" href="assets/proof-run-bundle.zip" download>
-                Download sample bundle
+                Download proof bundle
               </a>
-              <a class="proof-link" href="assets/proof-run-bundle.json" target="_blank" rel="noreferrer">
-                Open manifest JSON
+              <a class="proof-link" href="assets/proof-run-summary.json" target="_blank" rel="noreferrer">
+                Open run summary
               </a>
             </div>
           </div>
@@ -320,124 +344,67 @@
 
       <section class="support-section" id="product">
         <div class="section-head" data-reveal>
-          <p class="kicker">Implemented now</p>
-          <h2>What the prototype does today.</h2>
+          <p class="kicker">Current product scope</p>
+          <h2>What the build already does, and what still needs product work.</h2>
           <p class="section-body">
-            The current prototype already handles page cleanup, responsive capture, export
-            redaction, and page-signal extraction for review work.
+            The current prototype already covers the capture workflow itself. The remaining work is
+            around editing, sync, and broader product layers.
           </p>
         </div>
 
         <div class="support-grid">
-          <div class="support-copy" data-reveal>
-            <article class="support-row">
-              <span class="status-tag">Implemented</span>
-              <div>
-                <h3>Clean the page before capture</h3>
-                <p>
-                  Fixed, sticky, and high-z layers are temporarily hidden so exports start from the
-                  page itself instead of floating chrome.
-                </p>
-              </div>
-            </article>
-
-            <article class="support-row">
-              <span class="status-tag">Implemented</span>
-              <div>
-                <h3>Capture the responsive set</h3>
-                <p>
-                  One action can generate desktop, tablet, and mobile outputs together so reviews
-                  do not depend on a single lucky viewport.
-                </p>
-              </div>
-            </article>
-
-            <article class="support-row">
-              <span class="status-tag">Implemented</span>
-              <div>
-                <h3>Sanitize the export</h3>
-                <p>
-                  Emails, phone numbers, token-like strings, and filled fields can be blurred as
-                  part of export. Current redaction covers visible text and filled inputs during
-                  export and should be reviewed before external sharing.
-                </p>
-              </div>
-            </article>
-
-            <article class="support-row">
-              <span class="status-tag">Implemented</span>
-              <div>
-                <h3>Keep useful page signals</h3>
-                <p>
-                  The capture can carry palette, fonts, hero copy, CTA language, and navigation
-                  labels so the output stays useful in review and reference work.
-                </p>
-              </div>
-            </article>
+          <div class="support-flow-card" data-reveal>
+            <p class="support-label">How it works</p>
+            <div class="support-flow-steps">
+              <article>
+                <strong>1</strong>
+                <h3>Clean the page</h3>
+                <p>Remove sticky headers, banners, chat launchers, and overlay chrome.</p>
+              </article>
+              <article>
+                <strong>2</strong>
+                <h3>Load everything</h3>
+                <p>Force lazy content to render before the stitched capture starts.</p>
+              </article>
+              <article>
+                <strong>3</strong>
+                <h3>Capture responsive</h3>
+                <p>Generate desktop, tablet, and mobile outputs in one grouped bundle.</p>
+              </article>
+              <article>
+                <strong>4</strong>
+                <h3>Redact and extract</h3>
+                <p>Blur visible sensitive data and keep colors, fonts, CTA, and nav attached.</p>
+              </article>
+            </div>
           </div>
 
           <div class="support-visual" data-reveal>
-            <div class="support-panel support-panel-top">
-              <p class="support-label">Last local run</p>
-              <div class="file-list">
-                <div>
-                  <strong>proof-run-desktop.png</strong>
-                  <span>full-page desktop export</span>
-                </div>
-                <div>
-                  <strong>proof-run-tablet.png</strong>
-                  <span>responsive tablet export</span>
-                </div>
-                <div>
-                  <strong>proof-run-mobile.png</strong>
-                  <span>responsive mobile export</span>
-                </div>
-                <div>
-                  <strong>proof-run-bundle.json</strong>
-                  <span>views, redactions, and page signals</span>
-                </div>
+            <div class="support-panel support-panel-split">
+              <div class="support-split-block">
+                <p class="support-label">Implemented now</p>
+                <ul class="support-notes support-notes-tight">
+                  <li>Sticky and overlay cleanup</li>
+                  <li>Lazy-load forcing</li>
+                  <li>Responsive capture sets</li>
+                  <li>Auto-redaction on export</li>
+                  <li>Signals extraction</li>
+                  <li>Bundle manifest JSON sidecar</li>
+                  <li>Local history with run details</li>
+                  <li>Tail remeasurement and stall retry</li>
+                </ul>
               </div>
-            </div>
 
-            <div class="support-panel support-panel-bottom">
-              <p class="support-label">Run summary</p>
-              <div class="support-metrics">
-                <div>
-                  <strong>3</strong>
-                  <span>responsive views</span>
-                </div>
-                <div>
-                  <strong>4</strong>
-                  <span>redactions</span>
-                </div>
-                <div>
-                  <strong>2</strong>
-                  <span>fonts detected</span>
-                </div>
-              </div>
-              <ul class="support-notes">
-                <li>Sticky header and chat widget hidden during capture</li>
-                <li>Lazy-loaded media forced before export</li>
-                <li>Page height can grow during capture and the loop keeps following it</li>
-                <li>Tail of the page is remeasured before the run is marked complete</li>
-                <li>Capture history persisted locally for later review</li>
-              </ul>
-            </div>
-
-            <div class="support-panel support-panel-download">
-              <p class="support-label">Try the artifact</p>
-              <h3>Inspect the current sample bundle.</h3>
-              <p class="card-note">
-                Download the same proof package shown on this page and inspect the images, bundle
-                manifest, and extracted signals directly.
-              </p>
-              <div class="proof-actions">
-                <a class="proof-link proof-link-strong" href="assets/proof-run-bundle.zip" download>
-                  Download proof bundle
-                </a>
-                <a class="proof-link" href="assets/proof-run-summary.json" target="_blank" rel="noreferrer">
-                  Open run summary
-                </a>
+              <div class="support-split-block support-split-next">
+                <p class="support-label">Next</p>
+                <ul class="support-notes support-notes-tight">
+                  <li>Manual annotations</li>
+                  <li>Manual redaction boxes</li>
+                  <li>Cloud sync and team handoff</li>
+                  <li>Scheduled captures</li>
+                  <li>Visual diffs</li>
+                  <li>Auth, billing, and plans</li>
+                </ul>
               </div>
             </div>
           </div>
