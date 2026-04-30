@@ -18,6 +18,7 @@ build/
 coverage/
 *.zip
 *.crx
+!docs/assets/proof-run-bundle.zip
 
 # dependencies
 node_modules/

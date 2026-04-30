@@ -1,8 +1,12 @@
 import { promises as fs } from "node:fs";
+import { execFile as execFileCallback } from "node:child_process";
+import { promisify } from "node:util";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { chromium } from "playwright";
+
+const execFile = promisify(execFileCallback);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -18,6 +22,7 @@ const OUTPUT_FILES = {
   historyPanel: "proof-run-history.png",
   socialCard: "proof-social-card.png",
   bundleJson: "proof-run-bundle.json",
+  bundleArchive: "proof-run-bundle.zip",
   signalsJson: "proof-run-signals.json",
   summaryJson: "proof-run-summary.json"
 };
@@ -555,6 +560,7 @@ async function main() {
       `${JSON.stringify(bundleManifest, null, 2)}\n`,
       "utf8"
     );
+    await createProofArchive();
 
     await renderSignalsPanel(browser, desktopRun.blueprint, path.join(assetDir, OUTPUT_FILES.signalsPanel));
 
@@ -570,6 +576,7 @@ async function main() {
         OUTPUT_FILES.tablet,
         OUTPUT_FILES.mobile,
         OUTPUT_FILES.bundleJson,
+        OUTPUT_FILES.bundleArchive,
         OUTPUT_FILES.signalsJson
       ],
       hiddenCount: desktopRun.prepareResult.page.hiddenCount,
@@ -586,6 +593,26 @@ async function main() {
     );
   } finally {
     await browser.close();
+  }
+}
+
+async function createProofArchive() {
+  const outputPath = path.join(assetDir, OUTPUT_FILES.bundleArchive);
+  const archiveInputs = [
+    OUTPUT_FILES.desktop,
+    OUTPUT_FILES.tablet,
+    OUTPUT_FILES.mobile,
+    OUTPUT_FILES.bundleJson,
+    OUTPUT_FILES.signalsJson
+  ];
+
+  try {
+    await fs.rm(outputPath, { force: true });
+    await execFile("zip", ["-j", outputPath, ...archiveInputs.map((file) => path.join(assetDir, file))], {
+      cwd: assetDir
+    });
+  } catch (error) {
+    console.warn("Skipping proof archive creation:", error.message);
   }
 }
 

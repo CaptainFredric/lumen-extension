@@ -114,6 +114,7 @@ The landing page includes proof assets generated from the current prototype:
 8. `docs/assets/proof-run-signals.json`
 9. `docs/assets/proof-run-summary.json`
 10. `docs/assets/proof-social-card.png`
+11. `docs/assets/proof-run-bundle.zip`
 
 To regenerate them:
 
@@ -129,6 +130,8 @@ npm run proof:install-browser
 ```
 
 The proof script depends on Playwright and a local Chromium install. It is reproducible, but it is not a zero-dependency step.
+
+The script also tries to create `docs/assets/proof-run-bundle.zip` with the system `zip` command. If `zip` is missing, the proof images and JSON files still generate, but the archive step is skipped.
 
 ## Publish The Landing Site
 

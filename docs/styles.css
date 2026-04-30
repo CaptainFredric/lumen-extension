@@ -852,6 +852,37 @@ h3 {
   line-height: 1.6;
 }
 
+.proof-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.proof-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.proof-link:hover {
+  transform: translateY(-1px);
+  border-color: rgba(137, 241, 209, 0.22);
+}
+
+.proof-link-strong {
+  color: #05101a;
+  background: linear-gradient(180deg, rgba(137, 241, 209, 0.96), rgba(119, 183, 255, 0.9));
+}
+
 .support-section,
 .mechanics-section,
 .audience-section,
@@ -898,6 +929,11 @@ h3 {
 .scope-panel {
   border-radius: 28px;
   padding: 22px;
+}
+
+.support-panel-download {
+  display: grid;
+  gap: 12px;
 }
 
 .file-list {
@@ -1189,6 +1225,7 @@ h3 {
   .header-actions,
   .hero-actions,
   .cta-actions,
+  .proof-actions,
   .support-metrics {
     align-items: flex-start;
   }
