@@ -307,9 +307,45 @@ h3 {
 }
 
 .device-block {
-  justify-content: space-between;
+  display: grid;
   gap: 12px;
   padding-top: 6px;
+}
+
+.manual-redaction-panel {
+  display: grid;
+  gap: 12px;
+  padding: 13px;
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(134, 221, 255, 0.08), transparent 48%),
+    rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(134, 221, 255, 0.12);
+}
+
+.manual-redaction-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.manual-redaction-copy strong {
+  font-size: 0.9rem;
+}
+
+.manual-redaction-copy small {
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.manual-redaction-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.manual-redaction-actions .tiny-note {
+  margin-right: auto;
 }
 
 .annotation-panel {
@@ -329,7 +365,7 @@ h3 {
 }
 
 .annotation-block.is-disabled {
-  opacity: 0.52;
+  display: none;
 }
 
 .annotation-toolbar {
@@ -374,15 +410,18 @@ h3 {
 
 .segmented-control-wide {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
 }
 
 .segmented-control-device {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: 100%;
 }
 
 .segment,
 .capture-button,
 .secondary-action,
+.mini-action,
 .feature-chip,
 .secondary-button,
 .ghost-button {
@@ -437,10 +476,27 @@ h3 {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.mini-action {
+  min-height: 34px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: rgba(134, 221, 255, 0.1);
+  border: 1px solid rgba(134, 221, 255, 0.2);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.ghost-mini-action {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+}
+
 .capture-button:disabled,
-.secondary-action:disabled {
+.secondary-action:disabled,
+.mini-action:disabled {
   opacity: 0.55;
-  cursor: progress;
+  cursor: not-allowed;
 }
 
 .status-panel {
@@ -450,7 +506,7 @@ h3 {
 
 .status-panel.is-hidden,
 .is-hidden {
-  display: none;
+  display: none !important;
 }
 
 .status-panel[data-tone="error"] .status-badge {
@@ -698,6 +754,7 @@ h3 {
 .segment:hover,
 .capture-button:hover,
 .secondary-action:hover,
+.mini-action:hover,
 .feature-chip:hover,
 .secondary-button:hover,
 .ghost-button:hover {
@@ -707,6 +764,7 @@ h3 {
 .segment:focus-visible,
 .capture-button:focus-visible,
 .secondary-action:focus-visible,
+.mini-action:focus-visible,
 .feature-chip:focus-visible,
 .secondary-button:focus-visible,
 .ghost-button:focus-visible,

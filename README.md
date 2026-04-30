@@ -10,7 +10,7 @@ The current wedge is narrow on purpose:
 4. attach useful page signals beside the image
 5. save a bundle manifest so the capture can travel with its context
 
-It is aimed at design review, QA, and product work. It is not presented here as a broad platform or finished SaaS product.
+The repo is aimed at design review, QA, and product work with a deliberately narrow first wedge.
 
 ## What Works Now
 
@@ -22,22 +22,24 @@ The current build includes:
 4. full-page stitching with offscreen composition
 5. desktop, tablet, mobile, and responsive-set capture modes
 6. export-time redaction for emails, phone numbers, token-like strings, and filled inputs
-7. anchored capture notes rendered into the exported image
-8. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
-9. bundle-manifest JSON exports with view, redaction, signal, and note metadata
-10. local capture history with file and summary metadata
-11. a local backend slice for demo session state and history sync when an API is reachable
-12. a GitHub Pages landing site in `docs/`
+7. manual redaction boxes for areas the scanner cannot infer on the active desktop layout
+8. anchored capture notes rendered into the exported image
+9. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
+10. bundle-manifest JSON exports with view, redaction, signal, and note metadata
+11. local capture history with file and summary metadata
+12. a local backend slice for demo session state and history sync when an API is reachable
+13. a GitHub Pages landing site in `docs/`
 
 ## Current Limits
 
 These limits are important:
 
 1. redaction currently covers visible text and filled inputs during export and should be reviewed before external sharing
-2. the current annotation pass is one anchored capture note, not a freeform annotation editor
-3. cloud sync, billing, scheduled monitoring, and visual diffs are not implemented as product-ready features
-4. highly dynamic sites with virtualization or unusual scroll behavior can still need site-specific fallback work
-5. the local backend slice is a small demo path, not a production account system
+2. manual redaction boxes currently apply to the active desktop layout only
+3. the current annotation pass is one anchored capture note
+4. cloud sync, billing, scheduled monitoring, and visual diffs remain future work
+5. highly dynamic sites with virtualization or unusual scroll behavior can still need site-specific fallback work
+6. the local backend slice remains a small demo path rather than a production account system
 
 ## Architecture
 
@@ -65,7 +67,7 @@ The current signal extraction reads:
 5. most-used type families
 6. layout counts such as sections, headings, buttons, forms, visuals, and words
 
-The proof generator uses the same content-script extraction path. If the proof assets do not show a signal, the product copy should not pretend that signal is reliable.
+The proof generator uses the same content-script extraction path. If the proof assets miss a signal, the product copy should avoid claiming that signal as reliable.
 
 ## Local Development
 
@@ -100,10 +102,11 @@ The public landing page will be available at `http://127.0.0.1:3000/`.
 2. Open the Lumen popup
 3. Choose the capture device and export mode
 4. Enable sticky cleanup, lazy-load forcing, or auto-redaction as needed
-5. Add a capture note if you want the export to carry a review comment
-6. Keep `Save bundle manifest` enabled if you want a portable JSON sidecar next to the capture files
-7. Run `Analyze Page` or `Capture Full Page`
-8. Check the latest blueprint and local history in the popup
+5. Use `Mark boxes` if you need manual desktop redactions before capture
+6. Add a capture note if you want the export to carry a review comment
+7. Keep `Save bundle manifest` enabled if you want a portable JSON sidecar next to the capture files
+8. Run `Analyze Page` or `Capture Full Page`
+9. Check the latest blueprint and local history in the popup
 
 ## Proof Assets
 
@@ -128,13 +131,13 @@ npm install
 npm run proof:assets
 ```
 
-If Chromium is not installed for Playwright yet, run:
+To install Chromium for Playwright, run:
 
 ```bash
 npm run proof:install-browser
 ```
 
-The proof script depends on Playwright and a local Chromium install. It is reproducible, but it is not a zero-dependency step.
+The proof script depends on Playwright and a local Chromium install. It is reproducible and requires those local browser dependencies.
 
 The script also tries to create `docs/assets/proof-run-bundle.zip` with the system `zip` command. If `zip` is missing, the proof images and JSON files still generate, but the archive step is skipped.
 
@@ -147,7 +150,7 @@ The script also tries to create `docs/assets/proof-run-bundle.zip` with the syst
 
 ## Future Direction
 
-These are future layers, not present-day proof:
+These are future layers:
 
 1. freeform annotation tools
 2. cloud sync destinations
@@ -160,5 +163,5 @@ These are future layers, not present-day proof:
 The highest-leverage next steps are:
 
 1. improve capture reliability on difficult real-world sites
-2. expand the first-pass capture note into freeform annotation and manual redaction tools
+2. improve manual redaction mapping for responsive captures
 3. tighten the backend from demo session state into a real account path

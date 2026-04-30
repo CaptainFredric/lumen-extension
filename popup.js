@@ -16,6 +16,9 @@ const ui = {
   removeStickyHeaders: document.querySelector("#removeStickyHeaders"),
   forceLazyLoad: document.querySelector("#forceLazyLoad"),
   autoRedact: document.querySelector("#autoRedact"),
+  manualRedactionCount: document.querySelector("#manualRedactionCount"),
+  startRedactionPickerButton: document.querySelector("#startRedactionPickerButton"),
+  clearManualRedactionsButton: document.querySelector("#clearManualRedactionsButton"),
   exportManifest: document.querySelector("#exportManifest"),
   annotationEnabled: document.querySelector("#annotationEnabled"),
   annotationBlock: document.querySelector("#annotationBlock"),
@@ -69,6 +72,9 @@ let currentSession = {
   source: "local",
   backendReachable: false
 };
+let manualRedactionRecord = {
+  regions: []
+};
 
 bootstrap().catch((error) => {
   showStatus({
@@ -106,6 +112,10 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "LUMEN_HISTORY_UPDATED") {
     renderHistory(message.payload || []);
   }
+
+  if (message?.type === "LUMEN_MANUAL_REDACTIONS_UPDATED") {
+    renderManualRedactions(message.payload);
+  }
 });
 
 async function bootstrap() {
@@ -125,6 +135,8 @@ function bindEvents() {
     persistCurrentSettings();
   });
   ui.annotationText.addEventListener("input", persistCurrentSettings);
+  ui.startRedactionPickerButton.addEventListener("click", handleStartRedactionPicker);
+  ui.clearManualRedactionsButton.addEventListener("click", handleClearManualRedactions);
 
   for (const button of ui.deviceButtons) {
     button.addEventListener("click", () => {
@@ -188,12 +200,14 @@ async function restoreAppState() {
     renderBlueprint(null);
     renderHistory([]);
     renderSession(currentSession);
+    await refreshManualRedactions();
     return;
   }
 
   renderBlueprint(response.latestBlueprint);
   renderHistory(response.captureHistory || []);
   renderSession(response.session || currentSession);
+  await refreshManualRedactions();
 }
 
 async function persistCurrentSettings() {
@@ -354,6 +368,95 @@ async function handleAnalyzeClick() {
       tone: "error",
       eyebrow: "Inspect",
       title: "Analysis failed",
+      detail: error.message,
+      badge: "Failed",
+      progress: 0.12
+    });
+  } finally {
+    setActionBusy(false);
+  }
+}
+
+async function handleStartRedactionPicker() {
+  if (actionBusy) {
+    return;
+  }
+
+  setActionBusy(true);
+
+  showStatus({
+    tone: "neutral",
+    eyebrow: "Redact",
+    title: "Opening page picker",
+    detail: "Draw boxes over areas to sanitize. Press Done in the page overlay when finished.",
+    badge: "Picker",
+    progress: 0.08
+  });
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "LUMEN_START_REDACTION_PICKER"
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error?.description || "Manual redaction picker could not start.");
+    }
+
+    renderManualRedactions(response.record);
+
+    showStatus({
+      tone: "success",
+      eyebrow: "Redact",
+      title: "Picker ready on page",
+      detail: "Manual boxes are stored locally for this URL and applied to the next desktop capture.",
+      badge: "Ready",
+      progress: 1
+    });
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Redact",
+      title: "Picker failed",
+      detail: error.message,
+      badge: "Failed",
+      progress: 0.12
+    });
+  } finally {
+    setActionBusy(false);
+  }
+}
+
+async function handleClearManualRedactions() {
+  if (actionBusy) {
+    return;
+  }
+
+  setActionBusy(true);
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "LUMEN_CLEAR_MANUAL_REDACTIONS"
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error?.description || "Manual redactions could not be cleared.");
+    }
+
+    renderManualRedactions(response.record);
+
+    showStatus({
+      tone: "neutral",
+      eyebrow: "Redact",
+      title: "Manual boxes cleared",
+      detail: "The next capture will only use auto-redaction unless you mark new boxes.",
+      badge: "Cleared",
+      progress: 0.2
+    });
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Redact",
+      title: "Clear failed",
       detail: error.message,
       badge: "Failed",
       progress: 0.12
@@ -539,6 +642,7 @@ function renderHistory(history) {
       `${item.files?.length || 0} file${item.files?.length === 1 ? "" : "s"}`,
       item.manifestFile ? "manifest saved" : "",
       item.annotation?.text ? "note added" : "",
+      item.manualRedactionCount ? `${item.manualRedactionCount} manual box${item.manualRedactionCount === 1 ? "" : "es"}` : "",
       item.redactionCount ? `${item.redactionCount} redaction${item.redactionCount === 1 ? "" : "s"}` : "",
       item.blueprintSummary?.siteType || ""
     ]
@@ -556,6 +660,16 @@ function renderHistory(history) {
 
     ui.historyList.appendChild(row);
   }
+}
+
+function renderManualRedactions(record) {
+  manualRedactionRecord = record || {
+    regions: []
+  };
+
+  const count = manualRedactionRecord.regions?.length || 0;
+  ui.manualRedactionCount.textContent = `${count} box${count === 1 ? "" : "es"}`;
+  ui.clearManualRedactionsButton.disabled = count === 0 || actionBusy;
 }
 
 function renderBlueprint(blueprint) {
@@ -647,6 +761,8 @@ function setActionBusy(isBusy) {
   actionBusy = isBusy;
   ui.captureButton.disabled = isBusy;
   ui.analyzeButton.disabled = isBusy;
+  ui.startRedactionPickerButton.disabled = isBusy;
+  ui.clearManualRedactionsButton.disabled = isBusy || !(manualRedactionRecord.regions?.length);
 }
 
 function stageToEyebrow(stage) {
@@ -707,14 +823,29 @@ function buildCaptureSuccessMessage(response, settings) {
   const manifestText = response.manifestFile ? " Bundle manifest saved." : "";
   const captureNote = normalizeCaptureNoteOptions(settings);
   const noteText = response.annotation?.enabled || captureNote.enabled ? " Capture note added." : "";
+  const manualText = response.manualRedactionCount
+    ? ` ${response.manualRedactionCount} manual box${response.manualRedactionCount === 1 ? "" : "es"} applied.`
+    : "";
 
   if (!response.redactionCount) {
     return variantCount > 1
-      ? `${fileText}. ${variantCount} responsive views captured.${manifestText}${noteText}`
-      : `${fileText}.${manifestText}${noteText}`;
+      ? `${fileText}. ${variantCount} responsive views captured.${manifestText}${noteText}${manualText}`
+      : `${fileText}.${manifestText}${noteText}${manualText}`;
   }
 
-  return `${fileText}. ${variantCount > 1 ? `${variantCount} responsive views captured. ` : ""}${response.redactionCount} sensitive region${response.redactionCount === 1 ? "" : "s"} sanitized.${manifestText}${noteText}`;
+  return `${fileText}. ${variantCount > 1 ? `${variantCount} responsive views captured. ` : ""}${response.redactionCount} redaction region${response.redactionCount === 1 ? "" : "s"} sanitized.${manifestText}${noteText}${manualText}`;
+}
+
+async function refreshManualRedactions() {
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "LUMEN_GET_MANUAL_REDACTIONS"
+    });
+
+    renderManualRedactions(response?.record);
+  } catch {
+    renderManualRedactions(null);
+  }
 }
 
 function formatCompactNumber(value) {

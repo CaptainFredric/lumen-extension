@@ -715,6 +715,10 @@ function truncateLine(context, text, maxWidth) {
 }
 
 function formatRedactionLabel(kind) {
+  if (kind === "manual") {
+    return "MANUAL";
+  }
+
   if (kind === "email") {
     return "EMAIL";
   }

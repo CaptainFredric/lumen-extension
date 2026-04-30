@@ -75,6 +75,18 @@
           <span class="toggle-shell"><span class="toggle-knob"></span></span>
         </label>
 
+        <div class="manual-redaction-panel">
+          <div class="manual-redaction-copy">
+            <strong>Manual redaction boxes</strong>
+            <small>Mark areas the scanner cannot infer. Current boxes apply to the active desktop layout and should be reviewed before sharing.</small>
+          </div>
+          <div class="manual-redaction-actions">
+            <span id="manualRedactionCount" class="tiny-note">0 boxes</span>
+            <button id="startRedactionPickerButton" class="mini-action" type="button">Mark boxes</button>
+            <button id="clearManualRedactionsButton" class="mini-action ghost-mini-action" type="button">Clear</button>
+          </div>
+        </div>
+
         <label class="toggle-row">
           <span>
             <strong>Save bundle manifest</strong>

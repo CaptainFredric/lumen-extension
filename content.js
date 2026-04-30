@@ -13,6 +13,7 @@
   const MAX_REDACTION_REGIONS = 80;
   const PAGE_READY_TIMEOUT_MS = 2200;
   const OVERLAY_SETTLE_MS = 140;
+  const MANUAL_REDACTION_LIMIT = 24;
   const SENSITIVE_TEXT_PATTERNS = [
     {
       kind: "email",
@@ -48,7 +49,8 @@
     overlayObserver: null,
     prepared: false,
     scrollRoot: null,
-    scrollContext: null
+    scrollContext: null,
+    manualPicker: null
   };
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -94,6 +96,20 @@
     if (message.type === "LUMEN_SCAN_REDACTIONS") {
       Promise.resolve()
         .then(() => sendResponse({ ok: true, redactions: scanSensitiveRegions() }))
+        .catch((error) => sendResponse({ ok: false, error: error.message }));
+      return true;
+    }
+
+    if (message.type === "LUMEN_START_MANUAL_REDACTION_PICKER") {
+      Promise.resolve()
+        .then(() => sendResponse({ ok: true, picker: startManualRedactionPicker(message.payload || {}) }))
+        .catch((error) => sendResponse({ ok: false, error: error.message }));
+      return true;
+    }
+
+    if (message.type === "LUMEN_CLEAR_MANUAL_REDACTION_PICKER") {
+      Promise.resolve()
+        .then(() => sendResponse({ ok: true, picker: clearManualRedactionPicker() }))
         .catch((error) => sendResponse({ ok: false, error: error.message }));
       return true;
     }
@@ -162,6 +178,7 @@
   }
 
   async function restorePageState() {
+    teardownManualRedactionPicker(false);
     stopOverlayObserver();
     restoreHiddenNodes();
     removeFreezeStyle();
@@ -242,6 +259,425 @@
       count: regions.length,
       regions
     };
+  }
+
+  function startManualRedactionPicker({ regions = [] } = {}) {
+    teardownManualRedactionPicker(false);
+
+    const overlay = document.createElement("div");
+    const surface = document.createElement("div");
+    const toolbar = document.createElement("div");
+    const title = document.createElement("strong");
+    const hint = document.createElement("span");
+    const count = document.createElement("span");
+    const undoButton = document.createElement("button");
+    const clearButton = document.createElement("button");
+    const doneButton = document.createElement("button");
+    const cancelButton = document.createElement("button");
+
+    overlay.id = "lumen-redaction-picker";
+    surface.className = "lumen-redaction-surface";
+    toolbar.className = "lumen-redaction-toolbar";
+    title.textContent = "Lumen manual redaction";
+    hint.textContent = "Drag boxes over sensitive areas. These boxes apply to the current desktop layout.";
+    count.className = "lumen-redaction-count";
+    undoButton.textContent = "Undo";
+    clearButton.textContent = "Clear";
+    doneButton.textContent = "Done";
+    cancelButton.textContent = "Cancel";
+
+    for (const button of [undoButton, clearButton, doneButton, cancelButton]) {
+      button.type = "button";
+    }
+
+    toolbar.append(title, hint, count, undoButton, clearButton, doneButton, cancelButton);
+    overlay.append(surface, toolbar);
+    document.documentElement.appendChild(overlay);
+
+    const picker = {
+      overlay,
+      surface,
+      count,
+      regions: normalizeManualRegions(regions),
+      draft: null,
+      start: null,
+      moved: false
+    };
+
+    captureState.manualPicker = picker;
+    injectManualPickerStyles();
+    renderManualRedactionBoxes();
+
+    surface.addEventListener("pointerdown", handleManualPickerPointerDown);
+    surface.addEventListener("pointermove", handleManualPickerPointerMove);
+    surface.addEventListener("pointerup", handleManualPickerPointerUp);
+    surface.addEventListener("pointercancel", handleManualPickerPointerCancel);
+
+    undoButton.addEventListener("click", () => {
+      picker.regions.pop();
+      renderManualRedactionBoxes();
+      persistManualRedactions();
+    });
+    clearButton.addEventListener("click", () => {
+      picker.regions = [];
+      renderManualRedactionBoxes();
+      persistManualRedactions();
+    });
+    doneButton.addEventListener("click", () => {
+      persistManualRedactions();
+      teardownManualRedactionPicker(false);
+    });
+    cancelButton.addEventListener("click", () => teardownManualRedactionPicker(false));
+
+    window.addEventListener("keydown", handleManualPickerKeydown, true);
+
+    persistManualRedactions();
+    return buildManualPickerPayload();
+  }
+
+  function clearManualRedactionPicker() {
+    if (captureState.manualPicker) {
+      captureState.manualPicker.regions = [];
+      renderManualRedactionBoxes();
+    }
+
+    chrome.runtime.sendMessage({
+      type: "LUMEN_MANUAL_REDACTIONS_UPDATED",
+      payload: {
+        regions: [],
+        context: getPageMetrics()
+      }
+    }).catch(() => {});
+
+    return {
+      count: 0,
+      regions: []
+    };
+  }
+
+  function teardownManualRedactionPicker(persist = true) {
+    const picker = captureState.manualPicker;
+
+    if (!picker) {
+      return;
+    }
+
+    if (persist) {
+      persistManualRedactions();
+    }
+
+    window.removeEventListener("keydown", handleManualPickerKeydown, true);
+    picker.overlay.remove();
+    captureState.manualPicker = null;
+  }
+
+  function handleManualPickerPointerDown(event) {
+    const picker = captureState.manualPicker;
+
+    if (!picker || event.button !== 0) {
+      return;
+    }
+
+    event.preventDefault();
+    picker.surface.setPointerCapture(event.pointerId);
+    picker.start = {
+      x: event.clientX,
+      y: event.clientY,
+      pointerId: event.pointerId
+    };
+    picker.moved = false;
+    picker.draft = document.createElement("div");
+    picker.draft.className = "lumen-redaction-box lumen-redaction-box-draft";
+    picker.surface.appendChild(picker.draft);
+  }
+
+  function handleManualPickerPointerMove(event) {
+    const picker = captureState.manualPicker;
+
+    if (!picker?.start || !picker.draft || event.pointerId !== picker.start.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+    picker.moved = true;
+    drawManualPickerBox(picker.draft, normalizeViewportRect(picker.start.x, picker.start.y, event.clientX, event.clientY));
+  }
+
+  function handleManualPickerPointerUp(event) {
+    const picker = captureState.manualPicker;
+
+    if (!picker?.start || event.pointerId !== picker.start.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const rect = normalizeViewportRect(picker.start.x, picker.start.y, event.clientX, event.clientY);
+    picker.surface.releasePointerCapture(event.pointerId);
+    picker.draft?.remove();
+    picker.draft = null;
+    picker.start = null;
+
+    if (!picker.moved || rect.width < 8 || rect.height < 8) {
+      picker.moved = false;
+      return;
+    }
+
+    const region = buildManualRedactionRegion(rect);
+
+    if (region) {
+      picker.regions = [...picker.regions, region].slice(-MANUAL_REDACTION_LIMIT);
+      renderManualRedactionBoxes();
+      persistManualRedactions();
+    }
+
+    picker.moved = false;
+  }
+
+  function handleManualPickerPointerCancel(event) {
+    const picker = captureState.manualPicker;
+
+    if (!picker?.start || event.pointerId !== picker.start.pointerId) {
+      return;
+    }
+
+    picker.draft?.remove();
+    picker.draft = null;
+    picker.start = null;
+    picker.moved = false;
+  }
+
+  function handleManualPickerKeydown(event) {
+    const picker = captureState.manualPicker;
+
+    if (!picker) {
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      teardownManualRedactionPicker(false);
+      return;
+    }
+
+    if ((event.key === "Backspace" || event.key === "Delete") && picker.regions.length) {
+      event.preventDefault();
+      picker.regions.pop();
+      renderManualRedactionBoxes();
+      persistManualRedactions();
+    }
+  }
+
+  function buildManualRedactionRegion(viewportRect) {
+    const context = detectScrollContext();
+    const region = buildRedactionRegion(viewportRect, context, "manual");
+
+    if (!region) {
+      return null;
+    }
+
+    return {
+      ...region,
+      id: createLocalId()
+    };
+  }
+
+  function normalizeManualRegions(regions) {
+    return (Array.isArray(regions) ? regions : [])
+      .filter((region) => Number.isFinite(region.left) && Number.isFinite(region.top))
+      .map((region) => ({
+        id: region.id || createLocalId(),
+        kind: "manual",
+        left: Math.max(0, Math.round(region.left)),
+        top: Math.max(0, Math.round(region.top)),
+        width: Math.max(1, Math.round(region.width || 1)),
+        height: Math.max(1, Math.round(region.height || 1))
+      }))
+      .slice(0, MANUAL_REDACTION_LIMIT);
+  }
+
+  function normalizeViewportRect(startX, startY, endX, endY) {
+    const left = Math.min(startX, endX);
+    const top = Math.min(startY, endY);
+    const right = Math.max(startX, endX);
+    const bottom = Math.max(startY, endY);
+
+    return {
+      left,
+      top,
+      width: right - left,
+      height: bottom - top
+    };
+  }
+
+  function drawManualPickerBox(node, rect) {
+    node.style.left = `${Math.round(rect.left)}px`;
+    node.style.top = `${Math.round(rect.top)}px`;
+    node.style.width = `${Math.round(rect.width)}px`;
+    node.style.height = `${Math.round(rect.height)}px`;
+  }
+
+  function renderManualRedactionBoxes() {
+    const picker = captureState.manualPicker;
+
+    if (!picker) {
+      return;
+    }
+
+    picker.surface.querySelectorAll(".lumen-redaction-box:not(.lumen-redaction-box-draft)").forEach((node) => node.remove());
+
+    for (const region of picker.regions) {
+      const rect = fromScrollCoordinates(region, detectScrollContext());
+
+      if (!rect) {
+        continue;
+      }
+
+      const box = document.createElement("div");
+      box.className = "lumen-redaction-box";
+      drawManualPickerBox(box, rect);
+      picker.surface.appendChild(box);
+    }
+
+    picker.count.textContent = `${picker.regions.length} box${picker.regions.length === 1 ? "" : "es"}`;
+  }
+
+  function persistManualRedactions() {
+    const picker = captureState.manualPicker;
+
+    if (!picker) {
+      return;
+    }
+
+    chrome.runtime.sendMessage({
+      type: "LUMEN_MANUAL_REDACTIONS_UPDATED",
+      payload: buildManualPickerPayload()
+    }).catch(() => {});
+  }
+
+  function buildManualPickerPayload() {
+    const picker = captureState.manualPicker;
+
+    return {
+      regions: picker ? picker.regions : [],
+      context: getPageMetrics()
+    };
+  }
+
+  function fromScrollCoordinates(region, context) {
+    if (!region) {
+      return null;
+    }
+
+    if (context.isDocument) {
+      return {
+        left: region.left - window.scrollX,
+        top: region.top - window.scrollY,
+        width: region.width,
+        height: region.height
+      };
+    }
+
+    if (!(context.node instanceof HTMLElement)) {
+      return null;
+    }
+
+    const rootRect = context.node.getBoundingClientRect();
+
+    return {
+      left: rootRect.left + region.left - context.node.scrollLeft,
+      top: rootRect.top + region.top - context.node.scrollTop,
+      width: region.width,
+      height: region.height
+    };
+  }
+
+  function injectManualPickerStyles() {
+    if (document.getElementById("lumen-redaction-picker-style")) {
+      return;
+    }
+
+    const style = document.createElement("style");
+    style.id = "lumen-redaction-picker-style";
+    style.textContent = `
+      #lumen-redaction-picker {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 2147483647 !important;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+        color: #eef6ff !important;
+        cursor: crosshair !important;
+      }
+
+      #lumen-redaction-picker .lumen-redaction-surface {
+        position: absolute !important;
+        inset: 0 !important;
+        background: rgba(2, 8, 16, 0.22) !important;
+      }
+
+      #lumen-redaction-picker .lumen-redaction-toolbar {
+        position: absolute !important;
+        left: 18px !important;
+        right: 18px !important;
+        bottom: 18px !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        padding: 12px !important;
+        border: 1px solid rgba(134, 221, 255, 0.22) !important;
+        border-radius: 14px !important;
+        background: rgba(5, 11, 20, 0.92) !important;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.34) !important;
+        cursor: default !important;
+      }
+
+      #lumen-redaction-picker strong {
+        color: #86ddff !important;
+        font-size: 13px !important;
+        letter-spacing: 0.08em !important;
+        text-transform: uppercase !important;
+        white-space: nowrap !important;
+      }
+
+      #lumen-redaction-picker span {
+        color: rgba(238, 246, 255, 0.72) !important;
+        font-size: 13px !important;
+      }
+
+      #lumen-redaction-picker .lumen-redaction-count {
+        margin-left: auto !important;
+        white-space: nowrap !important;
+      }
+
+      #lumen-redaction-picker button {
+        min-height: 34px !important;
+        padding: 0 12px !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 10px !important;
+        background: rgba(255, 255, 255, 0.06) !important;
+        color: #eef6ff !important;
+        font: inherit !important;
+        cursor: pointer !important;
+      }
+
+      #lumen-redaction-picker button:last-child {
+        color: rgba(238, 246, 255, 0.7) !important;
+      }
+
+      #lumen-redaction-picker .lumen-redaction-box {
+        position: fixed !important;
+        border: 2px solid #86ddff !important;
+        border-radius: 10px !important;
+        background: rgba(134, 221, 255, 0.18) !important;
+        box-shadow: 0 0 0 9999px rgba(2, 8, 16, 0.02), inset 0 0 0 1px rgba(255, 255, 255, 0.2) !important;
+        pointer-events: none !important;
+      }
+
+      #lumen-redaction-picker .lumen-redaction-box-draft {
+        border-style: dashed !important;
+      }
+    `;
+    document.documentElement.appendChild(style);
   }
 
   function freezeAnimationsAndSmoothScroll() {
@@ -1064,6 +1500,14 @@
 
   function cleanText(rawText) {
     return rawText.replace(/\s+/g, " ").trim();
+  }
+
+  function createLocalId() {
+    if (typeof crypto?.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+
+    return `lumen-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   }
 
   function getPageMetrics() {

@@ -278,6 +278,7 @@
                   <li>Lazy-load forcing</li>
                   <li>Responsive capture sets</li>
                   <li>Auto-redaction on export</li>
+                  <li>Manual redaction boxes</li>
                   <li>Anchored capture note</li>
                   <li>Signals extraction</li>
                   <li>Bundle manifest JSON sidecar</li>
@@ -290,7 +291,6 @@
                 <p class="support-label">Next</p>
                 <ul class="support-notes support-notes-tight">
                   <li>Freeform annotations</li>
-                  <li>Manual redaction boxes</li>
                   <li>Cloud sync and team handoff</li>
                   <li>Scheduled captures</li>
                   <li>Visual diffs</li>
@@ -362,8 +362,8 @@
             <p class="kicker">Workflow</p>
             <h2>Capture with the context still attached.</h2>
             <p class="section-body">
-              Lumen is most useful when it removes downstream cleanup work. The point is not to
-              save a PNG. The point is to hand over a better artifact.
+              Lumen is most useful when it removes downstream cleanup work. A useful capture
+              should hand over a better artifact than a plain PNG.
             </p>
           </div>
 
@@ -379,7 +379,7 @@
 
           <article class="workflow-step" data-step="responsive" data-reveal>
             <span>Capture set</span>
-            <h3>Generate the layout set, not one isolated viewport.</h3>
+            <h3>Generate the layout set across key viewports.</h3>
             <p>
               The current build can produce desktop, tablet, and mobile outputs in one grouped
               bundle so review threads have the right layout context from the start.
@@ -528,8 +528,8 @@
         </div>
 
         <p class="section-note" data-reveal>
-          Broader archive, sync, and monitoring workflows remain future direction. They are not the
-          main story on this page.
+          Broader archive, sync, and monitoring workflows remain future direction. The main story
+          here is cleaner review evidence.
         </p>
       </section>
 
@@ -539,8 +539,8 @@
           <h2>Separate present proof from later product layers.</h2>
             <p class="section-body">
               The current prototype already supports the capture workflow described on this page. The
-            next product layer is most likely studio output and team handoff, not a broad monitoring
-            suite.
+            next product layer is most likely studio output and team handoff rather than a broad
+            monitoring suite.
           </p>
         </div>
 
@@ -552,6 +552,7 @@
               <li>Clean sticky, fixed, and overlay page chrome before capture</li>
               <li>Generate desktop, tablet, and mobile bundles in one run</li>
               <li>Blur sensitive visible text and filled fields in exports</li>
+              <li>Mark manual redaction boxes on the active desktop layout</li>
               <li>Add one anchored capture note into the export</li>
               <li>Extract palette, font, hero, CTA, and navigation signals</li>
               <li>Store local capture history with bundle metadata</li>
@@ -562,7 +563,7 @@
             <p class="support-label">Future direction</p>
             <h3>What still needs product work</h3>
             <ul class="scope-list">
-              <li>Freeform annotation and manual redaction tools</li>
+              <li>Freeform annotation tools and responsive manual redaction mapping</li>
               <li>Cloud sync and team handoff workflows</li>
               <li>User accounts, billing, and plan gating</li>
               <li>Scheduled monitoring and visual diffs</li>
@@ -573,11 +574,12 @@
 
       <section class="cta-section" id="docs" data-reveal>
         <p class="kicker">Implemented now</p>
-        <h2>Lumen is early. The current build already handles cleanup, capture, redaction, anchored notes, signals, and a portable bundle manifest.</h2>
+        <h2>Lumen is early. The current build already handles cleanup, capture, redaction, manual boxes, anchored notes, signals, and a portable bundle manifest.</h2>
         <p>
           The repository already covers page cleanup, responsive capture bundles, export redaction,
-          capture notes, page-signal extraction, bundle metadata, and local history. The next work
-          is freeform annotation, sync, auth, and billing.
+          manual desktop redaction boxes, capture notes, page-signal extraction, bundle metadata,
+          and local history. The next work is responsive redaction mapping, freeform annotation,
+          sync, auth, and billing.
         </p>
 
         <div class="cta-actions">

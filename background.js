@@ -20,6 +20,7 @@ const CAPTURE_PROGRESS_EVENT = "LUMEN_CAPTURE_PROGRESS";
 const BLUEPRINT_UPDATE_EVENT = "LUMEN_BLUEPRINT_UPDATED";
 const SESSION_UPDATE_EVENT = "LUMEN_SESSION_UPDATED";
 const HISTORY_UPDATE_EVENT = "LUMEN_HISTORY_UPDATED";
+const MANUAL_REDACTIONS_UPDATE_EVENT = "LUMEN_MANUAL_REDACTIONS_UPDATED";
 
 let captureInFlight = false;
 let analyzeInFlight = false;
@@ -110,6 +111,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "LUMEN_START_REDACTION_PICKER") {
+    runManualRedactionPicker()
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_CLEAR_MANUAL_REDACTIONS") {
+    clearManualRedactionsForActiveTab()
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_GET_MANUAL_REDACTIONS") {
+    getManualRedactionsForActiveTab()
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_MANUAL_REDACTIONS_UPDATED") {
+    persistManualRedactionsFromContent(sender.tab, message.payload)
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
   if (message?.type === "LUMEN_DEMO_SIGN_IN") {
     startDemoSession()
       .then(async (session) => {
@@ -158,6 +191,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
   }
 
   const variants = getCaptureVariants(options.devicePreset);
+  const manualRedactions = await getManualRedactionsForTab(sourceTab);
   const results = [];
   let blueprint = null;
 
@@ -166,6 +200,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
       sourceTab,
       variant: variants[index],
       options,
+      manualRedactions,
       extractBlueprint: index === 0
     });
 
@@ -177,6 +212,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
   const segmentCount = results.reduce((sum, result) => sum + result.segmentCount, 0);
   const tileCount = results.reduce((sum, result) => sum + result.tileCount, 0);
   const redactionCount = results.reduce((sum, result) => sum + result.redactionCount, 0);
+  const manualRedactionCount = results.reduce((sum, result) => sum + result.manualRedactionCount, 0);
   const variantSummaries = results.map((result) => ({
     id: result.variant.id,
     label: result.variant.label,
@@ -184,6 +220,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     exportPreset: result.exportPreset,
     tileCount: result.tileCount,
     redactionCount: result.redactionCount,
+    manualRedactionCount: result.manualRedactionCount,
     dimensions: result.dimensions
   }));
 
@@ -199,6 +236,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     exportPreset: firstResult.exportPreset,
     variants: variantSummaries,
     redactionCount,
+    manualRedactionCount,
     segmentCount,
     tileCount,
     blueprint
@@ -219,7 +257,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
   ];
 
   const captureHistory = await persistCaptureRecord({
-    id: crypto.randomUUID(),
+    id: createLocalId(),
     title: firstResult.page.title,
     host: new URL(firstResult.page.url).host,
     url: firstResult.page.url,
@@ -229,6 +267,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     files: downloadedFiles,
     tileCount,
     redactionCount,
+    manualRedactionCount,
     manifestFile,
     annotation: captureNote.enabled && captureNote.text ? captureNote : null,
     variants: variantSummaries,
@@ -256,6 +295,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
       segmentCount,
       fileCount: downloadedFiles.length,
       redactionCount,
+      manualRedactionCount,
       variantCount: variants.length,
       manifestSaved: Boolean(manifestFile),
       annotationAdded: Boolean(captureNote.enabled && captureNote.text)
@@ -270,6 +310,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     exportPreset: firstResult.exportPreset,
     tileCount,
     redactionCount,
+    manualRedactionCount,
     manifestFile,
     annotation: captureNote.enabled && captureNote.text ? captureNote : null,
     variantCount: variants.length,
@@ -313,7 +354,195 @@ async function runBlueprintFlow() {
   };
 }
 
-async function captureVariant({ sourceTab, variant, options, extractBlueprint }) {
+async function runManualRedactionPicker() {
+  const sourceTab = await getCurrentTab();
+
+  if (!sourceTab?.id || !sourceTab.url) {
+    throw createFriendlyError(
+      "No Active Page",
+      "Open a normal browser tab, then start the redaction picker again."
+    );
+  }
+
+  if (isRestrictedCaptureUrl(sourceTab.url)) {
+    throw createFriendlyError(
+      "This Page Cannot Be Marked",
+      "Chrome blocks script injection on internal pages, so manual redaction cannot run here."
+    );
+  }
+
+  await ensureContentScript(sourceTab.id);
+  const record = await getManualRedactionsForTab(sourceTab);
+  const response = await chrome.tabs.sendMessage(sourceTab.id, {
+    type: "LUMEN_START_MANUAL_REDACTION_PICKER",
+    payload: {
+      regions: record.regions || []
+    }
+  });
+
+  if (!response?.ok) {
+    throw createFriendlyError(
+      "Redaction Picker Failed",
+      response?.error || "Lumen could not start the manual redaction picker on this page."
+    );
+  }
+
+  return {
+    record: {
+      ...record,
+      regions: response.picker?.regions || record.regions || []
+    }
+  };
+}
+
+async function clearManualRedactionsForActiveTab() {
+  const sourceTab = await getCurrentTab();
+
+  if (!sourceTab?.url) {
+    return {
+      record: buildEmptyManualRedactionRecord()
+    };
+  }
+
+  const record = await clearManualRedactionsForTab(sourceTab);
+
+  if (sourceTab.id) {
+    chrome.tabs.sendMessage(sourceTab.id, {
+      type: "LUMEN_CLEAR_MANUAL_REDACTION_PICKER"
+    }).catch(() => {});
+  }
+
+  broadcastManualRedactions(record);
+  return { record };
+}
+
+async function getManualRedactionsForActiveTab() {
+  const sourceTab = await getCurrentTab();
+
+  if (!sourceTab?.url) {
+    return {
+      record: buildEmptyManualRedactionRecord()
+    };
+  }
+
+  return {
+    record: await getManualRedactionsForTab(sourceTab)
+  };
+}
+
+async function persistManualRedactionsFromContent(tab, payload = {}) {
+  if (!tab?.url) {
+    return {
+      record: buildEmptyManualRedactionRecord()
+    };
+  }
+
+  const store = await readManualRedactionStore();
+  const key = buildManualRedactionKey(tab.url);
+  const regions = normalizeManualRedactionRegions(payload.regions);
+  const record = {
+    url: tab.url,
+    host: new URL(tab.url).host,
+    updatedAt: new Date().toISOString(),
+    context: payload.context || null,
+    regions
+  };
+
+  if (regions.length) {
+    store[key] = record;
+  } else {
+    delete store[key];
+  }
+
+  await writeManualRedactionStore(store);
+  broadcastManualRedactions(record);
+
+  return { record };
+}
+
+async function getManualRedactionsForTab(tab) {
+  if (!tab?.url || isRestrictedCaptureUrl(tab.url)) {
+    return buildEmptyManualRedactionRecord();
+  }
+
+  const store = await readManualRedactionStore();
+  return store[buildManualRedactionKey(tab.url)] || buildEmptyManualRedactionRecord(tab.url);
+}
+
+async function clearManualRedactionsForTab(tab) {
+  if (!tab?.url) {
+    return buildEmptyManualRedactionRecord();
+  }
+
+  const store = await readManualRedactionStore();
+  delete store[buildManualRedactionKey(tab.url)];
+  await writeManualRedactionStore(store);
+  return buildEmptyManualRedactionRecord(tab.url);
+}
+
+function selectManualRedactionsForPage(record, page) {
+  if (!record?.regions?.length) {
+    return [];
+  }
+
+  const context = record.context || {};
+  const contextMatches =
+    !context.scrollMode ||
+    (context.scrollMode === page.scrollMode && context.scrollContainer === page.scrollContainer);
+
+  if (!contextMatches) {
+    return [];
+  }
+
+  return normalizeManualRedactionRegions(record.regions);
+}
+
+function normalizeManualRedactionRegions(regions) {
+  return (Array.isArray(regions) ? regions : [])
+    .filter((region) => Number.isFinite(region.left) && Number.isFinite(region.top))
+    .map((region) => ({
+      id: region.id || createLocalId(),
+      kind: "manual",
+      left: Math.max(0, Math.round(region.left)),
+      top: Math.max(0, Math.round(region.top)),
+      width: Math.max(1, Math.round(region.width || 1)),
+      height: Math.max(1, Math.round(region.height || 1))
+    }))
+    .slice(0, LUMEN_CONFIG.capture.manualRedactionLimit || 24);
+}
+
+async function readManualRedactionStore() {
+  const stored = await chrome.storage.local.get(STORAGE_KEYS.manualRedactions);
+  const value = stored[STORAGE_KEYS.manualRedactions];
+  return value && typeof value === "object" ? value : {};
+}
+
+async function writeManualRedactionStore(store) {
+  const entries = Object.entries(store)
+    .sort((left, right) => new Date(right[1].updatedAt || 0) - new Date(left[1].updatedAt || 0))
+    .slice(0, 50);
+
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.manualRedactions]: Object.fromEntries(entries)
+  });
+}
+
+function buildManualRedactionKey(rawUrl) {
+  const url = new URL(rawUrl);
+  return `${url.origin}${url.pathname}${url.search}`;
+}
+
+function buildEmptyManualRedactionRecord(rawUrl = "") {
+  return {
+    url: rawUrl,
+    host: rawUrl ? new URL(rawUrl).host : "",
+    updatedAt: "",
+    context: null,
+    regions: []
+  };
+}
+
+async function captureVariant({ sourceTab, variant, options, manualRedactions, extractBlueprint }) {
   const target = await createCaptureTarget(sourceTab, variant);
 
   try {
@@ -335,7 +564,7 @@ async function captureVariant({ sourceTab, variant, options, extractBlueprint })
     }
 
     const page = prepareResult.page;
-    const sessionId = crypto.randomUUID();
+    const sessionId = createLocalId();
     let redactionScan = {
       count: 0,
       regions: []
@@ -352,6 +581,14 @@ async function captureVariant({ sourceTab, variant, options, extractBlueprint })
       redactionScan = await requestRedactionScan(target.tab.id);
     }
 
+    const manualRegions = target.kind === "desktop"
+      ? selectManualRedactionsForPage(manualRedactions, page)
+      : [];
+    const combinedRedactions = [
+      ...redactionScan.regions,
+      ...manualRegions
+    ];
+
     if (extractBlueprint) {
       blueprint = await maybeExtractBlueprint(target.tab.id);
     }
@@ -363,7 +600,7 @@ async function captureVariant({ sourceTab, variant, options, extractBlueprint })
         ...options,
         devicePreset: variant.id
       },
-      redactions: redactionScan.regions
+      redactions: combinedRedactions
     });
 
     const segmentCount = await capturePageSegments(target, page, sessionId, variant);
@@ -398,6 +635,7 @@ async function captureVariant({ sourceTab, variant, options, extractBlueprint })
       segmentCount,
       tileCount: stitched.outputs.length,
       redactionCount: stitched.redactionCount,
+      manualRedactionCount: manualRegions.length,
       exportPreset: stitched.appliedPreset,
       dimensions: {
         width: stitched.width,
@@ -809,10 +1047,19 @@ function createFriendlyError(title, description) {
   return { title, description };
 }
 
+function createLocalId() {
+  if (typeof crypto?.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `lumen-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function buildCaptureCompletionDetail({
   segmentCount,
   fileCount,
   redactionCount,
+  manualRedactionCount,
   variantCount,
   manifestSaved,
   annotationAdded
@@ -832,7 +1079,11 @@ function buildCaptureCompletionDetail({
   }
 
   if (redactionCount) {
-    fragments.push(`${redactionCount} sensitive region${redactionCount === 1 ? "" : "s"} sanitized`);
+    fragments.push(`${redactionCount} redaction region${redactionCount === 1 ? "" : "s"} sanitized`);
+  }
+
+  if (manualRedactionCount) {
+    fragments.push(`${manualRedactionCount} manual box${manualRedactionCount === 1 ? "" : "es"} applied`);
   }
 
   if (manifestSaved) {
@@ -900,6 +1151,13 @@ function broadcastHistory(captureHistory) {
   chrome.runtime.sendMessage({
     type: HISTORY_UPDATE_EVENT,
     payload: captureHistory
+  }).catch(() => {});
+}
+
+function broadcastManualRedactions(record) {
+  chrome.runtime.sendMessage({
+    type: MANUAL_REDACTIONS_UPDATE_EVENT,
+    payload: record
   }).catch(() => {});
 }
 
@@ -972,6 +1230,7 @@ function buildCaptureBundleManifest({
   exportPreset,
   variants,
   redactionCount,
+  manualRedactionCount,
   segmentCount,
   tileCount,
   blueprint
@@ -995,6 +1254,7 @@ function buildCaptureBundleManifest({
       segmentCount,
       tileCount,
       redactionCount,
+      manualRedactionCount,
       annotation
     },
     variants: variants.map((variant) => ({
@@ -1005,6 +1265,7 @@ function buildCaptureBundleManifest({
       files: variant.files,
       tileCount: variant.tileCount,
       redactionCount: variant.redactionCount,
+      manualRedactionCount: variant.manualRedactionCount || 0,
       dimensions: variant.dimensions
     })),
     pageSignals: blueprint
