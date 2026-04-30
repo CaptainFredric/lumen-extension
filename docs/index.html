@@ -419,6 +419,7 @@
                 <li>Sticky header and chat widget hidden during capture</li>
                 <li>Lazy-loaded media forced before export</li>
                 <li>Page height can grow during capture and the loop keeps following it</li>
+                <li>Tail of the page is remeasured before the run is marked complete</li>
                 <li>Capture history persisted locally for later review</li>
               </ul>
             </div>
@@ -595,6 +596,14 @@
             <p>
               The capture loop updates page height while it scrolls, so late-loading content can
               extend the document without being clipped from the final export.
+            </p>
+          </article>
+
+          <article class="mechanic-row" data-reveal>
+            <strong>Tail remeasurement and stall retry</strong>
+            <p>
+              Before Lumen marks a page complete, it remeasures the scroll surface and retries a
+              few stalled advances. That catches late-growing bottoms and reduces premature stops.
             </p>
           </article>
 

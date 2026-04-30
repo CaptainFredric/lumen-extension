@@ -6,9 +6,11 @@ export const LUMEN_CONFIG = {
     historyLimit: 12,
     lateOverlaySettleMs: 140,
     mediaSettleTimeoutMs: 2200,
+    maxStallRetries: 3,
     preflightStepFactor: 0.82,
     preflightPauseMs: 36,
     segmentSettleMs: 180,
+    tailReflowSettleMs: 240,
     tileMaxOutputHeight: 12000,
     viewports: {
       tablet: {

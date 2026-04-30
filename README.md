@@ -18,14 +18,15 @@ The current build includes:
 
 1. sticky, fixed, and high-z cleanup before capture
 2. lazy-load preflight scrolling
-3. full-page stitching with offscreen composition
-4. desktop, tablet, mobile, and responsive-set capture modes
-5. export-time redaction for emails, phone numbers, token-like strings, and filled inputs
-6. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
-7. bundle-manifest JSON exports with view, redaction, and signal metadata
-8. local capture history with file and summary metadata
-9. a local backend slice for demo session state and history sync when an API is reachable
-10. a GitHub Pages landing site in `docs/`
+3. tail remeasurement and stalled-scroll retries for late-growing pages
+4. full-page stitching with offscreen composition
+5. desktop, tablet, mobile, and responsive-set capture modes
+6. export-time redaction for emails, phone numbers, token-like strings, and filled inputs
+7. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
+8. bundle-manifest JSON exports with view, redaction, and signal metadata
+9. local capture history with file and summary metadata
+10. a local backend slice for demo session state and history sync when an API is reachable
+11. a GitHub Pages landing site in `docs/`
 
 ## Current Limits
 
@@ -45,10 +46,11 @@ The current capture flow is:
 1. popup sends the selected capture options to the background worker
 2. background injects the content script and prepares the page
 3. content script freezes motion, runs the preflight scroll when enabled, and hides sticky or high-layer UI when enabled
-4. background scrolls the page in slices and sends each visible segment to the offscreen document
-5. offscreen stitches the final output using device-pixel-ratio aware composition
-6. if the page is too large for one safe canvas, the export falls back to tiled raw output
-7. background downloads the files, writes the bundle manifest, writes local history, and restores the page
+4. background scrolls the page in slices, remeasures the tail when the document grows, and retries a few stalled scrolls before failing
+5. background sends each visible segment to the offscreen document
+6. offscreen stitches the final output using device-pixel-ratio aware composition
+7. if the page is too large for one safe canvas, the export falls back to tiled raw output
+8. background downloads the files, writes the bundle manifest, writes local history, and restores the page
 
 ### Page Signals
 

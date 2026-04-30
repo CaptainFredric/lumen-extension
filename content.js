@@ -77,6 +77,13 @@
       return true;
     }
 
+    if (message.type === "LUMEN_MEASURE_PAGE") {
+      measurePreparedPage()
+        .then((page) => sendResponse({ ok: true, page }))
+        .catch((error) => sendResponse({ ok: false, error: error.message }));
+      return true;
+    }
+
     if (message.type === "LUMEN_EXTRACT_BLUEPRINT") {
       Promise.resolve()
         .then(() => sendResponse({ ok: true, blueprint: extractBrandBlueprint() }))
@@ -167,6 +174,18 @@
     captureState.prepared = false;
     captureState.scrollRoot = null;
     captureState.scrollContext = null;
+  }
+
+  async function measurePreparedPage() {
+    await waitForPageReady();
+
+    if (captureState.overlayObserver || captureState.hiddenNodes.length) {
+      hideAggressiveLayers();
+      await pause(OVERLAY_SETTLE_MS);
+    }
+
+    await settleFrames(2);
+    return getPageMetrics();
   }
 
   function extractBrandBlueprint() {

@@ -415,6 +415,7 @@ async function capturePageSegments(target, page, sessionId, variant) {
   let previousTop = null;
   let requestedTop = 0;
   let segmentCount = 0;
+  let stallRetries = 0;
 
   while (segmentCount < maxSegments) {
     const scrollResult = await chrome.tabs.sendMessage(target.tab.id, {
@@ -425,6 +426,37 @@ async function capturePageSegments(target, page, sessionId, variant) {
     const actualTop = scrollResult?.top ?? 0;
     page.pageHeight = Math.max(page.pageHeight, scrollResult?.pageHeight ?? page.pageHeight);
     page.viewportHeight = scrollResult?.viewportHeight ?? page.viewportHeight;
+
+    if (previousTop !== null && actualTop <= previousTop) {
+      if (stallRetries >= LUMEN_CONFIG.capture.maxStallRetries) {
+        throw createFriendlyError(
+          "Capture Stalled",
+          "The page stopped moving before the full document could be captured. This usually points to a complex app shell, virtualized feed, or runtime layout that needs a site-specific fallback."
+        );
+      }
+
+      stallRetries += 1;
+
+      broadcastProgress({
+        stage: "capture",
+        title: `Rechecking ${variant.label.toLowerCase()} layout`,
+        detail: "The page stopped advancing, so Lumen is remeasuring the scroll surface before trying again.",
+        progress: 0.82
+      });
+
+      const refreshedPage = await requestPreparedPageMetrics(target.tab.id);
+      page.pageHeight = Math.max(page.pageHeight, refreshedPage.pageHeight ?? page.pageHeight);
+      page.viewportHeight = refreshedPage.viewportHeight ?? page.viewportHeight;
+      requestedTop = Math.min(
+        Math.max(0, page.pageHeight - page.viewportHeight),
+        previousTop + Math.max(120, Math.round(page.viewportHeight * 0.55))
+      );
+
+      await sleep(LUMEN_CONFIG.capture.tailReflowSettleMs);
+      continue;
+    }
+
+    stallRetries = 0;
 
     await sleep(LUMEN_CONFIG.capture.segmentSettleMs);
     lastCaptureTimestamp = await waitForCaptureWindow(lastCaptureTimestamp);
@@ -465,14 +497,13 @@ async function capturePageSegments(target, page, sessionId, variant) {
     });
 
     if (actualTop + page.viewportHeight >= page.pageHeight - 1) {
-      return segmentCount;
-    }
+      const refreshedPage = await requestPreparedPageMetrics(target.tab.id);
+      page.pageHeight = Math.max(page.pageHeight, refreshedPage.pageHeight ?? page.pageHeight);
+      page.viewportHeight = refreshedPage.viewportHeight ?? page.viewportHeight;
 
-    if (previousTop !== null && actualTop <= previousTop) {
-      throw createFriendlyError(
-        "Capture Stalled",
-        "The page stopped moving before the full document could be captured. This usually points to a complex app shell, virtualized feed, or runtime layout that needs a site-specific fallback."
-      );
+      if (actualTop + page.viewportHeight >= page.pageHeight - 1) {
+        return segmentCount;
+      }
     }
 
     previousTop = actualTop;
@@ -599,6 +630,21 @@ async function requestRedactionScan(tabId) {
   }
 
   return response.redactions;
+}
+
+async function requestPreparedPageMetrics(tabId) {
+  const response = await chrome.tabs.sendMessage(tabId, {
+    type: "LUMEN_MEASURE_PAGE"
+  });
+
+  if (!response?.ok || !response.page) {
+    throw createFriendlyError(
+      "Capture Recheck Failed",
+      response?.error || "Lumen could not remeasure the page after scrolling."
+    );
+  }
+
+  return response.page;
 }
 
 async function persistLatestBlueprint(blueprint) {
