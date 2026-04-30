@@ -551,7 +551,28 @@ h3 {
 
 .artifact-image-redacted {
   max-width: none;
+}
+
+.artifact-cell-redaction .artifact-image,
+.artifact-cell-signals .artifact-image {
   object-fit: cover;
+  object-position: center;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 38%),
+    #070c14;
+}
+
+.artifact-cell-redaction .artifact-image {
+  object-position: top center;
+}
+
+.artifact-cell-history .artifact-image {
+  object-fit: contain;
+  object-position: center;
+  padding: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 38%),
+    #070c14;
 }
 
 .artifact-image-history {
@@ -854,8 +875,7 @@ h3 {
 }
 
 .proof-strip-section {
-  display: grid;
-  gap: 18px;
+  display: block;
   padding: 18px 0 20px;
 }
 
@@ -873,7 +893,7 @@ h3 {
 
 .proof-strip-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.8fr) minmax(300px, 0.9fr);
+  grid-template-columns: minmax(0, 1.42fr) minmax(250px, 0.72fr) minmax(280px, 0.86fr);
   gap: 18px;
 }
 
@@ -893,6 +913,14 @@ h3 {
 .proof-metrics-card {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0;
+  position: relative;
+  padding-top: 50px;
+}
+
+.proof-card-label {
+  position: absolute;
+  top: 20px;
+  left: 22px;
 }
 
 .proof-metric {
@@ -1349,6 +1377,7 @@ h3 {
   .hero,
   .support-grid,
   .workflow-section,
+  .proof-strip-section,
   .proof-strip-grid {
     grid-template-columns: 1fr;
   }
