@@ -46,6 +46,7 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <a class="skip-link" href="#product">Skip to content</a>
     <div class="noise"></div>
 
     <header class="site-header">
@@ -68,12 +69,13 @@
 
       <div class="header-actions">
         <a
-          class="nav-link"
+          class="nav-link nav-link-split"
           href="https://github.com/CaptainFredric/lumen-extension"
           target="_blank"
           rel="noreferrer"
         >
-          View on GitHub
+          <span>Star on GitHub</span>
+          <span class="nav-link-chip">Repository</span>
         </a>
         <a
           class="nav-link nav-link-accent"
@@ -88,7 +90,7 @@
     <main>
       <section class="hero" id="top">
         <div class="hero-copy" data-reveal>
-          <p class="hero-kicker">Browser capture for product teams</p>
+          <p class="hero-kicker">Browser capture for design review, QA, and product work</p>
           <h1>Clean, responsive,<br />safer evidence<br />from <span>any webpage.</span></h1>
           <p class="hero-body">
             Lumen removes page noise before capture, generates responsive sets, redacts sensitive
@@ -98,17 +100,17 @@
           <div class="hero-actions">
             <a
               class="primary-link"
-              href="assets/proof-run-bundle.zip"
-              download
+              href="https://github.com/CaptainFredric/lumen-extension#load-the-extension-locally"
+              target="_blank"
+              rel="noreferrer"
             >
-              Download the sample bundle
+              Add to Chrome — local build
             </a>
             <a class="secondary-link" href="https://github.com/CaptainFredric/lumen-extension" target="_blank" rel="noreferrer">View on GitHub</a>
           </div>
 
           <p class="hero-inline-note">
-            No account required to test locally. No watermarks. Proof assets are generated from the
-            current prototype.
+            Works locally. No sign-up required. Proof assets come from the current prototype run.
           </p>
         </div>
 
@@ -125,6 +127,8 @@
                 <img
                   class="artifact-image"
                   src="assets/proof-run-desktop.png"
+                  loading="lazy"
+                  decoding="async"
                   alt="Real cleaned desktop capture from the current Lumen proof run."
                 />
               </figure>
@@ -134,6 +138,8 @@
                 <img
                   class="artifact-image artifact-image-redacted"
                   src="assets/proof-run-redacted.png"
+                  loading="lazy"
+                  decoding="async"
                   alt="Real redaction example from the current Lumen proof run."
                 />
                 <figcaption class="artifact-copy">
@@ -146,6 +152,8 @@
                 <img
                   class="artifact-image"
                   src="assets/proof-run-signals.png"
+                  loading="lazy"
+                  decoding="async"
                   alt="Extracted signals panel rendered from the current Lumen proof run."
                 />
               </figure>
@@ -155,6 +163,8 @@
                 <img
                   class="artifact-image artifact-image-history"
                   src="assets/proof-run-history.png"
+                  loading="lazy"
+                  decoding="async"
                   alt="Local history item rendered from the current Lumen proof run."
                 />
               </figure>
