@@ -141,6 +141,14 @@ npm run smoke:capture
 
 The smoke suite runs deterministic Playwright pages through the content-script capture path. It checks sticky and overlay cleanup, lazy media hydration, redaction scanning, navigation extraction, nested scroll containers, and anchored manual redaction projection.
 
+To verify the unpacked MV3 extension can boot, start its service worker, initialize settings, and render the popup:
+
+```bash
+npm run smoke:extension
+```
+
+This opens a temporary Chromium profile, loads the extension unpacked, checks the background service worker, opens `popup.html`, then closes the profile.
+
 To install Chromium for Playwright, run:
 
 ```bash
