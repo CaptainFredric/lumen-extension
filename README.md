@@ -133,6 +133,14 @@ npm install
 npm run proof:assets
 ```
 
+### Run Capture Smoke Tests
+
+```bash
+npm run smoke:capture
+```
+
+The smoke suite runs deterministic Playwright pages through the content-script capture path. It checks sticky and overlay cleanup, lazy media hydration, redaction scanning, navigation extraction, nested scroll containers, and anchored manual redaction projection.
+
 To install Chromium for Playwright, run:
 
 ```bash

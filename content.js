@@ -148,7 +148,7 @@
       hiddenCount = hideAggressiveLayers();
       startOverlayObserver();
       await pause(OVERLAY_SETTLE_MS);
-      hiddenCount = hideAggressiveLayers();
+      hiddenCount += hideAggressiveLayers();
       await settleFrames(2);
     }
 
