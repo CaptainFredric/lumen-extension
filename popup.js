@@ -695,6 +695,7 @@ function renderHistory(history) {
       item.manifestFile ? "manifest saved" : "",
       item.annotation?.text ? "note added" : "",
       item.manualRedactionCount ? `${item.manualRedactionCount} manual box${item.manualRedactionCount === 1 ? "" : "es"}` : "",
+      formatManualProjectionStats(item.manualProjectionStats),
       item.redactionCount ? `${item.redactionCount} redaction${item.redactionCount === 1 ? "" : "s"}` : "",
       item.blueprintSummary?.siteType || ""
     ]
@@ -883,14 +884,16 @@ function buildCaptureSuccessMessage(response, settings) {
   const manualText = response.manualRedactionCount
     ? ` ${response.manualRedactionCount} manual box${response.manualRedactionCount === 1 ? "" : "es"} applied.`
     : "";
+  const projectionText = formatManualProjectionStats(response.manualProjectionStats);
+  const projectionSentence = projectionText ? ` ${projectionText}.` : "";
 
   if (!response.redactionCount) {
     return variantCount > 1
-      ? `${fileText}. ${variantCount} responsive views captured.${manifestText}${noteText}${manualText}`
-      : `${fileText}.${manifestText}${noteText}${manualText}`;
+      ? `${fileText}. ${variantCount} responsive views captured.${manifestText}${noteText}${manualText}${projectionSentence}`
+      : `${fileText}.${manifestText}${noteText}${manualText}${projectionSentence}`;
   }
 
-  return `${fileText}. ${variantCount > 1 ? `${variantCount} responsive views captured. ` : ""}${response.redactionCount} redaction region${response.redactionCount === 1 ? "" : "s"} sanitized.${manifestText}${noteText}${manualText}`;
+  return `${fileText}. ${variantCount > 1 ? `${variantCount} responsive views captured. ` : ""}${response.redactionCount} redaction region${response.redactionCount === 1 ? "" : "s"} sanitized.${manifestText}${noteText}${manualText}${projectionSentence}`;
 }
 
 function buildRedactionPreviewText(preview) {
@@ -911,6 +914,33 @@ function formatRedactionKinds(byKind = {}) {
     .filter(([, count]) => count > 0)
     .map(([kind, count]) => `${count} ${kind}`)
     .join(", ");
+}
+
+function formatManualProjectionStats(stats = {}) {
+  const storedCount = Number.isFinite(stats.storedCount) ? Math.max(0, Math.round(stats.storedCount)) : 0;
+
+  if (!storedCount) {
+    return "";
+  }
+
+  const projectedCount = Number.isFinite(stats.projectedCount) ? Math.max(0, Math.round(stats.projectedCount)) : 0;
+  const directCount = Number.isFinite(stats.directCount) ? Math.max(0, Math.round(stats.directCount)) : 0;
+  const skippedCount = Number.isFinite(stats.skippedCount) ? Math.max(0, Math.round(stats.skippedCount)) : 0;
+  const parts = [];
+
+  if (projectedCount) {
+    parts.push(`${projectedCount} projected`);
+  }
+
+  if (directCount) {
+    parts.push(`${directCount} direct`);
+  }
+
+  if (skippedCount) {
+    parts.push(`${skippedCount} skipped`);
+  }
+
+  return parts.length ? `manual projection ${parts.join(", ")}` : "";
 }
 
 async function refreshManualRedactions() {

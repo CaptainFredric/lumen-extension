@@ -233,6 +233,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
   const redactionCount = results.reduce((sum, result) => sum + result.redactionCount, 0);
   const manualRedactionCount = results.reduce((sum, result) => sum + result.manualRedactionCount, 0);
   const redactionBreakdown = mergeRedactionBreakdowns(results.map((result) => result.redactionBreakdown));
+  const manualProjectionStats = mergeManualProjectionStats(results.map((result) => result.manualProjectionStats));
   const variantSummaries = results.map((result) => ({
     id: result.variant.id,
     label: result.variant.label,
@@ -241,6 +242,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     tileCount: result.tileCount,
     redactionCount: result.redactionCount,
     manualRedactionCount: result.manualRedactionCount,
+    manualProjectionStats: result.manualProjectionStats,
     redactionBreakdown: result.redactionBreakdown,
     dimensions: result.dimensions
   }));
@@ -258,6 +260,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     variants: variantSummaries,
     redactionCount,
     manualRedactionCount,
+    manualProjectionStats,
     redactionBreakdown,
     segmentCount,
     tileCount,
@@ -290,6 +293,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     tileCount,
     redactionCount,
     manualRedactionCount,
+    manualProjectionStats,
     redactionBreakdown,
     manifestFile,
     annotation: captureNote.enabled && captureNote.text ? captureNote : null,
@@ -319,6 +323,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
       fileCount: downloadedFiles.length,
       redactionCount,
       manualRedactionCount,
+      manualProjectionStats,
       variantCount: variants.length,
       manifestSaved: Boolean(manifestFile),
       annotationAdded: Boolean(captureNote.enabled && captureNote.text)
@@ -334,6 +339,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     tileCount,
     redactionCount,
     manualRedactionCount,
+    manualProjectionStats,
     manifestFile,
     annotation: captureNote.enabled && captureNote.text ? captureNote : null,
     variantCount: variants.length,
@@ -689,6 +695,40 @@ function mergeRedactionBreakdowns(breakdowns) {
   });
 }
 
+function buildManualProjectionStats({
+  storedCount = 0,
+  appliedCount = 0,
+  directCount = 0,
+  projectedCount = 0,
+  skippedCount = 0
+} = {}) {
+  return {
+    storedCount: clampNonNegativeInteger(storedCount),
+    appliedCount: clampNonNegativeInteger(appliedCount),
+    directCount: clampNonNegativeInteger(directCount),
+    projectedCount: clampNonNegativeInteger(projectedCount),
+    skippedCount: clampNonNegativeInteger(skippedCount)
+  };
+}
+
+function mergeManualProjectionStats(statsList) {
+  return (Array.isArray(statsList) ? statsList : []).reduce((merged, stats) => {
+    const normalized = buildManualProjectionStats(stats || {});
+
+    return {
+      storedCount: merged.storedCount + normalized.storedCount,
+      appliedCount: merged.appliedCount + normalized.appliedCount,
+      directCount: merged.directCount + normalized.directCount,
+      projectedCount: merged.projectedCount + normalized.projectedCount,
+      skippedCount: merged.skippedCount + normalized.skippedCount
+    };
+  }, buildManualProjectionStats());
+}
+
+function clampNonNegativeInteger(value) {
+  return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+}
+
 async function readManualRedactionStore() {
   const stored = await chrome.storage.local.get(STORAGE_KEYS.manualRedactions);
   const value = stored[STORAGE_KEYS.manualRedactions];
@@ -759,7 +799,8 @@ async function captureVariant({ sourceTab, variant, options, manualRedactions, e
       redactionScan = await requestRedactionScan(target.tab.id);
     }
 
-    const manualRegions = await resolveManualRedactionsForTarget(target.tab.id, manualRedactions, page);
+    const manualResolution = await resolveManualRedactionsForTarget(target.tab.id, manualRedactions, page);
+    const manualRegions = manualResolution.regions;
     const combinedRedactions = [
       ...redactionScan.regions,
       ...manualRegions
@@ -812,6 +853,7 @@ async function captureVariant({ sourceTab, variant, options, manualRedactions, e
       tileCount: stitched.outputs.length,
       redactionCount: stitched.redactionCount,
       manualRedactionCount: manualRegions.length,
+      manualProjectionStats: manualResolution.stats,
       redactionBreakdown: buildRedactionBreakdown(combinedRedactions),
       exportPreset: stitched.appliedPreset,
       dimensions: {
@@ -1055,8 +1097,13 @@ async function requestRedactionScan(tabId) {
 
 async function resolveManualRedactionsForTarget(tabId, manualRedactions, page) {
   if (!manualRedactions?.regions?.length) {
-    return [];
+    return {
+      regions: [],
+      stats: buildManualProjectionStats()
+    };
   }
+
+  const storedCount = manualRedactions.regions.length;
 
   try {
     const response = await chrome.tabs.sendMessage(tabId, {
@@ -1068,13 +1115,35 @@ async function resolveManualRedactionsForTarget(tabId, manualRedactions, page) {
     });
 
     if (response?.ok && Array.isArray(response.manualRedactions?.regions)) {
-      return normalizeManualRedactionRegions(response.manualRedactions.regions);
+      const regions = normalizeManualRedactionRegions(response.manualRedactions.regions);
+
+      return {
+        regions,
+        stats: buildManualProjectionStats({
+          storedCount,
+          appliedCount: regions.length,
+          directCount: response.manualRedactions.directCount,
+          projectedCount: response.manualRedactions.projectedCount,
+          skippedCount: response.manualRedactions.skippedCount
+        })
+      };
     }
   } catch (error) {
     console.debug("Lumen manual redaction projection skipped:", error);
   }
 
-  return selectManualRedactionsForPage(manualRedactions, page);
+  const fallbackRegions = selectManualRedactionsForPage(manualRedactions, page);
+
+  return {
+    regions: fallbackRegions,
+    stats: buildManualProjectionStats({
+      storedCount,
+      appliedCount: fallbackRegions.length,
+      directCount: fallbackRegions.length,
+      projectedCount: 0,
+      skippedCount: Math.max(0, storedCount - fallbackRegions.length)
+    })
+  };
 }
 
 async function requestPreparedPageMetrics(tabId) {
@@ -1261,6 +1330,7 @@ function buildCaptureCompletionDetail({
   fileCount,
   redactionCount,
   manualRedactionCount,
+  manualProjectionStats,
   variantCount,
   manifestSaved,
   annotationAdded
@@ -1268,8 +1338,9 @@ function buildCaptureCompletionDetail({
   const sliceText = `${segmentCount} slice${segmentCount === 1 ? "" : "s"} stitched`;
   const fileText = `${fileCount} file${fileCount === 1 ? "" : "s"} saved`;
   const variantText = variantCount > 1 ? `${variantCount} responsive views captured` : "";
+  const projectionText = formatManualProjectionStats(manualProjectionStats);
 
-  if (!redactionCount && !variantText && !manifestSaved && !annotationAdded) {
+  if (!redactionCount && !variantText && !projectionText && !manifestSaved && !annotationAdded) {
     return `${sliceText} and ${fileText} successfully.`;
   }
 
@@ -1287,6 +1358,10 @@ function buildCaptureCompletionDetail({
     fragments.push(`${manualRedactionCount} manual box${manualRedactionCount === 1 ? "" : "es"} applied`);
   }
 
+  if (projectionText) {
+    fragments.push(projectionText);
+  }
+
   if (manifestSaved) {
     fragments.push("bundle manifest saved");
   }
@@ -1296,6 +1371,29 @@ function buildCaptureCompletionDetail({
   }
 
   return `${fragments.join(", ")}.`;
+}
+
+function formatManualProjectionStats(stats) {
+  const normalized = buildManualProjectionStats(stats || {});
+  const parts = [];
+
+  if (!normalized.storedCount) {
+    return "";
+  }
+
+  if (normalized.projectedCount) {
+    parts.push(`${normalized.projectedCount} projected`);
+  }
+
+  if (normalized.directCount) {
+    parts.push(`${normalized.directCount} direct`);
+  }
+
+  if (normalized.skippedCount) {
+    parts.push(`${normalized.skippedCount} skipped`);
+  }
+
+  return parts.length ? `manual projection ${parts.join(", ")}` : "";
 }
 
 function buildVariantProgressDetail(variant, stage) {
@@ -1432,6 +1530,7 @@ function buildCaptureBundleManifest({
   variants,
   redactionCount,
   manualRedactionCount,
+  manualProjectionStats,
   redactionBreakdown,
   segmentCount,
   tileCount,
@@ -1457,6 +1556,7 @@ function buildCaptureBundleManifest({
       tileCount,
       redactionCount,
       manualRedactionCount,
+      manualProjectionStats,
       redactionBreakdown,
       annotation
     },
@@ -1469,6 +1569,7 @@ function buildCaptureBundleManifest({
       tileCount: variant.tileCount,
       redactionCount: variant.redactionCount,
       manualRedactionCount: variant.manualRedactionCount || 0,
+      manualProjectionStats: variant.manualProjectionStats || buildManualProjectionStats(),
       redactionBreakdown: variant.redactionBreakdown || buildRedactionBreakdown([]),
       dimensions: variant.dimensions
     })),

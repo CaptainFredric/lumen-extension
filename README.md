@@ -26,7 +26,7 @@ The current build includes:
 8. anchored manual redaction boxes for areas the scanner cannot infer, with projection into responsive captures when the source element still resolves
 9. anchored capture notes rendered into the exported image
 10. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
-11. bundle-manifest JSON exports with view, redaction, signal, breakdown, and note metadata
+11. bundle-manifest JSON exports with view, redaction, manual projection, signal, breakdown, and note metadata
 12. local capture history with file and summary metadata
 13. a local backend slice for demo session state and history sync when an API is reachable
 14. a GitHub Pages landing site in `docs/`
