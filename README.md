@@ -23,7 +23,7 @@ The current build includes:
 5. desktop, tablet, mobile, and responsive-set capture modes
 6. export-time redaction for emails, phone numbers, token-like strings, and filled inputs across the current DOM
 7. redaction preview from the popup before export
-8. manual redaction boxes for areas the scanner cannot infer on the active desktop layout
+8. anchored manual redaction boxes for areas the scanner cannot infer, with projection into responsive captures when the source element still resolves
 9. anchored capture notes rendered into the exported image
 10. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
 11. bundle-manifest JSON exports with view, redaction, signal, breakdown, and note metadata
@@ -36,7 +36,7 @@ The current build includes:
 These limits are important:
 
 1. redaction currently covers text and filled inputs present in the current DOM during export and should be reviewed before external sharing
-2. manual redaction boxes currently apply to the active desktop layout only
+2. manual redaction boxes can project into responsive captures through DOM anchors, but the result still needs review before external sharing
 3. the current annotation pass is one anchored capture note
 4. cloud sync, billing, scheduled monitoring, and visual diffs remain future work
 5. highly dynamic sites with virtualization or unusual scroll behavior can still need site-specific fallback work
@@ -104,7 +104,7 @@ The public landing page will be available at `http://127.0.0.1:3000/`.
 3. Choose the capture device and export mode
 4. Enable sticky cleanup, lazy-load forcing, or auto-redaction as needed
 5. Use `Scan` to preview detected redaction regions before export
-6. Use `Mark boxes` if you need manual desktop redactions before capture
+6. Use `Mark boxes` if you need manual redactions before capture
 7. Add a capture note if you want the export to carry a review comment
 8. Keep `Save bundle manifest` enabled if you want a portable JSON sidecar next to the capture files
 9. Run `Analyze Page` or `Capture Full Page`
@@ -165,5 +165,5 @@ These are future layers:
 The highest-leverage next steps are:
 
 1. improve capture reliability on difficult real-world sites
-2. improve manual redaction mapping for responsive captures
+2. improve cross-layout review for projected manual redactions
 3. tighten the backend from demo session state into a real account path

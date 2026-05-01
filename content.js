@@ -100,6 +100,13 @@
       return true;
     }
 
+    if (message.type === "LUMEN_RESOLVE_MANUAL_REDACTIONS") {
+      Promise.resolve()
+        .then(() => sendResponse({ ok: true, manualRedactions: resolveManualRedactions(message.payload || {}) }))
+        .catch((error) => sendResponse({ ok: false, error: error.message }));
+      return true;
+    }
+
     if (message.type === "LUMEN_START_MANUAL_REDACTION_PICKER") {
       Promise.resolve()
         .then(() => sendResponse({ ok: true, picker: startManualRedactionPicker(message.payload || {}) }))
@@ -477,9 +484,13 @@
       return null;
     }
 
+    const anchor = buildManualRedactionAnchor(viewportRect, region, context);
+
     return {
       ...region,
-      id: createLocalId()
+      id: createLocalId(),
+      sourceViewport: getManualRedactionSourceViewport(context),
+      ...(anchor ? { anchor } : {})
     };
   }
 
@@ -492,9 +503,391 @@
         left: Math.max(0, Math.round(region.left)),
         top: Math.max(0, Math.round(region.top)),
         width: Math.max(1, Math.round(region.width || 1)),
-        height: Math.max(1, Math.round(region.height || 1))
+        height: Math.max(1, Math.round(region.height || 1)),
+        ...(normalizeManualRedactionSourceViewport(region.sourceViewport) ? {
+          sourceViewport: normalizeManualRedactionSourceViewport(region.sourceViewport)
+        } : {}),
+        ...(normalizeManualRedactionAnchor(region.anchor) ? {
+          anchor: normalizeManualRedactionAnchor(region.anchor)
+        } : {})
       }))
       .slice(0, MANUAL_REDACTION_LIMIT);
+  }
+
+  function resolveManualRedactions({ regions = [], context: recordContext = null } = {}) {
+    const context = captureState.scrollContext || detectScrollContext();
+    const page = getPageMetrics();
+    const resolved = [];
+    const sourceViewportFallback = normalizeManualRedactionSourceViewport(recordContext);
+    let anchorResolvedCount = 0;
+    let directCount = 0;
+    let skippedCount = 0;
+
+    for (const region of normalizeManualRegions(regions)) {
+      const projected = resolveAnchoredManualRegion(region, context);
+
+      if (projected) {
+        resolved.push(projected);
+        anchorResolvedCount += 1;
+        continue;
+      }
+
+      const direct = resolveDirectManualRegion(region, context, page, sourceViewportFallback);
+
+      if (direct) {
+        resolved.push(direct);
+        directCount += 1;
+        continue;
+      }
+
+      skippedCount += 1;
+    }
+
+    return {
+      count: resolved.length,
+      regions: resolved,
+      projectedCount: anchorResolvedCount,
+      directCount,
+      skippedCount,
+      breakdown: buildRedactionBreakdown(resolved)
+    };
+  }
+
+  function resolveAnchoredManualRegion(region, context) {
+    const anchor = normalizeManualRedactionAnchor(region.anchor);
+
+    if (!anchor?.selector || !anchor.ratios) {
+      return null;
+    }
+
+    const node = findManualAnchorNode(anchor);
+
+    if (!(node instanceof HTMLElement) || !isElementScannable(node)) {
+      return null;
+    }
+
+    const coordinates = toScrollCoordinates(node.getBoundingClientRect(), context);
+
+    if (!coordinates || coordinates.width < 2 || coordinates.height < 2) {
+      return null;
+    }
+
+    const nextRegion = {
+      id: region.id,
+      kind: "manual",
+      left: Math.round(coordinates.left + anchor.ratios.left * coordinates.width),
+      top: Math.round(coordinates.top + anchor.ratios.top * coordinates.height),
+      width: Math.max(1, Math.round(anchor.ratios.width * coordinates.width)),
+      height: Math.max(1, Math.round(anchor.ratios.height * coordinates.height)),
+      projected: true,
+      projection: "anchor"
+    };
+
+    return isResolvedManualRegionValid(nextRegion) ? nextRegion : null;
+  }
+
+  function resolveDirectManualRegion(region, context, page, sourceViewportFallback) {
+    const sourceViewport = normalizeManualRedactionSourceViewport(region.sourceViewport) || sourceViewportFallback;
+
+    if (!sourceViewport) {
+      return null;
+    }
+
+    if (
+      (sourceViewport.scrollMode !== page.scrollMode || sourceViewport.scrollContainer !== page.scrollContainer)
+    ) {
+      return null;
+    }
+
+    const sourceWidth = sourceViewport?.viewportWidth;
+    const sameViewport =
+      !sourceWidth ||
+      Math.abs(sourceWidth - page.viewportWidth) <= Math.max(2, page.viewportWidth * 0.02);
+
+    if (!sameViewport) {
+      return null;
+    }
+
+    const nextRegion = {
+      id: region.id,
+      kind: "manual",
+      left: Math.max(0, Math.round(region.left)),
+      top: Math.max(0, Math.round(region.top)),
+      width: Math.max(1, Math.round(region.width)),
+      height: Math.max(1, Math.round(region.height)),
+      projected: false,
+      projection: "direct"
+    };
+
+    return isResolvedManualRegionValid(nextRegion) && doesManualRegionIntersectPage(nextRegion, context)
+      ? nextRegion
+      : null;
+  }
+
+  function isResolvedManualRegionValid(region) {
+    return Number.isFinite(region.left) &&
+      Number.isFinite(region.top) &&
+      Number.isFinite(region.width) &&
+      Number.isFinite(region.height) &&
+      region.width > 1 &&
+      region.height > 1;
+  }
+
+  function doesManualRegionIntersectPage(region, context) {
+    const page = getPageMetrics();
+    const maxWidth = context.isDocument ? document.documentElement.scrollWidth : context.node.scrollWidth;
+    const right = region.left + region.width;
+    const bottom = region.top + region.height;
+
+    return right > 0 && bottom > 0 && region.left < maxWidth && region.top < page.pageHeight;
+  }
+
+  function buildManualRedactionAnchor(viewportRect, region, context) {
+    const node = getElementUnderManualRect(viewportRect);
+
+    if (!(node instanceof HTMLElement)) {
+      return null;
+    }
+
+    const selector = buildStableCssPath(node);
+
+    if (!selector) {
+      return null;
+    }
+
+    const elementCoordinates = toScrollCoordinates(node.getBoundingClientRect(), context);
+
+    if (!elementCoordinates || elementCoordinates.width < 2 || elementCoordinates.height < 2) {
+      return null;
+    }
+
+    return {
+      selector,
+      tagName: node.tagName.toLowerCase(),
+      sourceRect: {
+        left: Math.round(elementCoordinates.left),
+        top: Math.round(elementCoordinates.top),
+        width: Math.round(elementCoordinates.width),
+        height: Math.round(elementCoordinates.height)
+      },
+      ratios: {
+        left: clampRatio((region.left - elementCoordinates.left) / elementCoordinates.width),
+        top: clampRatio((region.top - elementCoordinates.top) / elementCoordinates.height),
+        width: clampRatio(region.width / elementCoordinates.width),
+        height: clampRatio(region.height / elementCoordinates.height)
+      }
+    };
+  }
+
+  function getElementUnderManualRect(viewportRect) {
+    const centerX = viewportRect.left + viewportRect.width / 2;
+    const centerY = viewportRect.top + viewportRect.height / 2;
+    const overlay = captureState.manualPicker?.overlay;
+    const previousVisibility = overlay?.style.visibility || "";
+    const previousPointerEvents = overlay?.style.pointerEvents || "";
+
+    if (overlay) {
+      overlay.style.visibility = "hidden";
+      overlay.style.pointerEvents = "none";
+    }
+
+    try {
+      const nodes = document.elementsFromPoint(centerX, centerY);
+      return nodes.find((node) =>
+        node instanceof HTMLElement &&
+        !["html", "body"].includes(node.tagName.toLowerCase()) &&
+        !node.closest("#lumen-redaction-picker") &&
+        isElementScannable(node)
+      ) || null;
+    } finally {
+      if (overlay) {
+        overlay.style.visibility = previousVisibility;
+        overlay.style.pointerEvents = previousPointerEvents;
+      }
+    }
+  }
+
+  function findManualAnchorNode(anchor) {
+    try {
+      const node = document.querySelector(anchor.selector);
+
+      if (node instanceof HTMLElement) {
+        return node;
+      }
+    } catch (error) {
+      return null;
+    }
+
+    return null;
+  }
+
+  function buildStableCssPath(node) {
+    if (!(node instanceof HTMLElement)) {
+      return "";
+    }
+
+    if (node.id && document.querySelectorAll(`#${escapeCssIdentifier(node.id)}`).length === 1) {
+      return `#${escapeCssIdentifier(node.id)}`;
+    }
+
+    const parts = [];
+    let current = node;
+
+    while (current && current instanceof HTMLElement && current !== document.body && current !== document.documentElement) {
+      parts.unshift(buildCssPathPart(current));
+
+      const candidate = parts.join(" > ");
+
+      try {
+        if (document.querySelectorAll(candidate).length === 1) {
+          return candidate;
+        }
+      } catch (error) {
+        return "";
+      }
+
+      current = current.parentElement;
+
+      if (parts.length >= 6) {
+        break;
+      }
+    }
+
+    return "";
+  }
+
+  function buildCssPathPart(node) {
+    const tag = node.tagName.toLowerCase();
+    const stableAttributes = ["data-testid", "data-test", "data-cy", "name", "aria-label"];
+
+    for (const attr of stableAttributes) {
+      const value = node.getAttribute(attr);
+
+      if (value && !looksSensitiveSelectorValue(value)) {
+        return `${tag}[${attr}="${escapeCssString(value)}"]`;
+      }
+    }
+
+    const classNames = [...node.classList]
+      .filter((className) => !/^lumen-/i.test(className) && /^[A-Za-z0-9_-]{2,}$/.test(className))
+      .slice(0, 2)
+      .map((className) => `.${escapeCssIdentifier(className)}`)
+      .join("");
+    const siblingIndex = getElementSiblingIndex(node);
+
+    return `${tag}${classNames}:nth-of-type(${siblingIndex})`;
+  }
+
+  function normalizeManualRedactionAnchor(anchor) {
+    if (!anchor || typeof anchor !== "object" || typeof anchor.selector !== "string") {
+      return null;
+    }
+
+    const ratios = anchor.ratios || {};
+
+    if (
+      !Number.isFinite(ratios.left) ||
+      !Number.isFinite(ratios.top) ||
+      !Number.isFinite(ratios.width) ||
+      !Number.isFinite(ratios.height)
+    ) {
+      return null;
+    }
+
+    return {
+      selector: anchor.selector.slice(0, 640),
+      tagName: typeof anchor.tagName === "string" ? anchor.tagName.slice(0, 48) : "",
+      sourceRect: normalizeAnchorSourceRect(anchor.sourceRect),
+      ratios: {
+        left: clampRatio(ratios.left),
+        top: clampRatio(ratios.top),
+        width: clampRatio(ratios.width),
+        height: clampRatio(ratios.height)
+      }
+    };
+  }
+
+  function normalizeAnchorSourceRect(sourceRect) {
+    if (!sourceRect || typeof sourceRect !== "object") {
+      return null;
+    }
+
+    return {
+      left: Math.max(0, Math.round(sourceRect.left || 0)),
+      top: Math.max(0, Math.round(sourceRect.top || 0)),
+      width: Math.max(1, Math.round(sourceRect.width || 1)),
+      height: Math.max(1, Math.round(sourceRect.height || 1))
+    };
+  }
+
+  function getManualRedactionSourceViewport(context) {
+    const metrics = getPageMetrics();
+
+    return {
+      viewportWidth: metrics.viewportWidth,
+      viewportHeight: metrics.viewportHeight,
+      pageHeight: metrics.pageHeight,
+      scrollMode: metrics.scrollMode,
+      scrollContainer: metrics.scrollContainer || context.label || "document"
+    };
+  }
+
+  function normalizeManualRedactionSourceViewport(sourceViewport) {
+    if (!sourceViewport || typeof sourceViewport !== "object") {
+      return null;
+    }
+
+    return {
+      viewportWidth: Math.max(1, Math.round(sourceViewport.viewportWidth || 0)),
+      viewportHeight: Math.max(1, Math.round(sourceViewport.viewportHeight || 0)),
+      pageHeight: Math.max(1, Math.round(sourceViewport.pageHeight || 0)),
+      scrollMode: sourceViewport.scrollMode === "container" ? "container" : "document",
+      scrollContainer: typeof sourceViewport.scrollContainer === "string"
+        ? sourceViewport.scrollContainer.slice(0, 160)
+        : "document"
+    };
+  }
+
+  function getElementSiblingIndex(node) {
+    let index = 1;
+    let sibling = node.previousElementSibling;
+
+    while (sibling) {
+      if (sibling.tagName === node.tagName) {
+        index += 1;
+      }
+
+      sibling = sibling.previousElementSibling;
+    }
+
+    return index;
+  }
+
+  function looksSensitiveSelectorValue(value) {
+    return SENSITIVE_TEXT_PATTERNS.some((pattern) => {
+      const regex = new RegExp(pattern.regex.source, pattern.regex.flags);
+      return regex.test(value);
+    });
+  }
+
+  function clampRatio(value) {
+    if (!Number.isFinite(value)) {
+      return 0;
+    }
+
+    return Math.max(0, Math.min(1, Number(value.toFixed(5))));
+  }
+
+  function escapeCssIdentifier(value) {
+    if (window.CSS?.escape) {
+      return window.CSS.escape(value);
+    }
+
+    return String(value).replace(/[^A-Za-z0-9_-]/g, "\\$&");
+  }
+
+  function escapeCssString(value) {
+    return String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   }
 
   function normalizeViewportRect(startX, startY, endX, endY) {

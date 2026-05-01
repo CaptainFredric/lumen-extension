@@ -555,8 +555,11 @@ function selectManualRedactionsForPage(record, page) {
   const contextMatches =
     !context.scrollMode ||
     (context.scrollMode === page.scrollMode && context.scrollContainer === page.scrollContainer);
+  const viewportMatches =
+    !context.viewportWidth ||
+    Math.abs(context.viewportWidth - page.viewportWidth) <= Math.max(2, page.viewportWidth * 0.02);
 
-  if (!contextMatches) {
+  if (!contextMatches || !viewportMatches) {
     return [];
   }
 
@@ -572,9 +575,83 @@ function normalizeManualRedactionRegions(regions) {
       left: Math.max(0, Math.round(region.left)),
       top: Math.max(0, Math.round(region.top)),
       width: Math.max(1, Math.round(region.width || 1)),
-      height: Math.max(1, Math.round(region.height || 1))
+      height: Math.max(1, Math.round(region.height || 1)),
+      ...(normalizeManualSourceViewport(region.sourceViewport) ? {
+        sourceViewport: normalizeManualSourceViewport(region.sourceViewport)
+      } : {}),
+      ...(normalizeManualAnchor(region.anchor) ? {
+        anchor: normalizeManualAnchor(region.anchor)
+      } : {}),
+      ...(region.projected ? { projected: true } : {}),
+      ...(typeof region.projection === "string" ? { projection: region.projection.slice(0, 32) } : {})
     }))
     .slice(0, LUMEN_CONFIG.capture.manualRedactionLimit || 24);
+}
+
+function normalizeManualSourceViewport(sourceViewport) {
+  if (!sourceViewport || typeof sourceViewport !== "object") {
+    return null;
+  }
+
+  return {
+    viewportWidth: Math.max(1, Math.round(sourceViewport.viewportWidth || 0)),
+    viewportHeight: Math.max(1, Math.round(sourceViewport.viewportHeight || 0)),
+    pageHeight: Math.max(1, Math.round(sourceViewport.pageHeight || 0)),
+    scrollMode: sourceViewport.scrollMode === "container" ? "container" : "document",
+    scrollContainer: typeof sourceViewport.scrollContainer === "string"
+      ? sourceViewport.scrollContainer.slice(0, 160)
+      : "document"
+  };
+}
+
+function normalizeManualAnchor(anchor) {
+  if (!anchor || typeof anchor !== "object" || typeof anchor.selector !== "string") {
+    return null;
+  }
+
+  const ratios = anchor.ratios || {};
+
+  if (
+    !Number.isFinite(ratios.left) ||
+    !Number.isFinite(ratios.top) ||
+    !Number.isFinite(ratios.width) ||
+    !Number.isFinite(ratios.height)
+  ) {
+    return null;
+  }
+
+  return {
+    selector: anchor.selector.slice(0, 640),
+    tagName: typeof anchor.tagName === "string" ? anchor.tagName.slice(0, 48) : "",
+    sourceRect: normalizeManualAnchorRect(anchor.sourceRect),
+    ratios: {
+      left: clampRatio(ratios.left),
+      top: clampRatio(ratios.top),
+      width: clampRatio(ratios.width),
+      height: clampRatio(ratios.height)
+    }
+  };
+}
+
+function normalizeManualAnchorRect(sourceRect) {
+  if (!sourceRect || typeof sourceRect !== "object") {
+    return null;
+  }
+
+  return {
+    left: Math.max(0, Math.round(sourceRect.left || 0)),
+    top: Math.max(0, Math.round(sourceRect.top || 0)),
+    width: Math.max(1, Math.round(sourceRect.width || 1)),
+    height: Math.max(1, Math.round(sourceRect.height || 1))
+  };
+}
+
+function clampRatio(value) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(1, Number(value.toFixed(5))));
 }
 
 function buildRedactionBreakdown(regions) {
@@ -682,9 +759,7 @@ async function captureVariant({ sourceTab, variant, options, manualRedactions, e
       redactionScan = await requestRedactionScan(target.tab.id);
     }
 
-    const manualRegions = target.kind === "desktop"
-      ? selectManualRedactionsForPage(manualRedactions, page)
-      : [];
+    const manualRegions = await resolveManualRedactionsForTarget(target.tab.id, manualRedactions, page);
     const combinedRedactions = [
       ...redactionScan.regions,
       ...manualRegions
@@ -976,6 +1051,30 @@ async function requestRedactionScan(tabId) {
   }
 
   return response.redactions;
+}
+
+async function resolveManualRedactionsForTarget(tabId, manualRedactions, page) {
+  if (!manualRedactions?.regions?.length) {
+    return [];
+  }
+
+  try {
+    const response = await chrome.tabs.sendMessage(tabId, {
+      type: "LUMEN_RESOLVE_MANUAL_REDACTIONS",
+      payload: {
+        regions: manualRedactions.regions,
+        context: manualRedactions.context || null
+      }
+    });
+
+    if (response?.ok && Array.isArray(response.manualRedactions?.regions)) {
+      return normalizeManualRedactionRegions(response.manualRedactions.regions);
+    }
+  } catch (error) {
+    console.debug("Lumen manual redaction projection skipped:", error);
+  }
+
+  return selectManualRedactionsForPage(manualRedactions, page);
 }
 
 async function requestPreparedPageMetrics(tabId) {
