@@ -152,6 +152,14 @@ npm run smoke:extension
 
 This opens a temporary Chromium profile, loads the extension unpacked, checks the background service worker, opens `popup.html`, then closes the profile.
 
+To verify the loaded extension can capture a real local page and produce finished artifacts:
+
+```bash
+npm run smoke:e2e
+```
+
+This starts a local fixture page, loads a temporary copy of the extension with explicit test only capture access, runs the capture through the MV3 background worker, waits for Chrome downloads to finish, validates the PNG and manifest artifacts, and checks that local history stores the run. The checked in manifest is not widened by this test.
+
 To install Chromium for Playwright, run:
 
 ```bash

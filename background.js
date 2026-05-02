@@ -1454,6 +1454,34 @@ function callDownloadsMethod(method, ...args) {
   });
 }
 
+async function waitForDownloadComplete(downloadId, timeoutMs = 30000) {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const [downloadItem] = await chrome.downloads.search({
+      id: downloadId
+    });
+
+    if (downloadItem?.state === "complete") {
+      return downloadItem;
+    }
+
+    if (downloadItem?.state === "interrupted") {
+      throw createFriendlyError(
+        "Download Interrupted",
+        downloadItem.error || "Chrome interrupted the capture download before it finished."
+      );
+    }
+
+    await sleep(120);
+  }
+
+  throw createFriendlyError(
+    "Download Timed Out",
+    "Chrome started the capture download, but it did not finish in time."
+  );
+}
+
 function createFriendlyError(title, description) {
   return { title, description };
 }
@@ -1639,10 +1667,12 @@ async function downloadRenderedOutputs(outputs, { folder, fileBaseName, variantI
       conflictAction: "uniquify",
       saveAs: false
     });
+    const downloadItem = await waitForDownloadComplete(downloadId);
 
     downloadRecords.push({
       downloadId,
       filename,
+      bytesReceived: downloadItem.bytesReceived || 0,
       kind: "image",
       variantId,
       exportPreset,
@@ -1666,10 +1696,12 @@ async function downloadBundleManifest({ folder, fileBaseName, manifest }) {
     conflictAction: "uniquify",
     saveAs: false
   });
+  const downloadItem = await waitForDownloadComplete(downloadId);
 
   return {
     downloadId,
     filename,
+    bytesReceived: downloadItem.bytesReceived || 0,
     kind: "manifest"
   };
 }
