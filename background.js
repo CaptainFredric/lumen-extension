@@ -154,6 +154,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "LUMEN_OPEN_CAPTURE_DOWNLOAD") {
+    runHistoryDownloadAction(message.payload, "open")
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_SHOW_CAPTURE_DOWNLOAD") {
+    runHistoryDownloadAction(message.payload, "show")
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
   if (message?.type === "LUMEN_MANUAL_REDACTIONS_UPDATED") {
     persistManualRedactionsFromContent(sender.tab, message.payload)
       .then((result) => sendResponse({ ok: true, ...result }))
@@ -194,6 +210,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function runCaptureFlow(options = getDefaultSettings()) {
   const captureNote = normalizeCaptureNoteOptions(options);
   const sourceTab = await getCurrentTab();
+  const capturedAt = new Date().toISOString();
+  const captureId = createLocalId();
 
   if (!sourceTab?.id || !sourceTab.url) {
     throw createFriendlyError(
@@ -211,6 +229,11 @@ async function runCaptureFlow(options = getDefaultSettings()) {
 
   const variants = getCaptureVariants(options.devicePreset);
   const manualRedactions = await getManualRedactionsForTab(sourceTab);
+  const runContext = buildCaptureRunContext({
+    title: sourceTab.title,
+    url: sourceTab.url,
+    capturedAt
+  });
   const results = [];
   let blueprint = null;
 
@@ -220,6 +243,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
       variant: variants[index],
       options,
       manualRedactions,
+      runContext,
       extractBlueprint: index === 0
     });
 
@@ -238,6 +262,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     id: result.variant.id,
     label: result.variant.label,
     files: result.downloadedFiles,
+    downloads: result.downloadRecords,
     exportPreset: result.exportPreset,
     tileCount: result.tileCount,
     redactionCount: result.redactionCount,
@@ -253,7 +278,8 @@ async function runCaptureFlow(options = getDefaultSettings()) {
 
   const bundleManifest = buildCaptureBundleManifest({
     page: firstResult.page,
-    capturedAt: new Date().toISOString(),
+    capturedAt,
+    archiveFolder: runContext.folder,
     options,
     annotation: captureNote.enabled && captureNote.text ? captureNote : null,
     exportPreset: firstResult.exportPreset,
@@ -268,28 +294,34 @@ async function runCaptureFlow(options = getDefaultSettings()) {
   });
 
   let manifestFile = "";
+  let manifestDownload = null;
 
   if (options.exportManifest !== false) {
-    manifestFile = await downloadBundleManifest({
+    manifestDownload = await downloadBundleManifest({
+      folder: runContext.folder,
       fileBaseName: buildManifestFileBaseName(firstResult.page, options, firstResult.exportPreset),
       manifest: bundleManifest
     });
+    manifestFile = manifestDownload.filename;
   }
 
-  const downloadedFiles = [
-    ...results.flatMap((result) => result.downloadedFiles),
-    ...(manifestFile ? [manifestFile] : [])
+  const downloadedRecords = [
+    ...results.flatMap((result) => result.downloadRecords),
+    ...(manifestDownload ? [manifestDownload] : [])
   ];
+  const downloadedFiles = downloadedRecords.map((record) => record.filename);
 
   const captureHistory = await persistCaptureRecord({
-    id: createLocalId(),
+    id: captureId,
     title: firstResult.page.title,
     host: new URL(firstResult.page.url).host,
     url: firstResult.page.url,
     devicePreset: options.devicePreset,
     exportPreset: firstResult.exportPreset,
-    capturedAt: new Date().toISOString(),
+    capturedAt,
+    archiveFolder: runContext.folder,
     files: downloadedFiles,
+    downloads: downloadedRecords,
     tileCount,
     redactionCount,
     manualRedactionCount,
@@ -334,6 +366,8 @@ async function runCaptureFlow(options = getDefaultSettings()) {
   return {
     fileName: downloadedFiles[0] || "",
     files: downloadedFiles,
+    downloads: downloadedRecords,
+    archiveFolder: runContext.folder,
     segmentCount,
     exportPreset: firstResult.exportPreset,
     tileCount,
@@ -423,6 +457,65 @@ async function runRedactionPreviewFlow() {
     redactionCount: autoScan.regions.length + manualRegions.length,
     redactionBreakdown: combinedBreakdown,
     scope: "current DOM"
+  };
+}
+
+async function runHistoryDownloadAction(payload = {}, action = "show") {
+  const captureId = payload.captureId || "";
+  const localState = await readLocalState();
+  const record = localState.captureHistory.find((item) => item.id === captureId);
+
+  if (!record) {
+    throw createFriendlyError(
+      "Capture Not Found",
+      "The selected capture is no longer available in local history."
+    );
+  }
+
+  const downloadRecord = selectPrimaryDownloadRecord(record);
+
+  if (!downloadRecord?.downloadId) {
+    throw createFriendlyError(
+      "Download Handle Missing",
+      "This capture was saved before Lumen started storing local download handles. Run a fresh capture, then use this action again."
+    );
+  }
+
+  const [downloadItem] = await chrome.downloads.search({
+    id: downloadRecord.downloadId
+  });
+
+  if (!downloadItem) {
+    throw createFriendlyError(
+      "Download Not Found",
+      "Chrome no longer has a local record for this downloaded file."
+    );
+  }
+
+  if (downloadItem.state && downloadItem.state !== "complete") {
+    throw createFriendlyError(
+      "Download Still Running",
+      "Chrome has not finished writing this capture yet."
+    );
+  }
+
+  try {
+    if (action === "open") {
+      await callDownloadsMethod("open", downloadRecord.downloadId);
+    } else {
+      await callDownloadsMethod("show", downloadRecord.downloadId);
+    }
+  } catch (error) {
+    throw createFriendlyError(
+      action === "open" ? "File Could Not Open" : "File Could Not Be Revealed",
+      error.message || "Chrome could not access this downloaded artifact. It may have been moved or deleted."
+    );
+  }
+
+  return {
+    filename: downloadRecord.filename,
+    archiveFolder: record.archiveFolder || "",
+    action
   };
 }
 
@@ -760,7 +853,7 @@ function buildEmptyManualRedactionRecord(rawUrl = "") {
   };
 }
 
-async function captureVariant({ sourceTab, variant, options, manualRedactions, extractBlueprint }) {
+async function captureVariant({ sourceTab, variant, options, manualRedactions, runContext, extractBlueprint }) {
   const target = await createCaptureTarget(sourceTab, variant);
 
   try {
@@ -842,13 +935,20 @@ async function captureVariant({ sourceTab, variant, options, manualRedactions, e
       detail: `Writing the ${variant.label.toLowerCase()} capture to your Downloads folder.`
     });
 
-    const downloadedFiles = await downloadRenderedOutputs(stitched.outputs, fileBaseName);
+    const downloadRecords = await downloadRenderedOutputs(stitched.outputs, {
+      folder: runContext.folder,
+      fileBaseName,
+      variantId: variant.id,
+      exportPreset: stitched.appliedPreset
+    });
+    const downloadedFiles = downloadRecords.map((record) => record.filename);
 
     return {
       variant,
       page,
       blueprint,
       downloadedFiles,
+      downloadRecords,
       segmentCount,
       tileCount: stitched.outputs.length,
       redactionCount: stitched.redactionCount,
@@ -1291,19 +1391,28 @@ async function waitForTabComplete(tabId, timeoutMs = 15000) {
 
 function buildCaptureFileBaseName({ title, url, devicePreset, exportPreset }) {
   const host = new URL(url).hostname.replace(/^www\./, "");
-  const safeTitle = sanitizeSegment(title || host).slice(0, 64);
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const safeTitle = sanitizeSegment(title || host).slice(0, 48);
 
-  return `${safeTitle || "capture"}-${devicePreset}-${exportPreset}-${timestamp}`;
+  return `${safeTitle || "capture"}-${devicePreset}-${exportPreset}`;
 }
 
 function buildManifestFileBaseName(page, options, exportPreset) {
-  return buildCaptureFileBaseName({
-    title: page.title,
-    url: page.url,
-    devicePreset: options.devicePreset || "desktop",
-    exportPreset
-  }).replace(/-(raw|browser|phone)-/, "-bundle-");
+  const host = new URL(page.url).hostname.replace(/^www\./, "");
+  const safeTitle = sanitizeSegment(page.title || host).slice(0, 48);
+
+  return `${safeTitle || "capture"}-bundle-${options.devicePreset || "desktop"}-${exportPreset}`;
+}
+
+function buildCaptureRunContext({ title, url, capturedAt }) {
+  const host = new URL(url).hostname.replace(/^www\./, "");
+  const safeTitle = sanitizeSegment(title || host).slice(0, 48) || "capture";
+  const day = capturedAt.slice(0, 10);
+  const timestamp = capturedAt.replace(/[:.]/g, "-");
+
+  return {
+    capturedAt,
+    folder: `Lumen/${day}/${safeTitle}-${timestamp}`
+  };
 }
 
 function sanitizeSegment(input) {
@@ -1311,6 +1420,38 @@ function sanitizeSegment(input) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function selectPrimaryDownloadRecord(record) {
+  const downloads = Array.isArray(record.downloads) ? record.downloads : [];
+
+  return downloads.find((download) => Number.isInteger(download.downloadId) && download.kind === "image") ||
+    downloads.find((download) => Number.isInteger(download.downloadId)) ||
+    null;
+}
+
+function callDownloadsMethod(method, ...args) {
+  return new Promise((resolve, reject) => {
+    try {
+      const result = chrome.downloads[method](...args);
+
+      if (result && typeof result.then === "function") {
+        result.then(resolve, reject);
+        return;
+      }
+
+      const lastError = chrome.runtime.lastError;
+
+      if (lastError) {
+        reject(new Error(lastError.message));
+        return;
+      }
+
+      resolve(result);
+    } catch (error) {
+      reject(error);
+    }
+  });
 }
 
 function createFriendlyError(title, description) {
@@ -1482,48 +1623,61 @@ async function waitForCaptureWindow(previousCaptureTimestamp) {
   return Date.now();
 }
 
-async function downloadRenderedOutputs(outputs, fileBaseName) {
-  const downloadedFiles = [];
+async function downloadRenderedOutputs(outputs, { folder, fileBaseName, variantId, exportPreset }) {
+  const downloadRecords = [];
 
   for (const output of outputs) {
     const suffix =
       outputs.length > 1
         ? `-part-${String(output.index + 1).padStart(2, "0")}-of-${String(output.total).padStart(2, "0")}`
         : "";
-    const filename = `Lumen/${fileBaseName}${suffix}.png`;
+    const filename = `${folder}/${fileBaseName}${suffix}.png`;
 
-    await chrome.downloads.download({
+    const downloadId = await chrome.downloads.download({
       url: output.dataUrl,
       filename,
       conflictAction: "uniquify",
       saveAs: false
     });
 
-    downloadedFiles.push(filename);
+    downloadRecords.push({
+      downloadId,
+      filename,
+      kind: "image",
+      variantId,
+      exportPreset,
+      partIndex: output.index + 1,
+      partTotal: output.total
+    });
   }
 
-  return downloadedFiles;
+  return downloadRecords;
 }
 
-async function downloadBundleManifest({ fileBaseName, manifest }) {
-  const filename = `Lumen/${fileBaseName}.json`;
+async function downloadBundleManifest({ folder, fileBaseName, manifest }) {
+  const filename = `${folder}/${fileBaseName}.json`;
   const dataUrl = `data:application/json;charset=utf-8,${encodeURIComponent(
     `${JSON.stringify(manifest, null, 2)}\n`
   )}`;
 
-  await chrome.downloads.download({
+  const downloadId = await chrome.downloads.download({
     url: dataUrl,
     filename,
     conflictAction: "uniquify",
     saveAs: false
   });
 
-  return filename;
+  return {
+    downloadId,
+    filename,
+    kind: "manifest"
+  };
 }
 
 function buildCaptureBundleManifest({
   page,
   capturedAt,
+  archiveFolder,
   options,
   annotation,
   exportPreset,
@@ -1546,6 +1700,7 @@ function buildCaptureBundleManifest({
       host: new URL(page.url).host
     },
     capture: {
+      archiveFolder,
       devicePreset: options.devicePreset || "desktop",
       exportPreset,
       removeStickyHeaders: options.removeStickyHeaders !== false,

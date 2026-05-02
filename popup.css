@@ -757,6 +757,51 @@ h3 {
   line-height: 1.45;
 }
 
+.history-path {
+  overflow: hidden;
+  padding: 7px 9px;
+  border: 1px solid rgba(134, 221, 255, 0.13);
+  border-radius: 10px;
+  background: rgba(134, 221, 255, 0.05);
+  color: rgba(213, 245, 255, 0.82);
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.history-action {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 7px 10px;
+  transition: border-color 150ms ease, background 150ms ease, color 150ms ease, transform 150ms ease;
+}
+
+.history-action:hover:not(:disabled) {
+  border-color: rgba(134, 221, 255, 0.36);
+  background: rgba(134, 221, 255, 0.12);
+  color: #ecfbff;
+  transform: translateY(-1px);
+}
+
+.history-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
 .segment:hover,
 .capture-button:hover,
 .secondary-action:hover,
@@ -774,6 +819,7 @@ h3 {
 .feature-chip:focus-visible,
 .secondary-button:focus-visible,
 .ghost-button:focus-visible,
+.history-action:focus-visible,
 #annotationText:focus-visible,
 .toggle-row input:focus-visible + .toggle-shell {
   outline: 2px solid rgba(134, 221, 255, 0.9);

@@ -170,6 +170,7 @@ function bindEvents() {
   ui.signInButton.addEventListener("click", handleSignIn);
   ui.signOutButton.addEventListener("click", handleSignOut);
   ui.billingButton.addEventListener("click", handleBillingClick);
+  ui.historyList.addEventListener("click", handleHistoryAction);
 }
 
 async function restoreSettings() {
@@ -631,6 +632,57 @@ function handleBillingClick() {
   });
 }
 
+async function handleHistoryAction(event) {
+  const button = event.target.closest("[data-history-action]");
+
+  if (!button) {
+    return;
+  }
+
+  const captureId = button.dataset.captureId || "";
+  const action = button.dataset.historyAction;
+  const messageType =
+    action === "open"
+      ? "LUMEN_OPEN_CAPTURE_DOWNLOAD"
+      : "LUMEN_SHOW_CAPTURE_DOWNLOAD";
+
+  button.disabled = true;
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: messageType,
+      payload: {
+        captureId
+      }
+    });
+
+    if (!response?.ok) {
+      showStatus({
+        tone: "error",
+        eyebrow: "Archive",
+        title: response?.error?.title || "History action failed",
+        detail: response?.error?.description || "Lumen could not access that downloaded artifact.",
+        badge: "Blocked",
+        progress: 0.12
+      });
+      return;
+    }
+
+    showStatus({
+      tone: "success",
+      eyebrow: "Archive",
+      title: action === "open" ? "Opened capture artifact" : "Revealed capture artifact",
+      detail: response.archiveFolder
+        ? `Saved in ${response.archiveFolder}.`
+        : response.filename || "Chrome opened the local artifact.",
+      badge: "Ready",
+      progress: 1
+    });
+  } finally {
+    button.disabled = actionBusy || button.dataset.downloadReady !== "true";
+  }
+}
+
 function renderSession(session) {
   currentSession = session || currentSession;
 
@@ -704,12 +756,52 @@ function renderHistory(history) {
 
     row.append(topRow, meta);
 
+    const archiveFolder = item.archiveFolder || "";
+    const hasDownloadHandles = Array.isArray(item.downloads) &&
+      item.downloads.some((download) => Number.isInteger(download.downloadId));
+
+    if (archiveFolder || hasDownloadHandles) {
+      const archive = document.createElement("p");
+      archive.className = "history-path";
+      archive.textContent = archiveFolder || "Local download handles available";
+      row.append(archive);
+    }
+
     if (item.annotation?.text) {
       const note = document.createElement("p");
       note.className = "history-meta";
       note.textContent = `Note: ${item.annotation.text}`;
       row.append(note);
     }
+
+    const actions = document.createElement("div");
+    actions.className = "history-actions";
+
+    const openButton = document.createElement("button");
+    openButton.className = "history-action";
+    openButton.type = "button";
+    openButton.dataset.historyAction = "open";
+    openButton.dataset.captureId = item.id || "";
+    openButton.dataset.downloadReady = hasDownloadHandles ? "true" : "false";
+    openButton.disabled = !hasDownloadHandles;
+    openButton.textContent = "Open";
+
+    const showButton = document.createElement("button");
+    showButton.className = "history-action";
+    showButton.type = "button";
+    showButton.dataset.historyAction = "show";
+    showButton.dataset.captureId = item.id || "";
+    showButton.dataset.downloadReady = hasDownloadHandles ? "true" : "false";
+    showButton.disabled = !hasDownloadHandles;
+    showButton.textContent = "Show in folder";
+
+    if (!hasDownloadHandles) {
+      openButton.title = "Run a fresh capture to enable local file actions.";
+      showButton.title = "Run a fresh capture to enable local file actions.";
+    }
+
+    actions.append(openButton, showButton);
+    row.append(actions);
 
     ui.historyList.appendChild(row);
   }
@@ -821,6 +913,10 @@ function setActionBusy(isBusy) {
   ui.previewRedactionsButton.disabled = isBusy;
   ui.startRedactionPickerButton.disabled = isBusy;
   ui.clearManualRedactionsButton.disabled = isBusy || !(manualRedactionRecord.regions?.length);
+
+  for (const button of ui.historyList.querySelectorAll("[data-history-action]")) {
+    button.disabled = isBusy || button.dataset.downloadReady !== "true";
+  }
 }
 
 function stageToEyebrow(stage) {
@@ -879,6 +975,7 @@ function buildCaptureSuccessMessage(response, settings) {
   const fileText = `${response.files.length} file${response.files.length === 1 ? "" : "s"} saved using ${response.exportPreset} export mode`;
   const variantCount = response.variantCount || getCaptureVariants(settings.devicePreset).length;
   const manifestText = response.manifestFile ? " Bundle manifest saved." : "";
+  const folderText = response.archiveFolder ? ` Saved in ${response.archiveFolder}.` : "";
   const captureNote = normalizeCaptureNoteOptions(settings);
   const noteText = response.annotation?.enabled || captureNote.enabled ? " Capture note added." : "";
   const manualText = response.manualRedactionCount
@@ -889,11 +986,11 @@ function buildCaptureSuccessMessage(response, settings) {
 
   if (!response.redactionCount) {
     return variantCount > 1
-      ? `${fileText}. ${variantCount} responsive views captured.${manifestText}${noteText}${manualText}${projectionSentence}`
-      : `${fileText}.${manifestText}${noteText}${manualText}${projectionSentence}`;
+      ? `${fileText}. ${variantCount} responsive views captured.${manifestText}${folderText}${noteText}${manualText}${projectionSentence}`
+      : `${fileText}.${manifestText}${folderText}${noteText}${manualText}${projectionSentence}`;
   }
 
-  return `${fileText}. ${variantCount > 1 ? `${variantCount} responsive views captured. ` : ""}${response.redactionCount} redaction region${response.redactionCount === 1 ? "" : "s"} sanitized.${manifestText}${noteText}${manualText}${projectionSentence}`;
+  return `${fileText}. ${variantCount > 1 ? `${variantCount} responsive views captured. ` : ""}${response.redactionCount} redaction region${response.redactionCount === 1 ? "" : "s"} sanitized.${manifestText}${folderText}${noteText}${manualText}${projectionSentence}`;
 }
 
 function buildRedactionPreviewText(preview) {

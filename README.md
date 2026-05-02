@@ -27,9 +27,11 @@ The current build includes:
 9. anchored capture notes rendered into the exported image
 10. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
 11. bundle-manifest JSON exports with view, redaction, manual projection, signal, breakdown, and note metadata
-12. local capture history with file and summary metadata
-13. a local backend slice for demo session state and history sync when an API is reachable
-14. a GitHub Pages landing site in `docs/`
+12. dated per-run download folders so capture sets, tiles, and manifests stay together
+13. local capture history with file, folder, summary, and Chrome download-handle metadata
+14. popup history actions to open the latest artifact or reveal it in the Downloads folder
+15. a local backend slice for demo session state and history sync when an API is reachable
+16. a GitHub Pages landing site in `docs/`
 
 ## Current Limits
 
@@ -108,7 +110,8 @@ The public landing page will be available at `http://127.0.0.1:3000/`.
 7. Add a capture note if you want the export to carry a review comment
 8. Keep `Save bundle manifest` enabled if you want a portable JSON sidecar next to the capture files
 9. Run `Analyze Page` or `Capture Full Page`
-10. Check the latest blueprint and local history in the popup
+10. Use `Open` or `Show in folder` from recent captures to get back to the saved artifact
+11. Check the latest blueprint and local history in the popup
 
 ## Proof Assets
 

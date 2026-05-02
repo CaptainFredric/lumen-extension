@@ -36,6 +36,38 @@ try {
   assert(manifest.background?.service_worker === "background.js", "Expected background service worker.", manifest);
   assert(manifest.action?.default_popup === "popup.html", "Expected popup entrypoint.", manifest);
 
+  const seededCaptureId = "smoke-capture-001";
+  await worker.evaluate((captureId) => chrome.storage.local.set({
+    "lumen.capture.history": [
+      {
+        id: captureId,
+        title: "Smoke capture",
+        host: "example.test",
+        url: "https://example.test/",
+        devicePreset: "desktop",
+        exportPreset: "raw",
+        capturedAt: new Date().toISOString(),
+        archiveFolder: "Lumen/2026-05-02/smoke-capture",
+        files: ["Lumen/2026-05-02/smoke-capture/smoke-desktop-raw.png"],
+        downloads: [
+          {
+            downloadId: 12345,
+            filename: "Lumen/2026-05-02/smoke-capture/smoke-desktop-raw.png",
+            kind: "image",
+            variantId: "desktop"
+          }
+        ],
+        variants: [
+          {
+            id: "desktop",
+            label: "Desktop",
+            files: ["Lumen/2026-05-02/smoke-capture/smoke-desktop-raw.png"]
+          }
+        ]
+      }
+    ]
+  }), seededCaptureId);
+
   const popup = await context.newPage();
   popup.on("console", (message) => {
     if (message.type() === "error") {
@@ -48,6 +80,7 @@ try {
 
   await popup.goto(`chrome-extension://${extensionId}/popup.html`, { waitUntil: "load" });
   await popup.waitForSelector("#captureButton", { timeout: 10000 });
+  await popup.waitForSelector("[data-history-action='open']", { timeout: 10000 });
 
   const popupState = await popup.evaluate(() => ({
     title: document.title,
@@ -55,7 +88,14 @@ try {
     captureButton: document.querySelector("#captureButton")?.textContent?.trim() || "",
     analyzeButton: document.querySelector("#analyzeButton")?.textContent?.trim() || "",
     statusHidden: document.querySelector("#statusPanel")?.classList.contains("is-hidden") ?? false,
-    manualCount: document.querySelector("#manualRedactionCount")?.textContent?.trim() || ""
+    manualCount: document.querySelector("#manualRedactionCount")?.textContent?.trim() || "",
+    historyCount: document.querySelector("#historyCount")?.textContent?.trim() || "",
+    historyPath: document.querySelector(".history-path")?.textContent?.trim() || "",
+    historyActions: [...document.querySelectorAll("[data-history-action]")].map((button) => ({
+      action: button.dataset.historyAction,
+      captureId: button.dataset.captureId,
+      disabled: button.disabled
+    }))
   }));
 
   assert(popupState.title === "Lumen", "Popup title did not load.", popupState);
@@ -64,6 +104,14 @@ try {
   assert(popupState.analyzeButton === "Analyze Page", "Analyze action did not render.", popupState);
   assert(popupState.statusHidden, "Popup status panel should start hidden.", popupState);
   assert(popupState.manualCount === "0 boxes", "Manual redaction counter did not initialize.", popupState);
+  assert(popupState.historyCount === "1 item", "Seeded history count did not render.", popupState);
+  assert(popupState.historyPath === "Lumen/2026-05-02/smoke-capture", "Archive folder did not render.", popupState);
+  assert(
+    popupState.historyActions.length === 2 &&
+      popupState.historyActions.every((button) => button.captureId === seededCaptureId && !button.disabled),
+    "History file actions did not render.",
+    popupState
+  );
   assert(!popupConsoleErrors.length, "Popup emitted console errors.", popupConsoleErrors);
 
   const storageState = await worker.evaluate(() =>
