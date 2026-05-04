@@ -216,7 +216,7 @@
     const metrics = getPageMetrics();
     const sampledElements = getVisibleElements(MAX_BLUEPRINT_SAMPLE_ELEMENTS);
     const structureHeadings = getStructureHeadings();
-    const heroHeadline = structureHeadings[0]?.text || cleanText(document.title);
+    const heroHeadline = findHeroHeadline(structureHeadings);
     const primaryCta = findPrimaryCta();
     const navLabels = getNavLabels();
     const colors = buildPalette(sampledElements);
@@ -1414,6 +1414,23 @@
       }))
       .filter((entry) => entry.text)
       .slice(0, MAX_STRUCTURE_HEADINGS);
+  }
+
+  function findHeroHeadline(structureHeadings = []) {
+    const pageHeading = structureHeadings.find((entry) => !isGenericHeadline(entry.text));
+
+    return pageHeading?.text || normalizeDocumentTitle(document.title) || cleanText(document.title);
+  }
+
+  function isGenericHeadline(text = "") {
+    return /^(navigation menu|global navigation|main navigation|site navigation|menu|skip to content)$/i.test(cleanText(text));
+  }
+
+  function normalizeDocumentTitle(title = "") {
+    return cleanText(title)
+      .replace(/^GitHub\s*-\s*/i, "")
+      .replace(/\s*·\s*GitHub$/i, "")
+      .replace(/\s*\|\s*GitHub$/i, "");
   }
 
   function getNavLabels() {

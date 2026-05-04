@@ -160,6 +160,14 @@ npm run smoke:e2e
 
 This starts a local fixture page, loads a temporary copy of the extension with explicit test only capture access, runs a responsive desktop, tablet, and mobile capture through the MV3 background worker, waits for Chrome downloads to finish, validates the PNG and manifest artifacts, and checks that local history stores the run. The checked in manifest is not widened by this test.
 
+To test the loaded extension against live pages tied to this project:
+
+```bash
+npm run smoke:real-sites
+```
+
+The default list captures the public Lumen docs page and the GitHub repository. Set `LUMEN_REAL_SITE_URLS` to a comma separated list if you want to test a personal page list.
+
 To install Chromium for Playwright, run:
 
 ```bash
