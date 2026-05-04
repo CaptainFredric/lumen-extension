@@ -158,7 +158,7 @@ To verify the loaded extension can capture a real local page and produce finishe
 npm run smoke:e2e
 ```
 
-This starts a local fixture page, loads a temporary copy of the extension with explicit test only capture access, runs the capture through the MV3 background worker, waits for Chrome downloads to finish, validates the PNG and manifest artifacts, and checks that local history stores the run. The checked in manifest is not widened by this test.
+This starts a local fixture page, loads a temporary copy of the extension with explicit test only capture access, runs a responsive desktop, tablet, and mobile capture through the MV3 background worker, waits for Chrome downloads to finish, validates the PNG and manifest artifacts, and checks that local history stores the run. The checked in manifest is not widened by this test.
 
 To install Chromium for Playwright, run:
 

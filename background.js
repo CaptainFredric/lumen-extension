@@ -1358,35 +1358,22 @@ async function getCurrentTab() {
 }
 
 async function waitForTabComplete(tabId, timeoutMs = 15000) {
-  const initial = await chrome.tabs.get(tabId);
+  const startedAt = Date.now();
 
-  if (initial.status === "complete") {
-    return;
-  }
+  while (Date.now() - startedAt < timeoutMs) {
+    const tab = await chrome.tabs.get(tabId);
 
-  await new Promise((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      chrome.tabs.onUpdated.removeListener(handleUpdated);
-      reject(
-        createFriendlyError(
-          "Page Load Timed Out",
-          "The temporary capture window took too long to finish rendering."
-        )
-      );
-    }, timeoutMs);
-
-    function handleUpdated(updatedTabId, info) {
-      if (updatedTabId !== tabId || info.status !== "complete") {
-        return;
-      }
-
-      clearTimeout(timeoutId);
-      chrome.tabs.onUpdated.removeListener(handleUpdated);
-      resolve();
+    if (tab.status === "complete") {
+      return tab;
     }
 
-    chrome.tabs.onUpdated.addListener(handleUpdated);
-  });
+    await sleep(120);
+  }
+
+  throw createFriendlyError(
+    "Page Load Timed Out",
+    "The temporary capture window took too long to finish rendering."
+  );
 }
 
 function buildCaptureFileBaseName({ title, url, devicePreset, exportPreset }) {

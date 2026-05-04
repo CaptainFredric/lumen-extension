@@ -13,6 +13,7 @@ const profileDir = path.join(tempRoot, "profile");
 const downloadDir = path.join(tempRoot, "downloads");
 const extensionDir = path.join(tempRoot, "extension");
 const popupConsoleErrors = [];
+const expectedVariantCount = 3;
 
 let context;
 let server;
@@ -66,9 +67,9 @@ try {
     autoRedact: true,
     exportManifest: true,
     annotationEnabled: true,
-    annotationText: "E2E review artifact",
+    annotationText: "E2E responsive review artifact",
     annotationPosition: "top-right",
-    devicePreset: "desktop",
+    devicePreset: "responsive",
     exportPreset: "raw"
   };
 
@@ -81,10 +82,11 @@ try {
     }), options);
 
   assert(response?.ok, "Loaded extension capture failed.", response);
-  assert(response.files?.length >= 2, "Expected image and manifest downloads.", response);
+  assert(response.variantCount === expectedVariantCount, "Expected responsive capture set.", response);
+  assert(response.files?.length >= expectedVariantCount + 1, "Expected responsive images and manifest downloads.", response);
   assert(response.archiveFolder?.startsWith("Lumen/"), "Expected organized Lumen archive folder.", response);
-  assert(response.redactionCount >= 3, "Expected automatic redactions from the fixture.", response);
-  assert(response.segmentCount >= 2, "Expected full-page capture to stitch multiple segments.", response);
+  assert(response.redactionCount >= expectedVariantCount * 3, "Expected automatic redactions across responsive views.", response);
+  assert(response.segmentCount >= expectedVariantCount * 2, "Expected full-page capture to stitch multiple responsive views.", response);
   assert(response.downloads.every((item) => Number.isInteger(item.downloadId)), "Expected Chrome download handles.", response.downloads);
   assert(response.downloads.every((item) => item.bytesReceived > 0), "Expected completed downloads with bytes.", response.downloads);
 
@@ -99,7 +101,8 @@ try {
 
   assert(latest?.archiveFolder === response.archiveFolder, "Expected history to store the archive folder.", latest);
   assert(latest?.downloads?.length === response.downloads.length, "Expected history to store download records.", latest);
-  assert(latest.redactionCount >= 3, "Expected history redaction count.", latest);
+  assert(latest?.variants?.length === expectedVariantCount, "Expected history to store responsive variants.", latest);
+  assert(latest.redactionCount >= expectedVariantCount * 3, "Expected history redaction count.", latest);
   assert(localState["lumen.inspector.latestBlueprint"]?.identity?.heroHeadline, "Expected latest blueprint to be stored.", localState);
 
   const downloadItems = await worker.evaluate((downloadIds) =>
@@ -128,18 +131,25 @@ try {
     downloads
   });
 
-  const imageItem = downloads.find((item) => item.lumenRecord.kind === "image");
+  const imageItems = downloads.filter((item) => item.lumenRecord.kind === "image");
   const manifestItem = downloads.find((item) => item.lumenRecord.kind === "manifest");
+  const capturedVariantIds = new Set(imageItems.map((item) => item.lumenRecord.variantId));
 
-  assert(imageItem, "Expected a PNG capture artifact.", downloads);
+  assert(imageItems.length === expectedVariantCount, "Expected one PNG capture artifact per responsive view.", downloads);
+  assert(capturedVariantIds.has("desktop") && capturedVariantIds.has("tablet") && capturedVariantIds.has("mobile"), "Expected desktop, tablet, and mobile image downloads.", downloads);
   assert(manifestItem, "Expected a JSON bundle manifest.", downloads);
 
-  await assertPng(imageItem.filename);
+  for (const imageItem of imageItems) {
+    await assertPng(imageItem.filename);
+  }
+
   const manifest = JSON.parse(await readFile(manifestItem.filename, "utf8"));
 
   assert(manifest.capture.archiveFolder === response.archiveFolder, "Expected manifest archive folder to match response.", manifest.capture);
-  assert(manifest.capture.redactionCount >= 3, "Expected manifest redaction metadata.", manifest.capture);
-  assert(manifest.capture.annotation?.text === "E2E review artifact", "Expected manifest annotation metadata.", manifest.capture);
+  assert(manifest.capture.variantCount === expectedVariantCount, "Expected manifest responsive variant metadata.", manifest.capture);
+  assert(manifest.variants?.length === expectedVariantCount, "Expected manifest variant records.", manifest.variants);
+  assert(manifest.capture.redactionCount >= expectedVariantCount * 3, "Expected manifest redaction metadata.", manifest.capture);
+  assert(manifest.capture.annotation?.text === "E2E responsive review artifact", "Expected manifest annotation metadata.", manifest.capture);
   assert(manifest.pageSignals?.heroHeadline, "Expected page signals in the bundle manifest.", manifest.pageSignals);
 
   assert(!popupConsoleErrors.length, "Popup emitted console errors.", popupConsoleErrors);
@@ -157,6 +167,7 @@ try {
       bytesReceived: item.bytesReceived
     })),
     capture: {
+      variantCount: response.variantCount,
       segmentCount: response.segmentCount,
       redactionCount: response.redactionCount,
       manifestFile: response.manifestFile
@@ -164,7 +175,8 @@ try {
     history: {
       count: history.length,
       latestTitle: latest.title,
-      archiveFolder: latest.archiveFolder
+      archiveFolder: latest.archiveFolder,
+      variantCount: latest.variants.length
     }
   }, null, 2));
 } catch (error) {
