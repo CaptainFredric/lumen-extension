@@ -139,8 +139,13 @@ try {
   assert(capturedVariantIds.has("desktop") && capturedVariantIds.has("tablet") && capturedVariantIds.has("mobile"), "Expected desktop, tablet, and mobile image downloads.", downloads);
   assert(manifestItem, "Expected a JSON bundle manifest.", downloads);
 
+  const imageInfos = [];
+
   for (const imageItem of imageItems) {
-    await assertPng(imageItem.filename);
+    imageInfos.push({
+      variantId: imageItem.lumenRecord.variantId,
+      ...(await assertPng(imageItem.filename))
+    });
   }
 
   const manifest = JSON.parse(await readFile(manifestItem.filename, "utf8"));
@@ -148,8 +153,36 @@ try {
   assert(manifest.capture.archiveFolder === response.archiveFolder, "Expected manifest archive folder to match response.", manifest.capture);
   assert(manifest.capture.variantCount === expectedVariantCount, "Expected manifest responsive variant metadata.", manifest.capture);
   assert(manifest.variants?.length === expectedVariantCount, "Expected manifest variant records.", manifest.variants);
+  assert(manifest.capture.artifactStats?.complete, "Expected manifest to mark output artifacts complete.", manifest.capture);
+  assert(manifest.capture.artifactStats?.imageCount === expectedVariantCount, "Expected manifest image artifact count.", manifest.capture);
+  assert(manifest.capture.artifactStats?.bytesReceived > 0, "Expected manifest byte count.", manifest.capture);
   assert(manifest.capture.redactionCount >= expectedVariantCount * 3, "Expected manifest redaction metadata.", manifest.capture);
   assert(manifest.capture.annotation?.text === "E2E responsive review artifact", "Expected manifest annotation metadata.", manifest.capture);
+  assert(
+    manifest.variants.every((variant) =>
+      variant.artifactStats?.complete &&
+        variant.outputs?.length >= 1 &&
+        variant.outputs.every((output) => output.complete && output.bytesReceived > 0) &&
+        variant.dimensions?.width > 0 &&
+        variant.dimensions?.height > 0
+    ),
+    "Expected per-variant artifact health and dimensions in the manifest.",
+    manifest.variants
+  );
+  assert(
+    imageInfos.every((info) => {
+      const variant = manifest.variants.find((item) => item.id === info.variantId);
+
+      return variant &&
+        info.width === variant.dimensions.width &&
+        info.height === variant.dimensions.height;
+    }),
+    "Expected PNG dimensions to align with manifest variants.",
+    {
+      imageInfos,
+      variants: manifest.variants
+    }
+  );
   assert(manifest.pageSignals?.heroHeadline, "Expected page signals in the bundle manifest.", manifest.pageSignals);
 
   assert(!popupConsoleErrors.length, "Popup emitted console errors.", popupConsoleErrors);
@@ -170,6 +203,7 @@ try {
       variantCount: response.variantCount,
       segmentCount: response.segmentCount,
       redactionCount: response.redactionCount,
+      bytesReceived: manifest.capture.artifactStats.bytesReceived,
       manifestFile: response.manifestFile
     },
     history: {
@@ -418,6 +452,12 @@ async function assertPng(filename) {
     filename,
     size: stats.size
   });
+
+  return {
+    width: file.readUInt32BE(16),
+    height: file.readUInt32BE(20),
+    size: stats.size
+  };
 }
 
 function isInside(parent, child) {

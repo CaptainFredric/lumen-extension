@@ -26,7 +26,7 @@ The current build includes:
 8. anchored manual redaction boxes for areas the scanner cannot infer, with projection into responsive captures when the source element still resolves
 9. anchored capture notes rendered into the exported image
 10. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
-11. bundle-manifest JSON exports with view, redaction, manual projection, signal, breakdown, and note metadata
+11. bundle-manifest JSON exports with view, redaction, manual projection, signal, output health, and note metadata
 12. dated per-run download folders so capture sets, tiles, and manifests stay together
 13. local capture history with file, folder, summary, and Chrome download-handle metadata
 14. popup history actions to open the latest artifact or reveal it in the Downloads folder

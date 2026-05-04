@@ -258,6 +258,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
   const manualRedactionCount = results.reduce((sum, result) => sum + result.manualRedactionCount, 0);
   const redactionBreakdown = mergeRedactionBreakdowns(results.map((result) => result.redactionBreakdown));
   const manualProjectionStats = mergeManualProjectionStats(results.map((result) => result.manualProjectionStats));
+  const artifactStats = buildArtifactStats(results.flatMap((result) => result.downloadRecords));
   const variantSummaries = results.map((result) => ({
     id: result.variant.id,
     label: result.variant.label,
@@ -327,6 +328,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     manualRedactionCount,
     manualProjectionStats,
     redactionBreakdown,
+    artifactStats,
     manifestFile,
     annotation: captureNote.enabled && captureNote.text ? captureNote : null,
     variants: variantSummaries,
@@ -374,6 +376,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     redactionCount,
     manualRedactionCount,
     manualProjectionStats,
+    artifactStats,
     manifestFile,
     annotation: captureNote.enabled && captureNote.text ? captureNote : null,
     variantCount: variants.length,
@@ -1709,6 +1712,9 @@ function buildCaptureBundleManifest({
   tileCount,
   blueprint
 }) {
+  const variantOutputs = variants.map((variant) => buildPortableOutputRecords(variant.downloads));
+  const artifactStats = buildArtifactStats(variantOutputs.flat());
+
   return {
     schemaVersion: 1,
     generator: "Lumen prototype",
@@ -1732,21 +1738,28 @@ function buildCaptureBundleManifest({
       manualRedactionCount,
       manualProjectionStats,
       redactionBreakdown,
+      artifactStats,
       annotation
     },
-    variants: variants.map((variant) => ({
-      id: variant.id,
-      label: variant.label,
-      exportPreset: variant.exportPreset,
-      fileCount: variant.files.length,
-      files: variant.files,
-      tileCount: variant.tileCount,
-      redactionCount: variant.redactionCount,
-      manualRedactionCount: variant.manualRedactionCount || 0,
-      manualProjectionStats: variant.manualProjectionStats || buildManualProjectionStats(),
-      redactionBreakdown: variant.redactionBreakdown || buildRedactionBreakdown([]),
-      dimensions: variant.dimensions
-    })),
+    variants: variants.map((variant, index) => {
+      const outputs = variantOutputs[index] || [];
+
+      return {
+        id: variant.id,
+        label: variant.label,
+        exportPreset: variant.exportPreset,
+        fileCount: variant.files.length,
+        files: variant.files,
+        outputs,
+        artifactStats: buildArtifactStats(outputs),
+        tileCount: variant.tileCount,
+        redactionCount: variant.redactionCount,
+        manualRedactionCount: variant.manualRedactionCount || 0,
+        manualProjectionStats: variant.manualProjectionStats || buildManualProjectionStats(),
+        redactionBreakdown: variant.redactionBreakdown || buildRedactionBreakdown([]),
+        dimensions: variant.dimensions
+      };
+    }),
     pageSignals: blueprint
       ? {
           siteType: blueprint.identity?.siteType || "",
@@ -1757,6 +1770,32 @@ function buildCaptureBundleManifest({
           typography: blueprint.typography?.families || []
         }
       : null
+  };
+}
+
+function buildPortableOutputRecords(downloads = []) {
+  return downloads.map((download) => ({
+    filename: download.filename,
+    kind: download.kind || "image",
+    bytesReceived: Math.max(0, Math.round(download.bytesReceived || 0)),
+    complete: Number(download.bytesReceived || 0) > 0,
+    variantId: download.variantId || "",
+    exportPreset: download.exportPreset || "",
+    partIndex: download.partIndex || 1,
+    partTotal: download.partTotal || 1
+  }));
+}
+
+function buildArtifactStats(outputs = []) {
+  const bytesReceived = outputs.reduce((sum, output) => sum + Math.max(0, output.bytesReceived || 0), 0);
+  const imageCount = outputs.filter((output) => output.kind === "image").length;
+
+  return {
+    outputCount: outputs.length,
+    imageCount,
+    bytesReceived,
+    complete: outputs.length > 0 && outputs.every((output) => output.complete),
+    tiled: outputs.some((output) => (output.partTotal || 1) > 1)
   };
 }
 
