@@ -89,6 +89,11 @@ try {
     analyzeButton: document.querySelector("#analyzeButton")?.textContent?.trim() || "",
     statusHidden: document.querySelector("#statusPanel")?.classList.contains("is-hidden") ?? false,
     manualCount: document.querySelector("#manualRedactionCount")?.textContent?.trim() || "",
+    runViewSummary: document.querySelector("#runViewSummary")?.textContent?.trim() || "",
+    runExportSummary: document.querySelector("#runExportSummary")?.textContent?.trim() || "",
+    runSafetySummary: document.querySelector("#runSafetySummary")?.textContent?.trim() || "",
+    timelineStepCount: document.querySelectorAll("[data-stage-step]").length,
+    statusLogText: document.querySelector("#statusLog")?.textContent?.trim() || "",
     historyCount: document.querySelector("#historyCount")?.textContent?.trim() || "",
     historyPath: document.querySelector(".history-path")?.textContent?.trim() || "",
     historyActions: [...document.querySelectorAll("[data-history-action]")].map((button) => ({
@@ -104,6 +109,11 @@ try {
   assert(popupState.analyzeButton === "Analyze Page", "Analyze action did not render.", popupState);
   assert(popupState.statusHidden, "Popup status panel should start hidden.", popupState);
   assert(popupState.manualCount === "0 boxes", "Manual redaction counter did not initialize.", popupState);
+  assert(popupState.runViewSummary === "Desktop", "Run view summary did not initialize.", popupState);
+  assert(popupState.runExportSummary === "Raw", "Run export summary did not initialize.", popupState);
+  assert(popupState.runSafetySummary.includes("Cleanup"), "Run safety summary did not initialize.", popupState);
+  assert(popupState.timelineStepCount === 6, "Capture timeline did not render.", popupState);
+  assert(popupState.statusLogText === "No active run yet.", "Status log did not initialize.", popupState);
   assert(popupState.historyCount === "1 item", "Seeded history count did not render.", popupState);
   assert(popupState.historyPath === "Lumen/2026-05-02/smoke-capture", "Archive folder did not render.", popupState);
   assert(

@@ -178,6 +178,68 @@
         <div class="progress-track">
           <div id="progressFill" class="progress-fill"></div>
         </div>
+
+        <div class="run-summary-grid" aria-label="Current capture settings">
+          <div class="run-summary-item">
+            <span>Views</span>
+            <strong id="runViewSummary">Desktop</strong>
+          </div>
+          <div class="run-summary-item">
+            <span>Export</span>
+            <strong id="runExportSummary">Raw</strong>
+          </div>
+          <div class="run-summary-item">
+            <span>Safety</span>
+            <strong id="runSafetySummary">Cleanup</strong>
+          </div>
+          <div class="run-summary-item">
+            <span>Sidecar</span>
+            <strong id="runManifestSummary">Manifest</strong>
+          </div>
+        </div>
+
+        <div id="captureTimeline" class="capture-timeline" aria-label="Capture progress timeline">
+          <div class="timeline-step" data-stage-step="prepare">
+            <span class="step-dot"></span>
+            <span>Prepare</span>
+            <small>Clean page and hydrate media</small>
+          </div>
+          <div class="timeline-step" data-stage-step="inspect">
+            <span class="step-dot"></span>
+            <span>Inspect</span>
+            <small>Read signals and page context</small>
+          </div>
+          <div class="timeline-step" data-stage-step="sanitize">
+            <span class="step-dot"></span>
+            <span>Sanitize</span>
+            <small>Apply auto and manual redactions</small>
+          </div>
+          <div class="timeline-step" data-stage-step="capture">
+            <span class="step-dot"></span>
+            <span>Capture</span>
+            <small>Scroll and grab slices</small>
+          </div>
+          <div class="timeline-step" data-stage-step="stitch">
+            <span class="step-dot"></span>
+            <span>Stitch</span>
+            <small>Compose final artifact</small>
+          </div>
+          <div class="timeline-step" data-stage-step="save">
+            <span class="step-dot"></span>
+            <span>Save</span>
+            <small>Write files and history</small>
+          </div>
+        </div>
+
+        <div class="status-log-shell">
+          <div class="status-log-head">
+            <span>Live log</span>
+            <strong id="statusLogCount">0</strong>
+          </div>
+          <div id="statusLog" class="status-log">
+            <p>No active run yet.</p>
+          </div>
+        </div>
       </section>
 
       <section class="panel inspector-panel">

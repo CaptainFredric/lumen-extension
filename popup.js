@@ -34,6 +34,13 @@ const ui = {
   statusDetail: document.querySelector("#statusDetail"),
   statusBadge: document.querySelector("#statusBadge"),
   progressFill: document.querySelector("#progressFill"),
+  runViewSummary: document.querySelector("#runViewSummary"),
+  runExportSummary: document.querySelector("#runExportSummary"),
+  runSafetySummary: document.querySelector("#runSafetySummary"),
+  runManifestSummary: document.querySelector("#runManifestSummary"),
+  timelineSteps: [...document.querySelectorAll("[data-stage-step]")],
+  statusLog: document.querySelector("#statusLog"),
+  statusLogCount: document.querySelector("#statusLogCount"),
   signInButton: document.querySelector("#signInButton"),
   signOutButton: document.querySelector("#signOutButton"),
   billingButton: document.querySelector("#billingButton"),
@@ -77,6 +84,16 @@ let currentSession = {
 let manualRedactionRecord = {
   regions: []
 };
+let statusEvents = [];
+
+const TIMELINE_STAGES = [
+  "prepare",
+  "inspect",
+  "sanitize",
+  "capture",
+  "stitch",
+  "save"
+];
 
 bootstrap().catch((error) => {
   showStatus({
@@ -95,6 +112,7 @@ chrome.runtime.onMessage.addListener((message) => {
 
     showStatus({
       tone: payload.stage === "done" ? "success" : "neutral",
+      stage: payload.stage,
       eyebrow: stageToEyebrow(payload.stage),
       title: payload.title || "Working",
       detail: payload.detail || "",
@@ -193,6 +211,9 @@ async function restoreSettings() {
   updateDeviceButtons();
   updateExportButtons();
   updateAnnotationControls();
+  renderRunSummary(currentSettings);
+  renderTimeline("idle");
+  renderStatusLog();
 }
 
 async function restoreAppState() {
@@ -233,6 +254,7 @@ async function persistCurrentSettings() {
   currentSettings.annotationPosition = captureNote.position;
   ui.annotationEnabled.checked = captureNote.enabled;
   updateAnnotationControls();
+  renderRunSummary(currentSettings);
 
   await chrome.storage.sync.set({
     [STORAGE_KEYS.settings]: currentSettings
@@ -284,9 +306,14 @@ async function handleCaptureClick() {
 
   setActionBusy(true);
   await persistCurrentSettings();
+  statusEvents = [];
+  renderRunSummary(currentSettings);
+  renderTimeline("prepare");
+  renderStatusLog();
 
   showStatus({
     tone: "neutral",
+    stage: "prepare",
     eyebrow: "Capture",
     title: "Queueing capture",
     detail: "Passing your capture and export settings into the pipeline.",
@@ -312,6 +339,7 @@ async function handleCaptureClick() {
 
     showStatus({
       tone: "success",
+      stage: "done",
       eyebrow: "Saved",
       title: "Capture complete",
       detail: buildCaptureSuccessMessage(response, currentSettings),
@@ -321,6 +349,7 @@ async function handleCaptureClick() {
   } catch (error) {
     showStatus({
       tone: "error",
+      stage: "error",
       eyebrow: "Error",
       title: "Capture failed",
       detail: error.message,
@@ -815,6 +844,7 @@ function renderManualRedactions(record) {
   const count = manualRedactionRecord.regions?.length || 0;
   ui.manualRedactionCount.textContent = `${count} box${count === 1 ? "" : "es"}`;
   ui.clearManualRedactionsButton.disabled = count === 0 || actionBusy;
+  renderRunSummary(currentSettings);
 }
 
 function renderRedactionPreview(preview) {
@@ -896,7 +926,7 @@ function renderFontStrip(fonts) {
   }
 }
 
-function showStatus({ tone, eyebrow, title, detail, badge, progress }) {
+function showStatus({ tone, stage, eyebrow, title, detail, badge, progress }) {
   ui.statusPanel.classList.remove("is-hidden");
   ui.statusPanel.dataset.tone = tone;
   ui.statusEyebrow.textContent = eyebrow;
@@ -904,6 +934,113 @@ function showStatus({ tone, eyebrow, title, detail, badge, progress }) {
   ui.statusDetail.textContent = detail;
   ui.statusBadge.textContent = badge;
   ui.progressFill.style.width = `${Math.max(4, Math.round(progress * 100))}%`;
+  if (stage) {
+    renderTimeline(stage, tone, progress);
+  }
+  appendStatusEvent({
+    badge,
+    title,
+    detail,
+    tone
+  });
+}
+
+function renderRunSummary(settings = currentSettings) {
+  const variants = getCaptureVariants(settings.devicePreset);
+  const viewLabel = variants.length > 1
+    ? variants.map((variant) => variant.label).join(", ")
+    : variants[0]?.label || "Desktop";
+  const exportLabel = titleCase(settings.exportPreset || "raw");
+  const safetyParts = [
+    settings.removeStickyHeaders !== false ? "Cleanup" : "",
+    settings.forceLazyLoad !== false ? "Lazy load" : "",
+    settings.autoRedact ? "Redact" : "",
+    manualRedactionRecord.regions?.length ? "Manual boxes" : ""
+  ].filter(Boolean);
+
+  ui.runViewSummary.textContent = viewLabel;
+  ui.runExportSummary.textContent = exportLabel;
+  ui.runSafetySummary.textContent = safetyParts.length ? safetyParts.join(", ") : "Basic";
+  ui.runManifestSummary.textContent = settings.exportManifest === false ? "Off" : "Manifest";
+}
+
+function renderTimeline(stage = "idle", tone = "neutral", progress = 0) {
+  const normalizedStage = normalizeTimelineStage(stage);
+  const activeIndex = TIMELINE_STAGES.indexOf(normalizedStage);
+  const markComplete = stage === "done" || (tone === "success" && progress >= 1);
+
+  for (const step of ui.timelineSteps) {
+    const stepIndex = TIMELINE_STAGES.indexOf(step.dataset.stageStep);
+    const isComplete = markComplete || (activeIndex >= 0 && stepIndex < activeIndex);
+    const isActive = !markComplete && activeIndex === stepIndex;
+    const isError = tone === "error" && isActive;
+
+    step.classList.toggle("is-complete", isComplete);
+    step.classList.toggle("is-active", isActive);
+    step.classList.toggle("is-error", isError);
+    step.classList.toggle("is-pending", !isComplete && !isActive);
+  }
+}
+
+function appendStatusEvent({ badge, title, detail, tone }) {
+  const event = {
+    badge: badge || "Run",
+    title: title || "Working",
+    detail: detail || "",
+    tone: tone || "neutral",
+    time: new Date()
+  };
+
+  const previous = statusEvents[0];
+
+  if (previous?.title === event.title && previous?.detail === event.detail) {
+    return;
+  }
+
+  statusEvents = [event, ...statusEvents].slice(0, 4);
+  renderStatusLog();
+}
+
+function renderStatusLog() {
+  ui.statusLog.replaceChildren();
+  ui.statusLogCount.textContent = String(statusEvents.length);
+
+  if (!statusEvents.length) {
+    const empty = document.createElement("p");
+    empty.textContent = "No active run yet.";
+    ui.statusLog.appendChild(empty);
+    return;
+  }
+
+  for (const event of statusEvents) {
+    const item = document.createElement("div");
+    item.className = "status-log-item";
+    item.dataset.tone = event.tone;
+
+    const meta = document.createElement("span");
+    meta.textContent = `${event.badge} | ${formatLogTime(event.time)}`;
+
+    const title = document.createElement("strong");
+    title.textContent = event.title;
+
+    const detail = document.createElement("p");
+    detail.textContent = event.detail;
+
+    item.append(meta, title, detail);
+    ui.statusLog.appendChild(item);
+  }
+}
+
+function normalizeTimelineStage(stage = "") {
+  if (stage === "done") {
+    return "save";
+  }
+
+  if (stage === "queued" || stage === "error") {
+    return "prepare";
+  }
+
+  return TIMELINE_STAGES.includes(stage) ? stage : "idle";
 }
 
 function setActionBusy(isBusy) {
@@ -1038,6 +1175,22 @@ function formatManualProjectionStats(stats = {}) {
   }
 
   return parts.length ? `manual projection ${parts.join(", ")}` : "";
+}
+
+function titleCase(value = "") {
+  return value
+    .split(/[\s-]+/)
+    .filter(Boolean)
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1).toLowerCase()}`)
+    .join(" ");
+}
+
+function formatLogTime(date) {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit"
+  }).format(date);
 }
 
 async function refreshManualRedactions() {

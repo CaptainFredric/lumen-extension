@@ -30,8 +30,9 @@ The current build includes:
 12. dated per-run download folders so capture sets, tiles, and manifests stay together
 13. local capture history with file, folder, summary, and Chrome download-handle metadata
 14. popup history actions to open the latest artifact or reveal it in the Downloads folder
-15. a local backend slice for demo session state and history sync when an API is reachable
-16. a GitHub Pages landing site in `docs/`
+15. capture-time popup UI with run settings, a live stage timeline, and recent status log
+16. a local backend slice for demo session state and history sync when an API is reachable
+17. a GitHub Pages landing site in `docs/`
 
 ## Current Limits
 
