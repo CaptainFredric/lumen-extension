@@ -740,6 +740,11 @@ h3 {
     0 0 0 1px rgba(255, 255, 255, 0.12) inset;
 }
 
+.launch-panel.is-blocked .capture-button,
+.launch-panel.is-blocked .secondary-action {
+  box-shadow: none;
+}
+
 .hold-menu-action {
   display: grid;
   gap: 4px;

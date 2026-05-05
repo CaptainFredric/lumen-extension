@@ -93,6 +93,8 @@ let manualRedactionRecord = {
 let statusEvents = [];
 let holdTimer = null;
 let suppressNextCaptureClick = false;
+let launchActionsBlocked = false;
+let launchTargetTab = null;
 
 const TIMELINE_STAGES = [
   "prepare",
@@ -251,6 +253,60 @@ async function restoreAppState() {
   renderHistory(response.captureHistory || []);
   renderSession(response.session || currentSession);
   await refreshManualRedactions();
+}
+
+async function resolveActionTargetTab() {
+  const tabs = await chrome.tabs.query({
+    currentWindow: true
+  });
+  const activeTab = tabs.find((tab) => tab.active);
+
+  if (activeTab?.url && isOriginPermissionSupported(activeTab.url)) {
+    return activeTab;
+  }
+
+  return tabs
+    .filter((tab) => tab?.url && isOriginPermissionSupported(tab.url))
+    .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))[0] || null;
+}
+
+async function ensureActionTargetReady(actionLabel = "run this action") {
+  const tab = await resolveActionTargetTab();
+
+  if (!tab) {
+    renderLaunchStatus({
+      state: "blocked",
+      title: "Open a normal web page first",
+      detail: "Lumen cannot run capture actions on Chrome, extension, or internal browser pages.",
+      actionsBlocked: true
+    });
+    showStatus({
+      tone: "error",
+      eyebrow: "Blocked",
+      title: "No capturable page",
+      detail: `Open an http or https page before asking Lumen to ${actionLabel}.`,
+      badge: "Blocked",
+      progress: 0.08
+    });
+    return null;
+  }
+
+  launchTargetTab = tab;
+
+  if (!tab.active && Number.isInteger(tab.id)) {
+    await chrome.tabs.update(tab.id, {
+      active: true
+    });
+  }
+
+  renderLaunchStatus({
+    state: "ready",
+    title: `${formatTabHost(tab.url)} ready`,
+    detail: "Target tab selected for the next Lumen action.",
+    actionsBlocked: false
+  });
+
+  return tab;
 }
 
 async function persistCurrentSettings() {
@@ -427,6 +483,10 @@ async function runQuickAction(action) {
 }
 
 function openHoldMenu(source = "hold") {
+  if (launchActionsBlocked) {
+    return;
+  }
+
   clearHoldTimer();
   ui.captureButton.classList.remove("is-holding");
   ui.launchPanel.classList.add("is-menu-open");
@@ -458,6 +518,10 @@ function clearHoldTimer() {
 
 async function handleCaptureClick() {
   if (actionBusy) {
+    return;
+  }
+
+  if (!(await ensureActionTargetReady("capture the page"))) {
     return;
   }
 
@@ -523,6 +587,10 @@ async function handleAnalyzeClick() {
     return;
   }
 
+  if (!(await ensureActionTargetReady("analyze the page"))) {
+    return;
+  }
+
   setActionBusy(true);
 
   showStatus({
@@ -569,6 +637,10 @@ async function handleAnalyzeClick() {
 
 async function handlePreviewRedactions() {
   if (actionBusy) {
+    return;
+  }
+
+  if (!(await ensureActionTargetReady("scan redactions"))) {
     return;
   }
 
@@ -621,6 +693,10 @@ async function handleStartRedactionPicker() {
     return;
   }
 
+  if (!(await ensureActionTargetReady("mark redaction boxes"))) {
+    return;
+  }
+
   setActionBusy(true);
 
   showStatus({
@@ -670,6 +746,10 @@ async function handleClearManualRedactions() {
     return;
   }
 
+  if (!(await ensureActionTargetReady("clear manual redactions"))) {
+    return;
+  }
+
   setActionBusy(true);
 
   try {
@@ -710,13 +790,18 @@ async function ensurePermissionsForCurrentCapture() {
     return true;
   }
 
-  const [tab] = await chrome.tabs.query({
-    active: true,
-    lastFocusedWindow: true
-  });
+  const tab = launchTargetTab || await resolveActionTargetTab();
 
   if (!tab?.url || !isOriginPermissionSupported(tab.url)) {
-    return true;
+    showStatus({
+      tone: "error",
+      eyebrow: "Blocked",
+      title: "No capturable page",
+      detail: "Open an http or https page before running tablet, mobile, or responsive capture.",
+      badge: "Blocked",
+      progress: 0.08
+    });
+    return false;
   }
 
   const origin = buildOriginPattern(tab.url);
@@ -1000,7 +1085,7 @@ function renderManualRedactions(record) {
 
   const count = manualRedactionRecord.regions?.length || 0;
   ui.manualRedactionCount.textContent = `${count} box${count === 1 ? "" : "es"}`;
-  ui.clearManualRedactionsButton.disabled = count === 0 || actionBusy;
+  updateActionDisabledState();
   renderRunSummary(currentSettings);
 }
 
@@ -1085,16 +1170,15 @@ function renderFontStrip(fonts) {
 
 async function refreshLaunchStatus() {
   try {
-    const [tab] = await chrome.tabs.query({
-      active: true,
-      lastFocusedWindow: true
-    });
+    const tab = await resolveActionTargetTab();
+    launchTargetTab = tab;
 
     if (!tab?.url) {
       renderLaunchStatus({
         state: "blocked",
         title: "No active tab found",
-        detail: "Open a web page, then launch Lumen again."
+        detail: "Open a web page, then launch Lumen again.",
+        actionsBlocked: true
       });
       return;
     }
@@ -1103,7 +1187,8 @@ async function refreshLaunchStatus() {
       renderLaunchStatus({
         state: "blocked",
         title: "This page cannot be captured",
-        detail: "Chrome blocks capture scripts on browser and extension pages."
+        detail: "Chrome blocks capture scripts on browser and extension pages.",
+        actionsBlocked: true
       });
       return;
     }
@@ -1111,13 +1196,15 @@ async function refreshLaunchStatus() {
     renderLaunchStatus({
       state: "ready",
       title: `${formatTabHost(tab.url)} ready`,
-      detail: "Click to capture. Hold the main button for quick actions."
+      detail: "Click to capture. Hold the main button for quick actions.",
+      actionsBlocked: false
     });
   } catch (error) {
     renderLaunchStatus({
       state: "blocked",
       title: "Tab check failed",
-      detail: error.message || "Lumen could not read the active tab."
+      detail: error.message || "Lumen could not read the active tab.",
+      actionsBlocked: true
     });
   }
 }
@@ -1127,7 +1214,8 @@ function renderLaunchStatusFromRun({ tone, title, detail, progress }) {
     renderLaunchStatus({
       state: "blocked",
       title: "Action needs attention",
-      detail: title || detail || "The last action could not finish."
+      detail: title || detail || "The last action could not finish.",
+      actionsBlocked: launchActionsBlocked
     });
     return;
   }
@@ -1136,7 +1224,8 @@ function renderLaunchStatusFromRun({ tone, title, detail, progress }) {
     renderLaunchStatus({
       state: "ready",
       title: "Ready for the next action",
-      detail: title || "The last Lumen action completed."
+      detail: title || "The last Lumen action completed.",
+      actionsBlocked: false
     });
     return;
   }
@@ -1144,14 +1233,18 @@ function renderLaunchStatusFromRun({ tone, title, detail, progress }) {
   renderLaunchStatus({
     state: "working",
     title: title || "Working",
-    detail: detail || "Lumen is running the selected action."
+    detail: detail || "Lumen is running the selected action.",
+    actionsBlocked: false
   });
 }
 
-function renderLaunchStatus({ state, title, detail }) {
+function renderLaunchStatus({ state, title, detail, actionsBlocked = false }) {
+  launchActionsBlocked = Boolean(actionsBlocked);
   ui.launchStatus.dataset.state = state || "ready";
   ui.launchStatusTitle.textContent = title || "Ready";
   ui.launchStatusDetail.textContent = detail || "Choose the next Lumen action.";
+  ui.launchPanel.classList.toggle("is-blocked", launchActionsBlocked);
+  updateActionDisabledState();
 }
 
 function showStatus({ tone, stage, eyebrow, title, detail, badge, progress }) {
@@ -1280,18 +1373,23 @@ function normalizeTimelineStage(stage = "") {
 function setActionBusy(isBusy) {
   actionBusy = isBusy;
   ui.launchPanel.classList.toggle("is-busy", isBusy);
-  ui.captureButton.disabled = isBusy;
-  ui.analyzeButton.disabled = isBusy;
-  ui.previewRedactionsButton.disabled = isBusy;
-  ui.startRedactionPickerButton.disabled = isBusy;
-  ui.clearManualRedactionsButton.disabled = isBusy || !(manualRedactionRecord.regions?.length);
+  updateActionDisabledState();
+}
+
+function updateActionDisabledState() {
+  const disabled = actionBusy || launchActionsBlocked;
+  ui.captureButton.disabled = disabled;
+  ui.analyzeButton.disabled = disabled;
+  ui.previewRedactionsButton.disabled = disabled;
+  ui.startRedactionPickerButton.disabled = disabled;
+  ui.clearManualRedactionsButton.disabled = disabled || !(manualRedactionRecord.regions?.length);
 
   for (const button of ui.holdMenuActions) {
-    button.disabled = isBusy;
+    button.disabled = disabled;
   }
 
   for (const button of ui.historyList.querySelectorAll("[data-history-action]")) {
-    button.disabled = isBusy || button.dataset.downloadReady !== "true";
+    button.disabled = actionBusy || button.dataset.downloadReady !== "true";
   }
 }
 

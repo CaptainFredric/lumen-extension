@@ -113,6 +113,8 @@ The public landing page will be available at `http://127.0.0.1:3000/`.
 9. Use `Open` or `Show in folder` from recent captures to get back to the saved artifact
 10. Check the latest blueprint and local history in the popup
 
+If the launch indicator says the page is blocked, switch to a normal `http://` or `https://` page. Chrome does not allow extension capture scripts on internal browser pages, Web Store pages, or other extension pages.
+
 ## Proof Assets
 
 The landing page includes proof assets generated from the current prototype:

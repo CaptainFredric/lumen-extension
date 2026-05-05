@@ -68,6 +68,15 @@ try {
     ]
   }), seededCaptureId);
 
+  await context.route("https://lumen-smoke.test/", (route) => route.fulfill({
+    status: 200,
+    contentType: "text/html",
+    body: "<!doctype html><title>Lumen smoke target</title><h1>Capture-ready page</h1>"
+  }));
+  const target = await context.newPage();
+  await target.goto("https://lumen-smoke.test/", { waitUntil: "domcontentloaded" });
+  await target.bringToFront();
+
   const popup = await context.newPage();
   popup.on("console", (message) => {
     if (message.type() === "error") {
@@ -87,9 +96,12 @@ try {
     hasShell: Boolean(document.querySelector(".shell")),
     launchStatusState: document.querySelector("#launchStatus")?.dataset.state || "",
     launchStatusTitle: document.querySelector("#launchStatusTitle")?.textContent?.trim() || "",
+    launchBlocked: document.querySelector("#launchPanel")?.classList.contains("is-blocked") || false,
     captureButton: document.querySelector("#captureButton strong")?.textContent?.trim() || "",
     captureHint: document.querySelector("#captureButton small")?.textContent?.trim() || "",
+    captureDisabled: document.querySelector("#captureButton")?.disabled || false,
     analyzeButton: document.querySelector("#analyzeButton span")?.textContent?.trim() || "",
+    analyzeDisabled: document.querySelector("#analyzeButton")?.disabled || false,
     holdMenuHidden: document.querySelector("#holdMenu")?.getAttribute("aria-hidden") || "",
     holdActionCount: document.querySelectorAll("[data-quick-action]").length,
     statusHidden: document.querySelector("#statusPanel")?.classList.contains("is-hidden") ?? false,
@@ -110,11 +122,14 @@ try {
 
   assert(popupState.title === "Lumen", "Popup title did not load.", popupState);
   assert(popupState.hasShell, "Popup shell did not render.", popupState);
-  assert(Boolean(popupState.launchStatusState), "Launch status did not initialize.", popupState);
-  assert(Boolean(popupState.launchStatusTitle), "Launch status title did not render.", popupState);
+  assert(popupState.launchStatusState === "ready", "Launch status should resolve the latest capturable tab.", popupState);
+  assert(popupState.launchStatusTitle === "lumen-smoke.test ready", "Launch status title did not render the target host.", popupState);
+  assert(!popupState.launchBlocked, "Launch panel should not block a capturable target tab.", popupState);
   assert(popupState.captureButton === "Capture page", "Capture action did not render.", popupState);
   assert(popupState.captureHint === "Full page capture. Hold for actions.", "Capture hold hint did not render.", popupState);
+  assert(!popupState.captureDisabled, "Capture action should be enabled for a capturable target tab.", popupState);
   assert(popupState.analyzeButton === "Analyze Page", "Analyze action did not render.", popupState);
+  assert(!popupState.analyzeDisabled, "Analyze action should be enabled for a capturable target tab.", popupState);
   assert(popupState.holdMenuHidden === "true", "Hold menu should start closed.", popupState);
   assert(popupState.holdActionCount === 4, "Hold menu actions did not render.", popupState);
   assert(popupState.statusHidden, "Popup status panel should start hidden.", popupState);
@@ -158,6 +173,25 @@ try {
     pointerId: 1,
     pointerType: "mouse"
   });
+
+  await target.close();
+  await popup.reload({ waitUntil: "load" });
+  await popup.waitForSelector("#captureButton", { timeout: 10000 });
+
+  const blockedState = await popup.evaluate(() => ({
+    launchStatusState: document.querySelector("#launchStatus")?.dataset.state || "",
+    launchStatusTitle: document.querySelector("#launchStatusTitle")?.textContent?.trim() || "",
+    launchBlocked: document.querySelector("#launchPanel")?.classList.contains("is-blocked") || false,
+    captureDisabled: document.querySelector("#captureButton")?.disabled || false,
+    analyzeDisabled: document.querySelector("#analyzeButton")?.disabled || false,
+    quickActionsDisabled: [...document.querySelectorAll("[data-quick-action]")].every((button) => button.disabled)
+  }));
+
+  assert(blockedState.launchStatusState === "blocked", "Launch status should block restricted or missing target tabs.", blockedState);
+  assert(blockedState.launchBlocked, "Launch panel should mark blocked target state.", blockedState);
+  assert(blockedState.captureDisabled, "Capture should be disabled without a capturable target tab.", blockedState);
+  assert(blockedState.analyzeDisabled, "Analyze should be disabled without a capturable target tab.", blockedState);
+  assert(blockedState.quickActionsDisabled, "Quick actions should be disabled without a capturable target tab.", blockedState);
 
   const storageState = await worker.evaluate(() =>
     chrome.storage.sync.get("lumen.capture.settings")
