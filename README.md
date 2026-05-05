@@ -104,15 +104,14 @@ The public landing page will be available at `http://127.0.0.1:3000/`.
 
 1. Open any normal `https://` page
 2. Open the Lumen popup
-3. Choose the capture device and export mode
-4. Enable sticky cleanup, lazy-load forcing, or auto-redaction as needed
-5. Use `Scan` to preview detected redaction regions before export
-6. Use `Mark boxes` if you need manual redactions before capture
-7. Add a capture note if you want the export to carry a review comment
-8. Keep `Save bundle manifest` enabled if you want a portable JSON sidecar next to the capture files
-9. Run `Analyze Page` or `Capture Full Page`
-10. Use `Open` or `Show in folder` from recent captures to get back to the saved artifact
-11. Check the latest blueprint and local history in the popup
+3. Check the launch indicator to confirm the current tab is capture-ready
+4. Click `Capture page` for the default full-page run
+5. Hold `Capture page` to open quick actions for responsive capture, redaction scan, manual boxes, or signal extraction
+6. Change capture device, export mode, cleanup, lazy-load forcing, auto-redaction, notes, or manifest settings when needed
+7. Use `Scan` to preview detected redaction regions before export
+8. Use `Mark boxes` if you need manual redactions before capture
+9. Use `Open` or `Show in folder` from recent captures to get back to the saved artifact
+10. Check the latest blueprint and local history in the popup
 
 ## Proof Assets
 

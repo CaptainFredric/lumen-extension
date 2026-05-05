@@ -85,8 +85,13 @@ try {
   const popupState = await popup.evaluate(() => ({
     title: document.title,
     hasShell: Boolean(document.querySelector(".shell")),
-    captureButton: document.querySelector("#captureButton")?.textContent?.trim() || "",
-    analyzeButton: document.querySelector("#analyzeButton")?.textContent?.trim() || "",
+    launchStatusState: document.querySelector("#launchStatus")?.dataset.state || "",
+    launchStatusTitle: document.querySelector("#launchStatusTitle")?.textContent?.trim() || "",
+    captureButton: document.querySelector("#captureButton strong")?.textContent?.trim() || "",
+    captureHint: document.querySelector("#captureButton small")?.textContent?.trim() || "",
+    analyzeButton: document.querySelector("#analyzeButton span")?.textContent?.trim() || "",
+    holdMenuHidden: document.querySelector("#holdMenu")?.getAttribute("aria-hidden") || "",
+    holdActionCount: document.querySelectorAll("[data-quick-action]").length,
     statusHidden: document.querySelector("#statusPanel")?.classList.contains("is-hidden") ?? false,
     manualCount: document.querySelector("#manualRedactionCount")?.textContent?.trim() || "",
     runViewSummary: document.querySelector("#runViewSummary")?.textContent?.trim() || "",
@@ -105,8 +110,13 @@ try {
 
   assert(popupState.title === "Lumen", "Popup title did not load.", popupState);
   assert(popupState.hasShell, "Popup shell did not render.", popupState);
-  assert(popupState.captureButton === "Capture Full Page", "Capture action did not render.", popupState);
+  assert(Boolean(popupState.launchStatusState), "Launch status did not initialize.", popupState);
+  assert(Boolean(popupState.launchStatusTitle), "Launch status title did not render.", popupState);
+  assert(popupState.captureButton === "Capture page", "Capture action did not render.", popupState);
+  assert(popupState.captureHint === "Full page capture. Hold for actions.", "Capture hold hint did not render.", popupState);
   assert(popupState.analyzeButton === "Analyze Page", "Analyze action did not render.", popupState);
+  assert(popupState.holdMenuHidden === "true", "Hold menu should start closed.", popupState);
+  assert(popupState.holdActionCount === 4, "Hold menu actions did not render.", popupState);
   assert(popupState.statusHidden, "Popup status panel should start hidden.", popupState);
   assert(popupState.manualCount === "0 boxes", "Manual redaction counter did not initialize.", popupState);
   assert(popupState.runViewSummary === "Desktop", "Run view summary did not initialize.", popupState);
@@ -123,6 +133,31 @@ try {
     popupState
   );
   assert(!popupConsoleErrors.length, "Popup emitted console errors.", popupConsoleErrors);
+
+  await popup.dispatchEvent("#captureButton", "pointerdown", {
+    button: 0,
+    pointerId: 1,
+    pointerType: "mouse"
+  });
+  await popup.waitForTimeout(650);
+
+  const holdState = await popup.evaluate(() => ({
+    menuOpen: document.querySelector("#launchPanel")?.classList.contains("is-menu-open") || false,
+    ariaHidden: document.querySelector("#holdMenu")?.getAttribute("aria-hidden") || "",
+    expanded: document.querySelector("#captureButton")?.getAttribute("aria-expanded") || "",
+    statusTitle: document.querySelector("#launchStatusTitle")?.textContent?.trim() || ""
+  }));
+
+  assert(holdState.menuOpen, "Holding capture did not open the quick action menu.", holdState);
+  assert(holdState.ariaHidden === "false", "Hold menu aria state did not open.", holdState);
+  assert(holdState.expanded === "true", "Capture button aria state did not expand.", holdState);
+  assert(holdState.statusTitle === "Hold menu ready", "Launch status did not reflect hold menu state.", holdState);
+
+  await popup.dispatchEvent("#captureButton", "pointerup", {
+    button: 0,
+    pointerId: 1,
+    pointerType: "mouse"
+  });
 
   const storageState = await worker.evaluate(() =>
     chrome.storage.sync.get("lumen.capture.settings")

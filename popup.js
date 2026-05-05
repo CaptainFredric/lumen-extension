@@ -11,8 +11,14 @@ import {
 } from "./config.js";
 
 const ui = {
+  launchPanel: document.querySelector("#launchPanel"),
+  launchStatus: document.querySelector("#launchStatus"),
+  launchStatusTitle: document.querySelector("#launchStatusTitle"),
+  launchStatusDetail: document.querySelector("#launchStatusDetail"),
   captureButton: document.querySelector("#captureButton"),
   analyzeButton: document.querySelector("#analyzeButton"),
+  holdMenu: document.querySelector("#holdMenu"),
+  holdMenuActions: [...document.querySelectorAll("[data-quick-action]")],
   removeStickyHeaders: document.querySelector("#removeStickyHeaders"),
   forceLazyLoad: document.querySelector("#forceLazyLoad"),
   autoRedact: document.querySelector("#autoRedact"),
@@ -85,6 +91,8 @@ let manualRedactionRecord = {
   regions: []
 };
 let statusEvents = [];
+let holdTimer = null;
+let suppressNextCaptureClick = false;
 
 const TIMELINE_STAGES = [
   "prepare",
@@ -94,6 +102,7 @@ const TIMELINE_STAGES = [
   "stitch",
   "save"
 ];
+const HOLD_TO_OPEN_MS = 520;
 
 bootstrap().catch((error) => {
   showStatus({
@@ -143,6 +152,7 @@ async function bootstrap() {
   await restoreSettings();
   bindEvents();
   await restoreAppState();
+  await refreshLaunchStatus();
 }
 
 function bindEvents() {
@@ -183,8 +193,16 @@ function bindEvents() {
     });
   }
 
-  ui.captureButton.addEventListener("click", handleCaptureClick);
+  ui.captureButton.addEventListener("pointerdown", handleCapturePointerDown);
+  ui.captureButton.addEventListener("pointerup", handleCapturePointerUp);
+  ui.captureButton.addEventListener("pointerleave", handleCapturePointerCancel);
+  ui.captureButton.addEventListener("pointercancel", handleCapturePointerCancel);
+  ui.captureButton.addEventListener("keydown", handleCaptureKeyDown);
+  ui.captureButton.addEventListener("click", handleCaptureButtonClick);
   ui.analyzeButton.addEventListener("click", handleAnalyzeClick);
+  ui.holdMenu.addEventListener("click", handleQuickActionClick);
+  document.addEventListener("keydown", handleDocumentKeyDown);
+  document.addEventListener("pointerdown", handleOutsidePointerDown);
   ui.signInButton.addEventListener("click", handleSignIn);
   ui.signOutButton.addEventListener("click", handleSignOut);
   ui.billingButton.addEventListener("click", handleBillingClick);
@@ -297,6 +315,145 @@ function applyProGates() {
     chip.classList.toggle("is-locked", !enabled);
     chip.disabled = !enabled;
   }
+}
+
+function handleCaptureButtonClick(event) {
+  if (suppressNextCaptureClick) {
+    event.preventDefault();
+    suppressNextCaptureClick = false;
+    return;
+  }
+
+  closeHoldMenu();
+  handleCaptureClick();
+}
+
+function handleCapturePointerDown(event) {
+  if (event.button !== 0 || actionBusy || ui.captureButton.disabled) {
+    return;
+  }
+
+  clearHoldTimer();
+  ui.captureButton.classList.add("is-holding");
+  try {
+    ui.captureButton.setPointerCapture?.(event.pointerId);
+  } catch {
+    // Synthetic smoke-test pointer events do not always create an active pointer.
+  }
+
+  holdTimer = window.setTimeout(() => {
+    suppressNextCaptureClick = true;
+    openHoldMenu("hold");
+  }, HOLD_TO_OPEN_MS);
+}
+
+function handleCapturePointerUp(event) {
+  clearHoldTimer();
+  ui.captureButton.classList.remove("is-holding");
+  try {
+    ui.captureButton.releasePointerCapture?.(event.pointerId);
+  } catch {
+    // Safe to ignore when the pointer was not captured.
+  }
+}
+
+function handleCapturePointerCancel(event) {
+  clearHoldTimer();
+  ui.captureButton.classList.remove("is-holding");
+  try {
+    ui.captureButton.releasePointerCapture?.(event.pointerId);
+  } catch {
+    // Safe to ignore when the pointer was not captured.
+  }
+}
+
+function handleCaptureKeyDown(event) {
+  if ((event.key === "ArrowDown" || event.key === "Menu") && !actionBusy) {
+    event.preventDefault();
+    openHoldMenu("keyboard");
+  }
+
+  if (event.key === "Escape") {
+    closeHoldMenu();
+  }
+}
+
+function handleDocumentKeyDown(event) {
+  if (event.key === "Escape") {
+    closeHoldMenu();
+  }
+}
+
+function handleOutsidePointerDown(event) {
+  if (!ui.launchPanel.contains(event.target)) {
+    closeHoldMenu();
+  }
+}
+
+async function handleQuickActionClick(event) {
+  const button = event.target.closest("[data-quick-action]");
+
+  if (!button || actionBusy) {
+    return;
+  }
+
+  await runQuickAction(button.dataset.quickAction);
+}
+
+async function runQuickAction(action) {
+  closeHoldMenu();
+
+  if (action === "responsive") {
+    currentSettings.devicePreset = "responsive";
+    updateDeviceButtons();
+    await persistCurrentSettings();
+    await handleCaptureClick();
+    return;
+  }
+
+  if (action === "redact") {
+    await handlePreviewRedactions();
+    return;
+  }
+
+  if (action === "mark") {
+    await handleStartRedactionPicker();
+    return;
+  }
+
+  if (action === "analyze") {
+    await handleAnalyzeClick();
+  }
+}
+
+function openHoldMenu(source = "hold") {
+  clearHoldTimer();
+  ui.captureButton.classList.remove("is-holding");
+  ui.launchPanel.classList.add("is-menu-open");
+  ui.holdMenu.setAttribute("aria-hidden", "false");
+  ui.captureButton.setAttribute("aria-expanded", "true");
+  renderLaunchStatus({
+    state: "ready",
+    title: source === "keyboard" ? "Quick actions open" : "Hold menu ready",
+    detail: "Choose a capture action without digging through settings."
+  });
+}
+
+function closeHoldMenu() {
+  clearHoldTimer();
+  ui.captureButton.classList.remove("is-holding");
+  ui.launchPanel.classList.remove("is-menu-open");
+  ui.holdMenu.setAttribute("aria-hidden", "true");
+  ui.captureButton.setAttribute("aria-expanded", "false");
+}
+
+function clearHoldTimer() {
+  if (!holdTimer) {
+    return;
+  }
+
+  window.clearTimeout(holdTimer);
+  holdTimer = null;
 }
 
 async function handleCaptureClick() {
@@ -926,6 +1083,77 @@ function renderFontStrip(fonts) {
   }
 }
 
+async function refreshLaunchStatus() {
+  try {
+    const [tab] = await chrome.tabs.query({
+      active: true,
+      lastFocusedWindow: true
+    });
+
+    if (!tab?.url) {
+      renderLaunchStatus({
+        state: "blocked",
+        title: "No active tab found",
+        detail: "Open a web page, then launch Lumen again."
+      });
+      return;
+    }
+
+    if (!isOriginPermissionSupported(tab.url)) {
+      renderLaunchStatus({
+        state: "blocked",
+        title: "This page cannot be captured",
+        detail: "Chrome blocks capture scripts on browser and extension pages."
+      });
+      return;
+    }
+
+    renderLaunchStatus({
+      state: "ready",
+      title: `${formatTabHost(tab.url)} ready`,
+      detail: "Click to capture. Hold the main button for quick actions."
+    });
+  } catch (error) {
+    renderLaunchStatus({
+      state: "blocked",
+      title: "Tab check failed",
+      detail: error.message || "Lumen could not read the active tab."
+    });
+  }
+}
+
+function renderLaunchStatusFromRun({ tone, title, detail, progress }) {
+  if (tone === "error") {
+    renderLaunchStatus({
+      state: "blocked",
+      title: "Action needs attention",
+      detail: title || detail || "The last action could not finish."
+    });
+    return;
+  }
+
+  if (tone === "success" || progress >= 1) {
+    renderLaunchStatus({
+      state: "ready",
+      title: "Ready for the next action",
+      detail: title || "The last Lumen action completed."
+    });
+    return;
+  }
+
+  renderLaunchStatus({
+    state: "working",
+    title: title || "Working",
+    detail: detail || "Lumen is running the selected action."
+  });
+}
+
+function renderLaunchStatus({ state, title, detail }) {
+  ui.launchStatus.dataset.state = state || "ready";
+  ui.launchStatusTitle.textContent = title || "Ready";
+  ui.launchStatusDetail.textContent = detail || "Choose the next Lumen action.";
+}
+
 function showStatus({ tone, stage, eyebrow, title, detail, badge, progress }) {
   ui.statusPanel.classList.remove("is-hidden");
   ui.statusPanel.dataset.tone = tone;
@@ -942,6 +1170,12 @@ function showStatus({ tone, stage, eyebrow, title, detail, badge, progress }) {
     title,
     detail,
     tone
+  });
+  renderLaunchStatusFromRun({
+    tone,
+    title,
+    detail,
+    progress
   });
 }
 
@@ -1045,11 +1279,16 @@ function normalizeTimelineStage(stage = "") {
 
 function setActionBusy(isBusy) {
   actionBusy = isBusy;
+  ui.launchPanel.classList.toggle("is-busy", isBusy);
   ui.captureButton.disabled = isBusy;
   ui.analyzeButton.disabled = isBusy;
   ui.previewRedactionsButton.disabled = isBusy;
   ui.startRedactionPickerButton.disabled = isBusy;
   ui.clearManualRedactionsButton.disabled = isBusy || !(manualRedactionRecord.regions?.length);
+
+  for (const button of ui.holdMenuActions) {
+    button.disabled = isBusy;
+  }
 
   for (const button of ui.historyList.querySelectorAll("[data-history-action]")) {
     button.disabled = isBusy || button.dataset.downloadReady !== "true";
@@ -1183,6 +1422,14 @@ function titleCase(value = "") {
     .filter(Boolean)
     .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1).toLowerCase()}`)
     .join(" ");
+}
+
+function formatTabHost(url) {
+  try {
+    return new URL(url).host.replace(/^www\./, "") || "Current tab";
+  } catch {
+    return "Current tab";
+  }
 }
 
 function formatLogTime(date) {
