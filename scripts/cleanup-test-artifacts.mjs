@@ -2,12 +2,15 @@ import { readdir, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-const tempDir = os.tmpdir();
-const exactPaths = [
-  path.join(tempDir, "lumen-docs-check.html"),
-  path.join(tempDir, "lumen-popup-hold-menu.png"),
-  path.join(tempDir, "lumen-popup-hold-menu-tight.png"),
-  path.join(tempDir, "lumen-popup-hold-menu-top.png")
+const tempDirs = uniqueExistingTempDirs([
+  os.tmpdir(),
+  "/tmp"
+]);
+const exactNames = [
+  "lumen-docs-check.html",
+  "lumen-popup-hold-menu.png",
+  "lumen-popup-hold-menu-tight.png",
+  "lumen-popup-hold-menu-top.png"
 ];
 const tempPrefixes = [
   "lumen-extension-smoke-",
@@ -18,28 +21,34 @@ const tempPrefixes = [
 const screenshotPattern = /^lumen-popup-.*\.png$/;
 const removed = [];
 
-for (const targetPath of exactPaths) {
-  await removeIfPresent(targetPath);
-}
+for (const tempDir of tempDirs) {
+  for (const name of exactNames) {
+    await removeIfPresent(path.join(tempDir, name));
+  }
 
-const entries = await readdir(tempDir, { withFileTypes: true });
+  const entries = await readdir(tempDir, { withFileTypes: true });
 
-for (const entry of entries) {
-  const shouldRemove =
-    tempPrefixes.some((prefix) => entry.name.startsWith(prefix)) ||
-    screenshotPattern.test(entry.name);
+  for (const entry of entries) {
+    const shouldRemove =
+      tempPrefixes.some((prefix) => entry.name.startsWith(prefix)) ||
+      screenshotPattern.test(entry.name);
 
-  if (shouldRemove) {
-    await removeIfPresent(path.join(tempDir, entry.name));
+    if (shouldRemove) {
+      await removeIfPresent(path.join(tempDir, entry.name));
+    }
   }
 }
 
 console.log(JSON.stringify({
   ok: true,
-  tempDir,
+  tempDirs,
   removedCount: removed.length,
   removed
 }, null, 2));
+
+function uniqueExistingTempDirs(values) {
+  return [...new Set(values.map((value) => path.resolve(value)))];
+}
 
 async function removeIfPresent(targetPath) {
   if (!(await pathExists(targetPath))) {
@@ -52,7 +61,7 @@ async function removeIfPresent(targetPath) {
     throw new Error(`Temporary artifact still exists after cleanup: ${targetPath}`);
   }
 
-  removed.push(path.relative(tempDir, targetPath));
+  removed.push(targetPath);
 }
 
 async function pathExists(targetPath) {
