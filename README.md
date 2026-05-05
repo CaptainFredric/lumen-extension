@@ -150,7 +150,7 @@ To verify the unpacked MV3 extension can boot, start its service worker, initial
 npm run smoke:extension
 ```
 
-This opens a temporary Chromium profile, loads the extension unpacked, checks the background service worker, opens `popup.html`, then closes the profile.
+This opens a temporary Chromium profile, loads the extension unpacked, checks the background service worker, opens `popup.html`, then closes and removes the profile.
 
 To verify the loaded extension can capture a real local page and produce finished artifacts:
 
@@ -158,7 +158,13 @@ To verify the loaded extension can capture a real local page and produce finishe
 npm run smoke:e2e
 ```
 
-This starts a local fixture page, loads a temporary copy of the extension with explicit test only capture access, runs a responsive desktop, tablet, and mobile capture through the MV3 background worker, waits for Chrome downloads to finish, validates the PNG and manifest artifacts, and checks that local history stores the run. The checked in manifest is not widened by this test.
+This starts a local fixture page, loads a temporary copy of the extension with explicit test only capture access, runs a responsive desktop, tablet, and mobile capture through the MV3 background worker, waits for Chrome downloads to finish, validates the PNG and manifest artifacts, checks that local history stores the run, then removes the temporary profile and download folder. The checked in manifest is not widened by this test.
+
+If a browser run is interrupted, remove leftover Lumen test screenshots, temporary profiles, and capture downloads with:
+
+```bash
+npm run cleanup:tmp
+```
 
 To test the loaded extension against live pages tied to this project:
 

@@ -76,7 +76,7 @@ try {
   process.exitCode = 1;
 } finally {
   await context?.close().catch(() => {});
-  await rm(tempRoot, { recursive: true, force: true }).catch(() => {});
+  await cleanupTemporaryPath(tempRoot, "real site capture temp root");
 }
 
 async function captureRealPage({ url, popup, worker }) {
@@ -383,4 +383,36 @@ function assert(condition, message, details = null) {
   const error = new Error(message);
   error.details = details;
   throw error;
+}
+
+async function cleanupTemporaryPath(targetPath, label) {
+  try {
+    await rm(targetPath, { recursive: true, force: true });
+
+    if (await pathExists(targetPath)) {
+      throw new Error(`${label} still exists after cleanup.`);
+    }
+  } catch (error) {
+    console.error(JSON.stringify({
+      ok: false,
+      cleanupFailed: true,
+      label,
+      path: targetPath,
+      message: error.message
+    }, null, 2));
+    process.exitCode = 1;
+  }
+}
+
+async function pathExists(targetPath) {
+  try {
+    await stat(targetPath);
+    return true;
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return false;
+    }
+
+    throw error;
+  }
 }
