@@ -8,6 +8,7 @@ const tempDirs = uniqueExistingTempDirs([
 ]);
 const exactNames = [
   "lumen-docs-check.html",
+  "lumen-runs.json",
   "lumen-popup-hold-menu.png",
   "lumen-popup-hold-menu-tight.png",
   "lumen-popup-hold-menu-top.png"
@@ -19,6 +20,7 @@ const tempPrefixes = [
   "lumen-popup-shot-"
 ];
 const screenshotPattern = /^lumen-popup-.*\.png$/;
+const liveCheckPattern = /^lumen-live-.*\.(html|headers)$/;
 const removed = [];
 
 for (const tempDir of tempDirs) {
@@ -31,7 +33,8 @@ for (const tempDir of tempDirs) {
   for (const entry of entries) {
     const shouldRemove =
       tempPrefixes.some((prefix) => entry.name.startsWith(prefix)) ||
-      screenshotPattern.test(entry.name);
+      screenshotPattern.test(entry.name) ||
+      liveCheckPattern.test(entry.name);
 
     if (shouldRemove) {
       await removeIfPresent(path.join(tempDir, entry.name));
