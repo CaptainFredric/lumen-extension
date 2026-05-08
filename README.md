@@ -192,7 +192,15 @@ The script also tries to create `docs/assets/proof-run-bundle.zip` with the syst
 1. Enable GitHub Pages to deploy through GitHub Actions
 2. Push changes to `main`
 3. Wait for the `Deploy Pages` workflow to complete
-4. Use the generated Pages URL
+4. Use `https://captainfredric.github.io/lumen-extension/`
+
+The Pages workflow deploys `docs/` as the public root. The project also keeps a compatibility route at `/docs/` so older shared links redirect back to the root product page.
+
+To verify the deployed route shape locally:
+
+```bash
+npm run smoke:site
+```
 
 ## Future Direction
 
