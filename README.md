@@ -111,7 +111,8 @@ The public landing page will be available at `http://127.0.0.1:3000/`.
 7. Use `Scan` to preview detected redaction regions before export
 8. Use `Mark boxes` if you need manual redactions before capture
 9. Use `Open` or `Show in folder` from recent captures to get back to the saved artifact
-10. Check the latest blueprint and local history in the popup
+10. Expand recent capture details to review views, artifacts, redactions, manifest status, notes, and page signals
+11. Copy a capture summary when you need to paste evidence into a review note or bug report
 
 If the launch indicator says the page is blocked, switch to a normal `http://` or `https://` page. Chrome does not allow extension capture scripts on internal browser pages, Web Store pages, or other extension pages.
 

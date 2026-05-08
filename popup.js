@@ -95,6 +95,8 @@ let holdTimer = null;
 let suppressNextCaptureClick = false;
 let launchActionsBlocked = false;
 let launchTargetTab = null;
+let latestHistoryItems = [];
+let expandedHistoryId = "";
 
 const TIMELINE_STAGES = [
   "prepare",
@@ -105,6 +107,7 @@ const TIMELINE_STAGES = [
   "save"
 ];
 const HOLD_TO_OPEN_MS = 520;
+const COLLAPSED_HISTORY_ID = "__collapsed__";
 
 bootstrap().catch((error) => {
   showStatus({
@@ -912,6 +915,18 @@ async function handleHistoryAction(event) {
 
   const captureId = button.dataset.captureId || "";
   const action = button.dataset.historyAction;
+
+  if (action === "details") {
+    expandedHistoryId = expandedHistoryId === captureId ? COLLAPSED_HISTORY_ID : captureId;
+    renderHistory(latestHistoryItems);
+    return;
+  }
+
+  if (action === "copy") {
+    await handleCopyHistorySummary(captureId, button);
+    return;
+  }
+
   const messageType =
     action === "open"
       ? "LUMEN_OPEN_CAPTURE_DOWNLOAD"
@@ -954,6 +969,39 @@ async function handleHistoryAction(event) {
   }
 }
 
+async function handleCopyHistorySummary(captureId, button) {
+  const item = latestHistoryItems.find((record) => record.id === captureId);
+
+  if (!item) {
+    return;
+  }
+
+  button.disabled = true;
+
+  try {
+    await copyTextToClipboard(buildHistorySummaryText(item));
+    showStatus({
+      tone: "success",
+      eyebrow: "Archive",
+      title: "Capture summary copied",
+      detail: "The run summary is ready to paste into a bug report, review note, or project doc.",
+      badge: "Copied",
+      progress: 1
+    });
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Archive",
+      title: "Copy failed",
+      detail: error.message || "The browser did not allow clipboard access.",
+      badge: "Failed",
+      progress: 0.12
+    });
+  } finally {
+    button.disabled = actionBusy;
+  }
+}
+
 function renderSession(session) {
   currentSession = session || currentSession;
 
@@ -980,10 +1028,12 @@ function renderSession(session) {
 
 function renderHistory(history) {
   const items = Array.isArray(history) ? history : [];
+  latestHistoryItems = items;
   ui.historyCount.textContent = `${items.length} item${items.length === 1 ? "" : "s"}`;
   ui.historyList.replaceChildren();
 
   if (!items.length) {
+    expandedHistoryId = "";
     ui.historyEmpty.classList.remove("is-hidden");
     ui.historyList.classList.add("is-hidden");
     return;
@@ -992,9 +1042,19 @@ function renderHistory(history) {
   ui.historyEmpty.classList.add("is-hidden");
   ui.historyList.classList.remove("is-hidden");
 
-  for (const item of items.slice(0, 5)) {
+  const visibleItems = items.slice(0, 5);
+  const visibleIds = new Set(visibleItems.map((item) => item.id || ""));
+
+  if (!expandedHistoryId || (expandedHistoryId !== COLLAPSED_HISTORY_ID && !visibleIds.has(expandedHistoryId))) {
+    expandedHistoryId = visibleItems[0]?.id || COLLAPSED_HISTORY_ID;
+  }
+
+  for (const item of visibleItems) {
+    const itemId = item.id || "";
+    const isExpanded = expandedHistoryId === itemId;
     const row = document.createElement("article");
     row.className = "history-item";
+    row.classList.toggle("is-expanded", isExpanded);
 
     const topRow = document.createElement("div");
     topRow.className = "history-head";
@@ -1048,11 +1108,26 @@ function renderHistory(history) {
     const actions = document.createElement("div");
     actions.className = "history-actions";
 
+    const detailsButton = document.createElement("button");
+    detailsButton.className = "history-action";
+    detailsButton.type = "button";
+    detailsButton.dataset.historyAction = "details";
+    detailsButton.dataset.captureId = itemId;
+    detailsButton.setAttribute("aria-expanded", String(isExpanded));
+    detailsButton.textContent = isExpanded ? "Hide details" : "Details";
+
+    const copyButton = document.createElement("button");
+    copyButton.className = "history-action";
+    copyButton.type = "button";
+    copyButton.dataset.historyAction = "copy";
+    copyButton.dataset.captureId = itemId;
+    copyButton.textContent = "Copy summary";
+
     const openButton = document.createElement("button");
     openButton.className = "history-action";
     openButton.type = "button";
     openButton.dataset.historyAction = "open";
-    openButton.dataset.captureId = item.id || "";
+    openButton.dataset.captureId = itemId;
     openButton.dataset.downloadReady = hasDownloadHandles ? "true" : "false";
     openButton.disabled = !hasDownloadHandles;
     openButton.textContent = "Open";
@@ -1061,7 +1136,7 @@ function renderHistory(history) {
     showButton.className = "history-action";
     showButton.type = "button";
     showButton.dataset.historyAction = "show";
-    showButton.dataset.captureId = item.id || "";
+    showButton.dataset.captureId = itemId;
     showButton.dataset.downloadReady = hasDownloadHandles ? "true" : "false";
     showButton.disabled = !hasDownloadHandles;
     showButton.textContent = "Show in folder";
@@ -1071,8 +1146,12 @@ function renderHistory(history) {
       showButton.title = "Run a fresh capture to enable local file actions.";
     }
 
-    actions.append(openButton, showButton);
+    actions.append(detailsButton, copyButton, openButton, showButton);
     row.append(actions);
+
+    if (isExpanded) {
+      row.append(buildHistoryDetails(item));
+    }
 
     ui.historyList.appendChild(row);
   }
@@ -1087,6 +1166,182 @@ function renderManualRedactions(record) {
   ui.manualRedactionCount.textContent = `${count} box${count === 1 ? "" : "es"}`;
   updateActionDisabledState();
   renderRunSummary(currentSettings);
+}
+
+function buildHistoryDetails(item) {
+  const detail = document.createElement("div");
+  detail.className = "history-detail";
+
+  const metrics = document.createElement("div");
+  metrics.className = "history-detail-grid";
+
+  const viewCount = item.variants?.length || (item.devicePreset === "responsive" ? 3 : 1);
+  const fileCount = item.files?.length || 0;
+  const redactionCount = item.redactionCount || 0;
+  const manifestState = item.manifestFile ? "Saved" : "Off";
+
+  metrics.append(
+    buildHistoryMetric("Views", String(viewCount)),
+    buildHistoryMetric("Files", String(fileCount)),
+    buildHistoryMetric("Redactions", String(redactionCount)),
+    buildHistoryMetric("Manifest", manifestState)
+  );
+  detail.append(metrics);
+
+  const variantList = buildHistoryVariantList(item);
+
+  if (variantList) {
+    detail.append(variantList);
+  }
+
+  const artifactList = buildHistoryArtifactList(item);
+
+  if (artifactList) {
+    detail.append(artifactList);
+  }
+
+  const signals = buildHistorySignalPanel(item);
+
+  if (signals) {
+    detail.append(signals);
+  }
+
+  if (item.annotation?.text) {
+    detail.append(buildHistoryTextPanel("Capture note", item.annotation.text));
+  }
+
+  return detail;
+}
+
+function buildHistoryMetric(label, value) {
+  const node = document.createElement("div");
+  node.className = "history-detail-metric";
+
+  const labelNode = document.createElement("span");
+  labelNode.textContent = label;
+
+  const valueNode = document.createElement("strong");
+  valueNode.textContent = value;
+
+  node.append(labelNode, valueNode);
+  return node;
+}
+
+function buildHistoryVariantList(item) {
+  const variants = Array.isArray(item.variants) ? item.variants : [];
+
+  if (!variants.length) {
+    return null;
+  }
+
+  const panel = buildHistoryPanelShell("Capture views");
+
+  for (const variant of variants) {
+    const row = document.createElement("div");
+    row.className = "history-detail-row";
+
+    const label = document.createElement("strong");
+    label.textContent = variant.label || titleCase(variant.id || "View");
+
+    const meta = document.createElement("span");
+    meta.textContent = [
+      variant.dimensions?.width && variant.dimensions?.height
+        ? `${variant.dimensions.width}x${variant.dimensions.height}`
+        : "",
+      variant.fileCount ? `${variant.fileCount} file${variant.fileCount === 1 ? "" : "s"}` : "",
+      variant.redactionCount ? `${variant.redactionCount} redaction${variant.redactionCount === 1 ? "" : "s"}` : ""
+    ]
+      .filter(Boolean)
+      .join(" | ") || "Captured";
+
+    row.append(label, meta);
+    panel.append(row);
+  }
+
+  return panel;
+}
+
+function buildHistoryArtifactList(item) {
+  const downloads = Array.isArray(item.downloads) ? item.downloads : [];
+  const files = Array.isArray(item.files) ? item.files : [];
+
+  if (!downloads.length && !files.length) {
+    return null;
+  }
+
+  const panel = buildHistoryPanelShell("Artifacts");
+  const records = downloads.length
+    ? downloads
+    : files.map((filename) => ({
+        filename,
+        kind: filename.endsWith(".json") ? "manifest" : "image"
+      }));
+
+  for (const record of records.slice(0, 5)) {
+    const row = document.createElement("div");
+    row.className = "history-detail-row";
+
+    const label = document.createElement("strong");
+    label.textContent = titleCase(record.kind || "file");
+
+    const meta = document.createElement("span");
+    meta.textContent = [
+      record.variantId ? titleCase(record.variantId) : "",
+      record.bytesReceived ? formatBytes(record.bytesReceived) : "",
+      record.filename ? shortenPath(record.filename) : ""
+    ]
+      .filter(Boolean)
+      .join(" | ");
+
+    row.append(label, meta);
+    panel.append(row);
+  }
+
+  if (records.length > 5) {
+    const more = document.createElement("p");
+    more.className = "history-detail-note";
+    more.textContent = `${records.length - 5} more artifact${records.length - 5 === 1 ? "" : "s"} in the bundle.`;
+    panel.append(more);
+  }
+
+  return panel;
+}
+
+function buildHistorySignalPanel(item) {
+  const summary = item.blueprintSummary;
+
+  if (!summary?.siteType && !summary?.heroHeadline && !summary?.primaryCta) {
+    return null;
+  }
+
+  const parts = [
+    summary.siteType ? `Type: ${summary.siteType}` : "",
+    summary.heroHeadline ? `Hero: ${summary.heroHeadline}` : "",
+    summary.primaryCta ? `CTA: ${summary.primaryCta}` : ""
+  ].filter(Boolean);
+
+  return buildHistoryTextPanel("Page signals", parts.join(" | "));
+}
+
+function buildHistoryTextPanel(label, text) {
+  const panel = buildHistoryPanelShell(label);
+  const copy = document.createElement("p");
+  copy.className = "history-detail-note";
+  copy.textContent = text;
+  panel.append(copy);
+  return panel;
+}
+
+function buildHistoryPanelShell(label) {
+  const panel = document.createElement("div");
+  panel.className = "history-detail-panel";
+
+  const title = document.createElement("p");
+  title.className = "field-label";
+  title.textContent = label;
+  panel.append(title);
+
+  return panel;
 }
 
 function renderRedactionPreview(preview) {
@@ -1389,7 +1644,8 @@ function updateActionDisabledState() {
   }
 
   for (const button of ui.historyList.querySelectorAll("[data-history-action]")) {
-    button.disabled = actionBusy || button.dataset.downloadReady !== "true";
+    const requiresDownload = button.dataset.historyAction === "open" || button.dataset.historyAction === "show";
+    button.disabled = actionBusy || (requiresDownload && button.dataset.downloadReady !== "true");
   }
 }
 
@@ -1480,6 +1736,49 @@ function buildRedactionPreviewText(preview) {
   return `${total} region${total === 1 ? "" : "s"} found: ${autoCount} auto, ${manualCount} manual${kinds ? ` (${kinds})` : ""}.`;
 }
 
+function buildHistorySummaryText(item) {
+  const lines = [
+    "Lumen capture summary",
+    `Title: ${item.title || item.host || "Untitled capture"}`,
+    `URL: ${item.url || "Unknown"}`,
+    `Captured: ${formatTimestamp(item.capturedAt)}`,
+    `Views: ${item.variants?.length || 1}`,
+    `Files: ${item.files?.length || 0}`,
+    `Redactions: ${item.redactionCount || 0}`,
+    item.manualRedactionCount ? `Manual boxes: ${item.manualRedactionCount}` : "",
+    item.manifestFile ? `Manifest: ${item.manifestFile}` : "Manifest: not saved",
+    item.archiveFolder ? `Folder: ${item.archiveFolder}` : "",
+    item.blueprintSummary?.siteType ? `Page type: ${item.blueprintSummary.siteType}` : "",
+    item.blueprintSummary?.heroHeadline ? `Hero: ${item.blueprintSummary.heroHeadline}` : "",
+    item.blueprintSummary?.primaryCta ? `Primary CTA: ${item.blueprintSummary.primaryCta}` : "",
+    item.annotation?.text ? `Note: ${item.annotation.text}` : ""
+  ];
+
+  return lines.filter(Boolean).join("\n");
+}
+
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+
+  const copied = document.execCommand("copy");
+  textarea.remove();
+
+  if (!copied) {
+    throw new Error("Clipboard write was blocked.");
+  }
+}
+
 function formatRedactionKinds(byKind = {}) {
   return Object.entries(byKind)
     .filter(([, count]) => count > 0)
@@ -1512,6 +1811,30 @@ function formatManualProjectionStats(stats = {}) {
   }
 
   return parts.length ? `manual projection ${parts.join(", ")}` : "";
+}
+
+function formatBytes(value = 0) {
+  const bytes = Math.max(0, Number(value) || 0);
+
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${Math.round(bytes / 1024)} KB`;
+  }
+
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function shortenPath(value = "") {
+  const parts = String(value).split(/[\\/]+/).filter(Boolean);
+
+  if (parts.length <= 2) {
+    return value;
+  }
+
+  return `${parts.at(-2)}/${parts.at(-1)}`;
 }
 
 function titleCase(value = "") {

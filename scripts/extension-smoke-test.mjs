@@ -48,20 +48,47 @@ try {
         exportPreset: "raw",
         capturedAt: new Date().toISOString(),
         archiveFolder: "Lumen/2026-05-02/smoke-capture",
-        files: ["Lumen/2026-05-02/smoke-capture/smoke-desktop-raw.png"],
+        files: [
+          "Lumen/2026-05-02/smoke-capture/smoke-desktop-raw.png",
+          "Lumen/2026-05-02/smoke-capture/smoke-bundle-desktop-raw.json"
+        ],
         downloads: [
           {
             downloadId: 12345,
             filename: "Lumen/2026-05-02/smoke-capture/smoke-desktop-raw.png",
+            bytesReceived: 120000,
             kind: "image",
             variantId: "desktop"
+          },
+          {
+            downloadId: 12346,
+            filename: "Lumen/2026-05-02/smoke-capture/smoke-bundle-desktop-raw.json",
+            bytesReceived: 4200,
+            kind: "manifest"
           }
         ],
+        redactionCount: 3,
+        manualRedactionCount: 1,
+        manifestFile: "Lumen/2026-05-02/smoke-capture/smoke-bundle-desktop-raw.json",
+        annotation: {
+          text: "Smoke review note"
+        },
+        blueprintSummary: {
+          siteType: "Landing page",
+          heroHeadline: "Clean capture evidence",
+          primaryCta: "Start review"
+        },
         variants: [
           {
             id: "desktop",
             label: "Desktop",
-            files: ["Lumen/2026-05-02/smoke-capture/smoke-desktop-raw.png"]
+            files: ["Lumen/2026-05-02/smoke-capture/smoke-desktop-raw.png"],
+            fileCount: 1,
+            redactionCount: 3,
+            dimensions: {
+              width: 1280,
+              height: 2400
+            }
           }
         ]
       }
@@ -113,6 +140,9 @@ try {
     statusLogText: document.querySelector("#statusLog")?.textContent?.trim() || "",
     historyCount: document.querySelector("#historyCount")?.textContent?.trim() || "",
     historyPath: document.querySelector(".history-path")?.textContent?.trim() || "",
+    historyDetailOpen: Boolean(document.querySelector(".history-item.is-expanded .history-detail")),
+    historyDetailMetrics: [...document.querySelectorAll(".history-detail-metric strong")].map((node) => node.textContent?.trim()),
+    historyDetailPanels: [...document.querySelectorAll(".history-detail-panel .field-label")].map((node) => node.textContent?.trim()),
     historyActions: [...document.querySelectorAll("[data-history-action]")].map((button) => ({
       action: button.dataset.historyAction,
       captureId: button.dataset.captureId,
@@ -141,8 +171,13 @@ try {
   assert(popupState.statusLogText === "No active run yet.", "Status log did not initialize.", popupState);
   assert(popupState.historyCount === "1 item", "Seeded history count did not render.", popupState);
   assert(popupState.historyPath === "Lumen/2026-05-02/smoke-capture", "Archive folder did not render.", popupState);
+  assert(popupState.historyDetailOpen, "Latest history detail panel did not open.", popupState);
+  assert(popupState.historyDetailMetrics.includes("Saved"), "History detail manifest state did not render.", popupState);
+  assert(popupState.historyDetailPanels.includes("Capture views"), "History detail capture views did not render.", popupState);
+  assert(popupState.historyDetailPanels.includes("Artifacts"), "History detail artifacts did not render.", popupState);
+  assert(popupState.historyDetailPanels.includes("Page signals"), "History detail page signals did not render.", popupState);
   assert(
-    popupState.historyActions.length === 2 &&
+    popupState.historyActions.length === 4 &&
       popupState.historyActions.every((button) => button.captureId === seededCaptureId && !button.disabled),
     "History file actions did not render.",
     popupState
