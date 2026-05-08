@@ -5,47 +5,30 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
-const siteRoot = path.join(repoRoot, "docs");
-let server;
+const siteRoots = [
+  {
+    name: "docs artifact root",
+    root: path.join(repoRoot, "docs"),
+    legacyDocsMode: "redirect",
+    assetPath: "/assets/proof-social-card.png"
+  },
+  {
+    name: "repository root",
+    root: repoRoot,
+    legacyDocsMode: "landing",
+    assetPath: "/assets/proof-social-card.png"
+  }
+];
+const results = [];
 
 try {
-  const fixture = await startStaticServer();
-  server = fixture.server;
-
-  const root = await fetchText(`${fixture.origin}/`);
-  assert(root.status === 200, "Expected root route to load.", root);
-  assert(root.body.includes("Clean, responsive"), "Expected root route to serve the Lumen landing page.", {
-    sample: root.body.slice(0, 240)
-  });
-
-  const legacyDocs = await fetchText(`${fixture.origin}/docs/`);
-  assert(legacyDocs.status === 200, "Expected legacy docs route to load.", legacyDocs);
-  assert(legacyDocs.body.includes("Lumen moved to the root URL"), "Expected legacy docs route to explain the move.", {
-    sample: legacyDocs.body.slice(0, 240)
-  });
-  assert(legacyDocs.body.includes("url=../"), "Expected legacy docs route to redirect one level up.", {
-    sample: legacyDocs.body.slice(0, 240)
-  });
-
-  const notFound = await fetchText(`${fixture.origin}/missing-route`);
-  assert(notFound.status === 404, "Expected missing routes to use the deployed 404 page.", notFound);
-  assert(notFound.body.includes("/lumen-extension/"), "Expected 404 page to redirect to the public root URL.", {
-    sample: notFound.body.slice(0, 240)
-  });
-
-  const socialCard = await fetchBytes(`${fixture.origin}/assets/proof-social-card.png`);
-  assert(socialCard.status === 200, "Expected social image asset to load.", socialCard);
-  assert(socialCard.bytes > 1024, "Expected social image asset to contain data.", socialCard);
+  for (const target of siteRoots) {
+    results.push(await runRouteChecks(target));
+  }
 
   console.log(JSON.stringify({
     ok: true,
-    origin: fixture.origin,
-    checks: [
-      "/",
-      "/docs/",
-      "/missing-route",
-      "/assets/proof-social-card.png"
-    ]
+    results
   }, null, 2));
 } catch (error) {
   console.error(JSON.stringify({
@@ -54,16 +37,63 @@ try {
     details: error.details || null
   }, null, 2));
   process.exitCode = 1;
-} finally {
-  if (server) {
-    await new Promise((resolve) => server.close(resolve));
+}
+
+async function runRouteChecks(target) {
+  const fixture = await startStaticServer(target.root);
+
+  try {
+    const root = await fetchText(`${fixture.origin}/`);
+    assert(root.status === 200, `Expected ${target.name} root route to load.`, root);
+    assert(root.body.includes("Clean, responsive"), `Expected ${target.name} root route to serve the Lumen landing page.`, {
+      sample: root.body.slice(0, 240)
+    });
+
+    const legacyDocs = await fetchText(`${fixture.origin}/docs/`);
+    assert(legacyDocs.status === 200, `Expected ${target.name} legacy docs route to load.`, legacyDocs);
+
+    if (target.legacyDocsMode === "redirect") {
+      assert(legacyDocs.body.includes("Lumen moved to the root URL"), "Expected legacy docs route to explain the move.", {
+        sample: legacyDocs.body.slice(0, 240)
+      });
+      assert(legacyDocs.body.includes("url=../"), "Expected legacy docs route to redirect one level up.", {
+        sample: legacyDocs.body.slice(0, 240)
+      });
+    } else {
+      assert(legacyDocs.body.includes("Clean, responsive"), "Expected repository-root docs route to serve the landing page.", {
+        sample: legacyDocs.body.slice(0, 240)
+      });
+    }
+
+    const notFound = await fetchText(`${fixture.origin}/missing-route`);
+    assert(notFound.status === 404, `Expected ${target.name} missing routes to use the 404 page.`, notFound);
+    assert(notFound.body.includes("/lumen-extension/"), `Expected ${target.name} 404 page to redirect to the public root URL.`, {
+      sample: notFound.body.slice(0, 240)
+    });
+
+    const socialCard = await fetchBytes(`${fixture.origin}${target.assetPath}`);
+    assert(socialCard.status === 200, `Expected ${target.name} social image asset to load.`, socialCard);
+    assert(socialCard.bytes > 1024, `Expected ${target.name} social image asset to contain data.`, socialCard);
+
+    return {
+      name: target.name,
+      origin: fixture.origin,
+      checks: [
+        "/",
+        "/docs/",
+        "/missing-route",
+        target.assetPath
+      ]
+    };
+  } finally {
+    await new Promise((resolve) => fixture.server.close(resolve));
   }
 }
 
-async function startStaticServer() {
+async function startStaticServer(siteRoot) {
   const serverInstance = createServer(async (request, response) => {
     try {
-      const filePath = resolveFilePath(request.url || "/");
+      const filePath = resolveFilePath(request.url || "/", siteRoot);
 
       if (!filePath) {
         response.writeHead(403);
@@ -96,11 +126,12 @@ async function startStaticServer() {
 
   return {
     server: serverInstance,
-    origin: `http://127.0.0.1:${address.port}`
+    origin: `http://127.0.0.1:${address.port}`,
+    siteRoot
   };
 }
 
-function resolveFilePath(requestUrl) {
+function resolveFilePath(requestUrl, siteRoot) {
   const url = new URL(requestUrl, "http://127.0.0.1");
   const pathname = decodeURIComponent(url.pathname);
   const normalized = pathname === "/" ? "/index.html" : pathname;
