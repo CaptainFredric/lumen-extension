@@ -138,6 +138,8 @@ try {
     runViewSummary: document.querySelector("#runViewSummary")?.textContent?.trim() || "",
     runExportSummary: document.querySelector("#runExportSummary")?.textContent?.trim() || "",
     runSafetySummary: document.querySelector("#runSafetySummary")?.textContent?.trim() || "",
+    exportReviewHidden: document.querySelector("#exportReviewPanel")?.classList.contains("is-hidden") ?? false,
+    exportReviewConfirm: document.querySelector("#exportReviewConfirmButton")?.textContent?.trim() || "",
     timelineStepCount: document.querySelectorAll("[data-stage-step]").length,
     statusLogText: document.querySelector("#statusLog")?.textContent?.trim() || "",
     historyCount: document.querySelector("#historyCount")?.textContent?.trim() || "",
@@ -171,6 +173,8 @@ try {
   assert(popupState.runViewSummary === "Desktop", "Run view summary did not initialize.", popupState);
   assert(popupState.runExportSummary === "Raw", "Run export summary did not initialize.", popupState);
   assert(popupState.runSafetySummary.includes("Cleanup"), "Run safety summary did not initialize.", popupState);
+  assert(popupState.exportReviewHidden, "Export review screen should start hidden.", popupState);
+  assert(popupState.exportReviewConfirm === "Run export", "Export review confirmation action did not render.", popupState);
   assert(popupState.timelineStepCount === 6, "Capture timeline did not render.", popupState);
   assert(popupState.statusLogText === "No active run yet.", "Status log did not initialize.", popupState);
   assert(popupState.historyCount === "1 item", "Seeded history count did not render.", popupState);

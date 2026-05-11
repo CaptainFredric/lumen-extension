@@ -225,6 +225,47 @@
         </div>
       </section>
 
+      <section id="exportReviewPanel" class="panel export-review-panel is-hidden" aria-live="polite">
+        <div class="panel-head compact">
+          <div>
+            <p class="section-label">Pre-export Review</p>
+            <h2>Check redactions and cutaways before saving.</h2>
+          </div>
+          <span id="exportReviewBadge" class="status-badge">Review</span>
+        </div>
+
+        <p id="exportReviewSummary" class="review-summary">
+          Lumen will check the requested view set before export.
+        </p>
+
+        <div class="review-metric-grid" aria-label="Pre-export review metrics">
+          <div class="review-metric">
+            <span>Views</span>
+            <strong id="reviewViewCount">0</strong>
+          </div>
+          <div class="review-metric">
+            <span>Auto</span>
+            <strong id="reviewAutoCount">0</strong>
+          </div>
+          <div class="review-metric">
+            <span>Manual</span>
+            <strong id="reviewManualCount">0</strong>
+          </div>
+          <div class="review-metric">
+            <span>Cutaway</span>
+            <strong id="reviewCutawayCount">0</strong>
+          </div>
+        </div>
+
+        <div id="exportReviewVariants" class="review-variant-list"></div>
+        <div id="exportReviewWarnings" class="review-warning-list"></div>
+
+        <div class="review-actions">
+          <button id="exportReviewCancelButton" class="mini-action ghost-mini-action" type="button">Back to settings</button>
+          <button id="exportReviewConfirmButton" class="mini-action review-confirm-action" type="button">Run export</button>
+        </div>
+      </section>
+
       <section id="statusPanel" class="panel status-panel is-hidden" aria-live="polite">
         <div class="panel-head compact">
           <div>

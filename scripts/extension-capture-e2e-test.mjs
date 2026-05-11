@@ -75,6 +75,21 @@ try {
     exportPreset: "raw"
   };
 
+  const review = await popup.evaluate((captureOptions) =>
+    chrome.runtime.sendMessage({
+      type: "LUMEN_PREVIEW_EXPORT_REVIEW",
+      payload: {
+        options: captureOptions
+      }
+    }), options);
+
+  assert(review?.ok, "Pre-export review failed.", review);
+  assert(review.variantCount === expectedVariantCount, "Expected pre-export review to inspect the responsive set.", review);
+  assert(review.cutawayAppliedCount === expectedCutawayCount, "Expected pre-export review to resolve cutaways for each view.", review);
+  assert(review.autoRedactionCount >= expectedVariantCount * 3, "Expected pre-export review to scan sensitive regions.", review);
+  assert(review.variants?.every((variant) => variant.cutawayApplied), "Expected every reviewed variant to have a cutaway crop ready.", review.variants);
+  assert(review.warnings?.some((warning) => /reviewed before external sharing/i.test(warning)), "Expected redaction safety warning in pre-export review.", review.warnings);
+
   const response = await popup.evaluate((captureOptions) =>
     chrome.runtime.sendMessage({
       type: "LUMEN_START_CAPTURE",

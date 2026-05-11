@@ -294,6 +294,7 @@
                   <li>Popup redaction preview</li>
                   <li>Anchored manual redaction boxes</li>
                   <li>Cutaway region picker with focused export artifacts</li>
+                  <li>Pre-export review for manual projection and cutaway resolution</li>
                   <li>Anchored capture note</li>
                   <li>Signals extraction</li>
                   <li>Bundle manifest JSON sidecar with output health</li>
@@ -498,11 +499,11 @@
           </article>
 
           <article class="mechanic-row" data-reveal>
-            <strong>Cutaway region foundation</strong>
+            <strong>Cutaway export foundation</strong>
             <p>
               The popup can open a page overlay, let the user draw one focused region, and store
-              that region locally for the current URL. Export cropping and scheduled watch are the
-              next engineering layers.
+              that region locally for the current URL. Captures can export focused cutaway crops
+              when that region resolves. Scheduled watch remains a later opt-in layer.
             </p>
           </article>
 
@@ -610,6 +611,7 @@
               <li>Generate desktop, tablet, and mobile bundles in one run</li>
               <li>Preview and blur sensitive text and filled fields in exports</li>
               <li>Project anchored manual redaction boxes into responsive captures when the source element still resolves</li>
+              <li>Review auto-redaction counts, manual projection, and cutaway resolution before export</li>
               <li>Add one anchored capture note into the export</li>
               <li>Extract palette, font, hero, CTA, and navigation signals</li>
               <li>Store one cutaway region per URL and export focused cutaway PNGs when it resolves</li>
@@ -621,7 +623,7 @@
             <p class="support-label">Future direction</p>
             <h3>What still needs product work</h3>
             <ul class="scope-list">
-              <li>Freeform annotation tools and projected-box review tooling</li>
+              <li>Freeform annotation tools and visual pre-export box previews</li>
               <li>Explicit region watch controls with pause, retention, and review flow</li>
               <li>Agent handoff with redaction review before sending</li>
               <li>Cloud sync and team handoff workflows</li>
@@ -634,13 +636,13 @@
 
       <section class="cta-section" id="docs" data-reveal>
         <p class="kicker">Implemented now</p>
-        <h2>Lumen is early. The current build already handles cleanup, capture, redaction preview, manual boxes, cutaway export, anchored notes, signals, local run details, and a portable bundle manifest.</h2>
+        <h2>Lumen is early. The current build already handles cleanup, capture, redaction preview, manual boxes, pre-export review, cutaway export, anchored notes, signals, local run details, and a portable bundle manifest.</h2>
         <p>
           The repository already covers page cleanup, responsive capture bundles, redaction preview,
-          export redaction, anchored manual redaction boxes, focused cutaway PNGs, capture notes,
-          page-signal extraction, bundle metadata with output health, dated download folders, local
-          history actions, and copyable capture summaries. The next work is projected-box review
-          tooling, freeform annotation, sync, auth, and billing.
+          export redaction, anchored manual redaction boxes, pre-export projection review, focused
+          cutaway PNGs, capture notes, page-signal extraction, bundle metadata with output health,
+          dated download folders, local history actions, and copyable capture summaries. The next
+          work is visual box previews, freeform annotation, sync, auth, and billing.
         </p>
 
         <div class="cta-actions">

@@ -22,6 +22,7 @@ The product can become ambitious without changing the first wedge. The screensho
 6. Page-signal extraction for palette, typography, headline, CTA, navigation, and layout counts.
 7. Local history with run details, artifacts, copyable summaries, and file actions.
 8. Cutaway region picker that stores one reusable page area per URL and exports focused crops when the region resolves during capture.
+9. Pre-export review that checks auto-redaction, manual projection, and cutaway resolution across the requested view set.
 
 ## Near-Term Product Bets
 
@@ -79,7 +80,7 @@ The current extension should stay usable with `activeTab`, optional host access 
 
 ## Next Engineering Milestones
 
-1. Add a history detail row for cutaway artifacts.
-2. Add a review screen for manual redaction and cutaway projection before export.
+1. Add a more visual pre-export review with cutaway thumbnails and box previews.
+2. Add a history detail row for cutaway artifacts.
 3. Add one real annotation tool that works on exported images.
 4. Build store readiness checks: permission rationale, privacy text, listing screenshots, and automated zip validation.

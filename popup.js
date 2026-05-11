@@ -50,6 +50,17 @@ const ui = {
   runExportSummary: document.querySelector("#runExportSummary"),
   runSafetySummary: document.querySelector("#runSafetySummary"),
   runManifestSummary: document.querySelector("#runManifestSummary"),
+  exportReviewPanel: document.querySelector("#exportReviewPanel"),
+  exportReviewBadge: document.querySelector("#exportReviewBadge"),
+  exportReviewSummary: document.querySelector("#exportReviewSummary"),
+  reviewViewCount: document.querySelector("#reviewViewCount"),
+  reviewAutoCount: document.querySelector("#reviewAutoCount"),
+  reviewManualCount: document.querySelector("#reviewManualCount"),
+  reviewCutawayCount: document.querySelector("#reviewCutawayCount"),
+  exportReviewVariants: document.querySelector("#exportReviewVariants"),
+  exportReviewWarnings: document.querySelector("#exportReviewWarnings"),
+  exportReviewCancelButton: document.querySelector("#exportReviewCancelButton"),
+  exportReviewConfirmButton: document.querySelector("#exportReviewConfirmButton"),
   timelineSteps: [...document.querySelectorAll("[data-stage-step]")],
   statusLog: document.querySelector("#statusLog"),
   statusLogCount: document.querySelector("#statusLogCount"),
@@ -107,6 +118,7 @@ let launchActionsBlocked = false;
 let launchTargetTab = null;
 let latestHistoryItems = [];
 let expandedHistoryId = "";
+let exportReviewDecision = null;
 
 const TIMELINE_STAGES = [
   "prepare",
@@ -223,6 +235,8 @@ function bindEvents() {
   ui.captureButton.addEventListener("click", handleCaptureButtonClick);
   ui.analyzeButton.addEventListener("click", handleAnalyzeClick);
   ui.holdMenu.addEventListener("click", handleQuickActionClick);
+  ui.exportReviewCancelButton.addEventListener("click", () => settleExportReview(false));
+  ui.exportReviewConfirmButton.addEventListener("click", () => settleExportReview(true));
   document.addEventListener("keydown", handleDocumentKeyDown);
   document.addEventListener("pointerdown", handleOutsidePointerDown);
   ui.signInButton.addEventListener("click", handleSignIn);
@@ -469,6 +483,11 @@ function handleCaptureKeyDown(event) {
 
 function handleDocumentKeyDown(event) {
   if (event.key === "Escape") {
+    if (isExportReviewOpen()) {
+      settleExportReview(false);
+      return;
+    }
+
     closeHoldMenu();
   }
 }
@@ -563,8 +582,46 @@ async function handleCaptureClick() {
     return;
   }
 
-  setActionBusy(true);
   await persistCurrentSettings();
+
+  try {
+    if (!(await ensurePermissionsForCurrentCapture())) {
+      return;
+    }
+
+    const approved = await requestExportReviewBeforeCapture();
+
+    if (!approved) {
+      showStatus({
+        tone: "neutral",
+        stage: "inspect",
+        eyebrow: "Review",
+        title: "Export paused",
+        detail: "Adjust settings, redaction boxes, or cutaway region before starting the export again.",
+        badge: "Paused",
+        progress: 0.18
+      });
+      return;
+    }
+
+    await runApprovedCapture();
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      stage: "error",
+      eyebrow: "Error",
+      title: "Capture failed",
+      detail: error.message,
+      badge: "Failed",
+      progress: 0.12
+    });
+    setActionBusy(false);
+  }
+}
+
+async function runApprovedCapture() {
+  setActionBusy(true);
+  hideExportReview();
   statusEvents = [];
   renderRunSummary(currentSettings);
   renderTimeline("prepare");
@@ -575,16 +632,12 @@ async function handleCaptureClick() {
     stage: "prepare",
     eyebrow: "Capture",
     title: "Queueing capture",
-    detail: "Passing your capture and export settings into the pipeline.",
+    detail: "Passing the reviewed capture settings into the export pipeline.",
     badge: "Queued",
     progress: 0.05
   });
 
   try {
-    if (!(await ensurePermissionsForCurrentCapture())) {
-      return;
-    }
-
     const response = await chrome.runtime.sendMessage({
       type: "LUMEN_START_CAPTURE",
       payload: {
@@ -618,6 +671,65 @@ async function handleCaptureClick() {
   } finally {
     setActionBusy(false);
   }
+}
+
+async function requestExportReviewBeforeCapture() {
+  setActionBusy(true);
+  if (exportReviewDecision) {
+    settleExportReview(false);
+  }
+  hideExportReview();
+
+  showStatus({
+    tone: "neutral",
+    stage: "inspect",
+    eyebrow: "Review",
+    title: "Preparing export review",
+    detail: "Checking requested viewports for auto-redaction, manual box projection, and cutaway resolution before saving.",
+    badge: "Review",
+    progress: 0.16
+  });
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "LUMEN_PREVIEW_EXPORT_REVIEW",
+      payload: {
+        options: currentSettings
+      }
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error?.description || "Export review could not be prepared.");
+    }
+
+    renderExportReview(response);
+
+    showStatus({
+      tone: "neutral",
+      stage: "inspect",
+      eyebrow: "Review",
+      title: "Review before export",
+      detail: buildExportReviewStatusText(response),
+      badge: "Confirm",
+      progress: 0.24
+    });
+  } catch (error) {
+    hideExportReview();
+    showStatus({
+      tone: "error",
+      stage: "error",
+      eyebrow: "Review",
+      title: "Review failed",
+      detail: error.message,
+      badge: "Failed",
+      progress: 0.12
+    });
+    return false;
+  } finally {
+    setActionBusy(false);
+  }
+
+  return waitForExportReviewDecision();
 }
 
 async function handleAnalyzeClick() {
@@ -1543,6 +1655,123 @@ function renderRedactionPreview(preview) {
   ui.redactionPreviewSummary.textContent = buildRedactionPreviewText(preview);
 }
 
+function renderExportReview(review) {
+  ui.exportReviewPanel.classList.remove("is-hidden");
+  ui.exportReviewBadge.textContent = review.warnings?.length ? "Review" : "Ready";
+  ui.exportReviewSummary.textContent = [
+    `${review.variantCount || 1} view${review.variantCount === 1 ? "" : "s"} checked for ${review.page?.host || "this page"}.`,
+    `${review.redactionCount || 0} redaction check${review.redactionCount === 1 ? "" : "s"} ready before export.`
+  ].join(" ");
+  ui.reviewViewCount.textContent = String(review.variantCount || 1);
+  ui.reviewAutoCount.textContent = String(review.autoRedactionCount || 0);
+  ui.reviewManualCount.textContent = formatReviewManualMetric(review);
+  ui.reviewCutawayCount.textContent = formatReviewCutawayMetric(review);
+
+  renderExportReviewVariants(review.variants || []);
+  renderExportReviewWarnings(review.warnings || []);
+
+  window.requestAnimationFrame(() => {
+    ui.exportReviewConfirmButton.focus();
+  });
+}
+
+function renderExportReviewVariants(variants) {
+  ui.exportReviewVariants.replaceChildren();
+
+  if (!variants.length) {
+    const empty = document.createElement("p");
+    empty.className = "review-summary";
+    empty.textContent = "No view checks were returned.";
+    ui.exportReviewVariants.append(empty);
+    return;
+  }
+
+  for (const variant of variants) {
+    const row = document.createElement("div");
+    row.className = "review-variant-row";
+
+    const label = document.createElement("strong");
+    label.textContent = variant.label || titleCase(variant.id || "View");
+
+    const metrics = document.createElement("span");
+    metrics.textContent = [
+      variant.dimensions?.viewportWidth && variant.dimensions?.viewportHeight
+        ? `${variant.dimensions.viewportWidth}x${variant.dimensions.viewportHeight}`
+        : "",
+      `${variant.autoRedactionCount || 0} auto`,
+      formatReviewVariantManual(variant),
+      formatReviewVariantCutaway(variant)
+    ]
+      .filter(Boolean)
+      .join(" | ");
+
+    const detail = document.createElement("p");
+    detail.textContent = buildReviewVariantDetail(variant);
+
+    row.append(label, metrics, detail);
+    ui.exportReviewVariants.append(row);
+  }
+}
+
+function renderExportReviewWarnings(warnings) {
+  ui.exportReviewWarnings.replaceChildren();
+
+  if (!warnings.length) {
+    const item = document.createElement("div");
+    item.className = "review-warning-item";
+
+    const label = document.createElement("strong");
+    label.textContent = "No blocking issues found";
+
+    const copy = document.createElement("p");
+    copy.textContent = "Review the final artifact before external sharing, then continue when ready.";
+
+    item.append(label, copy);
+    ui.exportReviewWarnings.append(item);
+    return;
+  }
+
+  for (const warning of warnings) {
+    const item = document.createElement("div");
+    item.className = "review-warning-item";
+
+    const label = document.createElement("strong");
+    label.textContent = "Check before export";
+
+    const copy = document.createElement("p");
+    copy.textContent = warning;
+
+    item.append(label, copy);
+    ui.exportReviewWarnings.append(item);
+  }
+}
+
+function hideExportReview() {
+  ui.exportReviewPanel.classList.add("is-hidden");
+}
+
+function isExportReviewOpen() {
+  return !ui.exportReviewPanel.classList.contains("is-hidden");
+}
+
+function waitForExportReviewDecision() {
+  return new Promise((resolve) => {
+    exportReviewDecision = resolve;
+  });
+}
+
+function settleExportReview(approved) {
+  if (!exportReviewDecision) {
+    hideExportReview();
+    return;
+  }
+
+  const resolve = exportReviewDecision;
+  exportReviewDecision = null;
+  hideExportReview();
+  resolve(Boolean(approved));
+}
+
 function renderBlueprint(blueprint) {
   if (!blueprint) {
     ui.blueprintTimestamp.textContent = "No analysis yet";
@@ -1837,6 +2066,8 @@ function updateActionDisabledState() {
   ui.startCutawayPickerButton.disabled = disabled;
   ui.clearCutawayButton.disabled = disabled || !cutawayRegionRecord.region;
   ui.explainCutawayPlanButton.disabled = disabled;
+  ui.exportReviewCancelButton.disabled = actionBusy;
+  ui.exportReviewConfirmButton.disabled = actionBusy;
 
   for (const button of ui.holdMenuActions) {
     button.disabled = disabled;
@@ -1898,6 +2129,95 @@ function formatTimestamp(rawValue) {
     hour: "numeric",
     minute: "2-digit"
   }).format(date);
+}
+
+function buildExportReviewStatusText(review) {
+  const warnings = review.warnings?.length || 0;
+  const cutawayText = review.cutawayStored
+    ? `${review.cutawayAppliedCount || 0} cutaway view${review.cutawayAppliedCount === 1 ? "" : "s"} ready`
+    : "no cutaway selected";
+  const manualText = review.manualStoredCount
+    ? `${review.manualAppliedCount || 0} manual check${review.manualAppliedCount === 1 ? "" : "s"} ready`
+    : "no manual boxes selected";
+
+  return `${manualText}, ${cutawayText}. ${warnings ? `${warnings} review note${warnings === 1 ? "" : "s"} to check.` : "No blocking review notes."}`;
+}
+
+function formatReviewManualMetric(review) {
+  const storedCount = review.manualStoredCount || 0;
+
+  if (!storedCount) {
+    return "None";
+  }
+
+  return `${review.manualAppliedCount || 0}/${storedCount * Math.max(1, review.variantCount || 1)}`;
+}
+
+function formatReviewCutawayMetric(review) {
+  if (!review.cutawayStored) {
+    return "None";
+  }
+
+  return `${review.cutawayAppliedCount || 0}/${Math.max(1, review.variantCount || 1)}`;
+}
+
+function formatReviewVariantManual(variant) {
+  const storedCount = variant.manualStoredCount || 0;
+
+  if (!storedCount) {
+    return "manual none";
+  }
+
+  return `${variant.manualAppliedCount || 0}/${storedCount} manual`;
+}
+
+function formatReviewVariantCutaway(variant) {
+  if (!variant.cutawayStored) {
+    return "cutaway none";
+  }
+
+  if (!variant.cutawayApplied) {
+    return "cutaway skipped";
+  }
+
+  const projection = variant.cutawayRegion?.projection || "resolved";
+  return `cutaway ${projection}`;
+}
+
+function buildReviewVariantDetail(variant) {
+  const manualText = formatProjectionStats("manual", variant.manualProjectionStats);
+  const cutawayText = formatProjectionStats("cutaway", variant.cutawayResolutionStats);
+  const cutawaySize = variant.cutawayRegion?.width && variant.cutawayRegion?.height
+    ? ` Cutaway crop ${variant.cutawayRegion.width}x${variant.cutawayRegion.height}.`
+    : "";
+
+  return `${manualText || "No manual boxes for this view."} ${cutawayText || "No cutaway region for this view."}${cutawaySize}`;
+}
+
+function formatProjectionStats(label, stats = {}) {
+  const projectedCount = Number.isFinite(stats.projectedCount) ? Math.max(0, Math.round(stats.projectedCount)) : 0;
+  const directCount = Number.isFinite(stats.directCount) ? Math.max(0, Math.round(stats.directCount)) : 0;
+  const skippedCount = Number.isFinite(stats.skippedCount) ? Math.max(0, Math.round(stats.skippedCount)) : 0;
+  const appliedCount = Number.isFinite(stats.appliedCount) ? Math.max(0, Math.round(stats.appliedCount)) : projectedCount + directCount;
+  const parts = [];
+
+  if (!stats.storedCount) {
+    return "";
+  }
+
+  if (projectedCount) {
+    parts.push(`${projectedCount} projected`);
+  }
+
+  if (directCount) {
+    parts.push(`${directCount} direct`);
+  }
+
+  if (skippedCount) {
+    parts.push(`${skippedCount} skipped`);
+  }
+
+  return `${titleCase(label)}: ${appliedCount} applied${parts.length ? `, ${parts.join(", ")}` : ""}.`;
 }
 
 function buildCaptureSuccessMessage(response, settings) {

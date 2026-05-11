@@ -131,6 +131,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "LUMEN_PREVIEW_EXPORT_REVIEW") {
+    if (captureInFlight || analyzeInFlight) {
+      sendResponse({
+        ok: false,
+        error: createFriendlyError(
+          "Lumen Is Busy",
+          "Wait for the current capture or analysis to finish before preparing an export review."
+        )
+      });
+      return;
+    }
+
+    runExportReviewFlow(message.payload?.options)
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
   if (message?.type === "LUMEN_START_REDACTION_PICKER") {
     runManualRedactionPicker()
       .then((result) => sendResponse({ ok: true, ...result }))
@@ -508,6 +527,181 @@ async function runRedactionPreviewFlow() {
     redactionBreakdown: combinedBreakdown,
     scope: "current DOM"
   };
+}
+
+async function runExportReviewFlow(options = getDefaultSettings()) {
+  const sourceTab = await getCurrentTab();
+
+  if (!sourceTab?.id || !sourceTab.url) {
+    throw createFriendlyError(
+      "No Active Page",
+      "Open a normal browser tab, then prepare the export review again."
+    );
+  }
+
+  if (isRestrictedCaptureUrl(sourceTab.url)) {
+    throw createFriendlyError(
+      "This Page Cannot Be Reviewed",
+      "Chrome blocks script injection on internal and protected pages."
+    );
+  }
+
+  const variants = getCaptureVariants(options.devicePreset);
+  const [manualRedactions, cutawayRegion] = await Promise.all([
+    getManualRedactionsForTab(sourceTab),
+    getCutawayRegionForTab(sourceTab)
+  ]);
+  const variantReviews = [];
+
+  for (const variant of variants) {
+    const target = await createCaptureTarget(sourceTab, variant);
+
+    try {
+      await ensureContentScript(target.tab.id);
+
+      const page = await requestPreparedPageMetrics(target.tab.id);
+      const [autoScan, manualResolution, cutawayResolution] = await Promise.all([
+        options.autoRedact ? requestRedactionScan(target.tab.id) : Promise.resolve({
+          regions: [],
+          breakdown: buildRedactionBreakdown([])
+        }),
+        resolveManualRedactionsForTarget(target.tab.id, manualRedactions, page),
+        resolveCutawayRegionForTarget(target.tab.id, cutawayRegion, page)
+      ]);
+
+      variantReviews.push(buildExportReviewVariant({
+        variant,
+        page,
+        autoScan,
+        manualResolution,
+        cutawayResolution,
+        manualRedactions,
+        cutawayRegion
+      }));
+    } finally {
+      if (target.kind === "viewport") {
+        await closeWindowSafely(target.windowId);
+      }
+    }
+  }
+
+  const manualProjectionStats = mergeManualProjectionStats(variantReviews.map((variant) => variant.manualProjectionStats));
+  const cutawayResolutionStats = mergeCutawayResolutionStats(variantReviews.map((variant) => variant.cutawayResolutionStats));
+  const redactionBreakdown = mergeRedactionBreakdowns(variantReviews.map((variant) => variant.redactionBreakdown));
+  const autoRedactionCount = variantReviews.reduce((sum, variant) => sum + variant.autoRedactionCount, 0);
+  const manualAppliedCount = variantReviews.reduce((sum, variant) => sum + variant.manualAppliedCount, 0);
+  const cutawayAppliedCount = variantReviews.reduce((sum, variant) => sum + (variant.cutawayApplied ? 1 : 0), 0);
+  const warnings = buildExportReviewWarnings({
+    options,
+    variants,
+    manualRedactions,
+    cutawayRegion,
+    manualProjectionStats,
+    cutawayResolutionStats
+  });
+
+  return {
+    page: {
+      title: sourceTab.title || "",
+      url: sourceTab.url,
+      host: new URL(sourceTab.url).host
+    },
+    options: {
+      devicePreset: options.devicePreset || "desktop",
+      exportPreset: options.exportPreset || "raw",
+      autoRedact: Boolean(options.autoRedact),
+      exportManifest: options.exportManifest !== false
+    },
+    variants: variantReviews,
+    variantCount: variants.length,
+    autoRedactionCount,
+    manualStoredCount: manualRedactions.regions?.length || 0,
+    manualAppliedCount,
+    manualProjectionStats,
+    cutawayStored: Boolean(cutawayRegion.region),
+    cutawayAppliedCount,
+    cutawayResolutionStats,
+    redactionCount: autoRedactionCount + manualAppliedCount,
+    redactionBreakdown,
+    warnings
+  };
+}
+
+function buildExportReviewVariant({
+  variant,
+  page,
+  autoScan,
+  manualResolution,
+  cutawayResolution,
+  manualRedactions,
+  cutawayRegion
+}) {
+  const manualProjectionStats = manualResolution.stats || buildManualProjectionStats();
+  const cutawayResolutionStats = cutawayResolution.stats || buildCutawayResolutionStats();
+
+  return {
+    id: variant.id,
+    label: variant.label,
+    dimensions: {
+      viewportWidth: page.viewportWidth,
+      viewportHeight: page.viewportHeight,
+      pageHeight: page.pageHeight
+    },
+    autoRedactionCount: autoScan.regions?.length || 0,
+    manualStoredCount: manualRedactions.regions?.length || 0,
+    manualAppliedCount: manualResolution.regions?.length || 0,
+    manualProjectionStats,
+    cutawayStored: Boolean(cutawayRegion.region),
+    cutawayApplied: Boolean(cutawayResolution.region),
+    cutawayRegion: cutawayResolution.region
+      ? {
+          left: cutawayResolution.region.left,
+          top: cutawayResolution.region.top,
+          width: cutawayResolution.region.width,
+          height: cutawayResolution.region.height,
+          projection: cutawayResolution.region.projection || ""
+        }
+      : null,
+    cutawayResolutionStats,
+    redactionBreakdown: mergeRedactionBreakdowns([
+      autoScan.breakdown || buildRedactionBreakdown(autoScan.regions || []),
+      buildRedactionBreakdown(manualResolution.regions || [])
+    ])
+  };
+}
+
+function buildExportReviewWarnings({
+  options,
+  variants,
+  manualRedactions,
+  cutawayRegion,
+  manualProjectionStats,
+  cutawayResolutionStats
+}) {
+  const warnings = [];
+  const manualCount = manualRedactions.regions?.length || 0;
+
+  if (!options.autoRedact && !manualCount) {
+    warnings.push("No redaction layer is enabled for this export.");
+  }
+
+  if (options.autoRedact) {
+    warnings.push("Current redaction covers visible text and filled inputs during export and should be reviewed before external sharing.");
+  }
+
+  if (manualProjectionStats.skippedCount) {
+    warnings.push(`${manualProjectionStats.skippedCount} manual box check${manualProjectionStats.skippedCount === 1 ? "" : "s"} did not resolve in the requested view set.`);
+  }
+
+  if (cutawayRegion.region && cutawayResolutionStats.skippedCount) {
+    warnings.push(`${cutawayResolutionStats.skippedCount} cutaway check${cutawayResolutionStats.skippedCount === 1 ? "" : "s"} did not resolve in the requested view set.`);
+  }
+
+  if ((manualCount || cutawayRegion.region) && variants.length > 1) {
+    warnings.push("Responsive projection is checked per viewport before export. The final manifest records the capture-time result for each view.");
+  }
+
+  return warnings;
 }
 
 async function runHistoryDownloadAction(payload = {}, action = "show") {

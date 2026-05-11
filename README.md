@@ -25,15 +25,16 @@ The current build includes:
 7. redaction preview from the popup before export
 8. anchored manual redaction boxes for areas the scanner cannot infer, with projection into responsive captures when the source element still resolves
 9. a cutaway region picker that stores one reusable page area per URL and exports focused cutaway crops when that region resolves during capture
-10. anchored capture notes rendered into the exported image
-11. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
-12. bundle-manifest JSON exports with view, redaction, manual projection, cutaway, signal, output health, and note metadata
-13. dated per-run download folders so capture sets, tiles, and manifests stay together
-14. local capture history with file, folder, summary, and Chrome download-handle metadata
-15. popup history actions to open the latest artifact or reveal it in the Downloads folder
-16. capture-time popup UI with run settings, cutaway state, a live stage timeline, and recent status log
-17. a local backend slice for demo session state and history sync when an API is reachable
-18. a GitHub Pages landing site in `docs/`
+10. a pre-export review screen that checks auto-redactions, manual projection, and cutaway resolution across the requested view set before saving
+11. anchored capture notes rendered into the exported image
+12. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
+13. bundle-manifest JSON exports with view, redaction, manual projection, cutaway, signal, output health, and note metadata
+14. dated per-run download folders so capture sets, tiles, and manifests stay together
+15. local capture history with file, folder, summary, and Chrome download-handle metadata
+16. popup history actions to open the latest artifact or reveal it in the Downloads folder
+17. capture-time popup UI with run settings, cutaway state, a live stage timeline, and recent status log
+18. a local backend slice for demo session state and history sync when an API is reachable
+19. a GitHub Pages landing site in `docs/`
 
 ## Current Limits
 
@@ -121,8 +122,9 @@ The public landing page will be available at `http://127.0.0.1:3000/`.
 8. Use `Mark boxes` if you need manual redactions before capture
 9. Use `Mark cutaway` to store one reusable page region; the next capture exports cutaway PNGs for views where the region resolves
 10. Use `Open` or `Show in folder` from recent captures to get back to the saved artifact
-11. Expand recent capture details to review views, artifacts, redactions, manifest status, notes, and page signals
-12. Copy a capture summary when you need to paste evidence into a review note or bug report
+11. When the pre-export review appears, check auto-redaction counts, manual projection status, cutaway status, and warnings, then click `Run export`
+12. Expand recent capture details to review views, artifacts, redactions, manifest status, notes, and page signals
+13. Copy a capture summary when you need to paste evidence into a review note or bug report
 
 If the launch indicator says the page is blocked, switch to a normal `http://` or `https://` page. Chrome does not allow extension capture scripts on internal browser pages, Web Store pages, or other extension pages.
 
@@ -231,6 +233,6 @@ See `STORE_READINESS.md` for the current submission checklist, permission ration
 The highest-leverage next steps are:
 
 1. improve capture reliability on difficult real-world sites
-2. improve cross-layout review for projected manual redactions and cutaway regions
+2. make the pre-export review more visual with cutaway thumbnails and box previews
 3. add a small cutaway preview and artifact filter in the popup history detail
 4. tighten the backend from demo session state into a real account path
