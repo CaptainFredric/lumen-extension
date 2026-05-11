@@ -581,6 +581,7 @@ async function main() {
       ],
       hiddenCount: desktopRun.prepareResult.page.hiddenCount,
       redactionCount: desktopRun.redactions.count,
+      redactionBreakdown: desktopRun.redactions.breakdown || buildRedactionBreakdown(desktopRun.redactions.regions),
       navLabelCount: desktopRun.blueprint.identity?.navLabels?.length || 0,
       blueprint: desktopRun.blueprint,
       historyItem
@@ -1130,7 +1131,8 @@ function buildBundleManifest(desktopRun) {
       devicePreset: "responsive",
       exportPreset: "raw",
       responsiveViews: 3,
-      redactionCount: desktopRun.redactions.count
+      redactionCount: desktopRun.redactions.count,
+      redactionBreakdown: desktopRun.redactions.breakdown || buildRedactionBreakdown(desktopRun.redactions.regions)
     },
     files: [
       OUTPUT_FILES.desktop,
@@ -1146,6 +1148,18 @@ function buildBundleManifest(desktopRun) {
       typography: desktopRun.blueprint.typography?.families || []
     }
   };
+}
+
+function buildRedactionBreakdown(regions = []) {
+  return regions.reduce((breakdown, region) => {
+    const kind = region.kind || "sensitive";
+    breakdown.total += 1;
+    breakdown.byKind[kind] = (breakdown.byKind[kind] || 0) + 1;
+    return breakdown;
+  }, {
+    total: 0,
+    byKind: {}
+  });
 }
 
 async function openProofPage(browser, contentScript, device) {

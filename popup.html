@@ -39,11 +39,62 @@
         </div>
       </header>
 
+      <section id="launchPanel" class="panel launch-panel" aria-label="Launch capture">
+        <div id="launchStatus" class="launch-status" data-state="checking">
+          <span class="ready-orb" aria-hidden="true"></span>
+          <div>
+            <strong id="launchStatusTitle">Checking current tab</strong>
+            <small id="launchStatusDetail">Lumen is reading the active page context.</small>
+          </div>
+        </div>
+
+        <div class="launch-grid">
+          <button
+            id="captureButton"
+            class="capture-button"
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded="false"
+            aria-controls="holdMenu"
+          >
+            <span>
+              <strong>Capture page</strong>
+              <small>Full page capture. Hold for actions.</small>
+            </span>
+            <span id="holdProgress" class="hold-progress" aria-hidden="true"></span>
+          </button>
+
+          <button id="analyzeButton" class="secondary-action" type="button">
+            <span>Analyze Page</span>
+            <small>Signals only</small>
+          </button>
+        </div>
+
+        <div id="holdMenu" class="hold-menu" role="menu" aria-label="Quick capture actions" aria-hidden="true">
+          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="responsive">
+            <span>Responsive set</span>
+            <small>Desktop, tablet, and mobile</small>
+          </button>
+          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="redact">
+            <span>Scan redactions</span>
+            <small>Preview sensitive regions</small>
+          </button>
+          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="mark">
+            <span>Mark boxes</span>
+            <small>Open manual picker</small>
+          </button>
+          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="analyze">
+            <span>Extract signals</span>
+            <small>Palette, type, layout</small>
+          </button>
+        </div>
+      </section>
+
       <section class="panel controls-panel">
         <div class="panel-head">
           <div>
-            <p class="section-label">Capture Engine</p>
-            <h2>Full-page controls</h2>
+            <p class="section-label">Capture Settings</p>
+            <h2>Defaults for the next run</h2>
           </div>
           <span class="tiny-note">Downloads to Lumen/</span>
         </div>
@@ -74,6 +125,20 @@
           <input id="autoRedact" type="checkbox" />
           <span class="toggle-shell"><span class="toggle-knob"></span></span>
         </label>
+
+        <div class="manual-redaction-panel">
+          <div class="manual-redaction-copy">
+            <strong>Manual redaction boxes</strong>
+            <small>Mark areas the scanner cannot infer. Boxes are anchored to the source element and can project into responsive captures when that element still resolves.</small>
+          </div>
+          <div class="manual-redaction-actions">
+            <span id="manualRedactionCount" class="tiny-note">0 boxes</span>
+            <button id="previewRedactionsButton" class="mini-action ghost-mini-action" type="button">Scan</button>
+            <button id="startRedactionPickerButton" class="mini-action" type="button">Mark boxes</button>
+            <button id="clearManualRedactionsButton" class="mini-action ghost-mini-action" type="button">Clear</button>
+          </div>
+          <p id="redactionPreviewSummary" class="redaction-preview-summary">Scan the current page before export to see detected sensitive regions.</p>
+        </div>
 
         <label class="toggle-row">
           <span>
@@ -140,15 +205,6 @@
             <button type="button" class="segment" data-export="phone">Phone</button>
           </div>
         </div>
-
-        <div class="action-row">
-          <button id="captureButton" class="capture-button" type="button">
-            Capture Full Page
-          </button>
-          <button id="analyzeButton" class="secondary-action" type="button">
-            Analyze Page
-          </button>
-        </div>
       </section>
 
       <section id="statusPanel" class="panel status-panel is-hidden" aria-live="polite">
@@ -164,6 +220,68 @@
 
         <div class="progress-track">
           <div id="progressFill" class="progress-fill"></div>
+        </div>
+
+        <div class="run-summary-grid" aria-label="Current capture settings">
+          <div class="run-summary-item">
+            <span>Views</span>
+            <strong id="runViewSummary">Desktop</strong>
+          </div>
+          <div class="run-summary-item">
+            <span>Export</span>
+            <strong id="runExportSummary">Raw</strong>
+          </div>
+          <div class="run-summary-item">
+            <span>Safety</span>
+            <strong id="runSafetySummary">Cleanup</strong>
+          </div>
+          <div class="run-summary-item">
+            <span>Sidecar</span>
+            <strong id="runManifestSummary">Manifest</strong>
+          </div>
+        </div>
+
+        <div id="captureTimeline" class="capture-timeline" aria-label="Capture progress timeline">
+          <div class="timeline-step" data-stage-step="prepare">
+            <span class="step-dot"></span>
+            <span>Prepare</span>
+            <small>Clean page and hydrate media</small>
+          </div>
+          <div class="timeline-step" data-stage-step="inspect">
+            <span class="step-dot"></span>
+            <span>Inspect</span>
+            <small>Read signals and page context</small>
+          </div>
+          <div class="timeline-step" data-stage-step="sanitize">
+            <span class="step-dot"></span>
+            <span>Sanitize</span>
+            <small>Apply auto and manual redactions</small>
+          </div>
+          <div class="timeline-step" data-stage-step="capture">
+            <span class="step-dot"></span>
+            <span>Capture</span>
+            <small>Scroll and grab slices</small>
+          </div>
+          <div class="timeline-step" data-stage-step="stitch">
+            <span class="step-dot"></span>
+            <span>Stitch</span>
+            <small>Compose final artifact</small>
+          </div>
+          <div class="timeline-step" data-stage-step="save">
+            <span class="step-dot"></span>
+            <span>Save</span>
+            <small>Write files and history</small>
+          </div>
+        </div>
+
+        <div class="status-log-shell">
+          <div class="status-log-head">
+            <span>Live log</span>
+            <strong id="statusLogCount">0</strong>
+          </div>
+          <div id="statusLog" class="status-log">
+            <p>No active run yet.</p>
+          </div>
         </div>
       </section>
 

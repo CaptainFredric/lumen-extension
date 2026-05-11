@@ -11,11 +11,22 @@ import {
 } from "./config.js";
 
 const ui = {
+  launchPanel: document.querySelector("#launchPanel"),
+  launchStatus: document.querySelector("#launchStatus"),
+  launchStatusTitle: document.querySelector("#launchStatusTitle"),
+  launchStatusDetail: document.querySelector("#launchStatusDetail"),
   captureButton: document.querySelector("#captureButton"),
   analyzeButton: document.querySelector("#analyzeButton"),
+  holdMenu: document.querySelector("#holdMenu"),
+  holdMenuActions: [...document.querySelectorAll("[data-quick-action]")],
   removeStickyHeaders: document.querySelector("#removeStickyHeaders"),
   forceLazyLoad: document.querySelector("#forceLazyLoad"),
   autoRedact: document.querySelector("#autoRedact"),
+  manualRedactionCount: document.querySelector("#manualRedactionCount"),
+  previewRedactionsButton: document.querySelector("#previewRedactionsButton"),
+  startRedactionPickerButton: document.querySelector("#startRedactionPickerButton"),
+  clearManualRedactionsButton: document.querySelector("#clearManualRedactionsButton"),
+  redactionPreviewSummary: document.querySelector("#redactionPreviewSummary"),
   exportManifest: document.querySelector("#exportManifest"),
   annotationEnabled: document.querySelector("#annotationEnabled"),
   annotationBlock: document.querySelector("#annotationBlock"),
@@ -30,6 +41,13 @@ const ui = {
   statusDetail: document.querySelector("#statusDetail"),
   statusBadge: document.querySelector("#statusBadge"),
   progressFill: document.querySelector("#progressFill"),
+  runViewSummary: document.querySelector("#runViewSummary"),
+  runExportSummary: document.querySelector("#runExportSummary"),
+  runSafetySummary: document.querySelector("#runSafetySummary"),
+  runManifestSummary: document.querySelector("#runManifestSummary"),
+  timelineSteps: [...document.querySelectorAll("[data-stage-step]")],
+  statusLog: document.querySelector("#statusLog"),
+  statusLogCount: document.querySelector("#statusLogCount"),
   signInButton: document.querySelector("#signInButton"),
   signOutButton: document.querySelector("#signOutButton"),
   billingButton: document.querySelector("#billingButton"),
@@ -70,6 +88,27 @@ let currentSession = {
   source: "local",
   backendReachable: false
 };
+let manualRedactionRecord = {
+  regions: []
+};
+let statusEvents = [];
+let holdTimer = null;
+let suppressNextCaptureClick = false;
+let launchActionsBlocked = false;
+let launchTargetTab = null;
+let latestHistoryItems = [];
+let expandedHistoryId = "";
+
+const TIMELINE_STAGES = [
+  "prepare",
+  "inspect",
+  "sanitize",
+  "capture",
+  "stitch",
+  "save"
+];
+const HOLD_TO_OPEN_MS = 520;
+const COLLAPSED_HISTORY_ID = "__collapsed__";
 
 bootstrap().catch((error) => {
   showStatus({
@@ -88,6 +127,7 @@ chrome.runtime.onMessage.addListener((message) => {
 
     showStatus({
       tone: payload.stage === "done" ? "success" : "neutral",
+      stage: payload.stage,
       eyebrow: stageToEyebrow(payload.stage),
       title: payload.title || "Working",
       detail: payload.detail || "",
@@ -107,6 +147,10 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "LUMEN_HISTORY_UPDATED") {
     renderHistory(message.payload || []);
   }
+
+  if (message?.type === "LUMEN_MANUAL_REDACTIONS_UPDATED") {
+    renderManualRedactions(message.payload);
+  }
 });
 
 async function bootstrap() {
@@ -114,6 +158,7 @@ async function bootstrap() {
   await restoreSettings();
   bindEvents();
   await restoreAppState();
+  await refreshLaunchStatus();
 }
 
 function bindEvents() {
@@ -126,6 +171,9 @@ function bindEvents() {
     persistCurrentSettings();
   });
   ui.annotationText.addEventListener("input", persistCurrentSettings);
+  ui.previewRedactionsButton.addEventListener("click", handlePreviewRedactions);
+  ui.startRedactionPickerButton.addEventListener("click", handleStartRedactionPicker);
+  ui.clearManualRedactionsButton.addEventListener("click", handleClearManualRedactions);
 
   for (const button of ui.deviceButtons) {
     button.addEventListener("click", () => {
@@ -151,11 +199,20 @@ function bindEvents() {
     });
   }
 
-  ui.captureButton.addEventListener("click", handleCaptureClick);
+  ui.captureButton.addEventListener("pointerdown", handleCapturePointerDown);
+  ui.captureButton.addEventListener("pointerup", handleCapturePointerUp);
+  ui.captureButton.addEventListener("pointerleave", handleCapturePointerCancel);
+  ui.captureButton.addEventListener("pointercancel", handleCapturePointerCancel);
+  ui.captureButton.addEventListener("keydown", handleCaptureKeyDown);
+  ui.captureButton.addEventListener("click", handleCaptureButtonClick);
   ui.analyzeButton.addEventListener("click", handleAnalyzeClick);
+  ui.holdMenu.addEventListener("click", handleQuickActionClick);
+  document.addEventListener("keydown", handleDocumentKeyDown);
+  document.addEventListener("pointerdown", handleOutsidePointerDown);
   ui.signInButton.addEventListener("click", handleSignIn);
   ui.signOutButton.addEventListener("click", handleSignOut);
   ui.billingButton.addEventListener("click", handleBillingClick);
+  ui.historyList.addEventListener("click", handleHistoryAction);
 }
 
 async function restoreSettings() {
@@ -179,6 +236,9 @@ async function restoreSettings() {
   updateDeviceButtons();
   updateExportButtons();
   updateAnnotationControls();
+  renderRunSummary(currentSettings);
+  renderTimeline("idle");
+  renderStatusLog();
 }
 
 async function restoreAppState() {
@@ -190,12 +250,68 @@ async function restoreAppState() {
     renderBlueprint(null);
     renderHistory([]);
     renderSession(currentSession);
+    await refreshManualRedactions();
     return;
   }
 
   renderBlueprint(response.latestBlueprint);
   renderHistory(response.captureHistory || []);
   renderSession(response.session || currentSession);
+  await refreshManualRedactions();
+}
+
+async function resolveActionTargetTab() {
+  const tabs = await chrome.tabs.query({
+    currentWindow: true
+  });
+  const activeTab = tabs.find((tab) => tab.active);
+
+  if (activeTab?.url && isOriginPermissionSupported(activeTab.url)) {
+    return activeTab;
+  }
+
+  return tabs
+    .filter((tab) => tab?.url && isOriginPermissionSupported(tab.url))
+    .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))[0] || null;
+}
+
+async function ensureActionTargetReady(actionLabel = "run this action") {
+  const tab = await resolveActionTargetTab();
+
+  if (!tab) {
+    renderLaunchStatus({
+      state: "blocked",
+      title: "Open a normal web page first",
+      detail: "Lumen cannot run capture actions on Chrome, extension, or internal browser pages.",
+      actionsBlocked: true
+    });
+    showStatus({
+      tone: "error",
+      eyebrow: "Blocked",
+      title: "No capturable page",
+      detail: `Open an http or https page before asking Lumen to ${actionLabel}.`,
+      badge: "Blocked",
+      progress: 0.08
+    });
+    return null;
+  }
+
+  launchTargetTab = tab;
+
+  if (!tab.active && Number.isInteger(tab.id)) {
+    await chrome.tabs.update(tab.id, {
+      active: true
+    });
+  }
+
+  renderLaunchStatus({
+    state: "ready",
+    title: `${formatTabHost(tab.url)} ready`,
+    detail: "Target tab selected for the next Lumen action.",
+    actionsBlocked: false
+  });
+
+  return tab;
 }
 
 async function persistCurrentSettings() {
@@ -218,6 +334,7 @@ async function persistCurrentSettings() {
   ui.annotationEnabled.checked = captureNote.enabled;
   updateAnnotationCounter();
   updateAnnotationControls();
+  renderRunSummary(currentSettings);
 
   await chrome.storage.sync.set({
     [STORAGE_KEYS.settings]: currentSettings
@@ -271,16 +388,168 @@ function applyProGates() {
   }
 }
 
+function handleCaptureButtonClick(event) {
+  if (suppressNextCaptureClick) {
+    event.preventDefault();
+    suppressNextCaptureClick = false;
+    return;
+  }
+
+  closeHoldMenu();
+  handleCaptureClick();
+}
+
+function handleCapturePointerDown(event) {
+  if (event.button !== 0 || actionBusy || ui.captureButton.disabled) {
+    return;
+  }
+
+  clearHoldTimer();
+  ui.captureButton.classList.add("is-holding");
+  try {
+    ui.captureButton.setPointerCapture?.(event.pointerId);
+  } catch {
+    // Synthetic smoke-test pointer events do not always create an active pointer.
+  }
+
+  holdTimer = window.setTimeout(() => {
+    suppressNextCaptureClick = true;
+    openHoldMenu("hold");
+  }, HOLD_TO_OPEN_MS);
+}
+
+function handleCapturePointerUp(event) {
+  clearHoldTimer();
+  ui.captureButton.classList.remove("is-holding");
+  try {
+    ui.captureButton.releasePointerCapture?.(event.pointerId);
+  } catch {
+    // Safe to ignore when the pointer was not captured.
+  }
+}
+
+function handleCapturePointerCancel(event) {
+  clearHoldTimer();
+  ui.captureButton.classList.remove("is-holding");
+  try {
+    ui.captureButton.releasePointerCapture?.(event.pointerId);
+  } catch {
+    // Safe to ignore when the pointer was not captured.
+  }
+}
+
+function handleCaptureKeyDown(event) {
+  if ((event.key === "ArrowDown" || event.key === "Menu") && !actionBusy) {
+    event.preventDefault();
+    openHoldMenu("keyboard");
+  }
+
+  if (event.key === "Escape") {
+    closeHoldMenu();
+  }
+}
+
+function handleDocumentKeyDown(event) {
+  if (event.key === "Escape") {
+    closeHoldMenu();
+  }
+}
+
+function handleOutsidePointerDown(event) {
+  if (!ui.launchPanel.contains(event.target)) {
+    closeHoldMenu();
+  }
+}
+
+async function handleQuickActionClick(event) {
+  const button = event.target.closest("[data-quick-action]");
+
+  if (!button || actionBusy) {
+    return;
+  }
+
+  await runQuickAction(button.dataset.quickAction);
+}
+
+async function runQuickAction(action) {
+  closeHoldMenu();
+
+  if (action === "responsive") {
+    currentSettings.devicePreset = "responsive";
+    updateDeviceButtons();
+    await persistCurrentSettings();
+    await handleCaptureClick();
+    return;
+  }
+
+  if (action === "redact") {
+    await handlePreviewRedactions();
+    return;
+  }
+
+  if (action === "mark") {
+    await handleStartRedactionPicker();
+    return;
+  }
+
+  if (action === "analyze") {
+    await handleAnalyzeClick();
+  }
+}
+
+function openHoldMenu(source = "hold") {
+  if (launchActionsBlocked) {
+    return;
+  }
+
+  clearHoldTimer();
+  ui.captureButton.classList.remove("is-holding");
+  ui.launchPanel.classList.add("is-menu-open");
+  ui.holdMenu.setAttribute("aria-hidden", "false");
+  ui.captureButton.setAttribute("aria-expanded", "true");
+  renderLaunchStatus({
+    state: "ready",
+    title: source === "keyboard" ? "Quick actions open" : "Hold menu ready",
+    detail: "Choose a capture action without digging through settings."
+  });
+}
+
+function closeHoldMenu() {
+  clearHoldTimer();
+  ui.captureButton.classList.remove("is-holding");
+  ui.launchPanel.classList.remove("is-menu-open");
+  ui.holdMenu.setAttribute("aria-hidden", "true");
+  ui.captureButton.setAttribute("aria-expanded", "false");
+}
+
+function clearHoldTimer() {
+  if (!holdTimer) {
+    return;
+  }
+
+  window.clearTimeout(holdTimer);
+  holdTimer = null;
+}
+
 async function handleCaptureClick() {
   if (actionBusy) {
     return;
   }
 
+  if (!(await ensureActionTargetReady("capture the page"))) {
+    return;
+  }
+
   setActionBusy(true);
   await persistCurrentSettings();
+  statusEvents = [];
+  renderRunSummary(currentSettings);
+  renderTimeline("prepare");
+  renderStatusLog();
 
   showStatus({
     tone: "neutral",
+    stage: "prepare",
     eyebrow: "Capture",
     title: "Queueing capture",
     detail: "Passing your capture and export settings into the pipeline.",
@@ -306,6 +575,7 @@ async function handleCaptureClick() {
 
     showStatus({
       tone: "success",
+      stage: "done",
       eyebrow: "Saved",
       title: "Capture complete",
       detail: buildCaptureSuccessMessage(response, currentSettings),
@@ -315,6 +585,7 @@ async function handleCaptureClick() {
   } catch (error) {
     showStatus({
       tone: "error",
+      stage: "error",
       eyebrow: "Error",
       title: "Capture failed",
       detail: error.message,
@@ -328,6 +599,10 @@ async function handleCaptureClick() {
 
 async function handleAnalyzeClick() {
   if (actionBusy) {
+    return;
+  }
+
+  if (!(await ensureActionTargetReady("analyze the page"))) {
     return;
   }
 
@@ -375,18 +650,173 @@ async function handleAnalyzeClick() {
   }
 }
 
+async function handlePreviewRedactions() {
+  if (actionBusy) {
+    return;
+  }
+
+  if (!(await ensureActionTargetReady("scan redactions"))) {
+    return;
+  }
+
+  setActionBusy(true);
+
+  showStatus({
+    tone: "neutral",
+    eyebrow: "Redact",
+    title: "Scanning current page",
+    detail: "Checking the current DOM for emails, phone numbers, token-like strings, filled fields, and manual boxes.",
+    badge: "Scan",
+    progress: 0.1
+  });
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "LUMEN_PREVIEW_REDACTIONS"
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error?.description || "Redaction scan could not run.");
+    }
+
+    renderRedactionPreview(response);
+
+    showStatus({
+      tone: "success",
+      eyebrow: "Redact",
+      title: "Redaction scan complete",
+      detail: buildRedactionPreviewText(response),
+      badge: "Ready",
+      progress: 1
+    });
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Redact",
+      title: "Scan failed",
+      detail: error.message,
+      badge: "Failed",
+      progress: 0.12
+    });
+  } finally {
+    setActionBusy(false);
+  }
+}
+
+async function handleStartRedactionPicker() {
+  if (actionBusy) {
+    return;
+  }
+
+  if (!(await ensureActionTargetReady("mark redaction boxes"))) {
+    return;
+  }
+
+  setActionBusy(true);
+
+  showStatus({
+    tone: "neutral",
+    eyebrow: "Redact",
+    title: "Opening page picker",
+    detail: "Draw boxes over areas to sanitize. Press Done in the page overlay when finished.",
+    badge: "Picker",
+    progress: 0.08
+  });
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "LUMEN_START_REDACTION_PICKER"
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error?.description || "Manual redaction picker could not start.");
+    }
+
+    renderManualRedactions(response.record);
+
+    showStatus({
+      tone: "success",
+      eyebrow: "Redact",
+      title: "Picker ready on page",
+      detail: "Manual boxes are stored locally for this URL and applied to the next desktop capture.",
+      badge: "Ready",
+      progress: 1
+    });
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Redact",
+      title: "Picker failed",
+      detail: error.message,
+      badge: "Failed",
+      progress: 0.12
+    });
+  } finally {
+    setActionBusy(false);
+  }
+}
+
+async function handleClearManualRedactions() {
+  if (actionBusy) {
+    return;
+  }
+
+  if (!(await ensureActionTargetReady("clear manual redactions"))) {
+    return;
+  }
+
+  setActionBusy(true);
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "LUMEN_CLEAR_MANUAL_REDACTIONS"
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error?.description || "Manual redactions could not be cleared.");
+    }
+
+    renderManualRedactions(response.record);
+
+    showStatus({
+      tone: "neutral",
+      eyebrow: "Redact",
+      title: "Manual boxes cleared",
+      detail: "The next capture will only use auto-redaction unless you mark new boxes.",
+      badge: "Cleared",
+      progress: 0.2
+    });
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Redact",
+      title: "Clear failed",
+      detail: error.message,
+      badge: "Failed",
+      progress: 0.12
+    });
+  } finally {
+    setActionBusy(false);
+  }
+}
+
 async function ensurePermissionsForCurrentCapture() {
   if (!requiresOriginPermission(currentSettings.devicePreset)) {
     return true;
   }
 
-  const [tab] = await chrome.tabs.query({
-    active: true,
-    lastFocusedWindow: true
-  });
+  const tab = launchTargetTab || await resolveActionTargetTab();
 
   if (!tab?.url || !isOriginPermissionSupported(tab.url)) {
-    return true;
+    showStatus({
+      tone: "error",
+      eyebrow: "Blocked",
+      title: "No capturable page",
+      detail: "Open an http or https page before running tablet, mobile, or responsive capture.",
+      badge: "Blocked",
+      progress: 0.08
+    });
+    return false;
   }
 
   const origin = buildOriginPattern(tab.url);
@@ -488,6 +918,102 @@ function handleBillingClick() {
   });
 }
 
+async function handleHistoryAction(event) {
+  const button = event.target.closest("[data-history-action]");
+
+  if (!button) {
+    return;
+  }
+
+  const captureId = button.dataset.captureId || "";
+  const action = button.dataset.historyAction;
+
+  if (action === "details") {
+    expandedHistoryId = expandedHistoryId === captureId ? COLLAPSED_HISTORY_ID : captureId;
+    renderHistory(latestHistoryItems);
+    return;
+  }
+
+  if (action === "copy") {
+    await handleCopyHistorySummary(captureId, button);
+    return;
+  }
+
+  const messageType =
+    action === "open"
+      ? "LUMEN_OPEN_CAPTURE_DOWNLOAD"
+      : "LUMEN_SHOW_CAPTURE_DOWNLOAD";
+
+  button.disabled = true;
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: messageType,
+      payload: {
+        captureId
+      }
+    });
+
+    if (!response?.ok) {
+      showStatus({
+        tone: "error",
+        eyebrow: "Archive",
+        title: response?.error?.title || "History action failed",
+        detail: response?.error?.description || "Lumen could not access that downloaded artifact.",
+        badge: "Blocked",
+        progress: 0.12
+      });
+      return;
+    }
+
+    showStatus({
+      tone: "success",
+      eyebrow: "Archive",
+      title: action === "open" ? "Opened capture artifact" : "Revealed capture artifact",
+      detail: response.archiveFolder
+        ? `Saved in ${response.archiveFolder}.`
+        : response.filename || "Chrome opened the local artifact.",
+      badge: "Ready",
+      progress: 1
+    });
+  } finally {
+    button.disabled = actionBusy || button.dataset.downloadReady !== "true";
+  }
+}
+
+async function handleCopyHistorySummary(captureId, button) {
+  const item = latestHistoryItems.find((record) => record.id === captureId);
+
+  if (!item) {
+    return;
+  }
+
+  button.disabled = true;
+
+  try {
+    await copyTextToClipboard(buildHistorySummaryText(item));
+    showStatus({
+      tone: "success",
+      eyebrow: "Archive",
+      title: "Capture summary copied",
+      detail: "The run summary is ready to paste into a bug report, review note, or project doc.",
+      badge: "Copied",
+      progress: 1
+    });
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Archive",
+      title: "Copy failed",
+      detail: error.message || "The browser did not allow clipboard access.",
+      badge: "Failed",
+      progress: 0.12
+    });
+  } finally {
+    button.disabled = actionBusy;
+  }
+}
+
 function renderSession(session) {
   currentSession = session || currentSession;
 
@@ -514,10 +1040,12 @@ function renderSession(session) {
 
 function renderHistory(history) {
   const items = Array.isArray(history) ? history : [];
+  latestHistoryItems = items;
   ui.historyCount.textContent = `${items.length} item${items.length === 1 ? "" : "s"}`;
   ui.historyList.replaceChildren();
 
   if (!items.length) {
+    expandedHistoryId = "";
     ui.historyEmpty.classList.remove("is-hidden");
     ui.historyList.classList.add("is-hidden");
     return;
@@ -526,9 +1054,19 @@ function renderHistory(history) {
   ui.historyEmpty.classList.add("is-hidden");
   ui.historyList.classList.remove("is-hidden");
 
-  for (const item of items.slice(0, 5)) {
+  const visibleItems = items.slice(0, 5);
+  const visibleIds = new Set(visibleItems.map((item) => item.id || ""));
+
+  if (!expandedHistoryId || (expandedHistoryId !== COLLAPSED_HISTORY_ID && !visibleIds.has(expandedHistoryId))) {
+    expandedHistoryId = visibleItems[0]?.id || COLLAPSED_HISTORY_ID;
+  }
+
+  for (const item of visibleItems) {
+    const itemId = item.id || "";
+    const isExpanded = expandedHistoryId === itemId;
     const row = document.createElement("article");
     row.className = "history-item";
+    row.classList.toggle("is-expanded", isExpanded);
 
     const topRow = document.createElement("div");
     topRow.className = "history-head";
@@ -551,6 +1089,8 @@ function renderHistory(history) {
       `${item.files?.length || 0} file${item.files?.length === 1 ? "" : "s"}`,
       item.manifestFile ? "manifest saved" : "",
       item.annotation?.text ? "note added" : "",
+      item.manualRedactionCount ? `${item.manualRedactionCount} manual box${item.manualRedactionCount === 1 ? "" : "es"}` : "",
+      formatManualProjectionStats(item.manualProjectionStats),
       item.redactionCount ? `${item.redactionCount} redaction${item.redactionCount === 1 ? "" : "s"}` : "",
       item.blueprintSummary?.siteType || ""
     ]
@@ -559,6 +1099,17 @@ function renderHistory(history) {
 
     row.append(topRow, meta);
 
+    const archiveFolder = item.archiveFolder || "";
+    const hasDownloadHandles = Array.isArray(item.downloads) &&
+      item.downloads.some((download) => Number.isInteger(download.downloadId));
+
+    if (archiveFolder || hasDownloadHandles) {
+      const archive = document.createElement("p");
+      archive.className = "history-path";
+      archive.textContent = archiveFolder || "Local download handles available";
+      row.append(archive);
+    }
+
     if (item.annotation?.text) {
       const note = document.createElement("p");
       note.className = "history-meta";
@@ -566,8 +1117,247 @@ function renderHistory(history) {
       row.append(note);
     }
 
+    const actions = document.createElement("div");
+    actions.className = "history-actions";
+
+    const detailsButton = document.createElement("button");
+    detailsButton.className = "history-action";
+    detailsButton.type = "button";
+    detailsButton.dataset.historyAction = "details";
+    detailsButton.dataset.captureId = itemId;
+    detailsButton.setAttribute("aria-expanded", String(isExpanded));
+    detailsButton.textContent = isExpanded ? "Hide details" : "Details";
+
+    const copyButton = document.createElement("button");
+    copyButton.className = "history-action";
+    copyButton.type = "button";
+    copyButton.dataset.historyAction = "copy";
+    copyButton.dataset.captureId = itemId;
+    copyButton.textContent = "Copy summary";
+
+    const openButton = document.createElement("button");
+    openButton.className = "history-action";
+    openButton.type = "button";
+    openButton.dataset.historyAction = "open";
+    openButton.dataset.captureId = itemId;
+    openButton.dataset.downloadReady = hasDownloadHandles ? "true" : "false";
+    openButton.disabled = !hasDownloadHandles;
+    openButton.textContent = "Open";
+
+    const showButton = document.createElement("button");
+    showButton.className = "history-action";
+    showButton.type = "button";
+    showButton.dataset.historyAction = "show";
+    showButton.dataset.captureId = itemId;
+    showButton.dataset.downloadReady = hasDownloadHandles ? "true" : "false";
+    showButton.disabled = !hasDownloadHandles;
+    showButton.textContent = "Show in folder";
+
+    if (!hasDownloadHandles) {
+      openButton.title = "Run a fresh capture to enable local file actions.";
+      showButton.title = "Run a fresh capture to enable local file actions.";
+    }
+
+    actions.append(detailsButton, copyButton, openButton, showButton);
+    row.append(actions);
+
+    if (isExpanded) {
+      row.append(buildHistoryDetails(item));
+    }
+
     ui.historyList.appendChild(row);
   }
+}
+
+function renderManualRedactions(record) {
+  manualRedactionRecord = record || {
+    regions: []
+  };
+
+  const count = manualRedactionRecord.regions?.length || 0;
+  ui.manualRedactionCount.textContent = `${count} box${count === 1 ? "" : "es"}`;
+  updateActionDisabledState();
+  renderRunSummary(currentSettings);
+}
+
+function buildHistoryDetails(item) {
+  const detail = document.createElement("div");
+  detail.className = "history-detail";
+
+  const metrics = document.createElement("div");
+  metrics.className = "history-detail-grid";
+
+  const viewCount = item.variants?.length || (item.devicePreset === "responsive" ? 3 : 1);
+  const fileCount = item.files?.length || 0;
+  const redactionCount = item.redactionCount || 0;
+  const manifestState = item.manifestFile ? "Saved" : "Off";
+
+  metrics.append(
+    buildHistoryMetric("Views", String(viewCount)),
+    buildHistoryMetric("Files", String(fileCount)),
+    buildHistoryMetric("Redactions", String(redactionCount)),
+    buildHistoryMetric("Manifest", manifestState)
+  );
+  detail.append(metrics);
+
+  const variantList = buildHistoryVariantList(item);
+
+  if (variantList) {
+    detail.append(variantList);
+  }
+
+  const artifactList = buildHistoryArtifactList(item);
+
+  if (artifactList) {
+    detail.append(artifactList);
+  }
+
+  const signals = buildHistorySignalPanel(item);
+
+  if (signals) {
+    detail.append(signals);
+  }
+
+  if (item.annotation?.text) {
+    detail.append(buildHistoryTextPanel("Capture note", item.annotation.text));
+  }
+
+  return detail;
+}
+
+function buildHistoryMetric(label, value) {
+  const node = document.createElement("div");
+  node.className = "history-detail-metric";
+
+  const labelNode = document.createElement("span");
+  labelNode.textContent = label;
+
+  const valueNode = document.createElement("strong");
+  valueNode.textContent = value;
+
+  node.append(labelNode, valueNode);
+  return node;
+}
+
+function buildHistoryVariantList(item) {
+  const variants = Array.isArray(item.variants) ? item.variants : [];
+
+  if (!variants.length) {
+    return null;
+  }
+
+  const panel = buildHistoryPanelShell("Capture views");
+
+  for (const variant of variants) {
+    const row = document.createElement("div");
+    row.className = "history-detail-row";
+
+    const label = document.createElement("strong");
+    label.textContent = variant.label || titleCase(variant.id || "View");
+
+    const meta = document.createElement("span");
+    meta.textContent = [
+      variant.dimensions?.width && variant.dimensions?.height
+        ? `${variant.dimensions.width}x${variant.dimensions.height}`
+        : "",
+      variant.fileCount ? `${variant.fileCount} file${variant.fileCount === 1 ? "" : "s"}` : "",
+      variant.redactionCount ? `${variant.redactionCount} redaction${variant.redactionCount === 1 ? "" : "s"}` : ""
+    ]
+      .filter(Boolean)
+      .join(" | ") || "Captured";
+
+    row.append(label, meta);
+    panel.append(row);
+  }
+
+  return panel;
+}
+
+function buildHistoryArtifactList(item) {
+  const downloads = Array.isArray(item.downloads) ? item.downloads : [];
+  const files = Array.isArray(item.files) ? item.files : [];
+
+  if (!downloads.length && !files.length) {
+    return null;
+  }
+
+  const panel = buildHistoryPanelShell("Artifacts");
+  const records = downloads.length
+    ? downloads
+    : files.map((filename) => ({
+        filename,
+        kind: filename.endsWith(".json") ? "manifest" : "image"
+      }));
+
+  for (const record of records.slice(0, 5)) {
+    const row = document.createElement("div");
+    row.className = "history-detail-row";
+
+    const label = document.createElement("strong");
+    label.textContent = titleCase(record.kind || "file");
+
+    const meta = document.createElement("span");
+    meta.textContent = [
+      record.variantId ? titleCase(record.variantId) : "",
+      record.bytesReceived ? formatBytes(record.bytesReceived) : "",
+      record.filename ? shortenPath(record.filename) : ""
+    ]
+      .filter(Boolean)
+      .join(" | ");
+
+    row.append(label, meta);
+    panel.append(row);
+  }
+
+  if (records.length > 5) {
+    const more = document.createElement("p");
+    more.className = "history-detail-note";
+    more.textContent = `${records.length - 5} more artifact${records.length - 5 === 1 ? "" : "s"} in the bundle.`;
+    panel.append(more);
+  }
+
+  return panel;
+}
+
+function buildHistorySignalPanel(item) {
+  const summary = item.blueprintSummary;
+
+  if (!summary?.siteType && !summary?.heroHeadline && !summary?.primaryCta) {
+    return null;
+  }
+
+  const parts = [
+    summary.siteType ? `Type: ${summary.siteType}` : "",
+    summary.heroHeadline ? `Hero: ${summary.heroHeadline}` : "",
+    summary.primaryCta ? `CTA: ${summary.primaryCta}` : ""
+  ].filter(Boolean);
+
+  return buildHistoryTextPanel("Page signals", parts.join(" | "));
+}
+
+function buildHistoryTextPanel(label, text) {
+  const panel = buildHistoryPanelShell(label);
+  const copy = document.createElement("p");
+  copy.className = "history-detail-note";
+  copy.textContent = text;
+  panel.append(copy);
+  return panel;
+}
+
+function buildHistoryPanelShell(label) {
+  const panel = document.createElement("div");
+  panel.className = "history-detail-panel";
+
+  const title = document.createElement("p");
+  title.className = "field-label";
+  title.textContent = label;
+  panel.append(title);
+
+  return panel;
+}
+
+function renderRedactionPreview(preview) {
+  ui.redactionPreviewSummary.textContent = buildRedactionPreviewText(preview);
 }
 
 function renderBlueprint(blueprint) {
@@ -645,7 +1435,86 @@ function renderFontStrip(fonts) {
   }
 }
 
-function showStatus({ tone, eyebrow, title, detail, badge, progress }) {
+async function refreshLaunchStatus() {
+  try {
+    const tab = await resolveActionTargetTab();
+    launchTargetTab = tab;
+
+    if (!tab?.url) {
+      renderLaunchStatus({
+        state: "blocked",
+        title: "No active tab found",
+        detail: "Open a web page, then launch Lumen again.",
+        actionsBlocked: true
+      });
+      return;
+    }
+
+    if (!isOriginPermissionSupported(tab.url)) {
+      renderLaunchStatus({
+        state: "blocked",
+        title: "This page cannot be captured",
+        detail: "Chrome blocks capture scripts on browser and extension pages.",
+        actionsBlocked: true
+      });
+      return;
+    }
+
+    renderLaunchStatus({
+      state: "ready",
+      title: `${formatTabHost(tab.url)} ready`,
+      detail: "Click to capture. Hold the main button for quick actions.",
+      actionsBlocked: false
+    });
+  } catch (error) {
+    renderLaunchStatus({
+      state: "blocked",
+      title: "Tab check failed",
+      detail: error.message || "Lumen could not read the active tab.",
+      actionsBlocked: true
+    });
+  }
+}
+
+function renderLaunchStatusFromRun({ tone, title, detail, progress }) {
+  if (tone === "error") {
+    renderLaunchStatus({
+      state: "blocked",
+      title: "Action needs attention",
+      detail: title || detail || "The last action could not finish.",
+      actionsBlocked: launchActionsBlocked
+    });
+    return;
+  }
+
+  if (tone === "success" || progress >= 1) {
+    renderLaunchStatus({
+      state: "ready",
+      title: "Ready for the next action",
+      detail: title || "The last Lumen action completed.",
+      actionsBlocked: false
+    });
+    return;
+  }
+
+  renderLaunchStatus({
+    state: "working",
+    title: title || "Working",
+    detail: detail || "Lumen is running the selected action.",
+    actionsBlocked: false
+  });
+}
+
+function renderLaunchStatus({ state, title, detail, actionsBlocked = false }) {
+  launchActionsBlocked = Boolean(actionsBlocked);
+  ui.launchStatus.dataset.state = state || "ready";
+  ui.launchStatusTitle.textContent = title || "Ready";
+  ui.launchStatusDetail.textContent = detail || "Choose the next Lumen action.";
+  ui.launchPanel.classList.toggle("is-blocked", launchActionsBlocked);
+  updateActionDisabledState();
+}
+
+function showStatus({ tone, stage, eyebrow, title, detail, badge, progress }) {
   ui.statusPanel.classList.remove("is-hidden");
   ui.statusPanel.dataset.tone = tone;
   ui.statusEyebrow.textContent = eyebrow;
@@ -653,12 +1522,143 @@ function showStatus({ tone, eyebrow, title, detail, badge, progress }) {
   ui.statusDetail.textContent = detail;
   ui.statusBadge.textContent = badge;
   ui.progressFill.style.width = `${Math.max(4, Math.round(progress * 100))}%`;
+  if (stage) {
+    renderTimeline(stage, tone, progress);
+  }
+  appendStatusEvent({
+    badge,
+    title,
+    detail,
+    tone
+  });
+  renderLaunchStatusFromRun({
+    tone,
+    title,
+    detail,
+    progress
+  });
+}
+
+function renderRunSummary(settings = currentSettings) {
+  const variants = getCaptureVariants(settings.devicePreset);
+  const viewLabel = variants.length > 1
+    ? variants.map((variant) => variant.label).join(", ")
+    : variants[0]?.label || "Desktop";
+  const exportLabel = titleCase(settings.exportPreset || "raw");
+  const safetyParts = [
+    settings.removeStickyHeaders !== false ? "Cleanup" : "",
+    settings.forceLazyLoad !== false ? "Lazy load" : "",
+    settings.autoRedact ? "Redact" : "",
+    manualRedactionRecord.regions?.length ? "Manual boxes" : ""
+  ].filter(Boolean);
+
+  ui.runViewSummary.textContent = viewLabel;
+  ui.runExportSummary.textContent = exportLabel;
+  ui.runSafetySummary.textContent = safetyParts.length ? safetyParts.join(", ") : "Basic";
+  ui.runManifestSummary.textContent = settings.exportManifest === false ? "Off" : "Manifest";
+}
+
+function renderTimeline(stage = "idle", tone = "neutral", progress = 0) {
+  const normalizedStage = normalizeTimelineStage(stage);
+  const activeIndex = TIMELINE_STAGES.indexOf(normalizedStage);
+  const markComplete = stage === "done" || (tone === "success" && progress >= 1);
+
+  for (const step of ui.timelineSteps) {
+    const stepIndex = TIMELINE_STAGES.indexOf(step.dataset.stageStep);
+    const isComplete = markComplete || (activeIndex >= 0 && stepIndex < activeIndex);
+    const isActive = !markComplete && activeIndex === stepIndex;
+    const isError = tone === "error" && isActive;
+
+    step.classList.toggle("is-complete", isComplete);
+    step.classList.toggle("is-active", isActive);
+    step.classList.toggle("is-error", isError);
+    step.classList.toggle("is-pending", !isComplete && !isActive);
+  }
+}
+
+function appendStatusEvent({ badge, title, detail, tone }) {
+  const event = {
+    badge: badge || "Run",
+    title: title || "Working",
+    detail: detail || "",
+    tone: tone || "neutral",
+    time: new Date()
+  };
+
+  const previous = statusEvents[0];
+
+  if (previous?.title === event.title && previous?.detail === event.detail) {
+    return;
+  }
+
+  statusEvents = [event, ...statusEvents].slice(0, 4);
+  renderStatusLog();
+}
+
+function renderStatusLog() {
+  ui.statusLog.replaceChildren();
+  ui.statusLogCount.textContent = String(statusEvents.length);
+
+  if (!statusEvents.length) {
+    const empty = document.createElement("p");
+    empty.textContent = "No active run yet.";
+    ui.statusLog.appendChild(empty);
+    return;
+  }
+
+  for (const event of statusEvents) {
+    const item = document.createElement("div");
+    item.className = "status-log-item";
+    item.dataset.tone = event.tone;
+
+    const meta = document.createElement("span");
+    meta.textContent = `${event.badge} | ${formatLogTime(event.time)}`;
+
+    const title = document.createElement("strong");
+    title.textContent = event.title;
+
+    const detail = document.createElement("p");
+    detail.textContent = event.detail;
+
+    item.append(meta, title, detail);
+    ui.statusLog.appendChild(item);
+  }
+}
+
+function normalizeTimelineStage(stage = "") {
+  if (stage === "done") {
+    return "save";
+  }
+
+  if (stage === "queued" || stage === "error") {
+    return "prepare";
+  }
+
+  return TIMELINE_STAGES.includes(stage) ? stage : "idle";
 }
 
 function setActionBusy(isBusy) {
   actionBusy = isBusy;
-  ui.captureButton.disabled = isBusy;
-  ui.analyzeButton.disabled = isBusy;
+  ui.launchPanel.classList.toggle("is-busy", isBusy);
+  updateActionDisabledState();
+}
+
+function updateActionDisabledState() {
+  const disabled = actionBusy || launchActionsBlocked;
+  ui.captureButton.disabled = disabled;
+  ui.analyzeButton.disabled = disabled;
+  ui.previewRedactionsButton.disabled = disabled;
+  ui.startRedactionPickerButton.disabled = disabled;
+  ui.clearManualRedactionsButton.disabled = disabled || !(manualRedactionRecord.regions?.length);
+
+  for (const button of ui.holdMenuActions) {
+    button.disabled = disabled;
+  }
+
+  for (const button of ui.historyList.querySelectorAll("[data-history-action]")) {
+    const requiresDownload = button.dataset.historyAction === "open" || button.dataset.historyAction === "show";
+    button.disabled = actionBusy || (requiresDownload && button.dataset.downloadReady !== "true");
+  }
 }
 
 function stageToEyebrow(stage) {
@@ -717,16 +1717,172 @@ function buildCaptureSuccessMessage(response, settings) {
   const fileText = `${response.files.length} file${response.files.length === 1 ? "" : "s"} saved using ${response.exportPreset} export mode`;
   const variantCount = response.variantCount || getCaptureVariants(settings.devicePreset).length;
   const manifestText = response.manifestFile ? " Bundle manifest saved." : "";
+  const folderText = response.archiveFolder ? ` Saved in ${response.archiveFolder}.` : "";
   const captureNote = normalizeCaptureNoteOptions(settings);
   const noteText = response.annotation?.enabled || captureNote.enabled ? " Capture note added." : "";
+  const manualText = response.manualRedactionCount
+    ? ` ${response.manualRedactionCount} manual box${response.manualRedactionCount === 1 ? "" : "es"} applied.`
+    : "";
+  const projectionText = formatManualProjectionStats(response.manualProjectionStats);
+  const projectionSentence = projectionText ? ` ${projectionText}.` : "";
 
   if (!response.redactionCount) {
     return variantCount > 1
-      ? `${fileText}. ${variantCount} responsive views captured.${manifestText}${noteText}`
-      : `${fileText}.${manifestText}${noteText}`;
+      ? `${fileText}. ${variantCount} responsive views captured.${manifestText}${folderText}${noteText}${manualText}${projectionSentence}`
+      : `${fileText}.${manifestText}${folderText}${noteText}${manualText}${projectionSentence}`;
   }
 
-  return `${fileText}. ${variantCount > 1 ? `${variantCount} responsive views captured. ` : ""}${response.redactionCount} sensitive region${response.redactionCount === 1 ? "" : "s"} sanitized.${manifestText}${noteText}`;
+  return `${fileText}. ${variantCount > 1 ? `${variantCount} responsive views captured. ` : ""}${response.redactionCount} redaction region${response.redactionCount === 1 ? "" : "s"} sanitized.${manifestText}${folderText}${noteText}${manualText}${projectionSentence}`;
+}
+
+function buildRedactionPreviewText(preview) {
+  const autoCount = preview?.autoRedactionCount || 0;
+  const manualCount = preview?.manualRedactionCount || 0;
+  const total = preview?.redactionCount ?? autoCount + manualCount;
+  const kinds = formatRedactionKinds(preview?.redactionBreakdown?.byKind);
+
+  if (!total) {
+    return "No sensitive regions detected in the current DOM. Review the page before external sharing.";
+  }
+
+  return `${total} region${total === 1 ? "" : "s"} found: ${autoCount} auto, ${manualCount} manual${kinds ? ` (${kinds})` : ""}.`;
+}
+
+function buildHistorySummaryText(item) {
+  const lines = [
+    "Lumen capture summary",
+    `Title: ${item.title || item.host || "Untitled capture"}`,
+    `URL: ${item.url || "Unknown"}`,
+    `Captured: ${formatTimestamp(item.capturedAt)}`,
+    `Views: ${item.variants?.length || 1}`,
+    `Files: ${item.files?.length || 0}`,
+    `Redactions: ${item.redactionCount || 0}`,
+    item.manualRedactionCount ? `Manual boxes: ${item.manualRedactionCount}` : "",
+    item.manifestFile ? `Manifest: ${item.manifestFile}` : "Manifest: not saved",
+    item.archiveFolder ? `Folder: ${item.archiveFolder}` : "",
+    item.blueprintSummary?.siteType ? `Page type: ${item.blueprintSummary.siteType}` : "",
+    item.blueprintSummary?.heroHeadline ? `Hero: ${item.blueprintSummary.heroHeadline}` : "",
+    item.blueprintSummary?.primaryCta ? `Primary CTA: ${item.blueprintSummary.primaryCta}` : "",
+    item.annotation?.text ? `Note: ${item.annotation.text}` : ""
+  ];
+
+  return lines.filter(Boolean).join("\n");
+}
+
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+
+  const copied = document.execCommand("copy");
+  textarea.remove();
+
+  if (!copied) {
+    throw new Error("Clipboard write was blocked.");
+  }
+}
+
+function formatRedactionKinds(byKind = {}) {
+  return Object.entries(byKind)
+    .filter(([, count]) => count > 0)
+    .map(([kind, count]) => `${count} ${kind}`)
+    .join(", ");
+}
+
+function formatManualProjectionStats(stats = {}) {
+  const storedCount = Number.isFinite(stats.storedCount) ? Math.max(0, Math.round(stats.storedCount)) : 0;
+
+  if (!storedCount) {
+    return "";
+  }
+
+  const projectedCount = Number.isFinite(stats.projectedCount) ? Math.max(0, Math.round(stats.projectedCount)) : 0;
+  const directCount = Number.isFinite(stats.directCount) ? Math.max(0, Math.round(stats.directCount)) : 0;
+  const skippedCount = Number.isFinite(stats.skippedCount) ? Math.max(0, Math.round(stats.skippedCount)) : 0;
+  const parts = [];
+
+  if (projectedCount) {
+    parts.push(`${projectedCount} projected`);
+  }
+
+  if (directCount) {
+    parts.push(`${directCount} direct`);
+  }
+
+  if (skippedCount) {
+    parts.push(`${skippedCount} skipped`);
+  }
+
+  return parts.length ? `manual projection ${parts.join(", ")}` : "";
+}
+
+function formatBytes(value = 0) {
+  const bytes = Math.max(0, Number(value) || 0);
+
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${Math.round(bytes / 1024)} KB`;
+  }
+
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function shortenPath(value = "") {
+  const parts = String(value).split(/[\\/]+/).filter(Boolean);
+
+  if (parts.length <= 2) {
+    return value;
+  }
+
+  return `${parts.at(-2)}/${parts.at(-1)}`;
+}
+
+function titleCase(value = "") {
+  return value
+    .split(/[\s-]+/)
+    .filter(Boolean)
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1).toLowerCase()}`)
+    .join(" ");
+}
+
+function formatTabHost(url) {
+  try {
+    return new URL(url).host.replace(/^www\./, "") || "Current tab";
+  } catch {
+    return "Current tab";
+  }
+}
+
+function formatLogTime(date) {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit"
+  }).format(date);
+}
+
+async function refreshManualRedactions() {
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "LUMEN_GET_MANUAL_REDACTIONS"
+    });
+
+    renderManualRedactions(response?.record);
+  } catch {
+    renderManualRedactions(null);
+  }
 }
 
 function formatCompactNumber(value) {

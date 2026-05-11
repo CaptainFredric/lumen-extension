@@ -43,7 +43,7 @@
       href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=20260501-dashboard" />
   </head>
   <body>
     <a class="skip-link" href="#product">Skip to content</a>
@@ -118,7 +118,7 @@
           <div class="evidence-board">
             <div class="evidence-head">
               <p class="support-label">Current output from the prototype</p>
-              <span class="evidence-domain">Captured Apr 29, 2026 at 10:42 AM</span>
+              <span class="evidence-domain">Generated May 1, 2026 UTC</span>
             </div>
 
             <div class="evidence-layout">
@@ -175,6 +175,8 @@
   "views": 3,
   "files": 4,
   "redactions": 4,
+  "outputsComplete": true,
+  "breakdown": {"email": 2, "phone": 1, "secret": 1},
   "signals": ["palette", "fonts", "cta", "nav"]
 }</code></pre>
               </figure>
@@ -184,16 +186,9 @@
       </section>
 
       <section class="proof-strip-section" id="proof" data-reveal>
-        <div class="proof-strip-intro">
-          <p class="proof-label">Proof: real run output</p>
-          <p class="proof-strip-copy">
-            The screenshot is raw input. The useful artifact is the cleaned, responsive, safer
-            capture bundle with the page context still attached.
-          </p>
-        </div>
-
         <div class="proof-strip-grid">
           <div class="proof-metrics-card">
+            <p class="proof-label proof-card-label">Proof: real run output</p>
             <div class="proof-metric">
               <strong>3</strong>
               <span>Image exports</span>
@@ -212,7 +207,7 @@
             <div class="proof-metric">
               <strong>1</strong>
               <span>History entry</span>
-              <p>Stored locally</p>
+              <p>Stored with local file actions</p>
             </div>
           </div>
 
@@ -295,10 +290,12 @@
                   <li>Lazy-load forcing</li>
                   <li>Responsive capture sets</li>
                   <li>Auto-redaction on export</li>
+                  <li>Popup redaction preview</li>
+                  <li>Anchored manual redaction boxes</li>
                   <li>Anchored capture note</li>
                   <li>Signals extraction</li>
-                  <li>Bundle manifest JSON sidecar</li>
-                  <li>Local history with run details</li>
+                  <li>Bundle manifest JSON sidecar with output health</li>
+                  <li>Local history with expanded run details and copyable summaries</li>
                   <li>Tail remeasurement and stall retry</li>
                 </ul>
               </div>
@@ -307,7 +304,6 @@
                 <p class="support-label">Next</p>
                 <ul class="support-notes support-notes-tight">
                   <li>Freeform annotations</li>
-                  <li>Manual redaction boxes</li>
                   <li>Cloud sync and team handoff</li>
                   <li>Scheduled captures</li>
                   <li>Visual diffs</li>
@@ -379,8 +375,8 @@
             <p class="kicker">Workflow</p>
             <h2>Capture with the context still attached.</h2>
             <p class="section-body">
-              Lumen is most useful when it removes downstream cleanup work. The point is not to
-              save a PNG. The point is to hand over a better artifact.
+              Lumen is most useful when it removes downstream cleanup work. A useful capture
+              should hand over a better artifact than a plain PNG.
             </p>
           </div>
 
@@ -396,7 +392,7 @@
 
           <article class="workflow-step" data-step="responsive" data-reveal>
             <span>Capture set</span>
-            <h3>Generate the layout set, not one isolated viewport.</h3>
+            <h3>Generate the layout set across key viewports.</h3>
             <p>
               The current build can produce desktop, tablet, and mobile outputs in one grouped
               bundle so review threads have the right layout context from the start.
@@ -501,8 +497,9 @@
           <article class="mechanic-row" data-reveal>
             <strong>Local-first history</strong>
             <p>
-              Demo session state and capture history exist today. Sync, auth, and billing still
-              need to be built.
+              New captures are saved into dated folders, then listed in popup history with artifact
+              counts, views, redactions, notes, page signals, and actions to open or reveal the
+              saved output. Sync, auth, and billing still need product work.
             </p>
           </article>
         </div>
@@ -545,8 +542,8 @@
         </div>
 
         <p class="section-note" data-reveal>
-          Broader archive, sync, and monitoring workflows remain future direction. They are not the
-          main story on this page.
+          Broader archive, sync, and monitoring workflows remain future direction. The main story
+          here is cleaner review evidence.
         </p>
       </section>
 
@@ -556,8 +553,8 @@
           <h2>Separate present proof from later product layers.</h2>
             <p class="section-body">
               The current prototype already supports the capture workflow described on this page. The
-            next product layer is most likely studio output and team handoff, not a broad monitoring
-            suite.
+            next product layer is most likely studio output and team handoff rather than a broad
+            monitoring suite.
           </p>
         </div>
 
@@ -568,10 +565,11 @@
             <ul class="scope-list">
               <li>Clean sticky, fixed, and overlay page chrome before capture</li>
               <li>Generate desktop, tablet, and mobile bundles in one run</li>
-              <li>Blur sensitive visible text and filled fields in exports</li>
+              <li>Preview and blur sensitive text and filled fields in exports</li>
+              <li>Project anchored manual redaction boxes into responsive captures when the source element still resolves</li>
               <li>Add one anchored capture note into the export</li>
               <li>Extract palette, font, hero, CTA, and navigation signals</li>
-              <li>Store local capture history with bundle metadata</li>
+              <li>Store local capture history with bundle metadata, run details, copyable summaries, and file actions</li>
             </ul>
           </article>
 
@@ -579,7 +577,7 @@
             <p class="support-label">Future direction</p>
             <h3>What still needs product work</h3>
             <ul class="scope-list">
-              <li>Freeform annotation and manual redaction tools</li>
+              <li>Freeform annotation tools and projected-box review tooling</li>
               <li>Cloud sync and team handoff workflows</li>
               <li>User accounts, billing, and plan gating</li>
               <li>Scheduled monitoring and visual diffs</li>
@@ -590,11 +588,13 @@
 
       <section class="cta-section" id="docs" data-reveal>
         <p class="kicker">Implemented now</p>
-        <h2>Lumen is early. The current build already handles cleanup, capture, redaction, anchored notes, signals, and a portable bundle manifest.</h2>
+        <h2>Lumen is early. The current build already handles cleanup, capture, redaction preview, manual boxes, anchored notes, signals, local run details, and a portable bundle manifest.</h2>
         <p>
-          The repository already covers page cleanup, responsive capture bundles, export redaction,
-          capture notes, page-signal extraction, bundle metadata, and local history. The next work
-          is freeform annotation, sync, auth, and billing.
+          The repository already covers page cleanup, responsive capture bundles, redaction preview,
+          export redaction, anchored manual redaction boxes, capture notes, page-signal extraction,
+          bundle metadata with output health, dated download folders, local history actions, and
+          copyable capture summaries. The next work is projected-box review tooling, freeform
+          annotation, sync, auth, and billing.
         </p>
 
         <div class="cta-actions">
@@ -623,6 +623,6 @@
       <span>Browser capture workflow for design review, QA, and product work.</span>
     </footer>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=20260430-fidelity"></script>
   </body>
 </html>

@@ -4,6 +4,7 @@ export const LUMEN_CONFIG = {
     maxSegments: 30,
     captureThrottleMs: 550,
     historyLimit: 12,
+    manualRedactionLimit: 24,
     lateOverlaySettleMs: 140,
     mediaSettleTimeoutMs: 2200,
     maxStallRetries: 3,
@@ -70,7 +71,8 @@ export const STORAGE_KEYS = {
   settings: "lumen.capture.settings",
   latestBlueprint: "lumen.inspector.latestBlueprint",
   session: "lumen.account.session",
-  captureHistory: "lumen.capture.history"
+  captureHistory: "lumen.capture.history",
+  manualRedactions: "lumen.capture.manualRedactions"
 };
 
 export function isRestrictedCaptureUrl(url = "") {

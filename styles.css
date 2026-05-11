@@ -129,29 +129,6 @@ button:focus-visible {
   box-shadow: 0 0 0 2px var(--bg), 0 0 0 5px rgba(100, 242, 223, 0.58);
 }
 
-button:focus-visible,
-input:focus-visible,
-textarea:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 1px rgba(7, 17, 28, 0.98), 0 0 0 4px var(--focus-ring);
-}
-
-.skip-link {
-  position: absolute;
-  left: 12px;
-  top: -44px;
-  z-index: 200;
-  padding: 10px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--surface-border);
-  background: rgba(3, 10, 18, 0.96);
-  color: var(--text-primary);
-}
-
-.skip-link:focus-visible {
-  top: 10px;
-}
-
 h1,
 h2,
 h3,
@@ -304,7 +281,6 @@ main,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
   min-height: 38px;
   padding: 0 14px;
   border: 1px solid rgba(173, 244, 226, 0.13);
@@ -312,19 +288,6 @@ main,
   color: var(--muted);
   background: rgba(255, 255, 255, 0.035);
   transition: color 180ms var(--ease), border-color 180ms var(--ease), background 180ms var(--ease), transform 180ms var(--ease);
-}
-
-.nav-link-split {
-  padding-right: 8px;
-}
-
-.nav-link-chip {
-  padding: 6px 10px;
-  border-left: 1px solid rgba(255, 255, 255, 0.12);
-  color: var(--text-secondary);
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .nav-link:hover {
@@ -483,12 +446,6 @@ h3 {
 
 .primary-link:hover {
   box-shadow: 0 22px 56px rgba(100, 242, 223, 0.24);
-}
-
-.hero-proof {
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 24px;
 }
 
 .secondary-link:hover,
