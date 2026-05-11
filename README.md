@@ -199,6 +199,14 @@ The proof script depends on Playwright and a local Chromium install. It is repro
 
 The script also tries to create `docs/assets/proof-run-bundle.zip` with the system `zip` command. If `zip` is missing, the proof images and JSON files still generate, but the archive step is skipped.
 
+### Build The Store Package
+
+```bash
+npm run package:extension
+```
+
+This validates the Manifest V3 upload package, checks required runtime files, verifies declared PNG icon dimensions, rejects development folders, and writes `dist/lumen-extension-0.2.0.zip`. The ZIP contains only the runtime extension files, not docs, tests, backend code, node_modules, or proof assets.
+
 ## Publish The Landing Site
 
 1. Enable GitHub Pages to deploy through GitHub Actions
@@ -233,6 +241,6 @@ See `STORE_READINESS.md` for the current submission checklist, permission ration
 The highest-leverage next steps are:
 
 1. improve capture reliability on difficult real-world sites
-2. make the pre-export review more visual with cutaway thumbnails and box previews
-3. add a small cutaway preview and artifact filter in the popup history detail
+2. add a small cutaway preview and artifact filter in the popup history detail
+3. prepare real Chrome Web Store screenshots and privacy policy copy
 4. tighten the backend from demo session state into a real account path

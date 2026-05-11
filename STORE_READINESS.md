@@ -11,6 +11,7 @@ This file tracks what Lumen needs before a serious Chrome Web Store submission.
 5. Clear blocked-page handling for Chrome, Web Store, extension, and internal browser pages.
 6. Manifest description shortened to 131 characters.
 7. Landing page keeps present features separate from future direction.
+8. Store package script builds a narrow upload ZIP and validates manifest fields, icons, permissions, and blocked development files.
 
 ## Permission Rationale
 
@@ -37,8 +38,28 @@ These are only needed for tablet, mobile, and responsive captures that open temp
 3. Keep agent handoff disabled until the user can review exactly what will be sent and choose the destination.
 4. Audit whether `tabs` can be removed or narrowed before submission.
 5. Prepare Chrome Web Store screenshots from real extension output, not concept art.
-6. Add a package validation script that builds the upload zip and checks file size, manifest fields, icons, and blocked development files.
-7. Add a support URL, privacy URL, and accurate single-purpose field.
+6. Add a support URL, privacy URL, and accurate single-purpose field.
+
+## Package Validation
+
+Run:
+
+```bash
+npm run package:extension
+```
+
+The script creates `dist/lumen-extension-0.2.0.zip` and checks:
+
+1. Manifest V3 fields, description length, background worker, popup, and version format.
+2. Required runtime files.
+3. Declared icon files and PNG dimensions.
+4. Permissions against the current approved list.
+5. Optional host permissions remain limited to `http://*/*` and `https://*/*`.
+6. Development paths such as docs, backend, scripts, node_modules, dist, and proof assets are not included.
+
+Current known warning:
+
+1. `tabs` remains present because the popup needs current tab selection and temporary viewport tabs. Re-audit this before submission.
 
 ## Official Policy References
 
