@@ -558,6 +558,96 @@ h3 {
   line-height: 1.4;
 }
 
+.review-preview-map {
+  display: grid;
+  gap: 7px;
+}
+
+.review-preview-surface {
+  position: relative;
+  height: 94px;
+  overflow: hidden;
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    rgba(5, 11, 20, 0.5);
+  background-size: 16px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.review-preview-viewport,
+.review-preview-box {
+  position: absolute;
+  display: block;
+  border-radius: 7px;
+  pointer-events: none;
+}
+
+.review-preview-viewport {
+  inset: 0 0 auto;
+  min-height: 10px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent);
+}
+
+.review-preview-box {
+  min-width: 6px;
+  min-height: 5px;
+  box-shadow: 0 0 0 1px rgba(5, 11, 20, 0.5);
+}
+
+.review-preview-box-auto {
+  background: rgba(255, 154, 154, 0.42);
+  border: 1px solid rgba(255, 154, 154, 0.72);
+}
+
+.review-preview-box-manual {
+  background: rgba(134, 221, 255, 0.38);
+  border: 1px solid rgba(134, 221, 255, 0.72);
+}
+
+.review-preview-box-cutaway {
+  background: rgba(127, 241, 197, 0.18);
+  border: 2px solid rgba(127, 241, 197, 0.9);
+  box-shadow:
+    0 0 0 1px rgba(5, 11, 20, 0.64),
+    0 0 20px rgba(127, 241, 197, 0.18);
+}
+
+.review-preview-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.review-preview-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-tertiary);
+  font-size: 0.66rem;
+}
+
+.review-preview-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.review-preview-legend-dot-auto {
+  background: var(--danger);
+}
+
+.review-preview-legend-dot-manual {
+  background: var(--accent);
+}
+
+.review-preview-legend-dot-cutaway {
+  background: var(--success);
+}
+
 .review-warning-item {
   border-color: rgba(255, 210, 130, 0.18);
   background:

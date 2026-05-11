@@ -1708,9 +1708,68 @@ function renderExportReviewVariants(variants) {
     const detail = document.createElement("p");
     detail.textContent = buildReviewVariantDetail(variant);
 
-    row.append(label, metrics, detail);
+    row.append(label, metrics, buildReviewPreviewMap(variant), detail);
     ui.exportReviewVariants.append(row);
   }
+}
+
+function buildReviewPreviewMap(variant) {
+  const preview = variant.preview || {};
+  const pageWidth = Math.max(1, Number(preview.pageWidth) || variant.dimensions?.viewportWidth || 1);
+  const pageHeight = Math.max(1, Number(preview.pageHeight) || variant.dimensions?.pageHeight || 1);
+  const viewportHeight = Math.max(1, Number(preview.viewportHeight) || variant.dimensions?.viewportHeight || 1);
+  const map = document.createElement("div");
+  const surface = document.createElement("div");
+  const legend = document.createElement("div");
+  const frame = document.createElement("span");
+
+  map.className = "review-preview-map";
+  surface.className = "review-preview-surface";
+  legend.className = "review-preview-legend";
+  frame.className = "review-preview-viewport";
+  frame.style.height = `${clampPercent(viewportHeight / pageHeight * 100, 8, 100)}%`;
+  surface.append(frame);
+
+  for (const region of preview.regions || []) {
+    const box = document.createElement("span");
+    box.className = `review-preview-box review-preview-box-${region.role || "auto"}`;
+    box.title = formatPreviewRegionTitle(region);
+    box.style.left = `${clampPercent(region.left / pageWidth * 100)}%`;
+    box.style.top = `${clampPercent(region.top / pageHeight * 100)}%`;
+    box.style.width = `${clampPercent(region.width / pageWidth * 100, 1.6, 100)}%`;
+    box.style.height = `${clampPercent(region.height / pageHeight * 100, 1.4, 100)}%`;
+    surface.append(box);
+  }
+
+  legend.append(
+    buildReviewLegendItem("Auto", "auto"),
+    buildReviewLegendItem("Manual", "manual"),
+    buildReviewLegendItem("Cutaway", "cutaway")
+  );
+  map.append(surface, legend);
+
+  return map;
+}
+
+function buildReviewLegendItem(label, role) {
+  const item = document.createElement("span");
+  const marker = document.createElement("i");
+  const text = document.createElement("span");
+
+  item.className = "review-preview-legend-item";
+  marker.className = `review-preview-legend-dot review-preview-legend-dot-${role}`;
+  text.textContent = label;
+  item.append(marker, text);
+
+  return item;
+}
+
+function formatPreviewRegionTitle(region) {
+  const role = titleCase(region.role || "region");
+  const size = `${Math.round(region.width || 0)}x${Math.round(region.height || 0)}`;
+  const projection = region.projection ? `, ${region.projection}` : "";
+
+  return `${role} ${size}${projection}`;
 }
 
 function renderExportReviewWarnings(warnings) {
@@ -2387,6 +2446,14 @@ function shortenPath(value = "") {
   }
 
   return `${parts.at(-2)}/${parts.at(-1)}`;
+}
+
+function clampPercent(value, min = 0, max = 100) {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+
+  return Math.max(min, Math.min(max, Number(value.toFixed(3))));
 }
 
 function titleCase(value = "") {

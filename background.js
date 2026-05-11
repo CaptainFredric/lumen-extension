@@ -576,9 +576,9 @@ async function runExportReviewFlow(options = getDefaultSettings()) {
         manualResolution,
         cutawayResolution,
         manualRedactions,
-        cutawayRegion
-      }));
-    } finally {
+      cutawayRegion
+    }));
+  } finally {
       if (target.kind === "viewport") {
         await closeWindowSafely(target.windowId);
       }
@@ -663,11 +663,51 @@ function buildExportReviewVariant({
         }
       : null,
     cutawayResolutionStats,
+    preview: buildExportReviewPreview({
+      page,
+      autoRegions: autoScan.regions || [],
+      manualRegions: manualResolution.regions || [],
+      cutawayRegion: cutawayResolution.region
+    }),
     redactionBreakdown: mergeRedactionBreakdowns([
       autoScan.breakdown || buildRedactionBreakdown(autoScan.regions || []),
       buildRedactionBreakdown(manualResolution.regions || [])
     ])
   };
+}
+
+function buildExportReviewPreview({ page, autoRegions, manualRegions, cutawayRegion }) {
+  return {
+    pageWidth: Math.max(1, Math.round(page.viewportWidth || 1)),
+    pageHeight: Math.max(1, Math.round(page.pageHeight || page.viewportHeight || 1)),
+    viewportHeight: Math.max(1, Math.round(page.viewportHeight || 1)),
+    regions: [
+      ...buildPreviewRegionRecords(autoRegions, "auto", 18),
+      ...buildPreviewRegionRecords(manualRegions, "manual", 24),
+      ...buildPreviewRegionRecords(cutawayRegion ? [cutawayRegion] : [], "cutaway", 1)
+    ]
+  };
+}
+
+function buildPreviewRegionRecords(regions, role, limit) {
+  return (Array.isArray(regions) ? regions : [])
+    .filter((region) =>
+      Number.isFinite(region.left) &&
+      Number.isFinite(region.top) &&
+      Number.isFinite(region.width) &&
+      Number.isFinite(region.height)
+    )
+    .slice(0, limit)
+    .map((region) => ({
+      role,
+      kind: region.kind || role,
+      left: Math.max(0, Math.round(region.left)),
+      top: Math.max(0, Math.round(region.top)),
+      width: Math.max(1, Math.round(region.width)),
+      height: Math.max(1, Math.round(region.height)),
+      ...(region.projected ? { projected: true } : {}),
+      ...(typeof region.projection === "string" ? { projection: region.projection.slice(0, 32) } : {})
+    }));
 }
 
 function buildExportReviewWarnings({
