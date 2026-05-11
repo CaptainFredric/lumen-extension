@@ -27,6 +27,11 @@ const ui = {
   startRedactionPickerButton: document.querySelector("#startRedactionPickerButton"),
   clearManualRedactionsButton: document.querySelector("#clearManualRedactionsButton"),
   redactionPreviewSummary: document.querySelector("#redactionPreviewSummary"),
+  cutawayRegionStatus: document.querySelector("#cutawayRegionStatus"),
+  startCutawayPickerButton: document.querySelector("#startCutawayPickerButton"),
+  clearCutawayButton: document.querySelector("#clearCutawayButton"),
+  explainCutawayPlanButton: document.querySelector("#explainCutawayPlanButton"),
+  cutawaySummary: document.querySelector("#cutawaySummary"),
   exportManifest: document.querySelector("#exportManifest"),
   annotationEnabled: document.querySelector("#annotationEnabled"),
   annotationBlock: document.querySelector("#annotationBlock"),
@@ -91,6 +96,10 @@ let currentSession = {
 let manualRedactionRecord = {
   regions: []
 };
+let cutawayRegionRecord = {
+  region: null,
+  regions: []
+};
 let statusEvents = [];
 let holdTimer = null;
 let suppressNextCaptureClick = false;
@@ -151,6 +160,10 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "LUMEN_MANUAL_REDACTIONS_UPDATED") {
     renderManualRedactions(message.payload);
   }
+
+  if (message?.type === "LUMEN_CUTAWAY_REGION_UPDATED") {
+    renderCutawayRegion(message.payload);
+  }
 });
 
 async function bootstrap() {
@@ -174,6 +187,9 @@ function bindEvents() {
   ui.previewRedactionsButton.addEventListener("click", handlePreviewRedactions);
   ui.startRedactionPickerButton.addEventListener("click", handleStartRedactionPicker);
   ui.clearManualRedactionsButton.addEventListener("click", handleClearManualRedactions);
+  ui.startCutawayPickerButton.addEventListener("click", handleStartCutawayPicker);
+  ui.clearCutawayButton.addEventListener("click", handleClearCutawayRegion);
+  ui.explainCutawayPlanButton.addEventListener("click", handleExplainCutawayPlan);
 
   for (const button of ui.deviceButtons) {
     button.addEventListener("click", () => {
@@ -251,6 +267,7 @@ async function restoreAppState() {
     renderHistory([]);
     renderSession(currentSession);
     await refreshManualRedactions();
+    await refreshCutawayRegion();
     return;
   }
 
@@ -258,6 +275,7 @@ async function restoreAppState() {
   renderHistory(response.captureHistory || []);
   renderSession(response.session || currentSession);
   await refreshManualRedactions();
+  await refreshCutawayRegion();
 }
 
 async function resolveActionTargetTab() {
@@ -489,6 +507,11 @@ async function runQuickAction(action) {
 
   if (action === "mark") {
     await handleStartRedactionPicker();
+    return;
+  }
+
+  if (action === "cutaway") {
+    await handleStartCutawayPicker();
     return;
   }
 
@@ -798,6 +821,118 @@ async function handleClearManualRedactions() {
   } finally {
     setActionBusy(false);
   }
+}
+
+async function handleStartCutawayPicker() {
+  if (actionBusy) {
+    return;
+  }
+
+  if (!(await ensureActionTargetReady("mark a cutaway region"))) {
+    return;
+  }
+
+  setActionBusy(true);
+
+  showStatus({
+    tone: "neutral",
+    eyebrow: "Cutaway",
+    title: "Opening region picker",
+    detail: "Draw one box around the page area you want to reuse. Press Done in the page overlay when finished.",
+    badge: "Picker",
+    progress: 0.08
+  });
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "LUMEN_START_CUTAWAY_PICKER"
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error?.description || "Cutaway picker could not start.");
+    }
+
+    renderCutawayRegion(response.record);
+
+    showStatus({
+      tone: "success",
+      eyebrow: "Cutaway",
+      title: "Cutaway picker ready",
+      detail: "The selected region is stored locally for this URL. Continuous watch still needs explicit opt-in and review UI.",
+      badge: "Ready",
+      progress: 1
+    });
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Cutaway",
+      title: "Picker failed",
+      detail: error.message,
+      badge: "Failed",
+      progress: 0.12
+    });
+  } finally {
+    setActionBusy(false);
+  }
+}
+
+async function handleClearCutawayRegion() {
+  if (actionBusy) {
+    return;
+  }
+
+  if (!(await ensureActionTargetReady("clear the cutaway region"))) {
+    return;
+  }
+
+  setActionBusy(true);
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "LUMEN_CLEAR_CUTAWAY_REGION"
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error?.description || "Cutaway region could not be cleared.");
+    }
+
+    renderCutawayRegion(response.record);
+
+    showStatus({
+      tone: "neutral",
+      eyebrow: "Cutaway",
+      title: "Cutaway cleared",
+      detail: "No reusable region is stored for this URL.",
+      badge: "Cleared",
+      progress: 0.2
+    });
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Cutaway",
+      title: "Clear failed",
+      detail: error.message,
+      badge: "Failed",
+      progress: 0.12
+    });
+  } finally {
+    setActionBusy(false);
+  }
+}
+
+function handleExplainCutawayPlan() {
+  const hasRegion = Boolean(cutawayRegionRecord.region);
+
+  showStatus({
+    tone: "neutral",
+    eyebrow: "Cutaway",
+    title: hasRegion ? "Region watch plan" : "Mark a region first",
+    detail: hasRegion
+      ? "Next layer: opt-in scheduled focused captures, visible pause controls, retention limits, and explicit agent handoff destinations."
+      : "Use Mark cutaway to save one page area before planning a watch or agent handoff flow.",
+    badge: hasRegion ? "Planned" : "No region",
+    progress: hasRegion ? 0.42 : 0.12
+  });
 }
 
 async function ensurePermissionsForCurrentCapture() {
@@ -1180,6 +1315,32 @@ function renderManualRedactions(record) {
   renderRunSummary(currentSettings);
 }
 
+function renderCutawayRegion(record) {
+  const region = record?.region || record?.regions?.[0] || null;
+  cutawayRegionRecord = {
+    ...(record || {}),
+    region,
+    regions: region ? [region] : []
+  };
+
+  if (!region) {
+    ui.cutawayRegionStatus.textContent = "No region";
+    ui.cutawaySummary.textContent = "A marked region is stored locally for this URL and can become the source for a focused capture or scheduled watch flow.";
+    updateActionDisabledState();
+    renderRunSummary(currentSettings);
+    return;
+  }
+
+  ui.cutawayRegionStatus.textContent = `${Math.round(region.width)}x${Math.round(region.height)}`;
+  ui.cutawaySummary.textContent = [
+    `Stored for ${record?.host || "this URL"}.`,
+    `Top ${Math.round(region.top)}px, left ${Math.round(region.left)}px.`,
+    "Automation remains opt-in future work."
+  ].join(" ");
+  updateActionDisabledState();
+  renderRunSummary(currentSettings);
+}
+
 function buildHistoryDetails(item) {
   const detail = document.createElement("div");
   detail.className = "history-detail";
@@ -1549,7 +1710,8 @@ function renderRunSummary(settings = currentSettings) {
     settings.removeStickyHeaders !== false ? "Cleanup" : "",
     settings.forceLazyLoad !== false ? "Lazy load" : "",
     settings.autoRedact ? "Redact" : "",
-    manualRedactionRecord.regions?.length ? "Manual boxes" : ""
+    manualRedactionRecord.regions?.length ? "Manual boxes" : "",
+    cutawayRegionRecord.region ? "Cutaway" : ""
   ].filter(Boolean);
 
   ui.runViewSummary.textContent = viewLabel;
@@ -1650,6 +1812,9 @@ function updateActionDisabledState() {
   ui.previewRedactionsButton.disabled = disabled;
   ui.startRedactionPickerButton.disabled = disabled;
   ui.clearManualRedactionsButton.disabled = disabled || !(manualRedactionRecord.regions?.length);
+  ui.startCutawayPickerButton.disabled = disabled;
+  ui.clearCutawayButton.disabled = disabled || !cutawayRegionRecord.region;
+  ui.explainCutawayPlanButton.disabled = disabled;
 
   for (const button of ui.holdMenuActions) {
     button.disabled = disabled;
@@ -1882,6 +2047,18 @@ async function refreshManualRedactions() {
     renderManualRedactions(response?.record);
   } catch {
     renderManualRedactions(null);
+  }
+}
+
+async function refreshCutawayRegion() {
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "LUMEN_GET_CUTAWAY_REGION"
+    });
+
+    renderCutawayRegion(response?.record);
+  } catch {
+    renderCutawayRegion(null);
   }
 }
 

@@ -50,7 +50,8 @@
     prepared: false,
     scrollRoot: null,
     scrollContext: null,
-    manualPicker: null
+    manualPicker: null,
+    cutawayPicker: null
   };
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -117,6 +118,20 @@
     if (message.type === "LUMEN_CLEAR_MANUAL_REDACTION_PICKER") {
       Promise.resolve()
         .then(() => sendResponse({ ok: true, picker: clearManualRedactionPicker() }))
+        .catch((error) => sendResponse({ ok: false, error: error.message }));
+      return true;
+    }
+
+    if (message.type === "LUMEN_START_CUTAWAY_REGION_PICKER") {
+      Promise.resolve()
+        .then(() => sendResponse({ ok: true, picker: startCutawayRegionPicker(message.payload || {}) }))
+        .catch((error) => sendResponse({ ok: false, error: error.message }));
+      return true;
+    }
+
+    if (message.type === "LUMEN_CLEAR_CUTAWAY_REGION_PICKER") {
+      Promise.resolve()
+        .then(() => sendResponse({ ok: true, picker: clearCutawayRegionPicker() }))
         .catch((error) => sendResponse({ ok: false, error: error.message }));
       return true;
     }
@@ -270,6 +285,7 @@
   }
 
   function startManualRedactionPicker({ regions = [] } = {}) {
+    teardownCutawayRegionPicker(false);
     teardownManualRedactionPicker(false);
 
     const overlay = document.createElement("div");
@@ -379,6 +395,110 @@
     captureState.manualPicker = null;
   }
 
+  function startCutawayRegionPicker({ region = null } = {}) {
+    teardownManualRedactionPicker(false);
+    teardownCutawayRegionPicker(false);
+
+    const overlay = document.createElement("div");
+    const surface = document.createElement("div");
+    const toolbar = document.createElement("div");
+    const title = document.createElement("strong");
+    const hint = document.createElement("span");
+    const count = document.createElement("span");
+    const clearButton = document.createElement("button");
+    const doneButton = document.createElement("button");
+    const cancelButton = document.createElement("button");
+
+    overlay.id = "lumen-cutaway-picker";
+    surface.className = "lumen-cutaway-surface";
+    toolbar.className = "lumen-cutaway-toolbar";
+    title.textContent = "Lumen cutaway region";
+    hint.textContent = "Drag one box around the area you want to reuse for a future watch or focused capture.";
+    count.className = "lumen-cutaway-count";
+    clearButton.textContent = "Clear";
+    doneButton.textContent = "Done";
+    cancelButton.textContent = "Cancel";
+
+    for (const button of [clearButton, doneButton, cancelButton]) {
+      button.type = "button";
+    }
+
+    toolbar.append(title, hint, count, clearButton, doneButton, cancelButton);
+    overlay.append(surface, toolbar);
+    document.documentElement.appendChild(overlay);
+
+    const picker = {
+      overlay,
+      surface,
+      count,
+      region: normalizeCutawayRegion(region),
+      draft: null,
+      start: null,
+      moved: false
+    };
+
+    captureState.cutawayPicker = picker;
+    injectCutawayPickerStyles();
+    renderCutawayRegionBox();
+
+    surface.addEventListener("pointerdown", handleCutawayPickerPointerDown);
+    surface.addEventListener("pointermove", handleCutawayPickerPointerMove);
+    surface.addEventListener("pointerup", handleCutawayPickerPointerUp);
+    surface.addEventListener("pointercancel", handleCutawayPickerPointerCancel);
+
+    clearButton.addEventListener("click", () => {
+      picker.region = null;
+      renderCutawayRegionBox();
+      persistCutawayRegion();
+    });
+    doneButton.addEventListener("click", () => {
+      persistCutawayRegion();
+      teardownCutawayRegionPicker(false);
+    });
+    cancelButton.addEventListener("click", () => teardownCutawayRegionPicker(false));
+
+    window.addEventListener("keydown", handleCutawayPickerKeydown, true);
+
+    persistCutawayRegion();
+    return buildCutawayPickerPayload();
+  }
+
+  function clearCutawayRegionPicker() {
+    if (captureState.cutawayPicker) {
+      captureState.cutawayPicker.region = null;
+      renderCutawayRegionBox();
+    }
+
+    chrome.runtime.sendMessage({
+      type: "LUMEN_CUTAWAY_REGION_UPDATED",
+      payload: {
+        region: null,
+        context: getPageMetrics()
+      }
+    }).catch(() => {});
+
+    return {
+      region: null,
+      regions: []
+    };
+  }
+
+  function teardownCutawayRegionPicker(persist = true) {
+    const picker = captureState.cutawayPicker;
+
+    if (!picker) {
+      return;
+    }
+
+    if (persist) {
+      persistCutawayRegion();
+    }
+
+    window.removeEventListener("keydown", handleCutawayPickerKeydown, true);
+    picker.overlay.remove();
+    captureState.cutawayPicker = null;
+  }
+
   function handleManualPickerPointerDown(event) {
     const picker = captureState.manualPicker;
 
@@ -455,6 +575,82 @@
     picker.moved = false;
   }
 
+  function handleCutawayPickerPointerDown(event) {
+    const picker = captureState.cutawayPicker;
+
+    if (!picker || event.button !== 0) {
+      return;
+    }
+
+    event.preventDefault();
+    picker.surface.setPointerCapture(event.pointerId);
+    picker.start = {
+      x: event.clientX,
+      y: event.clientY,
+      pointerId: event.pointerId
+    };
+    picker.moved = false;
+    picker.draft = document.createElement("div");
+    picker.draft.className = "lumen-cutaway-box lumen-cutaway-box-draft";
+    picker.surface.appendChild(picker.draft);
+  }
+
+  function handleCutawayPickerPointerMove(event) {
+    const picker = captureState.cutawayPicker;
+
+    if (!picker?.start || !picker.draft || event.pointerId !== picker.start.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+    picker.moved = true;
+    drawManualPickerBox(picker.draft, normalizeViewportRect(picker.start.x, picker.start.y, event.clientX, event.clientY));
+  }
+
+  function handleCutawayPickerPointerUp(event) {
+    const picker = captureState.cutawayPicker;
+
+    if (!picker?.start || event.pointerId !== picker.start.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const rect = normalizeViewportRect(picker.start.x, picker.start.y, event.clientX, event.clientY);
+    picker.surface.releasePointerCapture(event.pointerId);
+    picker.draft?.remove();
+    picker.draft = null;
+    picker.start = null;
+
+    if (!picker.moved || rect.width < 8 || rect.height < 8) {
+      picker.moved = false;
+      return;
+    }
+
+    const region = buildCutawayRegion(rect);
+
+    if (region) {
+      picker.region = region;
+      renderCutawayRegionBox();
+      persistCutawayRegion();
+    }
+
+    picker.moved = false;
+  }
+
+  function handleCutawayPickerPointerCancel(event) {
+    const picker = captureState.cutawayPicker;
+
+    if (!picker?.start || event.pointerId !== picker.start.pointerId) {
+      return;
+    }
+
+    picker.draft?.remove();
+    picker.draft = null;
+    picker.start = null;
+    picker.moved = false;
+  }
+
   function handleManualPickerKeydown(event) {
     const picker = captureState.manualPicker;
 
@@ -476,9 +672,48 @@
     }
   }
 
+  function handleCutawayPickerKeydown(event) {
+    const picker = captureState.cutawayPicker;
+
+    if (!picker) {
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      teardownCutawayRegionPicker(false);
+      return;
+    }
+
+    if ((event.key === "Backspace" || event.key === "Delete") && picker.region) {
+      event.preventDefault();
+      picker.region = null;
+      renderCutawayRegionBox();
+      persistCutawayRegion();
+    }
+  }
+
   function buildManualRedactionRegion(viewportRect) {
     const context = detectScrollContext();
     const region = buildRedactionRegion(viewportRect, context, "manual");
+
+    if (!region) {
+      return null;
+    }
+
+    const anchor = buildManualRedactionAnchor(viewportRect, region, context);
+
+    return {
+      ...region,
+      id: createLocalId(),
+      sourceViewport: getManualRedactionSourceViewport(context),
+      ...(anchor ? { anchor } : {})
+    };
+  }
+
+  function buildCutawayRegion(viewportRect) {
+    const context = detectScrollContext();
+    const region = buildRedactionRegion(viewportRect, context, "cutaway");
 
     if (!region) {
       return null;
@@ -512,6 +747,27 @@
         } : {})
       }))
       .slice(0, MANUAL_REDACTION_LIMIT);
+  }
+
+  function normalizeCutawayRegion(region) {
+    if (!region || typeof region !== "object" || !Number.isFinite(region.left) || !Number.isFinite(region.top)) {
+      return null;
+    }
+
+    return {
+      id: region.id || createLocalId(),
+      kind: "cutaway",
+      left: Math.max(0, Math.round(region.left)),
+      top: Math.max(0, Math.round(region.top)),
+      width: Math.max(1, Math.round(region.width || 1)),
+      height: Math.max(1, Math.round(region.height || 1)),
+      ...(normalizeManualRedactionSourceViewport(region.sourceViewport) ? {
+        sourceViewport: normalizeManualRedactionSourceViewport(region.sourceViewport)
+      } : {}),
+      ...(normalizeManualRedactionAnchor(region.anchor) ? {
+        anchor: normalizeManualRedactionAnchor(region.anchor)
+      } : {})
+    };
   }
 
   function resolveManualRedactions({ regions = [], context: recordContext = null } = {}) {
@@ -682,7 +938,7 @@
   function getElementUnderManualRect(viewportRect) {
     const centerX = viewportRect.left + viewportRect.width / 2;
     const centerY = viewportRect.top + viewportRect.height / 2;
-    const overlay = captureState.manualPicker?.overlay;
+    const overlay = captureState.manualPicker?.overlay || captureState.cutawayPicker?.overlay;
     const previousVisibility = overlay?.style.visibility || "";
     const previousPointerEvents = overlay?.style.pointerEvents || "";
 
@@ -697,6 +953,7 @@
         node instanceof HTMLElement &&
         !["html", "body"].includes(node.tagName.toLowerCase()) &&
         !node.closest("#lumen-redaction-picker") &&
+        !node.closest("#lumen-cutaway-picker") &&
         isElementScannable(node)
       ) || null;
     } finally {
@@ -936,6 +1193,29 @@
     picker.count.textContent = `${picker.regions.length} box${picker.regions.length === 1 ? "" : "es"}`;
   }
 
+  function renderCutawayRegionBox() {
+    const picker = captureState.cutawayPicker;
+
+    if (!picker) {
+      return;
+    }
+
+    picker.surface.querySelectorAll(".lumen-cutaway-box:not(.lumen-cutaway-box-draft)").forEach((node) => node.remove());
+
+    if (picker.region) {
+      const rect = fromScrollCoordinates(picker.region, detectScrollContext());
+
+      if (rect) {
+        const box = document.createElement("div");
+        box.className = "lumen-cutaway-box";
+        drawManualPickerBox(box, rect);
+        picker.surface.appendChild(box);
+      }
+    }
+
+    picker.count.textContent = picker.region ? "1 region" : "No region";
+  }
+
   function persistManualRedactions() {
     const picker = captureState.manualPicker;
 
@@ -954,6 +1234,29 @@
 
     return {
       regions: picker ? picker.regions : [],
+      context: getPageMetrics()
+    };
+  }
+
+  function persistCutawayRegion() {
+    const picker = captureState.cutawayPicker;
+
+    if (!picker) {
+      return;
+    }
+
+    chrome.runtime.sendMessage({
+      type: "LUMEN_CUTAWAY_REGION_UPDATED",
+      payload: buildCutawayPickerPayload()
+    }).catch(() => {});
+  }
+
+  function buildCutawayPickerPayload() {
+    const picker = captureState.cutawayPicker;
+
+    return {
+      region: picker ? picker.region : null,
+      regions: picker?.region ? [picker.region] : [],
       context: getPageMetrics()
     };
   }
@@ -1068,6 +1371,94 @@
       }
 
       #lumen-redaction-picker .lumen-redaction-box-draft {
+        border-style: dashed !important;
+      }
+    `;
+    document.documentElement.appendChild(style);
+  }
+
+  function injectCutawayPickerStyles() {
+    if (document.getElementById("lumen-cutaway-picker-style")) {
+      return;
+    }
+
+    const style = document.createElement("style");
+    style.id = "lumen-cutaway-picker-style";
+    style.textContent = `
+      #lumen-cutaway-picker {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 2147483647 !important;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+        color: #eef6ff !important;
+        cursor: crosshair !important;
+      }
+
+      #lumen-cutaway-picker .lumen-cutaway-surface {
+        position: absolute !important;
+        inset: 0 !important;
+        background: rgba(2, 8, 16, 0.3) !important;
+      }
+
+      #lumen-cutaway-picker .lumen-cutaway-toolbar {
+        position: absolute !important;
+        left: 18px !important;
+        right: 18px !important;
+        bottom: 18px !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        padding: 12px !important;
+        border: 1px solid rgba(127, 241, 197, 0.24) !important;
+        border-radius: 14px !important;
+        background: rgba(5, 11, 20, 0.92) !important;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.34) !important;
+        cursor: default !important;
+      }
+
+      #lumen-cutaway-picker strong {
+        color: #7ff1c5 !important;
+        font-size: 13px !important;
+        letter-spacing: 0.08em !important;
+        text-transform: uppercase !important;
+        white-space: nowrap !important;
+      }
+
+      #lumen-cutaway-picker span {
+        color: rgba(238, 246, 255, 0.72) !important;
+        font-size: 13px !important;
+      }
+
+      #lumen-cutaway-picker .lumen-cutaway-count {
+        margin-left: auto !important;
+        white-space: nowrap !important;
+      }
+
+      #lumen-cutaway-picker button {
+        min-height: 34px !important;
+        padding: 0 12px !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 10px !important;
+        background: rgba(255, 255, 255, 0.06) !important;
+        color: #eef6ff !important;
+        font: inherit !important;
+        cursor: pointer !important;
+      }
+
+      #lumen-cutaway-picker button:last-child {
+        color: rgba(238, 246, 255, 0.7) !important;
+      }
+
+      #lumen-cutaway-picker .lumen-cutaway-box {
+        position: fixed !important;
+        border: 2px solid #7ff1c5 !important;
+        border-radius: 12px !important;
+        background: rgba(127, 241, 197, 0.16) !important;
+        box-shadow: 0 0 0 9999px rgba(2, 8, 16, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.2) !important;
+        pointer-events: none !important;
+      }
+
+      #lumen-cutaway-picker .lumen-cutaway-box-draft {
         border-style: dashed !important;
       }
     `;

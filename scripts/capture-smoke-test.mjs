@@ -52,7 +52,9 @@ async function buildPatchedContentScript() {
         scanSensitiveRegions,
         startManualRedactionPicker,
         resolveManualRedactions,
-        clearManualRedactionPicker
+        clearManualRedactionPicker,
+        startCutawayRegionPicker,
+        clearCutawayRegionPicker
       };
     })();
     `
@@ -352,6 +354,62 @@ async function runManualProjectionSmoke(browser, contentScript) {
   });
 }
 
+async function runCutawayRegionSmoke(browser, contentScript) {
+  const html = `<!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Cutaway Region Fixture</title>
+        <style>
+          body { margin: 0; font-family: ui-sans-serif, system-ui, sans-serif; }
+          main { width: min(960px, calc(100% - 48px)); margin: 0 auto; padding: 72px 0 760px; }
+          #pricing-card { margin-top: 80px; min-height: 220px; padding: 28px; border: 1px solid #d7dee8; border-radius: 24px; background: #fff; }
+        </style>
+      </head>
+      <body>
+        <main>
+          <h1>Cutaway fixture</h1>
+          <section id="pricing-card">
+            <h2>Launch plan</h2>
+            <p>$49 per seat</p>
+          </section>
+        </main>
+      </body>
+    </html>`;
+
+  await withPage(browser, html, contentScript, { width: 1180, height: 820 }, async (page) => {
+    await page.evaluate(() =>
+      window.__LUMEN_TEST_API__.handlePrepareCapture({
+        removeStickyHeaders: false,
+        forceLazyLoad: false
+      })
+    );
+    const targetBox = await page.locator("#pricing-card").boundingBox();
+    assert(targetBox, "Cutaway fixture target is missing");
+
+    await page.evaluate(() => window.__LUMEN_TEST_API__.startCutawayRegionPicker());
+    await page.mouse.move(targetBox.x + 20, targetBox.y + 22);
+    await page.mouse.down();
+    await page.mouse.move(targetBox.x + targetBox.width - 28, targetBox.y + 156, { steps: 8 });
+    await page.mouse.up();
+
+    const message = await page.evaluate(() => window.__LUMEN_LAST_RUNTIME_MESSAGE__);
+    const region = message?.payload?.region;
+    await page.getByRole("button", { name: "Done" }).click();
+
+    assert(message?.type === "LUMEN_CUTAWAY_REGION_UPDATED", "Cutaway picker did not publish its region.", message);
+    assert(region?.kind === "cutaway", "Cutaway picker did not store a cutaway region kind.", region);
+    assert(region.width > 240 && region.height > 120, "Cutaway region geometry is too small.", region);
+    assert(region.anchor?.selector === "#pricing-card", "Cutaway region did not store a stable DOM anchor.", region);
+
+    record("cutaway region picker", {
+      selector: region.anchor.selector,
+      width: region.width,
+      height: region.height
+    });
+  });
+}
+
 async function main() {
   const contentScript = await buildPatchedContentScript();
   const browser = await chromium.launch();
@@ -360,6 +418,7 @@ async function main() {
     await runDocumentCaptureSmoke(browser, contentScript);
     await runNestedScrollSmoke(browser, contentScript);
     await runManualProjectionSmoke(browser, contentScript);
+    await runCutawayRegionSmoke(browser, contentScript);
   } finally {
     await browser.close();
   }

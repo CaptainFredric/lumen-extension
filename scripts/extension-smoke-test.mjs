@@ -133,6 +133,8 @@ try {
     holdActionCount: document.querySelectorAll("[data-quick-action]").length,
     statusHidden: document.querySelector("#statusPanel")?.classList.contains("is-hidden") ?? false,
     manualCount: document.querySelector("#manualRedactionCount")?.textContent?.trim() || "",
+    cutawayStatus: document.querySelector("#cutawayRegionStatus")?.textContent?.trim() || "",
+    cutawayClearDisabled: document.querySelector("#clearCutawayButton")?.disabled || false,
     runViewSummary: document.querySelector("#runViewSummary")?.textContent?.trim() || "",
     runExportSummary: document.querySelector("#runExportSummary")?.textContent?.trim() || "",
     runSafetySummary: document.querySelector("#runSafetySummary")?.textContent?.trim() || "",
@@ -161,9 +163,11 @@ try {
   assert(popupState.analyzeButton === "Analyze Page", "Analyze action did not render.", popupState);
   assert(!popupState.analyzeDisabled, "Analyze action should be enabled for a capturable target tab.", popupState);
   assert(popupState.holdMenuHidden === "true", "Hold menu should start closed.", popupState);
-  assert(popupState.holdActionCount === 4, "Hold menu actions did not render.", popupState);
+  assert(popupState.holdActionCount === 5, "Hold menu actions did not render.", popupState);
   assert(popupState.statusHidden, "Popup status panel should start hidden.", popupState);
   assert(popupState.manualCount === "0 boxes", "Manual redaction counter did not initialize.", popupState);
+  assert(popupState.cutawayStatus === "No region", "Cutaway region status did not initialize.", popupState);
+  assert(popupState.cutawayClearDisabled, "Cutaway clear action should start disabled without a region.", popupState);
   assert(popupState.runViewSummary === "Desktop", "Run view summary did not initialize.", popupState);
   assert(popupState.runExportSummary === "Raw", "Run export summary did not initialize.", popupState);
   assert(popupState.runSafetySummary.includes("Cleanup"), "Run safety summary did not initialize.", popupState);

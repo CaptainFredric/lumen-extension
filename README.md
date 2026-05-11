@@ -24,15 +24,16 @@ The current build includes:
 6. export-time redaction for emails, phone numbers, token-like strings, and filled inputs across the current DOM
 7. redaction preview from the popup before export
 8. anchored manual redaction boxes for areas the scanner cannot infer, with projection into responsive captures when the source element still resolves
-9. anchored capture notes rendered into the exported image
-10. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
-11. bundle-manifest JSON exports with view, redaction, manual projection, signal, output health, and note metadata
-12. dated per-run download folders so capture sets, tiles, and manifests stay together
-13. local capture history with file, folder, summary, and Chrome download-handle metadata
-14. popup history actions to open the latest artifact or reveal it in the Downloads folder
-15. capture-time popup UI with run settings, a live stage timeline, and recent status log
-16. a local backend slice for demo session state and history sync when an API is reachable
-17. a GitHub Pages landing site in `docs/`
+9. a cutaway region picker that stores one reusable page area per URL as the foundation for focused capture and opt-in watch flows
+10. anchored capture notes rendered into the exported image
+11. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
+12. bundle-manifest JSON exports with view, redaction, manual projection, signal, output health, and note metadata
+13. dated per-run download folders so capture sets, tiles, and manifests stay together
+14. local capture history with file, folder, summary, and Chrome download-handle metadata
+15. popup history actions to open the latest artifact or reveal it in the Downloads folder
+16. capture-time popup UI with run settings, cutaway state, a live stage timeline, and recent status log
+17. a local backend slice for demo session state and history sync when an API is reachable
+18. a GitHub Pages landing site in `docs/`
 
 ## Current Limits
 
@@ -40,10 +41,11 @@ These limits are important:
 
 1. redaction currently covers text and filled inputs present in the current DOM during export and should be reviewed before external sharing
 2. manual redaction boxes can project into responsive captures through DOM anchors, but the result still needs review before external sharing
-3. the current annotation pass is one anchored capture note
-4. cloud sync, billing, scheduled monitoring, and visual diffs remain future work
-5. highly dynamic sites with virtualization or unusual scroll behavior can still need site-specific fallback work
-6. the local backend slice remains a small demo path rather than a production account system
+3. cutaway regions are stored locally today, but focused cutaway export and continuous watch automation are not active yet
+4. the current annotation pass is one anchored capture note
+5. cloud sync, billing, scheduled monitoring, and visual diffs remain future work
+6. highly dynamic sites with virtualization or unusual scroll behavior can still need site-specific fallback work
+7. the local backend slice remains a small demo path rather than a production account system
 
 ## Architecture
 
@@ -110,9 +112,10 @@ The public landing page will be available at `http://127.0.0.1:3000/`.
 6. Change capture device, export mode, cleanup, lazy-load forcing, auto-redaction, notes, or manifest settings when needed
 7. Use `Scan` to preview detected redaction regions before export
 8. Use `Mark boxes` if you need manual redactions before capture
-9. Use `Open` or `Show in folder` from recent captures to get back to the saved artifact
-10. Expand recent capture details to review views, artifacts, redactions, manifest status, notes, and page signals
-11. Copy a capture summary when you need to paste evidence into a review note or bug report
+9. Use `Mark cutaway` to store one reusable page region for future focused capture or watch work
+10. Use `Open` or `Show in folder` from recent captures to get back to the saved artifact
+11. Expand recent capture details to review views, artifacts, redactions, manifest status, notes, and page signals
+12. Copy a capture summary when you need to paste evidence into a review note or bug report
 
 If the launch indicator says the page is blocked, switch to a normal `http://` or `https://` page. Chrome does not allow extension capture scripts on internal browser pages, Web Store pages, or other extension pages.
 
@@ -206,16 +209,22 @@ npm run smoke:site
 
 These are future layers:
 
-1. freeform annotation tools
-2. cloud sync destinations
-3. auth and billing
-4. scheduled monitoring
-5. visual diffs and alerts
+1. focused cutaway capture exports from the stored region
+2. freeform annotation tools
+3. opt-in region watch with visible pause and retention controls
+4. explicit agent handoff for selected bundles
+5. cloud sync destinations
+6. auth and billing
+7. visual diffs and alerts
+
+See `PRODUCT_ROADMAP.md` for the longer product direction and Chrome Web Store guardrails.
+See `STORE_READINESS.md` for the current submission checklist, permission rationale, and policy references.
 
 ## Next Work
 
 The highest-leverage next steps are:
 
 1. improve capture reliability on difficult real-world sites
-2. improve cross-layout review for projected manual redactions
-3. tighten the backend from demo session state into a real account path
+2. connect the cutaway region picker to focused crop export
+3. improve cross-layout review for projected manual redactions and cutaway regions
+4. tighten the backend from demo session state into a real account path

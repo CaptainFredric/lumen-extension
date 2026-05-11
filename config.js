@@ -5,6 +5,7 @@ export const LUMEN_CONFIG = {
     captureThrottleMs: 550,
     historyLimit: 12,
     manualRedactionLimit: 24,
+    cutawayRegionLimit: 1,
     lateOverlaySettleMs: 140,
     mediaSettleTimeoutMs: 2200,
     maxStallRetries: 3,
@@ -72,7 +73,8 @@ export const STORAGE_KEYS = {
   latestBlueprint: "lumen.inspector.latestBlueprint",
   session: "lumen.account.session",
   captureHistory: "lumen.capture.history",
-  manualRedactions: "lumen.capture.manualRedactions"
+  manualRedactions: "lumen.capture.manualRedactions",
+  cutawayRegions: "lumen.capture.cutawayRegions"
 };
 
 export function isRestrictedCaptureUrl(url = "") {

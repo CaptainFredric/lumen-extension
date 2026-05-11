@@ -21,6 +21,7 @@ const BLUEPRINT_UPDATE_EVENT = "LUMEN_BLUEPRINT_UPDATED";
 const SESSION_UPDATE_EVENT = "LUMEN_SESSION_UPDATED";
 const HISTORY_UPDATE_EVENT = "LUMEN_HISTORY_UPDATED";
 const MANUAL_REDACTIONS_UPDATE_EVENT = "LUMEN_MANUAL_REDACTIONS_UPDATED";
+const CUTAWAY_REGION_UPDATE_EVENT = "LUMEN_CUTAWAY_REGION_UPDATED";
 
 let captureInFlight = false;
 let analyzeInFlight = false;
@@ -154,6 +155,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "LUMEN_START_CUTAWAY_PICKER") {
+    runCutawayRegionPicker()
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_CLEAR_CUTAWAY_REGION") {
+    clearCutawayRegionForActiveTab()
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_GET_CUTAWAY_REGION") {
+    getCutawayRegionForActiveTab()
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
   if (message?.type === "LUMEN_OPEN_CAPTURE_DOWNLOAD") {
     runHistoryDownloadAction(message.payload, "open")
       .then((result) => sendResponse({ ok: true, ...result }))
@@ -172,6 +197,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message?.type === "LUMEN_MANUAL_REDACTIONS_UPDATED") {
     persistManualRedactionsFromContent(sender.tab, message.payload)
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_CUTAWAY_REGION_UPDATED") {
+    persistCutawayRegionFromContent(sender.tab, message.payload)
       .then((result) => sendResponse({ ok: true, ...result }))
       .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
 
@@ -648,6 +681,142 @@ async function clearManualRedactionsForTab(tab) {
   return buildEmptyManualRedactionRecord(tab.url);
 }
 
+async function runCutawayRegionPicker() {
+  const sourceTab = await getCurrentTab();
+
+  if (!sourceTab?.id || !sourceTab.url) {
+    throw createFriendlyError(
+      "No Active Page",
+      "Open a normal browser tab, then start the cutaway picker again."
+    );
+  }
+
+  if (isRestrictedCaptureUrl(sourceTab.url)) {
+    throw createFriendlyError(
+      "This Page Cannot Be Marked",
+      "Chrome blocks script injection on internal pages, so the cutaway picker cannot run here."
+    );
+  }
+
+  await ensureContentScript(sourceTab.id);
+  const record = await getCutawayRegionForTab(sourceTab);
+  const response = await chrome.tabs.sendMessage(sourceTab.id, {
+    type: "LUMEN_START_CUTAWAY_REGION_PICKER",
+    payload: {
+      region: record.region || null
+    }
+  });
+
+  if (!response?.ok) {
+    throw createFriendlyError(
+      "Cutaway Picker Failed",
+      response?.error || "Lumen could not start the cutaway picker on this page."
+    );
+  }
+
+  const region = normalizeCutawayRegion(response.picker?.region || record.region);
+
+  return {
+    record: {
+      ...record,
+      region,
+      regions: region ? [region] : []
+    }
+  };
+}
+
+async function clearCutawayRegionForActiveTab() {
+  const sourceTab = await getCurrentTab();
+
+  if (!sourceTab?.url) {
+    return {
+      record: buildEmptyCutawayRegionRecord()
+    };
+  }
+
+  const record = await clearCutawayRegionForTab(sourceTab);
+
+  if (sourceTab.id) {
+    chrome.tabs.sendMessage(sourceTab.id, {
+      type: "LUMEN_CLEAR_CUTAWAY_REGION_PICKER"
+    }).catch(() => {});
+  }
+
+  broadcastCutawayRegion(record);
+  return { record };
+}
+
+async function getCutawayRegionForActiveTab() {
+  const sourceTab = await getCurrentTab();
+
+  if (!sourceTab?.url) {
+    return {
+      record: buildEmptyCutawayRegionRecord()
+    };
+  }
+
+  return {
+    record: await getCutawayRegionForTab(sourceTab)
+  };
+}
+
+async function persistCutawayRegionFromContent(tab, payload = {}) {
+  if (!tab?.url) {
+    return {
+      record: buildEmptyCutawayRegionRecord()
+    };
+  }
+
+  const store = await readCutawayRegionStore();
+  const key = buildManualRedactionKey(tab.url);
+  const region = normalizeCutawayRegion(payload.region || payload.regions?.[0]);
+  const record = {
+    url: tab.url,
+    host: new URL(tab.url).host,
+    updatedAt: new Date().toISOString(),
+    context: payload.context || null,
+    region,
+    regions: region ? [region] : []
+  };
+
+  if (region) {
+    store[key] = record;
+  } else {
+    delete store[key];
+  }
+
+  await writeCutawayRegionStore(store);
+  broadcastCutawayRegion(record);
+
+  return { record };
+}
+
+async function getCutawayRegionForTab(tab) {
+  if (!tab?.url || isRestrictedCaptureUrl(tab.url)) {
+    return buildEmptyCutawayRegionRecord();
+  }
+
+  const store = await readCutawayRegionStore();
+  const stored = store[buildManualRedactionKey(tab.url)];
+
+  if (!stored) {
+    return buildEmptyCutawayRegionRecord(tab.url);
+  }
+
+  return normalizeCutawayRecord(stored, tab.url);
+}
+
+async function clearCutawayRegionForTab(tab) {
+  if (!tab?.url) {
+    return buildEmptyCutawayRegionRecord();
+  }
+
+  const store = await readCutawayRegionStore();
+  delete store[buildManualRedactionKey(tab.url)];
+  await writeCutawayRegionStore(store);
+  return buildEmptyCutawayRegionRecord(tab.url);
+}
+
 function selectManualRedactionsForPage(record, page) {
   if (!record?.regions?.length) {
     return [];
@@ -688,6 +857,45 @@ function normalizeManualRedactionRegions(regions) {
       ...(typeof region.projection === "string" ? { projection: region.projection.slice(0, 32) } : {})
     }))
     .slice(0, LUMEN_CONFIG.capture.manualRedactionLimit || 24);
+}
+
+function normalizeCutawayRecord(record = {}, fallbackUrl = "") {
+  const region = normalizeCutawayRegion(record.region || record.regions?.[0]);
+  const rawUrl = record.url || fallbackUrl;
+
+  return {
+    url: rawUrl,
+    host: rawUrl ? new URL(rawUrl).host : "",
+    updatedAt: record.updatedAt || "",
+    context: record.context || null,
+    region,
+    regions: region ? [region] : []
+  };
+}
+
+function normalizeCutawayRegion(region) {
+  if (!region || typeof region !== "object") {
+    return null;
+  }
+
+  if (!Number.isFinite(region.left) || !Number.isFinite(region.top)) {
+    return null;
+  }
+
+  return {
+    id: region.id || createLocalId(),
+    kind: "cutaway",
+    left: Math.max(0, Math.round(region.left)),
+    top: Math.max(0, Math.round(region.top)),
+    width: Math.max(1, Math.round(region.width || 1)),
+    height: Math.max(1, Math.round(region.height || 1)),
+    ...(normalizeManualSourceViewport(region.sourceViewport) ? {
+      sourceViewport: normalizeManualSourceViewport(region.sourceViewport)
+    } : {}),
+    ...(normalizeManualAnchor(region.anchor) ? {
+      anchor: normalizeManualAnchor(region.anchor)
+    } : {})
+  };
 }
 
 function normalizeManualSourceViewport(sourceViewport) {
@@ -841,6 +1049,22 @@ async function writeManualRedactionStore(store) {
   });
 }
 
+async function readCutawayRegionStore() {
+  const stored = await chrome.storage.local.get(STORAGE_KEYS.cutawayRegions);
+  const value = stored[STORAGE_KEYS.cutawayRegions];
+  return value && typeof value === "object" ? value : {};
+}
+
+async function writeCutawayRegionStore(store) {
+  const entries = Object.entries(store)
+    .sort((left, right) => new Date(right[1].updatedAt || 0) - new Date(left[1].updatedAt || 0))
+    .slice(0, 50);
+
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.cutawayRegions]: Object.fromEntries(entries)
+  });
+}
+
 function buildManualRedactionKey(rawUrl) {
   const url = new URL(rawUrl);
   return `${url.origin}${url.pathname}${url.search}`;
@@ -852,6 +1076,17 @@ function buildEmptyManualRedactionRecord(rawUrl = "") {
     host: rawUrl ? new URL(rawUrl).host : "",
     updatedAt: "",
     context: null,
+    regions: []
+  };
+}
+
+function buildEmptyCutawayRegionRecord(rawUrl = "") {
+  return {
+    url: rawUrl,
+    host: rawUrl ? new URL(rawUrl).host : "",
+    updatedAt: "",
+    context: null,
+    region: null,
     regions: []
   };
 }
@@ -1615,6 +1850,13 @@ function broadcastHistory(captureHistory) {
 function broadcastManualRedactions(record) {
   chrome.runtime.sendMessage({
     type: MANUAL_REDACTIONS_UPDATE_EVENT,
+    payload: record
+  }).catch(() => {});
+}
+
+function broadcastCutawayRegion(record) {
+  chrome.runtime.sendMessage({
+    type: CUTAWAY_REGION_UPDATE_EVENT,
     payload: record
   }).catch(() => {});
 }

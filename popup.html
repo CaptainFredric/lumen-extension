@@ -83,6 +83,10 @@
             <span>Mark boxes</span>
             <small>Open manual picker</small>
           </button>
+          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="cutaway">
+            <span>Mark cutaway</span>
+            <small>Save a reusable region</small>
+          </button>
           <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="analyze">
             <span>Extract signals</span>
             <small>Palette, type, layout</small>
@@ -138,6 +142,20 @@
             <button id="clearManualRedactionsButton" class="mini-action ghost-mini-action" type="button">Clear</button>
           </div>
           <p id="redactionPreviewSummary" class="redaction-preview-summary">Scan the current page before export to see detected sensitive regions.</p>
+        </div>
+
+        <div class="cutaway-panel">
+          <div class="cutaway-copy">
+            <strong>Cutaway region</strong>
+            <small>Select one reusable page area for focused review. Watch automation and agent handoff are planned opt-in layers, not background capture yet.</small>
+          </div>
+          <div class="cutaway-actions">
+            <span id="cutawayRegionStatus" class="tiny-note">No region</span>
+            <button id="startCutawayPickerButton" class="mini-action" type="button">Mark cutaway</button>
+            <button id="clearCutawayButton" class="mini-action ghost-mini-action" type="button">Clear</button>
+            <button id="explainCutawayPlanButton" class="mini-action ghost-mini-action" type="button">Plan</button>
+          </div>
+          <p id="cutawaySummary" class="cutaway-summary">A marked region is stored locally for this URL and can become the source for a focused capture or scheduled watch flow.</p>
         </div>
 
         <label class="toggle-row">

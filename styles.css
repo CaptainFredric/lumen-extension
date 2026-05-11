@@ -1017,6 +1017,7 @@ h3 {
 
 .mechanics-section,
 .audience-section,
+.region-section,
 .scope-section {
   border-top: 1px solid rgba(173, 244, 226, 0.08);
 }
@@ -1274,7 +1275,14 @@ h3 {
   }
 
   .site-nav {
-    gap: 18px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px 14px;
+    overflow: visible;
+  }
+
+  .site-nav a {
+    text-align: center;
   }
 
   section {
