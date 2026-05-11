@@ -93,6 +93,12 @@ npm run api
 
 The local API listens on `http://127.0.0.1:8787`.
 
+To verify the backend contract for sessions, captures, watch plans, agent jobs, stats, and integrations:
+
+```bash
+npm run smoke:backend
+```
+
 ### Run The Landing Site Locally
 
 ```bash
