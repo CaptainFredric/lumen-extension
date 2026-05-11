@@ -31,6 +31,7 @@ const ui = {
   annotationEnabled: document.querySelector("#annotationEnabled"),
   annotationBlock: document.querySelector("#annotationBlock"),
   annotationText: document.querySelector("#annotationText"),
+  annotationCounter: document.querySelector("#annotationCounter"),
   annotationPositionButtons: [...document.querySelectorAll("[data-annotation-position]")],
   deviceButtons: [...document.querySelectorAll("[data-device]")],
   exportButtons: [...document.querySelectorAll("[data-export]")],
@@ -231,6 +232,7 @@ async function restoreSettings() {
   ui.exportManifest.checked = Boolean(currentSettings.exportManifest);
   ui.annotationEnabled.checked = Boolean(currentSettings.annotationEnabled);
   ui.annotationText.value = currentSettings.annotationText || "";
+  updateAnnotationCounter();
   updateDeviceButtons();
   updateExportButtons();
   updateAnnotationControls();
@@ -330,12 +332,22 @@ async function persistCurrentSettings() {
   currentSettings.annotationText = captureNote.text;
   currentSettings.annotationPosition = captureNote.position;
   ui.annotationEnabled.checked = captureNote.enabled;
+  updateAnnotationCounter();
   updateAnnotationControls();
   renderRunSummary(currentSettings);
 
   await chrome.storage.sync.set({
     [STORAGE_KEYS.settings]: currentSettings
   });
+}
+
+function updateAnnotationCounter() {
+  if (!ui.annotationCounter) {
+    return;
+  }
+
+  const noteLength = ui.annotationText?.value?.trim()?.length || 0;
+  ui.annotationCounter.textContent = `${noteLength} / 180`;
 }
 
 function updateDeviceButtons() {
