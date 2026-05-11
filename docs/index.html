@@ -116,71 +116,151 @@
         </div>
 
         <div class="hero-stage" data-tilt data-reveal>
-          <div class="evidence-board">
-            <div class="evidence-head">
-              <p class="support-label">Current output from the prototype</p>
-              <span class="evidence-domain">Generated May 1, 2026 UTC</span>
+          <div class="product-demo-shell">
+            <div class="product-demo-head">
+              <div>
+                <p class="support-label">Extension control surface</p>
+                <strong>Live workflow model</strong>
+              </div>
+              <span>Prototype state</span>
             </div>
 
-            <div class="evidence-layout">
-              <figure class="artifact-surface artifact-surface-primary artifact-cell-capture">
-                <p class="artifact-title">1. Cleaned capture, desktop</p>
-                <img
-                  class="artifact-image"
-                  src="assets/proof-run-desktop.png"
-                  loading="lazy"
-                  decoding="async"
-                  alt="Real cleaned desktop capture from the current Lumen proof run."
-                />
-              </figure>
+            <div class="product-demo-grid">
+              <div class="demo-popup">
+                <div class="demo-panel demo-intro">
+                  <div class="demo-brand-row">
+                    <span class="demo-brand-mark">L</span>
+                    <div>
+                      <p class="support-label">Lumen</p>
+                      <h3>Clean capture for review work.</h3>
+                    </div>
+                    <span class="demo-pill">MV3</span>
+                  </div>
 
-              <figure class="artifact-surface artifact-surface-compact artifact-cell-redaction">
-                <p class="artifact-title">2. Redaction example</p>
-                <img
-                  class="artifact-image artifact-image-redacted"
-                  src="assets/proof-run-redacted.png"
-                  loading="lazy"
-                  decoding="async"
-                  alt="Real redaction example from the current Lumen proof run."
-                />
-                <figcaption class="artifact-copy">
-                  <p class="card-note">4 sensitive regions detected and redacted. Review before external sharing.</p>
-                </figcaption>
-              </figure>
+                  <p>
+                    One control surface for cleanup, responsive capture, redaction review,
+                    cutaways, signals, and local history.
+                  </p>
 
-              <figure class="artifact-surface artifact-surface-compact artifact-cell-signals">
-                <p class="artifact-title">3. Page signals, extract</p>
-                <img
-                  class="artifact-image"
-                  src="assets/proof-run-signals.png"
-                  loading="lazy"
-                  decoding="async"
-                  alt="Extracted signals panel rendered from the current Lumen proof run."
-                />
-              </figure>
+                  <div class="demo-chip-row" aria-label="Implemented capture capabilities">
+                    <span>Cleanup</span>
+                    <span>Lazy load</span>
+                    <span>Responsive</span>
+                    <span>Redact</span>
+                    <span>Signals</span>
+                  </div>
+                </div>
 
-              <figure class="artifact-surface artifact-surface-compact artifact-cell-history">
-                <p class="artifact-title">4. Local history, latest</p>
-                <img
-                  class="artifact-image artifact-image-history"
-                  src="assets/proof-run-history.png"
-                  loading="lazy"
-                  decoding="async"
-                  alt="Local history item rendered from the current Lumen proof run."
-                />
-              </figure>
+                <div class="demo-panel demo-launch-panel" data-demo-launch>
+                  <div class="demo-launch-status" data-demo-status>
+                    <span class="demo-ready-orb" aria-hidden="true"></span>
+                    <div>
+                      <strong data-demo-status-title>captainfredric.github.io ready</strong>
+                      <small data-demo-status-detail>Hold capture to choose a focused action.</small>
+                    </div>
+                  </div>
 
-              <figure class="artifact-surface artifact-surface-compact artifact-surface-manifest artifact-cell-manifest">
-                <p class="artifact-title">5. Bundle manifest, JSON</p>
-                <pre class="manifest-preview"><code>{
-  "views": 3,
-  "files": 4,
-  "redactions": 4,
-  "outputsComplete": true,
-  "breakdown": {"email": 2, "phone": 1, "secret": 1},
-  "signals": ["palette", "fonts", "cta", "nav"]
-}</code></pre>
-              </figure>
+                  <div class="demo-launch-grid">
+                    <button
+                      class="demo-capture-button"
+                      type="button"
+                      aria-haspopup="menu"
+                      aria-expanded="false"
+                      data-demo-hold-button
+                    >
+                      <span>
+                        <strong>Capture page</strong>
+                        <small>Full page capture. Hold for actions.</small>
+                      </span>
+                      <span class="demo-hold-progress" aria-hidden="true"></span>
+                    </button>
+
+                    <button class="demo-secondary-action" type="button">
+                      <span>Analyze Page</span>
+                      <small>Signals only</small>
+                    </button>
+                  </div>
+
+                  <div class="demo-hold-menu" role="menu" aria-label="Quick capture actions" aria-hidden="true">
+                    <button type="button" role="menuitem">
+                      <span>Responsive set</span>
+                      <small>Desktop, tablet, mobile</small>
+                    </button>
+                    <button type="button" role="menuitem">
+                      <span>Scan redactions</span>
+                      <small>Preview sensitive regions</small>
+                    </button>
+                    <button type="button" role="menuitem">
+                      <span>Mark boxes</span>
+                      <small>Manual redactions</small>
+                    </button>
+                    <button type="button" role="menuitem">
+                      <span>Mark cutaway</span>
+                      <small>Save a reusable crop</small>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="demo-panel demo-review-panel">
+                  <div class="demo-panel-head">
+                    <div>
+                      <p class="support-label">Pre-export review</p>
+                      <h3>Check before saving.</h3>
+                    </div>
+                    <span class="demo-pill">Review</span>
+                  </div>
+
+                  <div class="demo-review-metrics">
+                    <div><span>Views</span><strong>3</strong></div>
+                    <div><span>Auto</span><strong>9</strong></div>
+                    <div><span>Manual</span><strong>2</strong></div>
+                    <div><span>Cutaway</span><strong>3</strong></div>
+                  </div>
+
+                  <div class="demo-preview-map" aria-label="Preview map showing redaction and cutaway regions">
+                    <span class="demo-map-box demo-map-auto demo-map-auto-one"></span>
+                    <span class="demo-map-box demo-map-auto demo-map-auto-two"></span>
+                    <span class="demo-map-box demo-map-manual"></span>
+                    <span class="demo-map-box demo-map-cutaway"></span>
+                  </div>
+
+                  <p>
+                    Current redaction covers visible text and filled inputs during export and
+                    should be reviewed before external sharing.
+                  </p>
+                </div>
+              </div>
+
+              <aside class="demo-artifact-rail" aria-label="Current output summary">
+                <div class="demo-artifact-card">
+                  <p class="support-label">Current output</p>
+                  <img
+                    src="assets/proof-run-history.png"
+                    loading="lazy"
+                    decoding="async"
+                    alt="Local history output from a Lumen capture run."
+                  />
+                </div>
+
+                <div class="demo-artifact-list">
+                  <div>
+                    <span>Artifacts</span>
+                    <strong>3 images plus JSON</strong>
+                  </div>
+                  <div>
+                    <span>Region work</span>
+                    <strong>Cutaway saved locally</strong>
+                  </div>
+                  <div>
+                    <span>Signals</span>
+                    <strong>Palette, fonts, CTA, nav</strong>
+                  </div>
+                </div>
+
+                <a class="demo-proof-link" href="assets/proof-run-bundle.zip" download>
+                  Download proof bundle
+                </a>
+              </aside>
             </div>
           </div>
         </div>

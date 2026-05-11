@@ -1,4 +1,4 @@
-import { mkdtemp, rm, stat } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,17 +7,21 @@ import { chromium } from "playwright";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
-const profileDir = await mkdtemp(path.join(os.tmpdir(), "lumen-extension-smoke-"));
+const tempRoot = await mkdtemp(path.join(os.tmpdir(), "lumen-extension-smoke-"));
+const extensionDir = path.join(tempRoot, "extension");
+const profileDir = path.join(tempRoot, "profile");
 const popupConsoleErrors = [];
 
 let context;
 
 try {
+  await prepareExtensionCopy();
+
   context = await chromium.launchPersistentContext(profileDir, {
     headless: false,
     args: [
-      `--disable-extensions-except=${repoRoot}`,
-      `--load-extension=${repoRoot}`
+      `--disable-extensions-except=${extensionDir}`,
+      `--load-extension=${extensionDir}`
     ]
   });
 
@@ -267,7 +271,30 @@ try {
   process.exitCode = 1;
 } finally {
   await context?.close().catch(() => {});
-  await cleanupTemporaryPath(profileDir, "extension smoke profile");
+  await cleanupTemporaryPath(tempRoot, "extension smoke temp root");
+}
+
+async function prepareExtensionCopy() {
+  await cp(repoRoot, extensionDir, {
+    recursive: true,
+    filter(source) {
+      const relative = path.relative(repoRoot, source);
+      const parts = relative.split(path.sep);
+
+      return !parts.includes(".git") &&
+        !parts.includes("node_modules") &&
+        !parts.includes("dist") &&
+        !parts.some((part) => part.endsWith(".zip"));
+    }
+  });
+
+  const manifestPath = path.join(extensionDir, "manifest.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  // The production popup relies on activeTab from a toolbar launch. This direct
+  // popup smoke test grants only the fixture host so target lookup stays stable.
+  manifest.host_permissions = ["https://lumen-smoke.test/*"];
+
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
 function assert(condition, message, details = null) {

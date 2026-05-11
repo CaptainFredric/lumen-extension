@@ -137,7 +137,6 @@ async function captureRealPage({ url, popup, worker }) {
     });
 
     const downloads = await getDownloadItems(worker, response.downloads || []);
-    const imageItem = downloads.find((item) => item.lumenRecord.kind === "image");
     const manifestItem = downloads.find((item) => item.lumenRecord.kind === "manifest");
 
     assert(downloads.length >= 2, "Expected Chrome download records.", {
@@ -157,7 +156,9 @@ async function captureRealPage({ url, popup, worker }) {
       downloadDir,
       downloads
     });
-    assert(imageItem, "Expected an image artifact.", {
+    const imageItems = downloads.filter((item) => item.lumenRecord.kind === "image");
+
+    assert(imageItems.length, "Expected image artifacts.", {
       url,
       downloads
     });
@@ -166,9 +167,14 @@ async function captureRealPage({ url, popup, worker }) {
       downloads
     });
 
-    const imageInfo = await assertPng(imageItem.filename);
     const manifest = JSON.parse(await readFile(manifestItem.filename, "utf8"));
     const expectedHost = new URL(url).host;
+    const variant = manifest.variants?.[0];
+    const imageDimensions = await validateVariantImages({
+      url,
+      variant,
+      imageItems
+    });
 
     assert(manifest.page.host === expectedHost, "Manifest host did not match target URL.", {
       url,
@@ -181,16 +187,6 @@ async function captureRealPage({ url, popup, worker }) {
     assert(manifest.capture.artifactStats?.imageCount >= 1, "Manifest should count image artifacts.", {
       url,
       capture: manifest.capture
-    });
-    assert(manifest.variants?.[0]?.dimensions?.width === imageInfo.width, "Manifest width should match PNG width.", {
-      url,
-      imageInfo,
-      variant: manifest.variants?.[0]
-    });
-    assert(manifest.variants?.[0]?.dimensions?.height === imageInfo.height, "Manifest height should match PNG height.", {
-      url,
-      imageInfo,
-      variant: manifest.variants?.[0]
     });
     assert(manifest.pageSignals, "Expected page signals in the manifest.", {
       url,
@@ -223,7 +219,7 @@ async function captureRealPage({ url, popup, worker }) {
       segmentCount: response.segmentCount,
       redactionCount: response.redactionCount,
       bytesReceived: manifest.capture.artifactStats.bytesReceived,
-      dimensions: imageInfo,
+      dimensions: imageDimensions,
       pageSignals: {
         heroHeadline: manifest.pageSignals.heroHeadline || "",
         primaryCta: manifest.pageSignals.primaryCta || "",
@@ -346,6 +342,90 @@ async function assertPng(filename) {
     width: file.readUInt32BE(16),
     height: file.readUInt32BE(20),
     size: stats.size
+  };
+}
+
+async function validateVariantImages({ url, variant, imageItems }) {
+  assert(variant?.dimensions?.width > 0 && variant.dimensions.height > 0, "Expected manifest variant dimensions.", {
+    url,
+    variant
+  });
+
+  const imageInfos = await Promise.all(imageItems.map(async (item) => ({
+    ...(await assertPng(item.filename)),
+    lumenFilename: item.lumenRecord.filename
+  })));
+  const fullPageOutputs = (variant.outputs || []).filter((output) =>
+    output.kind === "image" && output.role === "full-page"
+  );
+
+  assert(fullPageOutputs.length === imageInfos.length, "Manifest image outputs should match downloaded images.", {
+    url,
+    fullPageOutputs,
+    imageInfos
+  });
+
+  const outputInfos = fullPageOutputs.map((output) => {
+    const imageInfo = imageInfos.find((item) => item.lumenFilename === output.filename);
+
+    assert(imageInfo, "Downloaded image did not match a manifest output.", {
+      url,
+      output,
+      imageInfos
+    });
+    assert(output.width === imageInfo.width, "Manifest output width should match PNG width.", {
+      url,
+      output,
+      imageInfo
+    });
+    assert(output.height === imageInfo.height, "Manifest output height should match PNG height.", {
+      url,
+      output,
+      imageInfo
+    });
+
+    return {
+      output,
+      imageInfo
+    };
+  });
+
+  const combinedHeight = outputInfos.reduce((total, item) => total + item.imageInfo.height, 0);
+  const maxWidth = Math.max(...outputInfos.map((item) => item.imageInfo.width));
+
+  assert(variant.dimensions.width === maxWidth, "Manifest width should match the widest image tile.", {
+    url,
+    variant,
+    imageInfos
+  });
+  assert(variant.dimensions.height === combinedHeight, "Manifest height should match the combined image tile heights.", {
+    url,
+    variant,
+    imageInfos
+  });
+
+  if (variant.artifactStats?.tiled) {
+    assert(variant.tileCount === outputInfos.length, "Tiled variant should report the downloaded tile count.", {
+      url,
+      variant,
+      outputInfos
+    });
+    assert(outputInfos.every((item) => item.output.partTotal === outputInfos.length), "Each tile should report the total tile count.", {
+      url,
+      outputInfos
+    });
+  } else {
+    assert(outputInfos.length === 1, "Untiled variant should produce one full-page image.", {
+      url,
+      outputInfos
+    });
+  }
+
+  return {
+    width: variant.dimensions.width,
+    height: variant.dimensions.height,
+    imageCount: imageInfos.length,
+    tiled: Boolean(variant.artifactStats?.tiled)
   };
 }
 

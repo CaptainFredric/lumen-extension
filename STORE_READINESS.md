@@ -12,6 +12,7 @@ This file tracks what Lumen needs before a serious Chrome Web Store submission.
 6. Manifest description shortened to 131 characters.
 7. Landing page keeps present features separate from future direction.
 8. Store package script builds a narrow upload ZIP and validates manifest fields, icons, permissions, and blocked development files.
+9. Production manifest no longer requests the broad `tabs` permission.
 
 ## Permission Rationale
 
@@ -22,7 +23,6 @@ Current permissions:
 3. `offscreen`: compose stitched images in an offscreen document.
 4. `scripting`: inject the capture and cleanup content script.
 5. `storage`: keep settings, local history, manual redactions, and cutaway regions.
-6. `tabs`: current implementation uses tab querying and temporary viewport tabs. This should receive another audit before submission.
 
 Optional host permissions:
 
@@ -36,9 +36,8 @@ These are only needed for tablet, mobile, and responsive captures that open temp
 1. Write a privacy policy that explains local capture history, screenshots, redaction metadata, page-signal extraction, and any future sync behavior.
 2. Keep continuous capture disabled until region watch has explicit schedule selection, visible pause controls, retention limits, and delete controls.
 3. Keep agent handoff disabled until the user can review exactly what will be sent and choose the destination.
-4. Audit whether `tabs` can be removed or narrowed before submission.
-5. Prepare Chrome Web Store screenshots from real extension output, not concept art.
-6. Add a support URL, privacy URL, and accurate single-purpose field.
+4. Prepare Chrome Web Store screenshots from real extension output, not concept art.
+5. Add a support URL, privacy URL, and accurate single-purpose field.
 
 ## Package Validation
 
@@ -59,7 +58,7 @@ The script creates `dist/lumen-extension-0.2.0.zip` and checks:
 
 Current known warning:
 
-1. `tabs` remains present because the popup needs current tab selection and temporary viewport tabs. Re-audit this before submission.
+1. No known package warning after the `tabs` permission removal. Recheck this with every package build.
 
 ## Official Policy References
 

@@ -171,7 +171,7 @@ function validateManifest(manifest, errors, warnings) {
     errors.push("Manifest should not request broad host_permissions for the current activeTab posture.");
   }
 
-  const allowedPermissions = new Set(["activeTab", "downloads", "offscreen", "scripting", "storage", "tabs"]);
+  const allowedPermissions = new Set(["activeTab", "downloads", "offscreen", "scripting", "storage"]);
   const unexpectedPermissions = (manifest.permissions || []).filter((permission) => !allowedPermissions.has(permission));
 
   if (unexpectedPermissions.length) {
@@ -180,10 +180,6 @@ function validateManifest(manifest, errors, warnings) {
 
   if ((manifest.optional_host_permissions || []).some((permission) => !/^https?:\/\/\*\/\*$/.test(permission))) {
     errors.push("Optional host permissions should stay limited to http://*/* and https://*/*.");
-  }
-
-  if ((manifest.permissions || []).includes("tabs")) {
-    warnings.push("The tabs permission is still present. Keep its rationale current before Web Store submission.");
   }
 
   if (!manifest.minimum_chrome_version) {
