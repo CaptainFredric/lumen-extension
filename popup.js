@@ -928,8 +928,8 @@ function handleExplainCutawayPlan() {
     eyebrow: "Cutaway",
     title: hasRegion ? "Region watch plan" : "Mark a region first",
     detail: hasRegion
-      ? "Next layer: opt-in scheduled focused captures, visible pause controls, retention limits, and explicit agent handoff destinations."
-      : "Use Mark cutaway to save one page area before planning a watch or agent handoff flow.",
+      ? "Implemented now: focused cutaway crops during capture. Next layer: opt-in schedules, pause controls, retention limits, and explicit agent handoff destinations."
+      : "Use Mark cutaway to save one page area before capture, watch, or agent handoff planning.",
     badge: hasRegion ? "Planned" : "No region",
     progress: hasRegion ? 0.42 : 0.12
   });
@@ -1225,7 +1225,9 @@ function renderHistory(history) {
       item.manifestFile ? "manifest saved" : "",
       item.annotation?.text ? "note added" : "",
       item.manualRedactionCount ? `${item.manualRedactionCount} manual box${item.manualRedactionCount === 1 ? "" : "es"}` : "",
+      item.cutawayCount ? `${item.cutawayCount} cutaway crop${item.cutawayCount === 1 ? "" : "s"}` : "",
       formatManualProjectionStats(item.manualProjectionStats),
+      formatCutawayResolutionStats(item.cutawayResolutionStats),
       item.redactionCount ? `${item.redactionCount} redaction${item.redactionCount === 1 ? "" : "s"}` : "",
       item.blueprintSummary?.siteType || ""
     ]
@@ -1325,7 +1327,7 @@ function renderCutawayRegion(record) {
 
   if (!region) {
     ui.cutawayRegionStatus.textContent = "No region";
-    ui.cutawaySummary.textContent = "A marked region is stored locally for this URL and can become the source for a focused capture or scheduled watch flow.";
+    ui.cutawaySummary.textContent = "A marked region is stored locally for this URL. The next capture can save cutaway PNGs beside the full-page artifact.";
     updateActionDisabledState();
     renderRunSummary(currentSettings);
     return;
@@ -1335,7 +1337,7 @@ function renderCutawayRegion(record) {
   ui.cutawaySummary.textContent = [
     `Stored for ${record?.host || "this URL"}.`,
     `Top ${Math.round(region.top)}px, left ${Math.round(region.left)}px.`,
-    "Automation remains opt-in future work."
+    "Captures can export focused cutaway PNGs when this region resolves."
   ].join(" ");
   updateActionDisabledState();
   renderRunSummary(currentSettings);
@@ -1351,12 +1353,14 @@ function buildHistoryDetails(item) {
   const viewCount = item.variants?.length || (item.devicePreset === "responsive" ? 3 : 1);
   const fileCount = item.files?.length || 0;
   const redactionCount = item.redactionCount || 0;
+  const cutawayCount = item.cutawayCount || 0;
   const manifestState = item.manifestFile ? "Saved" : "Off";
 
   metrics.append(
     buildHistoryMetric("Views", String(viewCount)),
     buildHistoryMetric("Files", String(fileCount)),
     buildHistoryMetric("Redactions", String(redactionCount)),
+    buildHistoryMetric("Cutaways", String(cutawayCount)),
     buildHistoryMetric("Manifest", manifestState)
   );
   detail.append(metrics);
@@ -1422,6 +1426,7 @@ function buildHistoryVariantList(item) {
         ? `${variant.dimensions.width}x${variant.dimensions.height}`
         : "",
       variant.fileCount ? `${variant.fileCount} file${variant.fileCount === 1 ? "" : "s"}` : "",
+      variant.cutawayCount ? `${variant.cutawayCount} cutaway${variant.cutawayCount === 1 ? "" : "s"}` : "",
       variant.redactionCount ? `${variant.redactionCount} redaction${variant.redactionCount === 1 ? "" : "s"}` : ""
     ]
       .filter(Boolean)
@@ -1450,16 +1455,17 @@ function buildHistoryArtifactList(item) {
         kind: filename.endsWith(".json") ? "manifest" : "image"
       }));
 
-  for (const record of records.slice(0, 5)) {
+  for (const record of records.slice(0, 7)) {
     const row = document.createElement("div");
     row.className = "history-detail-row";
 
     const label = document.createElement("strong");
-    label.textContent = titleCase(record.kind || "file");
+    label.textContent = formatArtifactLabel(record);
 
     const meta = document.createElement("span");
     meta.textContent = [
       record.variantId ? titleCase(record.variantId) : "",
+      record.width && record.height ? `${record.width}x${record.height}` : "",
       record.bytesReceived ? formatBytes(record.bytesReceived) : "",
       record.filename ? shortenPath(record.filename) : ""
     ]
@@ -1470,14 +1476,30 @@ function buildHistoryArtifactList(item) {
     panel.append(row);
   }
 
-  if (records.length > 5) {
+  if (records.length > 7) {
     const more = document.createElement("p");
     more.className = "history-detail-note";
-    more.textContent = `${records.length - 5} more artifact${records.length - 5 === 1 ? "" : "s"} in the bundle.`;
+    more.textContent = `${records.length - 7} more artifact${records.length - 7 === 1 ? "" : "s"} in the bundle.`;
     panel.append(more);
   }
 
   return panel;
+}
+
+function formatArtifactLabel(record) {
+  if (record.role === "cutaway") {
+    return "Cutaway PNG";
+  }
+
+  if (record.kind === "manifest") {
+    return "Manifest JSON";
+  }
+
+  if (record.kind === "image") {
+    return "Full-page PNG";
+  }
+
+  return titleCase(record.kind || "file");
 }
 
 function buildHistorySignalPanel(item) {
@@ -1888,16 +1910,21 @@ function buildCaptureSuccessMessage(response, settings) {
   const manualText = response.manualRedactionCount
     ? ` ${response.manualRedactionCount} manual box${response.manualRedactionCount === 1 ? "" : "es"} applied.`
     : "";
+  const cutawayText = response.cutawayCount
+    ? ` ${response.cutawayCount} cutaway crop${response.cutawayCount === 1 ? "" : "s"} exported.`
+    : "";
   const projectionText = formatManualProjectionStats(response.manualProjectionStats);
   const projectionSentence = projectionText ? ` ${projectionText}.` : "";
+  const cutawayProjectionText = formatCutawayResolutionStats(response.cutawayResolutionStats);
+  const cutawayProjectionSentence = cutawayProjectionText ? ` ${cutawayProjectionText}.` : "";
 
   if (!response.redactionCount) {
     return variantCount > 1
-      ? `${fileText}. ${variantCount} responsive views captured.${manifestText}${folderText}${noteText}${manualText}${projectionSentence}`
-      : `${fileText}.${manifestText}${folderText}${noteText}${manualText}${projectionSentence}`;
+      ? `${fileText}. ${variantCount} responsive views captured.${manifestText}${folderText}${noteText}${manualText}${cutawayText}${projectionSentence}${cutawayProjectionSentence}`
+      : `${fileText}.${manifestText}${folderText}${noteText}${manualText}${cutawayText}${projectionSentence}${cutawayProjectionSentence}`;
   }
 
-  return `${fileText}. ${variantCount > 1 ? `${variantCount} responsive views captured. ` : ""}${response.redactionCount} redaction region${response.redactionCount === 1 ? "" : "s"} sanitized.${manifestText}${folderText}${noteText}${manualText}${projectionSentence}`;
+  return `${fileText}. ${variantCount > 1 ? `${variantCount} responsive views captured. ` : ""}${response.redactionCount} redaction region${response.redactionCount === 1 ? "" : "s"} sanitized.${manifestText}${folderText}${noteText}${manualText}${cutawayText}${projectionSentence}${cutawayProjectionSentence}`;
 }
 
 function buildRedactionPreviewText(preview) {
@@ -1923,6 +1950,7 @@ function buildHistorySummaryText(item) {
     `Files: ${item.files?.length || 0}`,
     `Redactions: ${item.redactionCount || 0}`,
     item.manualRedactionCount ? `Manual boxes: ${item.manualRedactionCount}` : "",
+    item.cutawayCount ? `Cutaway crops: ${item.cutawayCount}` : "",
     item.manifestFile ? `Manifest: ${item.manifestFile}` : "Manifest: not saved",
     item.archiveFolder ? `Folder: ${item.archiveFolder}` : "",
     item.blueprintSummary?.siteType ? `Page type: ${item.blueprintSummary.siteType}` : "",
@@ -1988,6 +2016,33 @@ function formatManualProjectionStats(stats = {}) {
   }
 
   return parts.length ? `manual projection ${parts.join(", ")}` : "";
+}
+
+function formatCutawayResolutionStats(stats = {}) {
+  const storedCount = Number.isFinite(stats.storedCount) ? Math.max(0, Math.round(stats.storedCount)) : 0;
+
+  if (!storedCount) {
+    return "";
+  }
+
+  const projectedCount = Number.isFinite(stats.projectedCount) ? Math.max(0, Math.round(stats.projectedCount)) : 0;
+  const directCount = Number.isFinite(stats.directCount) ? Math.max(0, Math.round(stats.directCount)) : 0;
+  const skippedCount = Number.isFinite(stats.skippedCount) ? Math.max(0, Math.round(stats.skippedCount)) : 0;
+  const parts = [];
+
+  if (projectedCount) {
+    parts.push(`${projectedCount} projected`);
+  }
+
+  if (directCount) {
+    parts.push(`${directCount} direct`);
+  }
+
+  if (skippedCount) {
+    parts.push(`${skippedCount} skipped`);
+  }
+
+  return parts.length ? `cutaway ${parts.join(", ")}` : "";
 }
 
 function formatBytes(value = 0) {

@@ -33,11 +33,12 @@ async function routeMessage(message) {
   }
 }
 
-function initializeSession({ sessionId, page, options, redactions = [] }) {
+function initializeSession({ sessionId, page, options, redactions = [], cutawayRegion = null }) {
   stitchSessions.set(sessionId, {
     page,
     options,
     redactions,
+    cutawayRegion,
     segments: []
   });
 
@@ -73,8 +74,9 @@ async function renderSession(session) {
   const requestedPreset = session.options?.exportPreset || "raw";
   const canRenderSingle = canFitCanvas(renderModel.canvasWidth, renderModel.canvasHeight);
 
-  let outputs = [];
+  let outputItems = [];
   let appliedPreset = requestedPreset;
+  let tileCount = 0;
 
   if (canRenderSingle) {
     const baseCanvas = renderSliceCanvas(renderModel, 0, renderModel.canvasHeight);
@@ -84,24 +86,55 @@ async function renderSession(session) {
     });
 
     appliedPreset = enhancedCanvas === baseCanvas ? "raw" : requestedPreset;
-    outputs = [enhancedCanvas];
+    tileCount = 1;
+    outputItems = [{
+      canvas: enhancedCanvas,
+      role: "full-page",
+      index: 0,
+      total: 1
+    }];
+
+    const cutawayCanvas = renderCutawayCanvas(baseCanvas, renderModel.cutawayRegion);
+
+    if (cutawayCanvas) {
+      outputItems.push({
+        canvas: cutawayCanvas,
+        role: "cutaway",
+        index: 0,
+        total: 1,
+        cutawayRegion: renderModel.cutawayRegion
+      });
+    }
   } else {
     appliedPreset = "raw";
-    outputs = renderTiledCanvases(renderModel);
+    const tiledCanvases = renderTiledCanvases(renderModel);
+    tileCount = tiledCanvases.length;
+    outputItems = tiledCanvases.map((canvas, index) => ({
+      canvas,
+      role: "full-page",
+      index,
+      total: tiledCanvases.length
+    }));
   }
 
   return {
-    outputs: outputs.map((canvas, index) => ({
-      dataUrl: canvas.toDataURL("image/png"),
-      width: canvas.width,
-      height: canvas.height,
-      index,
-      total: outputs.length
+    outputs: outputItems.map((output) => ({
+      dataUrl: output.canvas.toDataURL("image/png"),
+      width: output.canvas.width,
+      height: output.canvas.height,
+      index: output.index,
+      total: output.total,
+      role: output.role,
+      partIndex: output.index + 1,
+      partTotal: output.total,
+      cutawayRegion: output.cutawayRegion || null
     })),
     width: renderModel.canvasWidth,
     height: renderModel.canvasHeight,
     pixelRatio: renderModel.effectiveScale,
     appliedPreset,
+    tileCount,
+    cutawayCount: outputItems.filter((output) => output.role === "cutaway").length,
     redactionCount: renderModel.redactions.length,
     annotation: renderModel.annotation
       ? {
@@ -151,6 +184,7 @@ async function buildRenderModel(session) {
     canvasHeight,
     effectiveScale,
     annotation,
+    cutawayRegion: scaleCutawayRegion(session.cutawayRegion, effectiveScale, canvasWidth, canvasHeight),
     redactions: (session.redactions || []).map((region) => ({
       ...region,
       left: Math.max(0, Math.round(region.left * effectiveScale)),
@@ -172,6 +206,43 @@ async function buildRenderModel(session) {
         drawBottom: drawTopPixels + sourceHeight
       };
     })
+  };
+}
+
+function scaleCutawayRegion(region, effectiveScale, canvasWidth, canvasHeight) {
+  if (!region || typeof region !== "object") {
+    return null;
+  }
+
+  if (
+    !Number.isFinite(region.left) ||
+    !Number.isFinite(region.top) ||
+    !Number.isFinite(region.width) ||
+    !Number.isFinite(region.height)
+  ) {
+    return null;
+  }
+
+  const left = Math.max(0, Math.round(region.left * effectiveScale));
+  const top = Math.max(0, Math.round(region.top * effectiveScale));
+  const right = Math.min(canvasWidth, Math.round((region.left + region.width) * effectiveScale));
+  const bottom = Math.min(canvasHeight, Math.round((region.top + region.height) * effectiveScale));
+  const width = right - left;
+  const height = bottom - top;
+
+  if (width < 2 || height < 2) {
+    return null;
+  }
+
+  return {
+    id: region.id || "",
+    kind: "cutaway",
+    left,
+    top,
+    width,
+    height,
+    ...(region.projected ? { projected: true } : {}),
+    ...(typeof region.projection === "string" ? { projection: region.projection } : {})
   };
 }
 
@@ -241,6 +312,39 @@ function renderSliceCanvas(renderModel, sliceStart, sliceEnd) {
 
   applyRedactionRegions(canvas, context, renderModel.redactions, sliceStart, sliceEnd);
   applyCaptureAnnotation(context, renderModel.annotation, sliceStart, sliceEnd);
+
+  return canvas;
+}
+
+function renderCutawayCanvas(sourceCanvas, region) {
+  if (!region) {
+    return null;
+  }
+
+  const left = Math.max(0, Math.min(sourceCanvas.width - 1, Math.round(region.left)));
+  const top = Math.max(0, Math.min(sourceCanvas.height - 1, Math.round(region.top)));
+  const width = Math.max(1, Math.min(sourceCanvas.width - left, Math.round(region.width)));
+  const height = Math.max(1, Math.min(sourceCanvas.height - top, Math.round(region.height)));
+
+  if (width < 2 || height < 2) {
+    return null;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext("2d", {
+    alpha: false
+  });
+
+  if (!context) {
+    return null;
+  }
+
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.drawImage(sourceCanvas, left, top, width, height, 0, 0, width, height);
 
   return canvas;
 }

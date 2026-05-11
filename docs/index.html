@@ -105,7 +105,7 @@
               target="_blank"
               rel="noreferrer"
             >
-              Add to Chrome — local build
+              Add to Chrome, local build
             </a>
             <a class="secondary-link" href="https://github.com/CaptainFredric/lumen-extension" target="_blank" rel="noreferrer">View on GitHub</a>
           </div>
@@ -293,7 +293,7 @@
                   <li>Auto-redaction on export</li>
                   <li>Popup redaction preview</li>
                   <li>Anchored manual redaction boxes</li>
-                  <li>Cutaway region picker for one reusable page area</li>
+                  <li>Cutaway region picker with focused export artifacts</li>
                   <li>Anchored capture note</li>
                   <li>Signals extraction</li>
                   <li>Bundle manifest JSON sidecar with output health</li>
@@ -306,7 +306,6 @@
                 <p class="support-label">Next</p>
                 <ul class="support-notes support-notes-tight">
                   <li>Freeform annotations</li>
-                  <li>Focused cutaway export</li>
                   <li>Opt-in region watch</li>
                   <li>Explicit agent handoff</li>
                   <li>Cloud sync and team handoff</li>
@@ -563,10 +562,10 @@
       <section class="region-section">
         <div class="section-head" data-reveal>
           <p class="kicker">Focused region work</p>
-          <h2>A practical path toward cutaway capture, watch, and agent handoff.</h2>
+          <h2>A practical path from cutaway capture to watch and agent handoff.</h2>
           <p class="section-body">
-            The current build now stores a selected page region. That creates a clear next step:
-            focused exports first, then visible opt-in automation, then external handoff.
+            The current build stores a selected page region and exports focused crops when that
+            region resolves during capture. Watch and external handoff stay later opt-in layers.
           </p>
         </div>
 
@@ -576,17 +575,16 @@
             <h3>Reusable region selection</h3>
             <p class="card-note">
               The extension can open a page overlay and save one rectangular cutaway region for the
-              current URL. The state is local and user-triggered.
+              current URL. The next capture adds cutaway PNGs for views where the region resolves.
             </p>
           </article>
 
           <article class="scope-panel" data-reveal>
             <p class="support-label">Next product layer</p>
-            <h3>Focused capture before automation</h3>
+            <h3>Review before automation</h3>
             <p class="card-note">
-              The next useful step is cropping a stitched capture to the saved region and adding
-              that artifact to history. Continuous watch should wait until pause controls,
-              retention, and review flow are in place.
+              Continuous watch should wait until pause controls, retention, and review flow are in
+              place. The current cutaway export gives that workflow a concrete artifact first.
             </p>
           </article>
         </div>
@@ -614,7 +612,7 @@
               <li>Project anchored manual redaction boxes into responsive captures when the source element still resolves</li>
               <li>Add one anchored capture note into the export</li>
               <li>Extract palette, font, hero, CTA, and navigation signals</li>
-              <li>Store one cutaway region per URL for focused capture work</li>
+              <li>Store one cutaway region per URL and export focused cutaway PNGs when it resolves</li>
               <li>Store local capture history with bundle metadata, run details, copyable summaries, and file actions</li>
             </ul>
           </article>
@@ -624,7 +622,7 @@
             <h3>What still needs product work</h3>
             <ul class="scope-list">
               <li>Freeform annotation tools and projected-box review tooling</li>
-              <li>Focused cutaway export and explicit region watch controls</li>
+              <li>Explicit region watch controls with pause, retention, and review flow</li>
               <li>Agent handoff with redaction review before sending</li>
               <li>Cloud sync and team handoff workflows</li>
               <li>User accounts, billing, and plan gating</li>
@@ -636,13 +634,13 @@
 
       <section class="cta-section" id="docs" data-reveal>
         <p class="kicker">Implemented now</p>
-        <h2>Lumen is early. The current build already handles cleanup, capture, redaction preview, manual boxes, cutaway selection, anchored notes, signals, local run details, and a portable bundle manifest.</h2>
+        <h2>Lumen is early. The current build already handles cleanup, capture, redaction preview, manual boxes, cutaway export, anchored notes, signals, local run details, and a portable bundle manifest.</h2>
         <p>
           The repository already covers page cleanup, responsive capture bundles, redaction preview,
-          export redaction, anchored manual redaction boxes, cutaway region selection, capture
-          notes, page-signal extraction, bundle metadata with output health, dated download
-          folders, local history actions, and copyable capture summaries. The next work is focused
-          cutaway export, projected-box review tooling, freeform annotation, sync, auth, and billing.
+          export redaction, anchored manual redaction boxes, focused cutaway PNGs, capture notes,
+          page-signal extraction, bundle metadata with output health, dated download folders, local
+          history actions, and copyable capture summaries. The next work is projected-box review
+          tooling, freeform annotation, sync, auth, and billing.
         </p>
 
         <div class="cta-actions">

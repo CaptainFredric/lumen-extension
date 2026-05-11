@@ -108,6 +108,13 @@
       return true;
     }
 
+    if (message.type === "LUMEN_RESOLVE_CUTAWAY_REGION") {
+      Promise.resolve()
+        .then(() => sendResponse({ ok: true, cutawayRegion: resolveCutawayRegion(message.payload || {}) }))
+        .catch((error) => sendResponse({ ok: false, error: error.message }));
+      return true;
+    }
+
     if (message.type === "LUMEN_START_MANUAL_REDACTION_PICKER") {
       Promise.resolve()
         .then(() => sendResponse({ ok: true, picker: startManualRedactionPicker(message.payload || {}) }))
@@ -201,6 +208,7 @@
 
   async function restorePageState() {
     teardownManualRedactionPicker(false);
+    teardownCutawayRegionPicker(false);
     stopOverlayObserver();
     restoreHiddenNodes();
     removeFreezeStyle();
@@ -809,7 +817,60 @@
     };
   }
 
-  function resolveAnchoredManualRegion(region, context) {
+  function resolveCutawayRegion({ region = null, context: recordContext = null } = {}) {
+    const normalized = normalizeCutawayRegion(region);
+
+    if (!normalized) {
+      return {
+        count: 0,
+        region: null,
+        regions: [],
+        projectedCount: 0,
+        directCount: 0,
+        skippedCount: 0
+      };
+    }
+
+    const context = captureState.scrollContext || detectScrollContext();
+    const page = getPageMetrics();
+    const sourceViewportFallback = normalizeManualRedactionSourceViewport(recordContext);
+    const projected = resolveAnchoredManualRegion(normalized, context, "cutaway");
+
+    if (projected) {
+      return {
+        count: 1,
+        region: projected,
+        regions: [projected],
+        projectedCount: 1,
+        directCount: 0,
+        skippedCount: 0
+      };
+    }
+
+    const direct = resolveDirectManualRegion(normalized, context, page, sourceViewportFallback, "cutaway");
+
+    if (direct) {
+      return {
+        count: 1,
+        region: direct,
+        regions: [direct],
+        projectedCount: 0,
+        directCount: 1,
+        skippedCount: 0
+      };
+    }
+
+    return {
+      count: 0,
+      region: null,
+      regions: [],
+      projectedCount: 0,
+      directCount: 0,
+      skippedCount: 1
+    };
+  }
+
+  function resolveAnchoredManualRegion(region, context, kind = "manual") {
     const anchor = normalizeManualRedactionAnchor(region.anchor);
 
     if (!anchor?.selector || !anchor.ratios) {
@@ -830,7 +891,7 @@
 
     const nextRegion = {
       id: region.id,
-      kind: "manual",
+      kind,
       left: Math.round(coordinates.left + anchor.ratios.left * coordinates.width),
       top: Math.round(coordinates.top + anchor.ratios.top * coordinates.height),
       width: Math.max(1, Math.round(anchor.ratios.width * coordinates.width)),
@@ -842,7 +903,7 @@
     return isResolvedManualRegionValid(nextRegion) ? nextRegion : null;
   }
 
-  function resolveDirectManualRegion(region, context, page, sourceViewportFallback) {
+  function resolveDirectManualRegion(region, context, page, sourceViewportFallback, kind = "manual") {
     const sourceViewport = normalizeManualRedactionSourceViewport(region.sourceViewport) || sourceViewportFallback;
 
     if (!sourceViewport) {
@@ -866,7 +927,7 @@
 
     const nextRegion = {
       id: region.id,
-      kind: "manual",
+      kind,
       left: Math.max(0, Math.round(region.left)),
       top: Math.max(0, Math.round(region.top)),
       width: Math.max(1, Math.round(region.width)),

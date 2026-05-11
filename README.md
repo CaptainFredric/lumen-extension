@@ -24,10 +24,10 @@ The current build includes:
 6. export-time redaction for emails, phone numbers, token-like strings, and filled inputs across the current DOM
 7. redaction preview from the popup before export
 8. anchored manual redaction boxes for areas the scanner cannot infer, with projection into responsive captures when the source element still resolves
-9. a cutaway region picker that stores one reusable page area per URL as the foundation for focused capture and opt-in watch flows
+9. a cutaway region picker that stores one reusable page area per URL and exports focused cutaway crops when that region resolves during capture
 10. anchored capture notes rendered into the exported image
 11. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
-12. bundle-manifest JSON exports with view, redaction, manual projection, signal, output health, and note metadata
+12. bundle-manifest JSON exports with view, redaction, manual projection, cutaway, signal, output health, and note metadata
 13. dated per-run download folders so capture sets, tiles, and manifests stay together
 14. local capture history with file, folder, summary, and Chrome download-handle metadata
 15. popup history actions to open the latest artifact or reveal it in the Downloads folder
@@ -41,7 +41,7 @@ These limits are important:
 
 1. redaction currently covers text and filled inputs present in the current DOM during export and should be reviewed before external sharing
 2. manual redaction boxes can project into responsive captures through DOM anchors, but the result still needs review before external sharing
-3. cutaway regions are stored locally today, but focused cutaway export and continuous watch automation are not active yet
+3. cutaway export works when the stored region can resolve in the captured view, but scheduled watch automation is not active yet
 4. the current annotation pass is one anchored capture note
 5. cloud sync, billing, scheduled monitoring, and visual diffs remain future work
 6. highly dynamic sites with virtualization or unusual scroll behavior can still need site-specific fallback work
@@ -58,9 +58,10 @@ The current capture flow is:
 3. content script freezes motion, runs the preflight scroll when enabled, and hides sticky or high-layer UI when enabled
 4. background scrolls the page in slices, remeasures the tail when the document grows, and retries a few stalled scrolls before failing
 5. background sends each visible segment to the offscreen document
-6. offscreen stitches the final output using device-pixel-ratio aware composition and can render one anchored capture note into the artifact
-7. if the page is too large for one safe canvas, the export falls back to tiled raw output
-8. background downloads the files, writes the bundle manifest, writes local history, and restores the page
+6. content script resolves manual redactions and any stored cutaway region against the current layout
+7. offscreen stitches the final output using device-pixel-ratio aware composition, renders one anchored capture note, and can export a cutaway crop from the stitched result
+8. if the page is too large for one safe canvas, the export falls back to tiled raw output and skips cutaway cropping for that view
+9. background downloads the files, writes the bundle manifest, writes local history, and restores the page
 
 ### Page Signals
 
@@ -118,7 +119,7 @@ The public landing page will be available at `http://127.0.0.1:3000/`.
 6. Change capture device, export mode, cleanup, lazy-load forcing, auto-redaction, notes, or manifest settings when needed
 7. Use `Scan` to preview detected redaction regions before export
 8. Use `Mark boxes` if you need manual redactions before capture
-9. Use `Mark cutaway` to store one reusable page region for future focused capture or watch work
+9. Use `Mark cutaway` to store one reusable page region; the next capture exports cutaway PNGs for views where the region resolves
 10. Use `Open` or `Show in folder` from recent captures to get back to the saved artifact
 11. Expand recent capture details to review views, artifacts, redactions, manifest status, notes, and page signals
 12. Copy a capture summary when you need to paste evidence into a review note or bug report
@@ -170,7 +171,7 @@ To verify the loaded extension can capture a real local page and produce finishe
 npm run smoke:e2e
 ```
 
-This starts a local fixture page, loads a temporary copy of the extension with explicit test only capture access, runs a responsive desktop, tablet, and mobile capture through the MV3 background worker, waits for Chrome downloads to finish, validates the PNG and manifest artifacts, checks that local history stores the run, then removes the temporary profile and download folder. The checked in manifest is not widened by this test.
+This starts a local fixture page, loads a temporary copy of the extension with explicit test only capture access, seeds one anchored cutaway region, runs a responsive desktop, tablet, and mobile capture through the MV3 background worker, waits for Chrome downloads to finish, validates the full-page PNGs, cutaway PNGs, and manifest artifacts, checks that local history stores the run, then removes the temporary profile and download folder. The checked in manifest is not widened by this test.
 
 If a browser run is interrupted, remove leftover Lumen test screenshots, temporary profiles, and capture downloads with:
 
@@ -215,13 +216,12 @@ npm run smoke:site
 
 These are future layers:
 
-1. focused cutaway capture exports from the stored region
-2. freeform annotation tools
-3. opt-in region watch with visible pause and retention controls
-4. explicit agent handoff for selected bundles
-5. cloud sync destinations
-6. auth and billing
-7. visual diffs and alerts
+1. freeform annotation tools
+2. opt-in region watch with visible pause and retention controls
+3. explicit agent handoff for selected bundles
+4. cloud sync destinations
+5. auth and billing
+6. visual diffs and alerts
 
 See `PRODUCT_ROADMAP.md` for the longer product direction and Chrome Web Store guardrails.
 See `STORE_READINESS.md` for the current submission checklist, permission rationale, and policy references.
@@ -231,6 +231,6 @@ See `STORE_READINESS.md` for the current submission checklist, permission ration
 The highest-leverage next steps are:
 
 1. improve capture reliability on difficult real-world sites
-2. connect the cutaway region picker to focused crop export
-3. improve cross-layout review for projected manual redactions and cutaway regions
+2. improve cross-layout review for projected manual redactions and cutaway regions
+3. add a small cutaway preview and artifact filter in the popup history detail
 4. tighten the backend from demo session state into a real account path

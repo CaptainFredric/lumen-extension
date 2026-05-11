@@ -262,6 +262,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
 
   const variants = getCaptureVariants(options.devicePreset);
   const manualRedactions = await getManualRedactionsForTab(sourceTab);
+  const cutawayRegion = await getCutawayRegionForTab(sourceTab);
   const runContext = buildCaptureRunContext({
     title: sourceTab.title,
     url: sourceTab.url,
@@ -276,6 +277,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
       variant: variants[index],
       options,
       manualRedactions,
+      cutawayRegion,
       runContext,
       extractBlueprint: index === 0
     });
@@ -289,8 +291,10 @@ async function runCaptureFlow(options = getDefaultSettings()) {
   const tileCount = results.reduce((sum, result) => sum + result.tileCount, 0);
   const redactionCount = results.reduce((sum, result) => sum + result.redactionCount, 0);
   const manualRedactionCount = results.reduce((sum, result) => sum + result.manualRedactionCount, 0);
+  const cutawayCount = results.reduce((sum, result) => sum + result.cutawayCount, 0);
   const redactionBreakdown = mergeRedactionBreakdowns(results.map((result) => result.redactionBreakdown));
   const manualProjectionStats = mergeManualProjectionStats(results.map((result) => result.manualProjectionStats));
+  const cutawayResolutionStats = mergeCutawayResolutionStats(results.map((result) => result.cutawayResolutionStats));
   const artifactStats = buildArtifactStats(results.flatMap((result) => result.downloadRecords));
   const variantSummaries = results.map((result) => ({
     id: result.variant.id,
@@ -301,7 +305,9 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     tileCount: result.tileCount,
     redactionCount: result.redactionCount,
     manualRedactionCount: result.manualRedactionCount,
+    cutawayCount: result.cutawayCount,
     manualProjectionStats: result.manualProjectionStats,
+    cutawayResolutionStats: result.cutawayResolutionStats,
     redactionBreakdown: result.redactionBreakdown,
     dimensions: result.dimensions
   }));
@@ -320,7 +326,9 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     variants: variantSummaries,
     redactionCount,
     manualRedactionCount,
+    cutawayCount,
     manualProjectionStats,
+    cutawayResolutionStats,
     redactionBreakdown,
     segmentCount,
     tileCount,
@@ -359,7 +367,9 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     tileCount,
     redactionCount,
     manualRedactionCount,
+    cutawayCount,
     manualProjectionStats,
+    cutawayResolutionStats,
     redactionBreakdown,
     artifactStats,
     manifestFile,
@@ -390,7 +400,9 @@ async function runCaptureFlow(options = getDefaultSettings()) {
       fileCount: downloadedFiles.length,
       redactionCount,
       manualRedactionCount,
+      cutawayCount,
       manualProjectionStats,
+      cutawayResolutionStats,
       variantCount: variants.length,
       manifestSaved: Boolean(manifestFile),
       annotationAdded: Boolean(captureNote.enabled && captureNote.text)
@@ -408,7 +420,9 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     tileCount,
     redactionCount,
     manualRedactionCount,
+    cutawayCount,
     manualProjectionStats,
+    cutawayResolutionStats,
     artifactStats,
     manifestFile,
     annotation: captureNote.enabled && captureNote.text ? captureNote : null,
@@ -837,6 +851,26 @@ function selectManualRedactionsForPage(record, page) {
   return normalizeManualRedactionRegions(record.regions);
 }
 
+function selectCutawayRegionForPage(record, page) {
+  if (!record?.region) {
+    return null;
+  }
+
+  const context = record.context || {};
+  const contextMatches =
+    !context.scrollMode ||
+    (context.scrollMode === page.scrollMode && context.scrollContainer === page.scrollContainer);
+  const viewportMatches =
+    !context.viewportWidth ||
+    Math.abs(context.viewportWidth - page.viewportWidth) <= Math.max(2, page.viewportWidth * 0.02);
+
+  if (!contextMatches || !viewportMatches) {
+    return null;
+  }
+
+  return normalizeCutawayRegion(record.region);
+}
+
 function normalizeManualRedactionRegions(regions) {
   return (Array.isArray(regions) ? regions : [])
     .filter((region) => Number.isFinite(region.left) && Number.isFinite(region.top))
@@ -1029,6 +1063,36 @@ function mergeManualProjectionStats(statsList) {
   }, buildManualProjectionStats());
 }
 
+function buildCutawayResolutionStats({
+  storedCount = 0,
+  appliedCount = 0,
+  directCount = 0,
+  projectedCount = 0,
+  skippedCount = 0
+} = {}) {
+  return {
+    storedCount: clampNonNegativeInteger(storedCount),
+    appliedCount: clampNonNegativeInteger(appliedCount),
+    directCount: clampNonNegativeInteger(directCount),
+    projectedCount: clampNonNegativeInteger(projectedCount),
+    skippedCount: clampNonNegativeInteger(skippedCount)
+  };
+}
+
+function mergeCutawayResolutionStats(statsList) {
+  return (Array.isArray(statsList) ? statsList : []).reduce((merged, stats) => {
+    const normalized = buildCutawayResolutionStats(stats || {});
+
+    return {
+      storedCount: merged.storedCount + normalized.storedCount,
+      appliedCount: merged.appliedCount + normalized.appliedCount,
+      directCount: merged.directCount + normalized.directCount,
+      projectedCount: merged.projectedCount + normalized.projectedCount,
+      skippedCount: merged.skippedCount + normalized.skippedCount
+    };
+  }, buildCutawayResolutionStats());
+}
+
 function clampNonNegativeInteger(value) {
   return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
 }
@@ -1091,7 +1155,15 @@ function buildEmptyCutawayRegionRecord(rawUrl = "") {
   };
 }
 
-async function captureVariant({ sourceTab, variant, options, manualRedactions, runContext, extractBlueprint }) {
+async function captureVariant({
+  sourceTab,
+  variant,
+  options,
+  manualRedactions,
+  cutawayRegion,
+  runContext,
+  extractBlueprint
+}) {
   const target = await createCaptureTarget(sourceTab, variant);
 
   try {
@@ -1132,6 +1204,7 @@ async function captureVariant({ sourceTab, variant, options, manualRedactions, r
 
     const manualResolution = await resolveManualRedactionsForTarget(target.tab.id, manualRedactions, page);
     const manualRegions = manualResolution.regions;
+    const cutawayResolution = await resolveCutawayRegionForTarget(target.tab.id, cutawayRegion, page);
     const combinedRedactions = [
       ...redactionScan.regions,
       ...manualRegions
@@ -1148,7 +1221,8 @@ async function captureVariant({ sourceTab, variant, options, manualRedactions, r
         ...options,
         devicePreset: variant.id
       },
-      redactions: combinedRedactions
+      redactions: combinedRedactions,
+      cutawayRegion: cutawayResolution.region
     });
 
     const segmentCount = await capturePageSegments(target, page, sessionId, variant);
@@ -1188,10 +1262,12 @@ async function captureVariant({ sourceTab, variant, options, manualRedactions, r
       downloadedFiles,
       downloadRecords,
       segmentCount,
-      tileCount: stitched.outputs.length,
+      tileCount: stitched.tileCount ?? stitched.outputs.length,
       redactionCount: stitched.redactionCount,
       manualRedactionCount: manualRegions.length,
+      cutawayCount: stitched.cutawayCount || 0,
       manualProjectionStats: manualResolution.stats,
+      cutawayResolutionStats: cutawayResolution.stats,
       redactionBreakdown: buildRedactionBreakdown(combinedRedactions),
       exportPreset: stitched.appliedPreset,
       dimensions: {
@@ -1484,6 +1560,57 @@ async function resolveManualRedactionsForTarget(tabId, manualRedactions, page) {
   };
 }
 
+async function resolveCutawayRegionForTarget(tabId, cutawayRecord, page) {
+  if (!cutawayRecord?.region) {
+    return {
+      region: null,
+      stats: buildCutawayResolutionStats()
+    };
+  }
+
+  const storedCount = 1;
+
+  try {
+    const response = await chrome.tabs.sendMessage(tabId, {
+      type: "LUMEN_RESOLVE_CUTAWAY_REGION",
+      payload: {
+        region: cutawayRecord.region,
+        context: cutawayRecord.context || null
+      }
+    });
+
+    if (response?.ok) {
+      const region = normalizeCutawayRegion(response.cutawayRegion?.region);
+
+      return {
+        region,
+        stats: buildCutawayResolutionStats({
+          storedCount,
+          appliedCount: region ? 1 : 0,
+          directCount: response.cutawayRegion?.directCount,
+          projectedCount: response.cutawayRegion?.projectedCount,
+          skippedCount: response.cutawayRegion?.skippedCount
+        })
+      };
+    }
+  } catch (error) {
+    console.debug("Lumen cutaway projection skipped:", error);
+  }
+
+  const fallbackRegion = selectCutawayRegionForPage(cutawayRecord, page);
+
+  return {
+    region: fallbackRegion,
+    stats: buildCutawayResolutionStats({
+      storedCount,
+      appliedCount: fallbackRegion ? 1 : 0,
+      directCount: fallbackRegion ? 1 : 0,
+      projectedCount: 0,
+      skippedCount: fallbackRegion ? 0 : 1
+    })
+  };
+}
+
 async function requestPreparedPageMetrics(tabId) {
   const response = await chrome.tabs.sendMessage(tabId, {
     type: "LUMEN_MEASURE_PAGE"
@@ -1724,7 +1851,9 @@ function buildCaptureCompletionDetail({
   fileCount,
   redactionCount,
   manualRedactionCount,
+  cutawayCount,
   manualProjectionStats,
+  cutawayResolutionStats,
   variantCount,
   manifestSaved,
   annotationAdded
@@ -1733,8 +1862,17 @@ function buildCaptureCompletionDetail({
   const fileText = `${fileCount} file${fileCount === 1 ? "" : "s"} saved`;
   const variantText = variantCount > 1 ? `${variantCount} responsive views captured` : "";
   const projectionText = formatManualProjectionStats(manualProjectionStats);
+  const cutawayProjectionText = formatCutawayResolutionStats(cutawayResolutionStats);
 
-  if (!redactionCount && !variantText && !projectionText && !manifestSaved && !annotationAdded) {
+  if (
+    !redactionCount &&
+    !variantText &&
+    !projectionText &&
+    !cutawayCount &&
+    !cutawayProjectionText &&
+    !manifestSaved &&
+    !annotationAdded
+  ) {
     return `${sliceText} and ${fileText} successfully.`;
   }
 
@@ -1752,8 +1890,16 @@ function buildCaptureCompletionDetail({
     fragments.push(`${manualRedactionCount} manual box${manualRedactionCount === 1 ? "" : "es"} applied`);
   }
 
+  if (cutawayCount) {
+    fragments.push(`${cutawayCount} cutaway crop${cutawayCount === 1 ? "" : "s"} exported`);
+  }
+
   if (projectionText) {
     fragments.push(projectionText);
+  }
+
+  if (cutawayProjectionText) {
+    fragments.push(cutawayProjectionText);
   }
 
   if (manifestSaved) {
@@ -1788,6 +1934,29 @@ function formatManualProjectionStats(stats) {
   }
 
   return parts.length ? `manual projection ${parts.join(", ")}` : "";
+}
+
+function formatCutawayResolutionStats(stats) {
+  const normalized = buildCutawayResolutionStats(stats || {});
+  const parts = [];
+
+  if (!normalized.storedCount) {
+    return "";
+  }
+
+  if (normalized.projectedCount) {
+    parts.push(`${normalized.projectedCount} projected`);
+  }
+
+  if (normalized.directCount) {
+    parts.push(`${normalized.directCount} direct`);
+  }
+
+  if (normalized.skippedCount) {
+    parts.push(`${normalized.skippedCount} skipped`);
+  }
+
+  return parts.length ? `cutaway ${parts.join(", ")}` : "";
 }
 
 function buildVariantProgressDetail(variant, stage) {
@@ -1887,10 +2056,11 @@ async function downloadRenderedOutputs(outputs, { folder, fileBaseName, variantI
   const downloadRecords = [];
 
   for (const output of outputs) {
-    const suffix =
-      outputs.length > 1
-        ? `-part-${String(output.index + 1).padStart(2, "0")}-of-${String(output.total).padStart(2, "0")}`
-        : "";
+    const role = output.role || "full-page";
+    const rawPartIndex = output.partIndex ?? (Number.isFinite(output.index) ? output.index + 1 : 1);
+    const partIndex = Math.max(1, clampNonNegativeInteger(rawPartIndex));
+    const partTotal = Math.max(1, clampNonNegativeInteger(output.partTotal ?? output.total ?? 1));
+    const suffix = role === "cutaway" ? "-cutaway" : buildPartFilenameSuffix(partIndex, partTotal);
     const filename = `${folder}/${fileBaseName}${suffix}.png`;
 
     const downloadId = await chrome.downloads.download({
@@ -1905,15 +2075,28 @@ async function downloadRenderedOutputs(outputs, { folder, fileBaseName, variantI
       downloadId,
       filename,
       bytesReceived: downloadItem.bytesReceived || 0,
+      complete: (downloadItem.bytesReceived || 0) > 0,
       kind: "image",
+      role,
       variantId,
       exportPreset,
-      partIndex: output.index + 1,
-      partTotal: output.total
+      partIndex,
+      partTotal,
+      width: output.width || 0,
+      height: output.height || 0,
+      cutawayRegion: output.cutawayRegion || null
     });
   }
 
   return downloadRecords;
+}
+
+function buildPartFilenameSuffix(partIndex, partTotal) {
+  if (partTotal <= 1) {
+    return "";
+  }
+
+  return `-part-${String(partIndex).padStart(2, "0")}-of-${String(partTotal).padStart(2, "0")}`;
 }
 
 async function downloadBundleManifest({ folder, fileBaseName, manifest }) {
@@ -1934,6 +2117,7 @@ async function downloadBundleManifest({ folder, fileBaseName, manifest }) {
     downloadId,
     filename,
     bytesReceived: downloadItem.bytesReceived || 0,
+    complete: (downloadItem.bytesReceived || 0) > 0,
     kind: "manifest"
   };
 }
@@ -1948,7 +2132,9 @@ function buildCaptureBundleManifest({
   variants,
   redactionCount,
   manualRedactionCount,
+  cutawayCount,
   manualProjectionStats,
+  cutawayResolutionStats,
   redactionBreakdown,
   segmentCount,
   tileCount,
@@ -1978,7 +2164,9 @@ function buildCaptureBundleManifest({
       tileCount,
       redactionCount,
       manualRedactionCount,
+      cutawayCount,
       manualProjectionStats,
+      cutawayResolutionStats,
       redactionBreakdown,
       artifactStats,
       annotation
@@ -1997,7 +2185,9 @@ function buildCaptureBundleManifest({
         tileCount: variant.tileCount,
         redactionCount: variant.redactionCount,
         manualRedactionCount: variant.manualRedactionCount || 0,
+        cutawayCount: variant.cutawayCount || 0,
         manualProjectionStats: variant.manualProjectionStats || buildManualProjectionStats(),
+        cutawayResolutionStats: variant.cutawayResolutionStats || buildCutawayResolutionStats(),
         redactionBreakdown: variant.redactionBreakdown || buildRedactionBreakdown([]),
         dimensions: variant.dimensions
       };
@@ -2023,8 +2213,12 @@ function buildPortableOutputRecords(downloads = []) {
     complete: Number(download.bytesReceived || 0) > 0,
     variantId: download.variantId || "",
     exportPreset: download.exportPreset || "",
+    role: download.role || "full-page",
     partIndex: download.partIndex || 1,
-    partTotal: download.partTotal || 1
+    partTotal: download.partTotal || 1,
+    width: Math.max(0, Math.round(download.width || 0)),
+    height: Math.max(0, Math.round(download.height || 0)),
+    cutawayRegion: download.cutawayRegion || null
   }));
 }
 
@@ -2035,6 +2229,7 @@ function buildArtifactStats(outputs = []) {
   return {
     outputCount: outputs.length,
     imageCount,
+    cutawayCount: outputs.filter((output) => output.role === "cutaway").length,
     bytesReceived,
     complete: outputs.length > 0 && outputs.every((output) => output.complete),
     tiled: outputs.some((output) => (output.partTotal || 1) > 1)

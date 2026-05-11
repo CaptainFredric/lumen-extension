@@ -21,21 +21,19 @@ The product can become ambitious without changing the first wedge. The screensho
 5. One anchored capture note rendered into the export.
 6. Page-signal extraction for palette, typography, headline, CTA, navigation, and layout counts.
 7. Local history with run details, artifacts, copyable summaries, and file actions.
-8. Cutaway region picker foundation that stores one reusable page area per URL.
+8. Cutaway region picker that stores one reusable page area per URL and exports focused crops when the region resolves during capture.
 
 ## Near-Term Product Bets
 
-### Focused Cutaway Capture
+### Cutaway Artifact Review
 
-Let the user draw a rectangular cutaway region and export only that area. This is useful for pricing tables, hero sections, checkout modules, dashboards, and bug reproduction areas where a full-page capture is noisy.
+The user can now draw a rectangular cutaway region and export that area beside the full-page capture. This is useful for pricing tables, hero sections, checkout modules, dashboards, and bug reproduction areas where a full-page capture is noisy.
 
-Implementation path:
+Next implementation path:
 
-1. Use the stored cutaway region from the popup picker.
-2. Project the region through the same viewport and anchor model used by manual redaction boxes.
-3. Crop the stitched output in the offscreen document after capture.
-4. Store the cutaway output beside the full-page artifact in the same bundle manifest.
-5. Show the cutaway in local history as its own artifact.
+1. Add a popup history filter for full-page, cutaway, and manifest artifacts.
+2. Show cutaway dimensions and projection status in the run detail view.
+3. Add a review screen before external handoff.
 
 ### Region Watch
 
@@ -64,15 +62,14 @@ Required guardrails:
 ## Future Feature Backlog
 
 1. Freeform annotation tools: arrow, text, highlight, blur, and numbered callouts.
-2. Cutaway capture export: crop from stitched output while keeping manifest context.
-3. Region watch: scheduled local captures of a selected area.
-4. Visual diff: compare the latest region or page capture against the previous run.
-5. Agent handoff: summarize change, prepare bug evidence, or draft review notes.
-6. Team sync: push selected bundles to Drive, Slack, Notion, GitHub, or Jira.
-7. Capture inbox: local queue of captures that need review, redaction approval, or export.
-8. Capture templates: QA bug report, design review, competitor reference, release evidence.
-9. Safer sharing: outbound checklist that confirms redactions, source URL, and included files.
-10. Store package readiness: permissions audit, privacy policy, screenshots, listing copy, and rejection-risk review.
+2. Region watch: scheduled local captures of a selected area.
+3. Visual diff: compare the latest region or page capture against the previous run.
+4. Agent handoff: summarize change, prepare bug evidence, or draft review notes.
+5. Team sync: push selected bundles to Drive, Slack, Notion, GitHub, or Jira.
+6. Capture inbox: local queue of captures that need review, redaction approval, or export.
+7. Capture templates: QA bug report, design review, competitor reference, release evidence.
+8. Safer sharing: outbound checklist that confirms redactions, source URL, and included files.
+9. Store package readiness: permissions audit, privacy policy, screenshots, listing copy, and rejection-risk review.
 
 ## Chrome Web Store Direction
 
@@ -82,8 +79,7 @@ The current extension should stay usable with `activeTab`, optional host access 
 
 ## Next Engineering Milestones
 
-1. Connect the stored cutaway region to a focused crop export.
-2. Add a history detail row for cutaway artifacts.
-3. Add a review screen for manual redaction and cutaway projection before export.
-4. Add one real annotation tool that works on exported images.
-5. Build store readiness checks: permission rationale, privacy text, listing screenshots, and automated zip validation.
+1. Add a history detail row for cutaway artifacts.
+2. Add a review screen for manual redaction and cutaway projection before export.
+3. Add one real annotation tool that works on exported images.
+4. Build store readiness checks: permission rationale, privacy text, listing screenshots, and automated zip validation.

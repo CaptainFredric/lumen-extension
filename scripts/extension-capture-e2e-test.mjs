@@ -14,6 +14,7 @@ const downloadDir = path.join(tempRoot, "downloads");
 const extensionDir = path.join(tempRoot, "extension");
 const popupConsoleErrors = [];
 const expectedVariantCount = 3;
+const expectedCutawayCount = expectedVariantCount;
 
 let context;
 let server;
@@ -45,6 +46,7 @@ try {
 
   const target = await context.newPage();
   await target.goto(fixture.url, { waitUntil: "networkidle" });
+  await seedCutawayRegion(worker, fixture.url);
 
   const popup = await context.newPage();
   popup.setDefaultTimeout(120000);
@@ -83,7 +85,9 @@ try {
 
   assert(response?.ok, "Loaded extension capture failed.", response);
   assert(response.variantCount === expectedVariantCount, "Expected responsive capture set.", response);
-  assert(response.files?.length >= expectedVariantCount + 1, "Expected responsive images and manifest downloads.", response);
+  assert(response.cutawayCount === expectedCutawayCount, "Expected focused cutaway exports from the stored region.", response);
+  assert(response.cutawayResolutionStats?.appliedCount === expectedCutawayCount, "Expected cutaway region to resolve during capture.", response);
+  assert(response.files?.length >= expectedVariantCount + expectedCutawayCount + 1, "Expected responsive images, a cutaway image, and manifest downloads.", response);
   assert(response.archiveFolder?.startsWith("Lumen/"), "Expected organized Lumen archive folder.", response);
   assert(response.redactionCount >= expectedVariantCount * 3, "Expected automatic redactions across responsive views.", response);
   assert(response.segmentCount >= expectedVariantCount * 2, "Expected full-page capture to stitch multiple responsive views.", response);
@@ -103,6 +107,7 @@ try {
   assert(latest?.downloads?.length === response.downloads.length, "Expected history to store download records.", latest);
   assert(latest?.variants?.length === expectedVariantCount, "Expected history to store responsive variants.", latest);
   assert(latest.redactionCount >= expectedVariantCount * 3, "Expected history redaction count.", latest);
+  assert(latest.cutawayCount === expectedCutawayCount, "Expected history cutaway count.", latest);
   assert(localState["lumen.inspector.latestBlueprint"]?.identity?.heroHeadline, "Expected latest blueprint to be stored.", localState);
 
   const downloadItems = await worker.evaluate((downloadIds) =>
@@ -132,11 +137,20 @@ try {
   });
 
   const imageItems = downloads.filter((item) => item.lumenRecord.kind === "image");
+  const fullPageImageItems = imageItems.filter((item) => item.lumenRecord.role !== "cutaway");
+  const cutawayImageItems = imageItems.filter((item) => item.lumenRecord.role === "cutaway");
   const manifestItem = downloads.find((item) => item.lumenRecord.kind === "manifest");
-  const capturedVariantIds = new Set(imageItems.map((item) => item.lumenRecord.variantId));
+  const capturedVariantIds = new Set(fullPageImageItems.map((item) => item.lumenRecord.variantId));
 
-  assert(imageItems.length === expectedVariantCount, "Expected one PNG capture artifact per responsive view.", downloads);
+  assert(imageItems.length === expectedVariantCount + expectedCutawayCount, "Expected responsive PNGs plus the focused cutaway PNG.", downloads);
+  assert(fullPageImageItems.length === expectedVariantCount, "Expected one full-page PNG capture artifact per responsive view.", downloads);
+  assert(cutawayImageItems.length === expectedCutawayCount, "Expected exactly one cutaway PNG artifact.", downloads);
   assert(capturedVariantIds.has("desktop") && capturedVariantIds.has("tablet") && capturedVariantIds.has("mobile"), "Expected desktop, tablet, and mobile image downloads.", downloads);
+  assert(
+    new Set(cutawayImageItems.map((item) => item.lumenRecord.variantId)).size === expectedVariantCount,
+    "Expected one cutaway artifact for each responsive view.",
+    downloads
+  );
   assert(manifestItem, "Expected a JSON bundle manifest.", downloads);
 
   const imageInfos = [];
@@ -144,9 +158,12 @@ try {
   for (const imageItem of imageItems) {
     imageInfos.push({
       variantId: imageItem.lumenRecord.variantId,
+      role: imageItem.lumenRecord.role || "full-page",
       ...(await assertPng(imageItem.filename))
     });
   }
+
+  const cutawayInfo = imageInfos.find((info) => info.role === "cutaway");
 
   const manifest = JSON.parse(await readFile(manifestItem.filename, "utf8"));
 
@@ -154,13 +171,16 @@ try {
   assert(manifest.capture.variantCount === expectedVariantCount, "Expected manifest responsive variant metadata.", manifest.capture);
   assert(manifest.variants?.length === expectedVariantCount, "Expected manifest variant records.", manifest.variants);
   assert(manifest.capture.artifactStats?.complete, "Expected manifest to mark output artifacts complete.", manifest.capture);
-  assert(manifest.capture.artifactStats?.imageCount === expectedVariantCount, "Expected manifest image artifact count.", manifest.capture);
+  assert(manifest.capture.artifactStats?.imageCount === expectedVariantCount + expectedCutawayCount, "Expected manifest image artifact count.", manifest.capture);
+  assert(manifest.capture.artifactStats?.cutawayCount === expectedCutawayCount, "Expected manifest cutaway artifact count.", manifest.capture);
+  assert(manifest.capture.cutawayCount === expectedCutawayCount, "Expected manifest capture cutaway count.", manifest.capture);
+  assert(manifest.capture.cutawayResolutionStats?.appliedCount === expectedCutawayCount, "Expected manifest cutaway resolution stats.", manifest.capture);
   assert(manifest.capture.artifactStats?.bytesReceived > 0, "Expected manifest byte count.", manifest.capture);
   assert(manifest.capture.redactionCount >= expectedVariantCount * 3, "Expected manifest redaction metadata.", manifest.capture);
   assert(manifest.capture.annotation?.text === "E2E responsive review artifact", "Expected manifest annotation metadata.", manifest.capture);
   assert(
     manifest.variants.every((variant) =>
-      variant.artifactStats?.complete &&
+        variant.artifactStats?.complete &&
         variant.outputs?.length >= 1 &&
         variant.outputs.every((output) => output.complete && output.bytesReceived > 0) &&
         variant.dimensions?.width > 0 &&
@@ -171,6 +191,10 @@ try {
   );
   assert(
     imageInfos.every((info) => {
+      if (info.role === "cutaway") {
+        return true;
+      }
+
       const variant = manifest.variants.find((item) => item.id === info.variantId);
 
       return variant &&
@@ -182,6 +206,24 @@ try {
       imageInfos,
       variants: manifest.variants
     }
+  );
+  assert(
+    cutawayInfo &&
+      cutawayInfo.width < manifest.variants.find((variant) => variant.id === "desktop")?.dimensions?.width &&
+      cutawayInfo.height < manifest.variants.find((variant) => variant.id === "desktop")?.dimensions?.height,
+        "Expected cutaway PNG to be smaller than the full desktop capture.",
+    { cutawayInfo, variants: manifest.variants }
+  );
+  assert(
+    manifest.variants.some((variant) =>
+      variant.outputs?.some((output) =>
+        output.role === "cutaway" &&
+        output.cutawayRegion?.width > 0 &&
+        output.cutawayRegion?.height > 0
+      )
+    ),
+    "Expected manifest to mark the cutaway output and its region.",
+    manifest.variants
   );
   assert(manifest.pageSignals?.heroHeadline, "Expected page signals in the bundle manifest.", manifest.pageSignals);
 
@@ -203,6 +245,7 @@ try {
       variantCount: response.variantCount,
       segmentCount: response.segmentCount,
       redactionCount: response.redactionCount,
+      cutawayCount: response.cutawayCount,
       bytesReceived: manifest.capture.artifactStats.bytesReceived,
       manifestFile: response.manifestFile
     },
@@ -280,6 +323,57 @@ async function getExtensionWorker(browserContext) {
   }
 
   return worker;
+}
+
+async function seedCutawayRegion(worker, fixtureUrl) {
+  await worker.evaluate(async (rawUrl) => {
+    const url = new URL(rawUrl);
+    const key = `${url.origin}${url.pathname}${url.search}`;
+    const sourceViewport = {
+      viewportWidth: 1280,
+      viewportHeight: 900,
+      pageHeight: 1800,
+      scrollMode: "document",
+      scrollContainer: "document"
+    };
+
+    await chrome.storage.local.set({
+      "lumen.capture.cutawayRegions": {
+        [key]: {
+          url: rawUrl,
+          host: url.host,
+          updatedAt: new Date().toISOString(),
+          context: sourceViewport,
+          region: {
+            id: "e2e-cutaway-region",
+            kind: "cutaway",
+            left: 652,
+            top: 424,
+            width: 300,
+            height: 220,
+            sourceViewport,
+            anchor: {
+              selector: ".proof .card:nth-child(2)",
+              tagName: "article",
+              sourceRect: {
+                left: 652,
+                top: 424,
+                width: 508,
+                height: 280
+              },
+              ratios: {
+                left: 0.08,
+                top: 0.08,
+                width: 0.68,
+                height: 0.72
+              }
+            }
+          },
+          regions: []
+        }
+      }
+    });
+  }, fixtureUrl);
 }
 
 async function startFixtureServer() {
