@@ -241,6 +241,6 @@ See `STORE_READINESS.md` for the current submission checklist, permission ration
 The highest-leverage next steps are:
 
 1. improve capture reliability on difficult real-world sites
-2. add a small cutaway preview and artifact filter in the popup history detail
-3. prepare real Chrome Web Store screenshots and privacy policy copy
+2. prepare real Chrome Web Store screenshots and privacy policy copy
+3. add one real annotation tool that works on exported images
 4. tighten the backend from demo session state into a real account path

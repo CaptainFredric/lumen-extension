@@ -1166,6 +1166,13 @@ function handleBillingClick() {
 }
 
 async function handleHistoryAction(event) {
+  const artifactFilterButton = event.target.closest("[data-history-artifact-filter]");
+
+  if (artifactFilterButton) {
+    setHistoryArtifactFilter(artifactFilterButton);
+    return;
+  }
+
   const button = event.target.closest("[data-history-action]");
 
   if (!button) {
@@ -1552,24 +1559,28 @@ function buildHistoryVariantList(item) {
 }
 
 function buildHistoryArtifactList(item) {
-  const downloads = Array.isArray(item.downloads) ? item.downloads : [];
-  const files = Array.isArray(item.files) ? item.files : [];
+  const records = getHistoryArtifactRecords(item);
 
-  if (!downloads.length && !files.length) {
+  if (!records.length) {
     return null;
   }
 
   const panel = buildHistoryPanelShell("Artifacts");
-  const records = downloads.length
-    ? downloads
-    : files.map((filename) => ({
-        filename,
-        kind: filename.endsWith(".json") ? "manifest" : "image"
-      }));
+  const list = document.createElement("div");
+  const cutawayPreview = buildHistoryCutawayPreview(item, records);
 
-  for (const record of records.slice(0, 7)) {
+  list.className = "history-artifact-list";
+  panel.append(buildHistoryArtifactFilters(records));
+
+  if (cutawayPreview) {
+    panel.append(cutawayPreview);
+  }
+
+  for (const record of records) {
+    const artifactType = getHistoryArtifactType(record);
     const row = document.createElement("div");
-    row.className = "history-detail-row";
+    row.className = `history-detail-row history-artifact-row history-artifact-row-${artifactType}`;
+    row.dataset.artifactType = artifactType;
 
     const label = document.createElement("strong");
     label.textContent = formatArtifactLabel(record);
@@ -1585,33 +1596,156 @@ function buildHistoryArtifactList(item) {
       .join(" | ");
 
     row.append(label, meta);
-    panel.append(row);
+    list.append(row);
   }
 
-  if (records.length > 7) {
-    const more = document.createElement("p");
-    more.className = "history-detail-note";
-    more.textContent = `${records.length - 7} more artifact${records.length - 7 === 1 ? "" : "s"} in the bundle.`;
-    panel.append(more);
-  }
-
+  panel.append(list);
   return panel;
 }
 
+function getHistoryArtifactRecords(item) {
+  const downloads = Array.isArray(item.downloads) ? item.downloads : [];
+  const files = Array.isArray(item.files) ? item.files : [];
+
+  if (downloads.length) {
+    return downloads;
+  }
+
+  return files.map((filename) => ({
+    filename,
+    kind: filename.endsWith(".json") ? "manifest" : "image",
+    role: filename.includes("-cutaway") ? "cutaway" : "full-page"
+  }));
+}
+
+function buildHistoryArtifactFilters(records) {
+  const filterRow = document.createElement("div");
+  const counts = countHistoryArtifacts(records);
+  const filters = [
+    ["all", "All", records.length],
+    ["image", "Full page", counts.image],
+    ["cutaway", "Cutaway", counts.cutaway],
+    ["manifest", "Manifest", counts.manifest]
+  ].filter(([, , count]) => count > 0);
+
+  filterRow.className = "history-artifact-filters";
+
+  for (const [filter, label, count] of filters) {
+    const button = document.createElement("button");
+    button.className = "history-artifact-filter";
+    button.type = "button";
+    button.dataset.historyArtifactFilter = filter;
+    button.setAttribute("aria-pressed", String(filter === "all"));
+    button.classList.toggle("is-active", filter === "all");
+    button.textContent = `${label} ${count}`;
+    filterRow.append(button);
+  }
+
+  return filterRow;
+}
+
+function countHistoryArtifacts(records) {
+  return records.reduce((counts, record) => {
+    counts[getHistoryArtifactType(record)] += 1;
+    return counts;
+  }, {
+    image: 0,
+    cutaway: 0,
+    manifest: 0
+  });
+}
+
+function setHistoryArtifactFilter(button) {
+  const panel = button.closest(".history-detail-panel");
+  const filter = button.dataset.historyArtifactFilter || "all";
+
+  if (!panel) {
+    return;
+  }
+
+  for (const filterButton of panel.querySelectorAll("[data-history-artifact-filter]")) {
+    const isActive = filterButton === button;
+    filterButton.classList.toggle("is-active", isActive);
+    filterButton.setAttribute("aria-pressed", String(isActive));
+  }
+
+  for (const row of panel.querySelectorAll("[data-artifact-type]")) {
+    row.classList.toggle("is-filtered", filter !== "all" && row.dataset.artifactType !== filter);
+  }
+}
+
+function buildHistoryCutawayPreview(item, records) {
+  const cutaways = records.filter((record) => getHistoryArtifactType(record) === "cutaway");
+
+  if (!cutaways.length) {
+    return null;
+  }
+
+  const preview = document.createElement("div");
+  const map = document.createElement("div");
+  const summary = document.createElement("p");
+  const first = cutaways[0];
+  const region = first.cutawayRegion || {};
+  const variant = findHistoryVariant(item, first.variantId);
+  const pageWidth = Math.max(1, Number(variant?.dimensions?.width) || Number(first.width) || Number(region.width) || 1);
+  const pageHeight = Math.max(1, Number(variant?.dimensions?.height) || Number(first.height) || Number(region.height) || 1);
+  const box = document.createElement("span");
+
+  preview.className = "history-cutaway-preview";
+  map.className = "history-cutaway-map";
+  box.className = "history-cutaway-box";
+  box.style.left = `${clampPercent((Number(region.left) || 0) / pageWidth * 100, 4, 92)}%`;
+  box.style.top = `${clampPercent((Number(region.top) || 0) / pageHeight * 100, 4, 92)}%`;
+  box.style.width = `${clampPercent((Number(region.width) || Number(first.width) || pageWidth) / pageWidth * 100, 8, 92)}%`;
+  box.style.height = `${clampPercent((Number(region.height) || Number(first.height) || pageHeight) / pageHeight * 100, 8, 92)}%`;
+
+  summary.className = "history-detail-note";
+  summary.textContent = [
+    `${cutaways.length} cutaway crop${cutaways.length === 1 ? "" : "s"} saved`,
+    first.variantId ? `${titleCase(first.variantId)} view` : "",
+    first.width && first.height ? `${first.width}x${first.height}` : "",
+    region.projection ? `${region.projection} region` : ""
+  ]
+    .filter(Boolean)
+    .join(" | ");
+
+  map.append(box);
+  preview.append(map, summary);
+  return preview;
+}
+
+function findHistoryVariant(item, variantId) {
+  const variants = Array.isArray(item.variants) ? item.variants : [];
+
+  return variants.find((variant) => variant.id === variantId) || variants[0] || null;
+}
+
+function getHistoryArtifactType(record) {
+  if (record.role === "cutaway" || /-cutaway(?:\.|$)/i.test(record.filename || "")) {
+    return "cutaway";
+  }
+
+  if (record.kind === "manifest" || /\.json$/i.test(record.filename || "")) {
+    return "manifest";
+  }
+
+  return "image";
+}
+
 function formatArtifactLabel(record) {
-  if (record.role === "cutaway") {
+  const artifactType = getHistoryArtifactType(record);
+
+  if (artifactType === "cutaway") {
     return "Cutaway PNG";
   }
 
-  if (record.kind === "manifest") {
+  if (artifactType === "manifest") {
     return "Manifest JSON";
   }
 
-  if (record.kind === "image") {
-    return "Full-page PNG";
-  }
-
-  return titleCase(record.kind || "file");
+  return record.partTotal > 1
+    ? `Full-page PNG ${record.partIndex || 1}/${record.partTotal}`
+    : "Full-page PNG";
 }
 
 function buildHistorySignalPanel(item) {

@@ -1544,6 +1544,112 @@ h3 {
   border: 1px solid rgba(255, 255, 255, 0.075);
 }
 
+.history-artifact-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.history-artifact-filter {
+  appearance: none;
+  min-height: 28px;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 800;
+  transition: border-color 150ms ease, background 150ms ease, color 150ms ease, transform 150ms ease;
+}
+
+.history-artifact-filter:hover,
+.history-artifact-filter:focus-visible,
+.history-artifact-filter.is-active {
+  border-color: rgba(134, 221, 255, 0.34);
+  background: rgba(134, 221, 255, 0.12);
+  color: var(--text-primary);
+}
+
+.history-artifact-filter:hover {
+  transform: translateY(-1px);
+}
+
+.history-artifact-list {
+  display: grid;
+  gap: 7px;
+}
+
+.history-artifact-row {
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(5, 11, 20, 0.34);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.history-artifact-row-cutaway {
+  border-color: rgba(127, 241, 197, 0.18);
+  background:
+    linear-gradient(135deg, rgba(127, 241, 197, 0.08), transparent 52%),
+    rgba(5, 11, 20, 0.34);
+}
+
+.history-artifact-row-manifest {
+  border-color: rgba(134, 221, 255, 0.16);
+}
+
+.history-artifact-row.is-filtered {
+  display: none;
+}
+
+.history-cutaway-preview {
+  display: grid;
+  gap: 7px;
+  padding: 8px;
+  border-radius: 13px;
+  background:
+    linear-gradient(135deg, rgba(127, 241, 197, 0.08), transparent 52%),
+    rgba(5, 11, 20, 0.36);
+  border: 1px solid rgba(127, 241, 197, 0.14);
+}
+
+.history-cutaway-map {
+  position: relative;
+  height: 74px;
+  overflow: hidden;
+  border-radius: 11px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    rgba(5, 11, 20, 0.58);
+  background-size: 14px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.history-cutaway-map::before {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 26px;
+  content: "";
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent);
+}
+
+.history-cutaway-box {
+  position: absolute;
+  display: block;
+  min-width: 10px;
+  min-height: 8px;
+  border: 2px solid rgba(127, 241, 197, 0.9);
+  border-radius: 8px;
+  background: rgba(127, 241, 197, 0.12);
+  box-shadow:
+    0 0 0 1px rgba(5, 11, 20, 0.62),
+    0 0 18px rgba(127, 241, 197, 0.18);
+}
+
 .history-detail-row {
   display: grid;
   grid-template-columns: 0.74fr 1.26fr;

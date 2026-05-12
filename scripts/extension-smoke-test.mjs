@@ -54,6 +54,7 @@ try {
         archiveFolder: "Lumen/2026-05-02/smoke-capture",
         files: [
           "Lumen/2026-05-02/smoke-capture/smoke-desktop-raw.png",
+          "Lumen/2026-05-02/smoke-capture/smoke-desktop-raw-cutaway.png",
           "Lumen/2026-05-02/smoke-capture/smoke-bundle-desktop-raw.json"
         ],
         downloads: [
@@ -62,7 +63,27 @@ try {
             filename: "Lumen/2026-05-02/smoke-capture/smoke-desktop-raw.png",
             bytesReceived: 120000,
             kind: "image",
-            variantId: "desktop"
+            role: "full-page",
+            variantId: "desktop",
+            width: 1280,
+            height: 2400
+          },
+          {
+            downloadId: 12347,
+            filename: "Lumen/2026-05-02/smoke-capture/smoke-desktop-raw-cutaway.png",
+            bytesReceived: 46000,
+            kind: "image",
+            role: "cutaway",
+            variantId: "desktop",
+            width: 640,
+            height: 320,
+            cutawayRegion: {
+              left: 220,
+              top: 480,
+              width: 640,
+              height: 320,
+              projection: "direct"
+            }
           },
           {
             downloadId: 12346,
@@ -73,6 +94,7 @@ try {
         ],
         redactionCount: 3,
         manualRedactionCount: 1,
+        cutawayCount: 1,
         manifestFile: "Lumen/2026-05-02/smoke-capture/smoke-bundle-desktop-raw.json",
         annotation: {
           text: "Smoke review note"
@@ -89,6 +111,7 @@ try {
             files: ["Lumen/2026-05-02/smoke-capture/smoke-desktop-raw.png"],
             fileCount: 1,
             redactionCount: 3,
+            cutawayCount: 1,
             dimensions: {
               width: 1280,
               height: 2400
@@ -151,6 +174,9 @@ try {
     historyDetailOpen: Boolean(document.querySelector(".history-item.is-expanded .history-detail")),
     historyDetailMetrics: [...document.querySelectorAll(".history-detail-metric strong")].map((node) => node.textContent?.trim()),
     historyDetailPanels: [...document.querySelectorAll(".history-detail-panel .field-label")].map((node) => node.textContent?.trim()),
+    historyArtifactFilters: [...document.querySelectorAll("[data-history-artifact-filter]")].map((button) => button.textContent?.trim()),
+    historyArtifactRows: [...document.querySelectorAll("[data-artifact-type]")].map((row) => row.dataset.artifactType),
+    historyCutawayPreview: Boolean(document.querySelector(".history-cutaway-preview")),
     historyActions: [...document.querySelectorAll("[data-history-action]")].map((button) => ({
       action: button.dataset.historyAction,
       captureId: button.dataset.captureId,
@@ -188,6 +214,10 @@ try {
   assert(popupState.historyDetailPanels.includes("Capture views"), "History detail capture views did not render.", popupState);
   assert(popupState.historyDetailPanels.includes("Artifacts"), "History detail artifacts did not render.", popupState);
   assert(popupState.historyDetailPanels.includes("Page signals"), "History detail page signals did not render.", popupState);
+  assert(popupState.historyArtifactFilters.includes("All 3"), "Artifact all filter did not render.", popupState);
+  assert(popupState.historyArtifactFilters.includes("Cutaway 1"), "Cutaway artifact filter did not render.", popupState);
+  assert(popupState.historyArtifactRows.includes("cutaway"), "Cutaway artifact row did not render.", popupState);
+  assert(popupState.historyCutawayPreview, "Cutaway preview did not render in history detail.", popupState);
   assert(
     popupState.historyActions.length === 4 &&
       popupState.historyActions.every((button) => button.captureId === seededCaptureId && !button.disabled),
@@ -195,6 +225,26 @@ try {
     popupState
   );
   assert(!popupConsoleErrors.length, "Popup emitted console errors.", popupConsoleErrors);
+
+  await popup.click("[data-history-artifact-filter='cutaway']");
+  const filteredArtifactState = await popup.evaluate(() => ({
+    activeFilter: document.querySelector("[data-history-artifact-filter].is-active")?.dataset.historyArtifactFilter || "",
+    visibleRows: [...document.querySelectorAll("[data-artifact-type]")]
+      .filter((row) => !row.classList.contains("is-filtered"))
+      .map((row) => row.dataset.artifactType),
+    hiddenRows: [...document.querySelectorAll("[data-artifact-type].is-filtered")]
+      .map((row) => row.dataset.artifactType)
+  }));
+
+  assert(filteredArtifactState.activeFilter === "cutaway", "Cutaway artifact filter did not become active.", filteredArtifactState);
+  assert(
+    filteredArtifactState.visibleRows.length === 1 &&
+      filteredArtifactState.visibleRows[0] === "cutaway" &&
+      filteredArtifactState.hiddenRows.includes("image") &&
+      filteredArtifactState.hiddenRows.includes("manifest"),
+    "Cutaway artifact filter did not hide unrelated artifact rows.",
+    filteredArtifactState
+  );
 
   await popup.dispatchEvent("#captureButton", "pointerdown", {
     button: 0,

@@ -30,11 +30,11 @@ The product can become ambitious without changing the first wedge. The screensho
 
 The user can now draw a rectangular cutaway region and export that area beside the full-page capture. This is useful for pricing tables, hero sections, checkout modules, dashboards, and bug reproduction areas where a full-page capture is noisy.
 
-Next implementation path:
+Implemented review layer:
 
-1. Add a popup history filter for full-page, cutaway, and manifest artifacts.
-2. Show cutaway dimensions and projection status in the run detail view.
-3. Add a review screen before external handoff.
+1. Popup history can filter artifacts by full-page image, cutaway crop, and manifest.
+2. Cutaway runs show a compact preview map, dimensions, variant, and projection status in the run detail.
+3. External handoff still needs its own review screen before anything leaves the browser.
 
 ### Region Watch
 
@@ -80,7 +80,7 @@ The current extension should stay usable with `activeTab`, optional host access 
 
 ## Next Engineering Milestones
 
-1. Add a more visual pre-export review with cutaway thumbnails and box previews.
-2. Add a history detail row for cutaway artifacts.
-3. Add one real annotation tool that works on exported images.
-4. Build store readiness checks: permission rationale, privacy text, listing screenshots, and automated zip validation.
+1. Add one real annotation tool that works on exported images.
+2. Prepare Chrome Web Store screenshots from current extension output.
+3. Draft privacy policy copy that matches local history, redaction metadata, screenshots, and optional future sync.
+4. Tighten the backend from demo session state into a real account path.
