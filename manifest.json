@@ -3,6 +3,7 @@
   "name": "Lumen",
   "version": "0.2.0",
   "description": "Clean browser capture for review work: remove page chrome, capture responsive sets, redact data, extract signals, and mark regions.",
+  "homepage_url": "https://captainfredric.github.io/lumen-extension/",
   "minimum_chrome_version": "109",
   "permissions": [
     "activeTab",

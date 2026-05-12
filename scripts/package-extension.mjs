@@ -9,6 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const distDir = path.join(repoRoot, "dist");
 const stagingDir = path.join(distDir, "extension-package");
+const publicHomepageUrl = "https://captainfredric.github.io/lumen-extension/";
 
 const requiredRuntimeFiles = [
   "manifest.json",
@@ -124,6 +125,7 @@ async function validatePackage({ manifest, zipPath }) {
     name: manifest.name,
     version: manifest.version,
     manifestVersion: manifest.manifest_version,
+    homepageUrl: manifest.homepage_url || "",
     zip: {
       path: zipPath,
       bytes: 0,
@@ -153,6 +155,10 @@ function validateManifest(manifest, errors, warnings) {
 
   if (!manifest.description || manifest.description.length > 132) {
     errors.push("Manifest description is missing or longer than 132 characters.");
+  }
+
+  if (manifest.homepage_url !== publicHomepageUrl) {
+    errors.push("Manifest homepage_url should point to the public Lumen site.");
   }
 
   if (!manifest.background?.service_worker) {

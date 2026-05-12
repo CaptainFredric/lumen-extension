@@ -235,12 +235,14 @@ These are future layers:
 
 See `PRODUCT_ROADMAP.md` for the longer product direction and Chrome Web Store guardrails.
 See `STORE_READINESS.md` for the current submission checklist, permission rationale, and policy references.
+See `PRIVACY.md` for the local-first privacy disclosure that mirrors the public privacy page.
+See `CHROME_STORE_LISTING.md` for the current single-purpose listing draft, permission rationale, and screenshot checklist.
 
 ## Next Work
 
 The highest-leverage next steps are:
 
 1. improve capture reliability on difficult real-world sites
-2. prepare real Chrome Web Store screenshots and privacy policy copy
+2. prepare real Chrome Web Store screenshots and final listing copy
 3. add one real annotation tool that works on exported images
 4. tighten the backend from demo session state into a real account path

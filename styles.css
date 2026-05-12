@@ -1654,6 +1654,115 @@ h3 {
   text-align: right;
 }
 
+.site-footer a {
+  margin-left: 12px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.site-footer a:hover,
+.site-footer a:focus-visible {
+  color: var(--text);
+}
+
+.privacy-main {
+  padding-bottom: 66px;
+}
+
+.privacy-hero {
+  display: grid;
+  gap: 18px;
+  max-width: 920px;
+  padding: clamp(58px, 8vw, 98px) 0 clamp(30px, 5vw, 54px);
+}
+
+.privacy-hero h1 {
+  max-width: 10ch;
+}
+
+.privacy-lede {
+  max-width: 68ch;
+  color: var(--muted);
+  font-size: clamp(1rem, 1.35vw, 1.16rem);
+  line-height: 1.68;
+}
+
+.privacy-date {
+  color: var(--quiet);
+  font-size: 0.88rem;
+}
+
+.privacy-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  padding: 0 0 clamp(36px, 5vw, 58px);
+}
+
+.privacy-card,
+.privacy-policy-body article {
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.058), transparent 52%),
+    rgba(8, 18, 28, 0.78);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.privacy-card {
+  display: grid;
+  gap: 12px;
+  min-height: 100%;
+  padding: 20px;
+  border-radius: var(--radius-lg);
+}
+
+.privacy-card h2,
+.privacy-policy-body h2 {
+  max-width: none;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(1.08rem, 1.6vw, 1.24rem);
+  font-weight: 700;
+  line-height: 1.18;
+  letter-spacing: -0.03em;
+}
+
+.privacy-card p,
+.privacy-policy-body p,
+.privacy-policy-body li {
+  color: var(--muted);
+  font-size: 0.96rem;
+  line-height: 1.66;
+}
+
+.privacy-policy-body {
+  display: grid;
+  gap: 14px;
+  max-width: 940px;
+  padding-bottom: 38px;
+}
+
+.privacy-policy-body article {
+  display: grid;
+  gap: 14px;
+  padding: clamp(20px, 3vw, 26px);
+  border-radius: var(--radius-lg);
+}
+
+.privacy-policy-body ul {
+  display: grid;
+  gap: 8px;
+  padding-left: 1.2rem;
+}
+
+.privacy-policy-body a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: rgba(100, 242, 223, 0.36);
+  text-underline-offset: 4px;
+}
+
 .js-ready [data-reveal] {
   opacity: 0;
   transform: translateY(14px);
@@ -1786,6 +1895,7 @@ h3 {
   .mechanics-grid,
   .audience-list,
   .scope-grid,
+  .privacy-grid,
   .support-panel-split {
     grid-template-columns: 1fr;
   }

@@ -70,7 +70,7 @@ Required guardrails:
 6. Capture inbox: local queue of captures that need review, redaction approval, or export.
 7. Capture templates: QA bug report, design review, competitor reference, release evidence.
 8. Safer sharing: outbound checklist that confirms redactions, source URL, and included files.
-9. Store package readiness: permissions audit, privacy policy, screenshots, listing copy, and rejection-risk review.
+9. Store package readiness: permissions audit, public privacy URL, screenshots, listing copy, and rejection-risk review.
 
 ## Chrome Web Store Direction
 
@@ -82,5 +82,5 @@ The current extension should stay usable with `activeTab`, optional host access 
 
 1. Add one real annotation tool that works on exported images.
 2. Prepare Chrome Web Store screenshots from current extension output.
-3. Draft privacy policy copy that matches local history, redaction metadata, screenshots, and optional future sync.
+3. Keep privacy disclosure aligned as sync, agent handoff, or watch features move beyond prototype status.
 4. Tighten the backend from demo session state into a real account path.

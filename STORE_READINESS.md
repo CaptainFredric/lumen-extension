@@ -13,6 +13,14 @@ This file tracks what Lumen needs before a serious Chrome Web Store submission.
 7. Landing page keeps present features separate from future direction.
 8. Store package script builds a narrow upload ZIP and validates manifest fields, icons, permissions, and blocked development files.
 9. Production manifest no longer requests the broad `tabs` permission.
+10. Public privacy policy exists at `https://captainfredric.github.io/lumen-extension/privacy.html`.
+11. Manifest declares the public homepage URL.
+
+## Public URLs
+
+1. Homepage: https://captainfredric.github.io/lumen-extension/
+2. Privacy policy: https://captainfredric.github.io/lumen-extension/privacy.html
+3. Support: https://github.com/CaptainFredric/lumen-extension/issues
 
 ## Permission Rationale
 
@@ -33,11 +41,11 @@ These are only needed for tablet, mobile, and responsive captures that open temp
 
 ## Submission Risks To Resolve
 
-1. Write a privacy policy that explains local capture history, screenshots, redaction metadata, page-signal extraction, and any future sync behavior.
+1. Keep the Chrome Web Store privacy fields consistent with `PRIVACY.md` and the public privacy URL.
 2. Keep continuous capture disabled until region watch has explicit schedule selection, visible pause controls, retention limits, and delete controls.
 3. Keep agent handoff disabled until the user can review exactly what will be sent and choose the destination.
 4. Prepare Chrome Web Store screenshots from real extension output, not concept art.
-5. Add a support URL, privacy URL, and accurate single-purpose field.
+5. Fill the single-purpose field from `CHROME_STORE_LISTING.md` without widening the product story.
 
 ## Package Validation
 
@@ -50,11 +58,12 @@ npm run package:extension
 The script creates `dist/lumen-extension-0.2.0.zip` and checks:
 
 1. Manifest V3 fields, description length, background worker, popup, and version format.
-2. Required runtime files.
-3. Declared icon files and PNG dimensions.
-4. Permissions against the current approved list.
-5. Optional host permissions remain limited to `http://*/*` and `https://*/*`.
-6. Development paths such as docs, backend, scripts, node_modules, dist, and proof assets are not included.
+2. Manifest homepage URL points to the public site.
+3. Required runtime files.
+4. Declared icon files and PNG dimensions.
+5. Permissions against the current approved list.
+6. Optional host permissions remain limited to `http://*/*` and `https://*/*`.
+7. Development paths such as docs, backend, scripts, node_modules, dist, and proof assets are not included.
 
 Current known warning:
 
@@ -65,6 +74,9 @@ Current known warning:
 1. Chrome `activeTab` permission: https://developer.chrome.com/docs/extensions/develop/concepts/activeTab
 2. Manifest description length: https://developer.chrome.com/docs/extensions/reference/manifest/description
 3. Chrome Web Store Program Policies: https://developer.chrome.com/docs/webstore/program-policies/policies
+4. Chrome Web Store Privacy Policies: https://developer.chrome.com/docs/webstore/program-policies/privacy
+5. Chrome Web Store Limited Use: https://developer.chrome.com/docs/webstore/program-policies/limited-use
+6. Chrome Web Store privacy fields: https://developer.chrome.com/docs/webstore/cws-dashboard-privacy
 
 ## Readiness Gate
 

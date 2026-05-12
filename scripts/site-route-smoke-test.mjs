@@ -49,6 +49,15 @@ async function runRouteChecks(target) {
       sample: root.body.slice(0, 240)
     });
 
+    const privacy = await fetchText(`${fixture.origin}/privacy.html`);
+    assert(privacy.status === 200, `Expected ${target.name} privacy route to load.`, privacy);
+    assert(privacy.body.includes("Local-first capture, clear limits"), `Expected ${target.name} privacy route to serve the privacy page.`, {
+      sample: privacy.body.slice(0, 240)
+    });
+    assert(privacy.body.includes("Limited Use requirements"), `Expected ${target.name} privacy route to include Limited Use disclosure.`, {
+      sample: privacy.body.slice(0, 240)
+    });
+
     const legacyDocs = await fetchText(`${fixture.origin}/docs/`);
     assert(legacyDocs.status === 200, `Expected ${target.name} legacy docs route to load.`, legacyDocs);
 
@@ -80,6 +89,7 @@ async function runRouteChecks(target) {
       origin: fixture.origin,
       checks: [
         "/",
+        "/privacy.html",
         "/docs/",
         "/missing-route",
         target.assetPath
