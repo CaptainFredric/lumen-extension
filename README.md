@@ -36,8 +36,9 @@ The current build includes:
 18. capture-time popup UI with run settings, cutaway state, a live stage timeline, and recent status log
 19. an on-page usage HUD that appears during preparation and review setup, then hides before screenshots so exports stay clean
 20. a shared entitlement model used by the popup and backend so paid-path features have one access contract
-21. a local backend slice for demo session state, entitlement checks, and history sync when an API is reachable
-22. a GitHub Pages landing site in `docs/`
+21. backend retention and delete controls for session-owned captures, watch records, and agent jobs
+22. a local backend slice for demo session state, entitlement checks, and history sync when an API is reachable
+23. a GitHub Pages landing site in `docs/`
 
 ## Current Limits
 
@@ -49,7 +50,8 @@ These limits are important:
 4. the current annotation pass is one anchored callout plus one capture note, not a full drawing suite
 5. cloud sync, billing, scheduled monitoring, and visual diffs remain future work
 6. highly dynamic sites with virtualization or unusual scroll behavior can still need site-specific fallback work
-7. the local backend slice now checks entitlements, but it remains a demo path rather than a production account or billing system
+7. retention and delete controls cover the local backend slice, but cloud deletion and account recovery are still production work
+8. the local backend slice now checks entitlements, but it remains a demo path rather than a production account or billing system
 
 ## Architecture
 
@@ -70,6 +72,10 @@ The current capture flow is:
 ### Entitlements
 
 `entitlements.js` is the shared plan contract for the extension and backend. Free keeps the local capture wedge available. Demo Pro unlocks current advanced local tools for testing. Team and Enterprise are required before the backend accepts future watch or agent records, and those records still require explicit opt-in and review flags.
+
+### Data Controls
+
+The backend exposes retention and account-data deletion routes for the active session. These controls are intentionally in place before real cloud destinations so synced capture workflows have a deletion and retention contract before they become customer-facing.
 
 ### Page Signals
 

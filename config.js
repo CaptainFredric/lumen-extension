@@ -46,6 +46,8 @@ export const LUMEN_CONFIG = {
       entitlements: "/v1/entitlements",
       logout: "/v1/session/logout",
       captures: "/v1/captures",
+      dataControls: "/v1/data-controls",
+      accountData: "/v1/account-data",
       billing: "/v1/billing/portal",
       syncDestinations: "/v1/integrations"
     }

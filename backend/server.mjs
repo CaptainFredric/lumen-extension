@@ -24,12 +24,15 @@ const MAX_CAPTURE_HISTORY = 500;
 const MAX_SESSION_CAPTURES = 200;
 const MAX_WATCH_PLANS = 100;
 const MAX_AGENT_JOBS = 200;
+const ALLOWED_RETENTION_DAYS = new Set([0, 7, 30, 90, 180, 365]);
+const DELETE_CONFIRMATION = "DELETE LUMEN DATA";
 
 const defaultStore = {
   sessions: [],
   captures: [],
   watchPlans: [],
   agentJobs: [],
+  dataControls: [],
   integrations: buildDefaultIntegrations()
 };
 
@@ -131,6 +134,14 @@ async function handleRequest(request, response) {
       return respondJson(response, 200, {
         integrations: store.integrations
       });
+    }
+
+    if (segments[0] === "v1" && segments[1] === "data-controls") {
+      return await handleDataControlsRoute({ request, response });
+    }
+
+    if (segments[0] === "v1" && segments[1] === "account-data") {
+      return await handleAccountDataRoute({ request, response });
     }
 
     if (segments[0] === "v1" && segments[1] === "captures") {
@@ -409,6 +420,74 @@ async function handleAgentJobsRoute({ request, response, url, segments }) {
   });
 }
 
+async function handleDataControlsRoute({ request, response }) {
+  const store = await readStore();
+  const session = requireSession(store, request);
+
+  if (!session) {
+    return respondJson(response, 401, {
+      error: "Missing or invalid session."
+    });
+  }
+
+  if (request.method === "GET") {
+    return respondJson(response, 200, {
+      dataControls: publicDataControls(getSessionDataControls(store, session.id))
+    });
+  }
+
+  if (request.method === "PATCH") {
+    const body = await readJsonBody(request);
+    const existing = getSessionDataControls(store, session.id);
+    const updated = normalizeDataControlsUpdate(existing, body, session);
+    store.dataControls = [
+      updated,
+      ...store.dataControls.filter((entry) => entry.sessionId !== session.id)
+    ].slice(0, 100);
+    await writeStore(store);
+
+    return respondJson(response, 200, {
+      dataControls: publicDataControls(updated)
+    });
+  }
+
+  return respondJson(response, 405, {
+    error: "Method not allowed."
+  });
+}
+
+async function handleAccountDataRoute({ request, response }) {
+  const store = await readStore();
+  const session = requireSession(store, request);
+
+  if (!session) {
+    return respondJson(response, 401, {
+      error: "Missing or invalid session."
+    });
+  }
+
+  if (request.method !== "DELETE") {
+    return respondJson(response, 405, {
+      error: "Method not allowed."
+    });
+  }
+
+  const body = await readJsonBody(request);
+
+  if (body?.confirmation !== DELETE_CONFIRMATION) {
+    throw createHttpError(400, `Account data deletion requires confirmation: ${DELETE_CONFIRMATION}.`);
+  }
+
+  const deleted = deleteSessionData(store, session.id);
+  await writeStore(store);
+
+  return respondJson(response, 200, {
+    ok: true,
+    deleted,
+    dataControls: publicDataControls(getSessionDataControls(store, session.id))
+  });
+}
+
 async function readStore() {
   await mkdir(DATA_DIR, {
     recursive: true
@@ -446,6 +525,7 @@ function normalizeStore(store = {}) {
     captures: Array.isArray(store.captures) ? store.captures.map(normalizeStoredCapture).filter(Boolean).slice(0, MAX_CAPTURE_HISTORY) : [],
     watchPlans: Array.isArray(store.watchPlans) ? store.watchPlans.map(normalizeStoredWatchPlan).filter(Boolean).slice(0, MAX_WATCH_PLANS) : [],
     agentJobs: Array.isArray(store.agentJobs) ? store.agentJobs.map(normalizeStoredAgentJob).filter(Boolean).slice(0, MAX_AGENT_JOBS) : [],
+    dataControls: Array.isArray(store.dataControls) ? store.dataControls.map(normalizeStoredDataControls).filter(Boolean).slice(0, 100) : [],
     integrations: Array.isArray(store.integrations) && store.integrations.length ? store.integrations : buildDefaultIntegrations()
   };
 }
@@ -471,6 +551,94 @@ function publicSession(session) {
   return {
     ...session,
     entitlements: getEntitlementsForPlan(session.plan)
+  };
+}
+
+function getSessionDataControls(store, sessionId) {
+  const existing = store.dataControls.find((entry) => entry.sessionId === sessionId);
+  return existing || buildDefaultDataControls(sessionId);
+}
+
+function buildDefaultDataControls(sessionId) {
+  const now = new Date().toISOString();
+
+  return {
+    sessionId,
+    retentionDays: 90,
+    cloudSyncEnabled: false,
+    deleteSyncedCopiesOnAccountDelete: true,
+    updatedAt: now
+  };
+}
+
+function normalizeStoredDataControls(controls) {
+  if (!controls || typeof controls !== "object" || !controls.sessionId) {
+    return null;
+  }
+
+  return {
+    sessionId: normalizeText(controls.sessionId, "", 96),
+    retentionDays: normalizeRetentionDays(controls.retentionDays, 90),
+    cloudSyncEnabled: controls.cloudSyncEnabled === true,
+    deleteSyncedCopiesOnAccountDelete: controls.deleteSyncedCopiesOnAccountDelete !== false,
+    updatedAt: normalizeIsoDate(controls.updatedAt)
+  };
+}
+
+function normalizeDataControlsUpdate(existing, body, session) {
+  if (!body || typeof body !== "object") {
+    throw createHttpError(400, "Data controls payload is required.");
+  }
+
+  const nextCloudSync = body.cloudSyncEnabled === undefined
+    ? existing.cloudSyncEnabled
+    : body.cloudSyncEnabled === true;
+
+  if (nextCloudSync && !hasFeatureAccess(session?.plan, "cloudSync")) {
+    throw createHttpError(402, "Cloud sync controls are locked for this plan.", {
+      code: "feature_locked",
+      feature: "cloudSync",
+      plan: normalizePlan(session?.plan || "free"),
+      requiredPlans: getFeatureRequiredPlans("cloudSync").filter((plan) => plan !== "demo-pro")
+    });
+  }
+
+  return {
+    ...existing,
+    retentionDays: body.retentionDays === undefined
+      ? existing.retentionDays
+      : normalizeRetentionDays(body.retentionDays, existing.retentionDays),
+    cloudSyncEnabled: nextCloudSync,
+    deleteSyncedCopiesOnAccountDelete: body.deleteSyncedCopiesOnAccountDelete === undefined
+      ? existing.deleteSyncedCopiesOnAccountDelete
+      : body.deleteSyncedCopiesOnAccountDelete !== false,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function publicDataControls(controls) {
+  const { sessionId, ...publicRecord } = controls;
+  return publicRecord;
+}
+
+function deleteSessionData(store, sessionId) {
+  const before = {
+    captures: store.captures.length,
+    watchPlans: store.watchPlans.length,
+    agentJobs: store.agentJobs.length,
+    dataControls: store.dataControls.length
+  };
+
+  store.captures = store.captures.filter((entry) => entry.sessionId !== sessionId);
+  store.watchPlans = store.watchPlans.filter((entry) => entry.sessionId !== sessionId);
+  store.agentJobs = store.agentJobs.filter((entry) => entry.sessionId !== sessionId);
+  store.dataControls = store.dataControls.filter((entry) => entry.sessionId !== sessionId);
+
+  return {
+    captures: before.captures - store.captures.length,
+    watchPlans: before.watchPlans - store.watchPlans.length,
+    agentJobs: before.agentJobs - store.agentJobs.length,
+    dataControls: before.dataControls - store.dataControls.length
   };
 }
 
@@ -867,6 +1035,11 @@ function requireFeatureAccess(session, featureName, label) {
 
 function normalizeInteger(value) {
   return Number.isFinite(Number(value)) ? Math.max(0, Math.round(Number(value))) : 0;
+}
+
+function normalizeRetentionDays(value, fallback) {
+  const normalized = normalizeInteger(value);
+  return ALLOWED_RETENTION_DAYS.has(normalized) ? normalized : fallback;
 }
 
 function normalizeIsoDate(value) {

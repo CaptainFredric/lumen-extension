@@ -9,9 +9,12 @@ import {
 import {
   bootstrapAppState,
   clearSession,
+  deleteRemoteAccountData,
   persistCaptureRecord,
+  readRemoteDataControls,
   readLocalState,
-  startDemoSession
+  startDemoSession,
+  updateRemoteDataControls
 } from "./lumen-backend.js";
 
 const OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
@@ -284,6 +287,49 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then((session) => {
         broadcastSession(session);
         sendResponse({ ok: true, session });
+      })
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_GET_DATA_CONTROLS") {
+    readRemoteDataControls()
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_UPDATE_DATA_CONTROLS") {
+    updateRemoteDataControls(message.payload || {})
+      .then((result) => sendResponse(result.ok ? result : {
+        ok: false,
+        error: createFriendlyError("Data Controls Unavailable", result.error)
+      }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_DELETE_ACCOUNT_DATA") {
+    deleteRemoteAccountData()
+      .then((result) => {
+        if (!result.ok) {
+          sendResponse({
+            ok: false,
+            error: createFriendlyError("Delete Unavailable", result.error)
+          });
+          return;
+        }
+
+        broadcastHistory(result.captureHistory || []);
+        sendResponse({
+          ok: true,
+          deleted: result.deleted,
+          dataControls: result.dataControls,
+          captureHistory: result.captureHistory || []
+        });
       })
       .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
 

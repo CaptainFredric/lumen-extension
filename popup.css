@@ -1401,7 +1401,8 @@ h3 {
 }
 
 .secondary-button,
-.ghost-button {
+.ghost-button,
+.danger-button {
   flex: 1;
   min-height: 42px;
   padding: 12px 14px;
@@ -1422,6 +1423,86 @@ h3 {
 
 .ghost-button:disabled {
   opacity: 0.36;
+  cursor: not-allowed;
+}
+
+.data-controls-shell {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(127, 241, 197, 0.08), transparent 58%),
+    rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(127, 241, 197, 0.12);
+}
+
+.data-controls-copy {
+  display: grid;
+  gap: 5px;
+}
+
+.data-controls-copy small,
+.data-sync-row small {
+  color: var(--text-tertiary);
+  line-height: 1.45;
+}
+
+.data-control-field,
+.data-sync-row {
+  display: grid;
+  gap: 8px;
+}
+
+.data-control-field span {
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.data-control-field select {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  color: var(--text-primary);
+  background: rgba(5, 11, 20, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.data-sync-row {
+  position: relative;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.data-sync-row input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.danger-button {
+  color: #ffd9d9;
+  background: rgba(255, 92, 122, 0.08);
+  border: 1px solid rgba(255, 92, 122, 0.2);
+}
+
+.danger-button:hover:not(:disabled) {
+  color: #ffecec;
+  border-color: rgba(255, 92, 122, 0.44);
+  background: rgba(255, 92, 122, 0.14);
+}
+
+.data-control-field select:disabled,
+.data-sync-row input:disabled + .toggle-shell,
+.danger-button:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
 }
 

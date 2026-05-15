@@ -169,6 +169,11 @@ try {
     runExportSummary: document.querySelector("#runExportSummary")?.textContent?.trim() || "",
     runSafetySummary: document.querySelector("#runSafetySummary")?.textContent?.trim() || "",
     accountPlan: document.querySelector("#accountPlan")?.textContent?.trim() || "",
+    dataControlsSummary: document.querySelector("#dataControlsSummary")?.textContent?.trim() || "",
+    retentionDisabled: document.querySelector("#retentionSelect")?.disabled || false,
+    retentionValue: document.querySelector("#retentionSelect")?.value || "",
+    cloudSyncDisabled: document.querySelector("#cloudSyncEnabled")?.disabled || false,
+    deleteBackendDataDisabled: document.querySelector("#deleteBackendDataButton")?.disabled || false,
     lockedFeatureCount: document.querySelectorAll("[data-pro-feature].is-locked").length,
     disabledResponsiveModes: [...document.querySelectorAll("[data-device]:disabled")].map((button) => button.dataset.device),
     disabledPosterModes: [...document.querySelectorAll("[data-export]:disabled")].map((button) => button.dataset.export),
@@ -214,6 +219,11 @@ try {
   assert(popupState.runExportSummary === "Raw", "Run export summary did not initialize.", popupState);
   assert(popupState.runSafetySummary.includes("Cleanup"), "Run safety summary did not initialize.", popupState);
   assert(popupState.accountPlan === "Free", "Free account plan did not render.", popupState);
+  assert(popupState.dataControlsSummary.includes("Start Demo Pro"), "Data controls summary did not explain the locked state.", popupState);
+  assert(popupState.retentionDisabled, "Retention control should start disabled without a backend session.", popupState);
+  assert(popupState.retentionValue === "90", "Retention control should default to 90 days.", popupState);
+  assert(popupState.cloudSyncDisabled, "Cloud sync control should start disabled for the free plan.", popupState);
+  assert(popupState.deleteBackendDataDisabled, "Backend delete action should start disabled without a backend session.", popupState);
   assert(popupState.lockedFeatureCount >= 2, "Advanced feature chips should start locked for the free plan.", popupState);
   assert(
     popupState.disabledResponsiveModes.includes("tablet") &&

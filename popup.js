@@ -78,6 +78,10 @@ const ui = {
   accountDescription: document.querySelector("#accountDescription"),
   accountPlan: document.querySelector("#accountPlan"),
   accountSource: document.querySelector("#accountSource"),
+  dataControlsSummary: document.querySelector("#dataControlsSummary"),
+  retentionSelect: document.querySelector("#retentionSelect"),
+  cloudSyncEnabled: document.querySelector("#cloudSyncEnabled"),
+  deleteBackendDataButton: document.querySelector("#deleteBackendDataButton"),
   blueprintTimestamp: document.querySelector("#blueprintTimestamp"),
   blueprintEmpty: document.querySelector("#blueprintEmpty"),
   blueprintContent: document.querySelector("#blueprintContent"),
@@ -107,6 +111,12 @@ let currentSession = {
   signedIn: false,
   plan: "free",
   source: "local",
+  backendReachable: false
+};
+let currentDataControls = {
+  retentionDays: 90,
+  cloudSyncEnabled: false,
+  deleteSyncedCopiesOnAccountDelete: true,
   backendReachable: false
 };
 let manualRedactionRecord = {
@@ -271,6 +281,9 @@ function bindEvents() {
   ui.signInButton.addEventListener("click", handleSignIn);
   ui.signOutButton.addEventListener("click", handleSignOut);
   ui.billingButton.addEventListener("click", handleBillingClick);
+  ui.retentionSelect.addEventListener("change", handleRetentionChange);
+  ui.cloudSyncEnabled.addEventListener("change", handleCloudSyncToggle);
+  ui.deleteBackendDataButton.addEventListener("click", handleDeleteBackendData);
   ui.historyList.addEventListener("click", handleHistoryAction);
 }
 
@@ -311,6 +324,7 @@ async function restoreAppState() {
     renderSession(currentSession);
     await refreshManualRedactions();
     await refreshCutawayRegion();
+    renderDataControls(currentDataControls);
     return;
   }
 
@@ -320,6 +334,7 @@ async function restoreAppState() {
   await refreshManualRedactions();
   await refreshCutawayRegion();
   await refreshAnnotationRegion();
+  await refreshDataControls();
 }
 
 async function resolveActionTargetTab() {
@@ -1347,6 +1362,7 @@ async function handleSignIn() {
 
   renderSession(response.session);
   renderHistory(response.captureHistory || []);
+  await refreshDataControls();
 
   showStatus({
     tone: "success",
@@ -1390,6 +1406,97 @@ function handleBillingClick() {
     detail: "This build has plan gates, but billing and account recovery are still production work.",
     badge: "Plan",
     progress: 0.12
+  });
+}
+
+async function refreshDataControls() {
+  const response = await chrome.runtime.sendMessage({
+    type: "LUMEN_GET_DATA_CONTROLS"
+  });
+
+  renderDataControls(response?.dataControls || currentDataControls);
+}
+
+async function handleRetentionChange() {
+  const retentionDays = Number(ui.retentionSelect.value);
+  await updateDataControls({
+    retentionDays
+  });
+}
+
+async function handleCloudSyncToggle() {
+  if (ui.cloudSyncEnabled.checked && !enforceFeatureAccess("cloudSync", "Cloud sync")) {
+    ui.cloudSyncEnabled.checked = false;
+    return;
+  }
+
+  await updateDataControls({
+    cloudSyncEnabled: ui.cloudSyncEnabled.checked
+  });
+}
+
+async function updateDataControls(patch) {
+  const response = await chrome.runtime.sendMessage({
+    type: "LUMEN_UPDATE_DATA_CONTROLS",
+    payload: patch
+  });
+
+  if (!response?.ok) {
+    renderDataControls(currentDataControls);
+    showStatus({
+      tone: "error",
+      eyebrow: "Data",
+      title: response?.error?.title || "Data controls unavailable",
+      detail: response?.error?.description || "Start a demo session with the backend running before changing backend data controls.",
+      badge: "Blocked",
+      progress: 0.12
+    });
+    return;
+  }
+
+  renderDataControls(response.dataControls);
+  showStatus({
+    tone: "success",
+    eyebrow: "Data",
+    title: "Data controls updated",
+    detail: `Retention is now ${formatRetentionDays(response.dataControls.retentionDays)}. Cloud sync is ${response.dataControls.cloudSyncEnabled ? "allowed" : "off"}.`,
+    badge: "Saved",
+    progress: 1
+  });
+}
+
+async function handleDeleteBackendData() {
+  const confirmed = window.confirm("Delete backend capture history, watch records, and agent jobs for this Lumen session?");
+
+  if (!confirmed) {
+    return;
+  }
+
+  const response = await chrome.runtime.sendMessage({
+    type: "LUMEN_DELETE_ACCOUNT_DATA"
+  });
+
+  if (!response?.ok) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Data",
+      title: response?.error?.title || "Delete unavailable",
+      detail: response?.error?.description || "Backend data could not be deleted from this session.",
+      badge: "Blocked",
+      progress: 0.12
+    });
+    return;
+  }
+
+  renderDataControls(response.dataControls || currentDataControls);
+  renderHistory(response.captureHistory || []);
+  showStatus({
+    tone: "success",
+    eyebrow: "Data",
+    title: "Backend data deleted",
+    detail: formatDeletedDataSummary(response.deleted),
+    badge: "Deleted",
+    progress: 1
   });
 }
 
@@ -1523,6 +1630,45 @@ function renderSession(session) {
   ui.signOutButton.classList.toggle("is-hidden", !signedIn);
   ui.billingButton.disabled = !signedIn || plan === "free";
   applyPlanGates();
+  renderDataControls(currentDataControls);
+}
+
+function renderDataControls(dataControls = currentDataControls) {
+  currentDataControls = {
+    ...currentDataControls,
+    ...dataControls
+  };
+
+  const signedIn = Boolean(currentSession?.signedIn);
+  const backendReachable = Boolean(currentSession?.backendReachable && currentDataControls.backendReachable !== false);
+  const canCloudSync = getFeatureAccess("cloudSync", currentSession?.plan || "free");
+  const controlsAvailable = signedIn && backendReachable;
+
+  ui.retentionSelect.value = String(currentDataControls.retentionDays ?? 90);
+  ui.retentionSelect.disabled = !controlsAvailable;
+  ui.cloudSyncEnabled.checked = Boolean(currentDataControls.cloudSyncEnabled);
+  ui.cloudSyncEnabled.disabled = !controlsAvailable || !canCloudSync;
+  ui.deleteBackendDataButton.disabled = !controlsAvailable;
+  ui.dataControlsSummary.textContent = controlsAvailable
+    ? `Backend retention is ${formatRetentionDays(currentDataControls.retentionDays)}. Cloud sync is ${currentDataControls.cloudSyncEnabled ? "allowed" : "off"}.`
+    : signedIn
+      ? "Backend is unavailable. Captures remain local in this browser until it reconnects."
+      : "Start Demo Pro to test backend retention and delete controls.";
+}
+
+function formatRetentionDays(days) {
+  const normalized = Number(days);
+  return normalized === 0 ? "manual delete only" : `${normalized} days`;
+}
+
+function formatDeletedDataSummary(deleted = {}) {
+  const parts = [
+    `${deleted.captures || 0} capture${deleted.captures === 1 ? "" : "s"}`,
+    `${deleted.watchPlans || 0} watch record${deleted.watchPlans === 1 ? "" : "s"}`,
+    `${deleted.agentJobs || 0} agent job${deleted.agentJobs === 1 ? "" : "s"}`
+  ];
+
+  return `Deleted ${parts.join(", ")} from the backend session.`;
 }
 
 function renderHistory(history) {

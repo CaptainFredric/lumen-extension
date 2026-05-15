@@ -91,6 +91,99 @@ export async function clearSession() {
   return guest;
 }
 
+export async function readRemoteDataControls(sessionId) {
+  const localState = await readLocalState();
+  const resolvedSessionId = sessionId || localState.session.id;
+
+  if (!localState.session.signedIn || !resolvedSessionId) {
+    return {
+      ok: false,
+      dataControls: buildLocalDataControls(),
+      backendReachable: false
+    };
+  }
+
+  const remote = await fetchJson(LUMEN_CONFIG.api.endpoints.dataControls, {
+    sessionId: resolvedSessionId
+  });
+
+  return remote?.ok
+    ? {
+        ok: true,
+        dataControls: normalizeDataControls(remote.data.dataControls),
+        backendReachable: true
+      }
+    : {
+        ok: false,
+        dataControls: buildLocalDataControls(),
+        backendReachable: false
+      };
+}
+
+export async function updateRemoteDataControls(patch = {}) {
+  const localState = await readLocalState();
+
+  if (!localState.session.signedIn || !localState.session.id) {
+    return {
+      ok: false,
+      error: "Start a demo session before changing backend data controls."
+    };
+  }
+
+  const remote = await fetchJson(LUMEN_CONFIG.api.endpoints.dataControls, {
+    method: "PATCH",
+    sessionId: localState.session.id,
+    body: patch
+  });
+
+  return remote?.ok
+    ? {
+        ok: true,
+        dataControls: normalizeDataControls(remote.data.dataControls)
+      }
+    : {
+        ok: false,
+        error: remote?.error || "Backend data controls were not reachable."
+      };
+}
+
+export async function deleteRemoteAccountData() {
+  const localState = await readLocalState();
+
+  if (!localState.session.signedIn || !localState.session.id) {
+    return {
+      ok: false,
+      error: "Start a demo session before deleting backend data."
+    };
+  }
+
+  const remote = await fetchJson(LUMEN_CONFIG.api.endpoints.accountData, {
+    method: "DELETE",
+    sessionId: localState.session.id,
+    body: {
+      confirmation: "DELETE LUMEN DATA"
+    }
+  });
+
+  if (!remote?.ok) {
+    return {
+      ok: false,
+      error: remote?.error || "Backend account data was not reachable."
+    };
+  }
+
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.captureHistory]: []
+  });
+
+  return {
+    ok: true,
+    deleted: remote.data.deleted,
+    dataControls: normalizeDataControls(remote.data.dataControls),
+    captureHistory: []
+  };
+}
+
 export async function persistCaptureRecord(record) {
   const localState = await readLocalState();
   const updatedHistory = [record, ...localState.captureHistory]
@@ -153,6 +246,28 @@ function buildGuestSession() {
     user: null,
     backendReachable: false,
     entitlements: getPlanEntitlements(plan)
+  };
+}
+
+function buildLocalDataControls() {
+  return {
+    retentionDays: 90,
+    cloudSyncEnabled: false,
+    deleteSyncedCopiesOnAccountDelete: true,
+    backendReachable: false
+  };
+}
+
+function normalizeDataControls(dataControls = {}) {
+  const allowedRetentionDays = new Set([0, 7, 30, 90, 180, 365]);
+  const retentionDays = Number(dataControls.retentionDays);
+
+  return {
+    retentionDays: allowedRetentionDays.has(retentionDays) ? retentionDays : 90,
+    cloudSyncEnabled: dataControls.cloudSyncEnabled === true,
+    deleteSyncedCopiesOnAccountDelete: dataControls.deleteSyncedCopiesOnAccountDelete !== false,
+    updatedAt: dataControls.updatedAt || "",
+    backendReachable: true
   };
 }
 

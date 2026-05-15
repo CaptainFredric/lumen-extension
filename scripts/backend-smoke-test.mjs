@@ -49,6 +49,15 @@ try {
     freeEntitlements
   );
 
+  const rejectedFreeCloudSync = await requestJson("/v1/data-controls", {
+    method: "PATCH",
+    sessionId: freeSessionId,
+    body: {
+      cloudSyncEnabled: true
+    }
+  });
+  assert(rejectedFreeCloudSync.status === 402, "Free plan should reject cloud sync controls.", rejectedFreeCloudSync);
+
   const rejectedPaidWatchPlan = await requestJson("/v1/watch-plans", {
     method: "POST",
     sessionId: freeSessionId,
@@ -94,6 +103,29 @@ try {
   );
 
   const sessionId = demo.body.session.id;
+  const defaultDataControls = await requestJson("/v1/data-controls", { sessionId });
+  assert(
+    defaultDataControls.status === 200 && defaultDataControls.body.dataControls?.retentionDays === 90,
+    "Default data controls did not load.",
+    defaultDataControls
+  );
+
+  const updatedDataControls = await requestJson("/v1/data-controls", {
+    method: "PATCH",
+    sessionId,
+    body: {
+      retentionDays: 30,
+      cloudSyncEnabled: true
+    }
+  });
+  assert(
+    updatedDataControls.status === 200 &&
+      updatedDataControls.body.dataControls.retentionDays === 30 &&
+      updatedDataControls.body.dataControls.cloudSyncEnabled === true,
+    "Data controls were not updated for the team plan.",
+    updatedDataControls
+  );
+
   const capturePayload = {
     id: "capture-smoke-001",
     title: "Backend Smoke Capture",
@@ -236,11 +268,36 @@ try {
   });
   assert(invalidSession.status === 401, "Invalid session should be rejected.", invalidSession);
 
-  const deletedCapture = await requestJson("/v1/captures/capture-smoke-001", {
+  const rejectedAccountDataDelete = await requestJson("/v1/account-data", {
     method: "DELETE",
     sessionId
   });
-  assert(deletedCapture.status === 200 && deletedCapture.body.deletedId === "capture-smoke-001", "Capture delete failed.", deletedCapture);
+  assert(
+    rejectedAccountDataDelete.status === 400,
+    "Account data delete should require confirmation.",
+    rejectedAccountDataDelete
+  );
+
+  const deletedAccountData = await requestJson("/v1/account-data", {
+    method: "DELETE",
+    sessionId,
+    body: {
+      confirmation: "DELETE LUMEN DATA"
+    }
+  });
+  assert(
+    deletedAccountData.status === 200 &&
+      deletedAccountData.body.deleted.captures === 1 &&
+      deletedAccountData.body.deleted.watchPlans === 1 &&
+      deletedAccountData.body.deleted.agentJobs === 1,
+    "Account data delete did not remove session records.",
+    deletedAccountData
+  );
+
+  const postDeleteStats = await requestJson("/v1/stats", { sessionId });
+  assert(postDeleteStats.body.stats.captureCount === 0, "Post-delete stats still count captures.", postDeleteStats);
+  assert(postDeleteStats.body.stats.watchPlanCount === 0, "Post-delete stats still count watch plans.", postDeleteStats);
+  assert(postDeleteStats.body.stats.agentJobCount === 0, "Post-delete stats still count agent jobs.", postDeleteStats);
 
   console.log(JSON.stringify({
     ok: true,
@@ -250,7 +307,8 @@ try {
       capture: createdCapture.body.capture.id,
       watchPlan: watchPlan.body.watchPlan.id,
       agentJob: agentJob.body.agentJob.id,
-      stats: stats.body.stats
+      stats: stats.body.stats,
+      deleted: deletedAccountData.body.deleted
     }
   }, null, 2));
 } catch (error) {
