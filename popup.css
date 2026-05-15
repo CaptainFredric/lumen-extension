@@ -1025,7 +1025,9 @@ h3 {
 .capture-button:disabled,
 .secondary-action:disabled,
 .mini-action:disabled,
-.hold-menu-action:disabled {
+.hold-menu-action:disabled,
+.segment:disabled,
+.feature-chip:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
@@ -1358,7 +1360,7 @@ h3 {
 }
 
 .feature-chip.is-locked::after {
-  content: "Pro";
+  content: "Locked";
   margin-left: 8px;
   padding: 4px 6px;
   border-radius: 999px;

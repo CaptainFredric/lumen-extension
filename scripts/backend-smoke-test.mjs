@@ -25,14 +25,73 @@ try {
   const health = await requestJson("/health");
   assert(health.status === 200 && health.body.ok, "Health endpoint did not return ok.", health);
 
+  const freeDemo = await requestJson("/v1/session/demo", {
+    method: "POST",
+    body: {
+      name: "Backend Smoke Free",
+      email: "free-smoke@lumen.test",
+      plan: "free"
+    }
+  });
+  assert(freeDemo.status === 200 && freeDemo.body.session?.id, "Free demo session did not initialize.", freeDemo);
+  assert(
+    freeDemo.body.session.entitlements?.features?.regionWatch?.available === false,
+    "Free session should lock region watch.",
+    freeDemo
+  );
+
+  const freeSessionId = freeDemo.body.session.id;
+  const freeEntitlements = await requestJson("/v1/entitlements", { sessionId: freeSessionId });
+  assert(
+    freeEntitlements.status === 200 &&
+      freeEntitlements.body.entitlements?.features?.autoRedact?.available === false,
+    "Free entitlements endpoint did not return locked advanced features.",
+    freeEntitlements
+  );
+
+  const rejectedPaidWatchPlan = await requestJson("/v1/watch-plans", {
+    method: "POST",
+    sessionId: freeSessionId,
+    body: {
+      explicitOptIn: true,
+      title: "Locked watch",
+      url: "https://example.com/pricing",
+      status: "active",
+      region: {
+        left: 100,
+        top: 220,
+        width: 640,
+        height: 320
+      }
+    }
+  });
+  assert(rejectedPaidWatchPlan.status === 402, "Free plan should reject paid watch records.", rejectedPaidWatchPlan);
+
+  const rejectedPaidAgentJob = await requestJson("/v1/agent-jobs", {
+    method: "POST",
+    sessionId: freeSessionId,
+    body: {
+      explicitOptIn: true,
+      payloadReviewed: true,
+      task: "summarize-capture"
+    }
+  });
+  assert(rejectedPaidAgentJob.status === 402, "Free plan should reject paid agent records.", rejectedPaidAgentJob);
+
   const demo = await requestJson("/v1/session/demo", {
     method: "POST",
     body: {
-      name: "Backend Smoke",
-      email: "smoke@lumen.test"
+      name: "Backend Smoke Team",
+      email: "smoke@lumen.test",
+      plan: "team"
     }
   });
   assert(demo.status === 200 && demo.body.session?.id, "Demo session did not initialize.", demo);
+  assert(
+    demo.body.session.entitlements?.features?.regionWatch?.available === true,
+    "Team session should unlock paid workflow records.",
+    demo
+  );
 
   const sessionId = demo.body.session.id;
   const capturePayload = {

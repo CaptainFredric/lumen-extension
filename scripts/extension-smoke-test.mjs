@@ -160,6 +160,7 @@ try {
     holdActionCount: document.querySelectorAll("[data-quick-action]").length,
     statusHidden: document.querySelector("#statusPanel")?.classList.contains("is-hidden") ?? false,
     manualCount: document.querySelector("#manualRedactionCount")?.textContent?.trim() || "",
+    autoRedactDisabled: document.querySelector("#autoRedact")?.disabled || false,
     cutawayStatus: document.querySelector("#cutawayRegionStatus")?.textContent?.trim() || "",
     cutawayClearDisabled: document.querySelector("#clearCutawayButton")?.disabled || false,
     annotationStatus: document.querySelector("#annotationRegionStatus")?.textContent?.trim() || "",
@@ -167,6 +168,10 @@ try {
     runViewSummary: document.querySelector("#runViewSummary")?.textContent?.trim() || "",
     runExportSummary: document.querySelector("#runExportSummary")?.textContent?.trim() || "",
     runSafetySummary: document.querySelector("#runSafetySummary")?.textContent?.trim() || "",
+    accountPlan: document.querySelector("#accountPlan")?.textContent?.trim() || "",
+    lockedFeatureCount: document.querySelectorAll("[data-pro-feature].is-locked").length,
+    disabledResponsiveModes: [...document.querySelectorAll("[data-device]:disabled")].map((button) => button.dataset.device),
+    disabledPosterModes: [...document.querySelectorAll("[data-export]:disabled")].map((button) => button.dataset.export),
     exportReviewHidden: document.querySelector("#exportReviewPanel")?.classList.contains("is-hidden") ?? false,
     exportReviewConfirm: document.querySelector("#exportReviewConfirmButton")?.textContent?.trim() || "",
     timelineStepCount: document.querySelectorAll("[data-stage-step]").length,
@@ -200,6 +205,7 @@ try {
   assert(popupState.holdActionCount === 6, "Hold menu actions did not render.", popupState);
   assert(popupState.statusHidden, "Popup status panel should start hidden.", popupState);
   assert(popupState.manualCount === "0 boxes", "Manual redaction counter did not initialize.", popupState);
+  assert(popupState.autoRedactDisabled, "Free local session should lock auto-redaction.", popupState);
   assert(popupState.cutawayStatus === "No region", "Cutaway region status did not initialize.", popupState);
   assert(popupState.cutawayClearDisabled, "Cutaway clear action should start disabled without a region.", popupState);
   assert(popupState.annotationStatus === "No callout", "Annotation callout status did not initialize.", popupState);
@@ -207,6 +213,20 @@ try {
   assert(popupState.runViewSummary === "Desktop", "Run view summary did not initialize.", popupState);
   assert(popupState.runExportSummary === "Raw", "Run export summary did not initialize.", popupState);
   assert(popupState.runSafetySummary.includes("Cleanup"), "Run safety summary did not initialize.", popupState);
+  assert(popupState.accountPlan === "Free", "Free account plan did not render.", popupState);
+  assert(popupState.lockedFeatureCount >= 2, "Advanced feature chips should start locked for the free plan.", popupState);
+  assert(
+    popupState.disabledResponsiveModes.includes("tablet") &&
+      popupState.disabledResponsiveModes.includes("mobile") &&
+      popupState.disabledResponsiveModes.includes("responsive"),
+    "Responsive modes should be gated for the free plan.",
+    popupState
+  );
+  assert(
+    popupState.disabledPosterModes.includes("browser") && popupState.disabledPosterModes.includes("phone"),
+    "Poster export modes should be gated for the free plan.",
+    popupState
+  );
   assert(popupState.exportReviewHidden, "Export review screen should start hidden.", popupState);
   assert(popupState.exportReviewConfirm === "Run export", "Export review confirmation action did not render.", popupState);
   assert(popupState.timelineStepCount === 6, "Capture timeline did not render.", popupState);

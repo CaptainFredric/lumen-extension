@@ -4,6 +4,7 @@ import {
   buildOriginPattern,
   getDefaultSettings,
   getFeatureAccess,
+  getPlanEntitlements,
   getCaptureVariants,
   isOriginPermissionSupported,
   normalizeCaptureNoteOptions,
@@ -191,17 +192,23 @@ chrome.runtime.onMessage.addListener((message) => {
 });
 
 async function bootstrap() {
-  applyProGates();
   await restoreSettings();
   bindEvents();
   await restoreAppState();
+  applyPlanGates();
   await refreshLaunchStatus();
 }
 
 function bindEvents() {
   ui.removeStickyHeaders.addEventListener("change", persistCurrentSettings);
   ui.forceLazyLoad.addEventListener("change", persistCurrentSettings);
-  ui.autoRedact.addEventListener("change", persistCurrentSettings);
+  ui.autoRedact.addEventListener("change", () => {
+    if (ui.autoRedact.checked && !enforceFeatureAccess("autoRedact", "Auto-redaction")) {
+      ui.autoRedact.checked = false;
+    }
+
+    persistCurrentSettings();
+  });
   ui.exportManifest.addEventListener("change", persistCurrentSettings);
   ui.annotationEnabled.addEventListener("change", () => {
     updateAnnotationControls();
@@ -219,6 +226,10 @@ function bindEvents() {
 
   for (const button of ui.deviceButtons) {
     button.addEventListener("click", () => {
+      if (button.dataset.device !== "desktop" && !enforceFeatureAccess("responsiveSnap", "Responsive capture")) {
+        return;
+      }
+
       currentSettings.devicePreset = button.dataset.device;
       updateDeviceButtons();
       persistCurrentSettings();
@@ -227,6 +238,10 @@ function bindEvents() {
 
   for (const button of ui.exportButtons) {
     button.addEventListener("click", () => {
+      if (button.dataset.export !== "raw" && !enforceFeatureAccess("beautify", "Poster export")) {
+        return;
+      }
+
       currentSettings.exportPreset = button.dataset.export;
       updateExportButtons();
       persistCurrentSettings();
@@ -436,14 +451,91 @@ function updateAnnotationControls() {
   }
 }
 
-function applyProGates() {
+function applyPlanGates() {
+  const plan = currentSession?.plan || "free";
+  const entitlements = currentSession?.entitlements || getPlanEntitlements(plan);
+
   for (const chip of ui.proChips) {
     const feature = chip.dataset.proFeature;
-    const enabled = getFeatureAccess(feature);
+    const featureState = entitlements.features?.[feature];
+    const enabled = Boolean(featureState?.available ?? getFeatureAccess(feature, plan));
 
     chip.classList.toggle("is-locked", !enabled);
     chip.disabled = !enabled;
+    chip.title = enabled
+      ? `${featureState?.label || feature} available on ${entitlements.label}.`
+      : `${featureState?.label || feature} requires ${formatRequiredPlans(featureState?.requiredPlans)}.`;
+    chip.setAttribute("aria-label", chip.title);
+    chip.dataset.featureStatus = featureState?.status || "";
   }
+
+  const canAutoRedact = getFeatureAccess("autoRedact", plan);
+  const canResponsive = getFeatureAccess("responsiveSnap", plan);
+  const canBeautify = getFeatureAccess("beautify", plan);
+
+  ui.autoRedact.disabled = !canAutoRedact;
+
+  if (!canAutoRedact && currentSettings.autoRedact) {
+    currentSettings.autoRedact = false;
+    ui.autoRedact.checked = false;
+  }
+
+  for (const button of ui.deviceButtons) {
+    const requiresResponsive = button.dataset.device !== "desktop";
+    button.disabled = requiresResponsive && !canResponsive;
+    button.title = button.disabled
+      ? "Responsive capture is available in Demo Pro and paid plans."
+      : "";
+
+    if (button.disabled && button.dataset.device === currentSettings.devicePreset) {
+      currentSettings.devicePreset = "desktop";
+    }
+  }
+
+  for (const button of ui.exportButtons) {
+    const requiresBeautify = button.dataset.export !== "raw";
+    button.disabled = requiresBeautify && !canBeautify;
+    button.title = button.disabled
+      ? "Poster export frames are available in Demo Pro and paid plans."
+      : "";
+
+    if (button.disabled && button.dataset.export === currentSettings.exportPreset) {
+      currentSettings.exportPreset = "raw";
+    }
+  }
+
+  updateDeviceButtons();
+  updateExportButtons();
+  renderRunSummary(currentSettings);
+}
+
+function enforceFeatureAccess(featureName, label) {
+  if (getFeatureAccess(featureName, currentSession?.plan || "free")) {
+    return true;
+  }
+
+  const entitlements = currentSession?.entitlements || getPlanEntitlements(currentSession?.plan || "free");
+  const feature = entitlements.features?.[featureName];
+
+  showStatus({
+    tone: "neutral",
+    eyebrow: "Plan",
+    title: `${label} is locked`,
+    detail: `Current plan: ${entitlements.label}. ${label} requires ${formatRequiredPlans(feature?.requiredPlans)}.`,
+    badge: "Plan",
+    progress: 0.12
+  });
+
+  return false;
+}
+
+function formatRequiredPlans(plans = []) {
+  const labels = (plans.length ? plans : ["pro", "team", "enterprise"])
+    .filter((plan) => plan !== "free")
+    .map((plan) => plan.replace(/-/g, " "))
+    .map((plan) => plan.replace(/\b\w/g, (letter) => letter.toUpperCase()));
+
+  return labels.length ? labels.join(", ") : "a paid plan";
 }
 
 function handleCaptureButtonClick(event) {
@@ -1289,12 +1381,14 @@ async function handleSignOut() {
 }
 
 function handleBillingClick() {
+  const entitlements = currentSession?.entitlements || getPlanEntitlements(currentSession?.plan || "free");
+
   showStatus({
     tone: "neutral",
-    eyebrow: "Billing",
-    title: "Billing hook reserved",
-    detail: "The UI hook is in place, but the demo backend does not implement billing yet.",
-    badge: "Soon",
+    eyebrow: "Plan",
+    title: `${entitlements.label} entitlement active`,
+    detail: "This build has plan gates, but billing and account recovery are still production work.",
+    badge: "Plan",
     progress: 0.12
   });
 }
@@ -1407,23 +1501,28 @@ function renderSession(session) {
 
   const signedIn = Boolean(currentSession?.signedIn);
   const plan = currentSession?.plan || "free";
+  const entitlements = currentSession?.entitlements || getPlanEntitlements(plan);
   const source = currentSession?.source || "local";
   const backendReachable = Boolean(currentSession?.backendReachable);
+  const lockedAdvancedCount = Object.values(entitlements.features || {})
+    .filter((feature) => feature.locked && feature.status !== "planned")
+    .length;
 
   ui.accountTitle.textContent = signedIn
     ? `${currentSession.user?.name || "Lumen user"}`
     : "Free local session";
   ui.accountDescription.textContent = signedIn
     ? backendReachable
-      ? "Session is connected to the backend slice. New captures can sync into history."
-      : "Session is active, but the backend was not reachable. Lumen keeps state locally and will still archive captures in this browser."
-    : "Start a demo session to test session state and history sync when a backend is reachable.";
-  ui.accountPlan.textContent = plan.replace(/-/g, " ");
+      ? `${entitlements.label} entitlement loaded. New captures can sync into local backend history.`
+      : `${entitlements.label} entitlement loaded locally. Captures stay in this browser until the backend is reachable.`
+    : `Free keeps local capture available. Start Demo Pro to unlock ${lockedAdvancedCount} current advanced tool${lockedAdvancedCount === 1 ? "" : "s"} for testing.`;
+  ui.accountPlan.textContent = entitlements.label;
   ui.accountSource.textContent = source;
   ui.backendBadge.textContent = backendReachable ? "Backend reachable" : "Local-first";
   ui.signInButton.classList.toggle("is-hidden", signedIn);
   ui.signOutButton.classList.toggle("is-hidden", !signedIn);
-  ui.billingButton.disabled = !signedIn || !/pro/i.test(plan);
+  ui.billingButton.disabled = !signedIn || plan === "free";
+  applyPlanGates();
 }
 
 function renderHistory(history) {

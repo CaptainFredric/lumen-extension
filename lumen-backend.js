@@ -1,4 +1,10 @@
-import { LUMEN_CONFIG, STORAGE_KEYS, getApiBaseUrls } from "./config.js";
+import {
+  LUMEN_CONFIG,
+  STORAGE_KEYS,
+  getApiBaseUrls,
+  getPlanEntitlements
+} from "./config.js";
+import { normalizePlan } from "./entitlements.js";
 
 const REQUEST_TIMEOUT_MS = 2500;
 
@@ -50,6 +56,7 @@ export async function startDemoSession() {
     method: "POST",
     body: {
       name: "Lumen Explorer",
+      plan: LUMEN_CONFIG.plans.demoPlan,
       source: "extension"
     }
   });
@@ -113,47 +120,73 @@ export async function readLocalState() {
 
   return {
     latestBlueprint: stored[STORAGE_KEYS.latestBlueprint] || null,
-    session: stored[STORAGE_KEYS.session] || buildGuestSession(),
+    session: normalizeStoredSession(stored[STORAGE_KEYS.session]),
     captureHistory: stored[STORAGE_KEYS.captureHistory] || []
   };
 }
 
+function normalizeStoredSession(session) {
+  if (!session || typeof session !== "object") {
+    return buildGuestSession();
+  }
+
+  const plan = normalizePlan(session.plan || "free");
+
+  return {
+    ...session,
+    signedIn: Boolean(session.signedIn),
+    plan,
+    source: session.source || "local",
+    backendReachable: Boolean(session.backendReachable),
+    entitlements: session.entitlements || getPlanEntitlements(plan)
+  };
+}
+
 function buildGuestSession() {
+  const plan = "free";
+
   return {
     id: "",
     signedIn: false,
-    plan: "free",
+    plan,
     source: "local",
     user: null,
-    backendReachable: false
+    backendReachable: false,
+    entitlements: getPlanEntitlements(plan)
   };
 }
 
 function buildLocalDemoSession() {
+  const plan = LUMEN_CONFIG.plans.demoPlan;
+
   return {
     id: `local-${crypto.randomUUID()}`,
     signedIn: true,
-    plan: "demo-pro",
+    plan,
     source: "local",
     user: {
       name: "Lumen Explorer",
       email: "local@lumen.demo"
     },
-    backendReachable: false
+    backendReachable: false,
+    entitlements: getPlanEntitlements(plan)
   };
 }
 
 function normalizeRemoteSession(session = {}, meta = {}) {
+  const plan = normalizePlan(session.plan || "pro");
+
   return {
     id: session.id || `remote-${crypto.randomUUID()}`,
     signedIn: true,
-    plan: session.plan || "pro",
+    plan,
     source: "remote",
     user: {
       name: session.user?.name || "Lumen User",
       email: session.user?.email || ""
     },
-    backendReachable: meta.backendReachable !== false
+    backendReachable: meta.backendReachable !== false,
+    entitlements: session.entitlements || getPlanEntitlements(plan)
   };
 }
 

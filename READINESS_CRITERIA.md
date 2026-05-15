@@ -56,17 +56,18 @@ Remaining gaps:
 3. Store screenshots should be manually reviewed at 640 by 400 downscale.
 4. Need a final install-from-ZIP test in a clean Chrome profile.
 
-### Paid Product: 36 percent
+### Paid Product: 42 percent
 
 Current positives:
 
 1. The product wedge is real: clean, responsive, safer evidence capture.
 2. A local backend models sessions, captures, watch plans, agent jobs, integrations, and stats.
 3. Future watch and agent records require explicit opt-in.
+4. A shared entitlement contract now gates advanced local tools in the popup and paid-path watch or agent records in the backend.
 
 Remaining gaps:
 
-1. No production auth, billing, support workflow, or account recovery.
+1. No production auth, billing provider, support workflow, or account recovery.
 2. No cloud storage, sync provider integration, or deletion controls.
 3. No durable watch scheduler, retention controls, or visual diff review workflow.
 4. No customer-facing reliability matrix or support path.
@@ -89,7 +90,8 @@ To move Web Store beta above 75 percent:
 
 To move paid product above 50 percent:
 
-1. Add production auth and capture metadata sync.
+1. Replace demo sessions with production auth and account recovery.
 2. Add deletion and retention controls before cloud upload.
 3. Add one opt-in destination, likely Google Drive or Slack, after export review.
-4. Build region watch only after pause, schedule, retention, and review controls exist.
+4. Connect entitlements to billing, receipts, support state, and plan change events.
+5. Build region watch only after pause, schedule, retention, and review controls exist.

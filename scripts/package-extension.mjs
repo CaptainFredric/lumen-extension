@@ -16,6 +16,7 @@ const requiredRuntimeFiles = [
   "background.js",
   "content.js",
   "config.js",
+  "entitlements.js",
   "lumen-backend.js",
   "offscreen.html",
   "offscreen.js",

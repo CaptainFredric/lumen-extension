@@ -1,5 +1,11 @@
+import { getEntitlementsForPlan, hasFeatureAccess, normalizePlan } from "./entitlements.js";
+
 export const LUMEN_CONFIG = {
   isProUser: false,
+  plans: {
+    defaultPlan: "free",
+    demoPlan: "demo-pro"
+  },
   capture: {
     maxSegments: 30,
     captureThrottleMs: 550,
@@ -37,17 +43,12 @@ export const LUMEN_CONFIG = {
     endpoints: {
       session: "/v1/session",
       demoSession: "/v1/session/demo",
+      entitlements: "/v1/entitlements",
       logout: "/v1/session/logout",
       captures: "/v1/captures",
       billing: "/v1/billing/portal",
       syncDestinations: "/v1/integrations"
     }
-  },
-  proFeatures: {
-    beautify: false,
-    autoRedact: false,
-    cloudSync: false,
-    responsiveSnap: false
   },
   defaults: {
     removeStickyHeaders: true,
@@ -84,12 +85,17 @@ export function isRestrictedCaptureUrl(url = "") {
     /^https:\/\/chromewebstore\.google\.com/i.test(url);
 }
 
-export function getFeatureAccess(featureName) {
-  if (LUMEN_CONFIG.isProUser) {
-    return true;
-  }
+export function getFeatureAccess(featureName, plan = "") {
+  const fallbackPlan = LUMEN_CONFIG.isProUser ? "pro" : LUMEN_CONFIG.plans.defaultPlan;
+  return hasFeatureAccess(normalizePlan(plan || fallbackPlan), featureName);
+}
 
-  return !LUMEN_CONFIG.proFeatures[featureName];
+export function getPlanFeatureAccess(plan, featureName) {
+  return hasFeatureAccess(normalizePlan(plan), featureName);
+}
+
+export function getPlanEntitlements(plan) {
+  return getEntitlementsForPlan(normalizePlan(plan));
 }
 
 export function buildOriginPattern(rawUrl) {

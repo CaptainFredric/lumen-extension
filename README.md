@@ -35,8 +35,9 @@ The current build includes:
 17. popup history actions to open the latest artifact or reveal it in the Downloads folder
 18. capture-time popup UI with run settings, cutaway state, a live stage timeline, and recent status log
 19. an on-page usage HUD that appears during preparation and review setup, then hides before screenshots so exports stay clean
-20. a local backend slice for demo session state and history sync when an API is reachable
-21. a GitHub Pages landing site in `docs/`
+20. a shared entitlement model used by the popup and backend so paid-path features have one access contract
+21. a local backend slice for demo session state, entitlement checks, and history sync when an API is reachable
+22. a GitHub Pages landing site in `docs/`
 
 ## Current Limits
 
@@ -48,7 +49,7 @@ These limits are important:
 4. the current annotation pass is one anchored callout plus one capture note, not a full drawing suite
 5. cloud sync, billing, scheduled monitoring, and visual diffs remain future work
 6. highly dynamic sites with virtualization or unusual scroll behavior can still need site-specific fallback work
-7. the local backend slice remains a small demo path rather than a production account system
+7. the local backend slice now checks entitlements, but it remains a demo path rather than a production account or billing system
 
 ## Architecture
 
@@ -65,6 +66,10 @@ The current capture flow is:
 7. offscreen stitches the final output using device-pixel-ratio aware composition, renders one capture note and callout marker, and can export a cutaway crop from the stitched result
 8. if the page is too large for one safe canvas, the export falls back to tiled raw output and skips cutaway cropping for that view
 9. background downloads the files, writes the bundle manifest, writes local history, and restores the page
+
+### Entitlements
+
+`entitlements.js` is the shared plan contract for the extension and backend. Free keeps the local capture wedge available. Demo Pro unlocks current advanced local tools for testing. Team and Enterprise are required before the backend accepts future watch or agent records, and those records still require explicit opt-in and review flags.
 
 ### Page Signals
 
@@ -256,4 +261,4 @@ The highest-leverage next steps are:
 1. improve capture reliability on difficult real-world sites
 2. review the generated Chrome Web Store screenshots against final listing copy
 3. expand annotation from one callout into arrows, labels, and lasso edits
-4. tighten the backend from demo session state into a real account path
+4. turn the entitlement contract into production auth, billing, retention, and deletion controls

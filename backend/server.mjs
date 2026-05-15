@@ -4,6 +4,12 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import {
+  getEntitlementsForPlan,
+  getFeatureRequiredPlans,
+  hasFeatureAccess,
+  normalizePlan
+} from "../entitlements.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -63,7 +69,7 @@ async function handleRequest(request, response) {
       const session = findSession(store, request.headers["x-lumen-session"]);
 
       return respondJson(response, 200, {
-        session: session || null,
+        session: session ? publicSession(session) : null,
         meta: {
           backendReachable: true
         }
@@ -76,7 +82,7 @@ async function handleRequest(request, response) {
       const now = new Date().toISOString();
       const session = {
         id: `remote-${randomUUID()}`,
-        plan: normalizePlan(body?.plan || "pro"),
+        plan: normalizePlan(body?.plan || "demo-pro"),
         user: {
           name: normalizeText(body?.name, "Lumen Explorer", 80),
           email: normalizeEmail(body?.email, "demo@lumen.app")
@@ -89,10 +95,20 @@ async function handleRequest(request, response) {
       await writeStore(store);
 
       return respondJson(response, 200, {
-        session,
+        session: publicSession(session),
         meta: {
           backendReachable: true
         }
+      });
+    }
+
+    if (request.method === "GET" && url.pathname === "/v1/entitlements") {
+      const store = await readStore();
+      const session = findSession(store, request.headers["x-lumen-session"]);
+
+      return respondJson(response, 200, {
+        entitlements: getEntitlementsForPlan(session?.plan || "free"),
+        sessionId: session?.id || ""
       });
     }
 
@@ -139,7 +155,8 @@ async function handleRequest(request, response) {
   } catch (error) {
     const statusCode = Number.isInteger(error.statusCode) ? error.statusCode : 500;
     return respondJson(response, statusCode, {
-      error: error.message || "Internal server error."
+      error: error.message || "Internal server error.",
+      ...(error.details ? { details: error.details } : {})
     });
   }
 }
@@ -259,6 +276,7 @@ async function handleWatchPlansRoute({ request, response, url, segments }) {
 
   if (request.method === "POST" && !planId) {
     const body = await readJsonBody(request);
+    requireFeatureAccess(session, "regionWatch", "Region watch");
     requireExplicitOptIn(body, "Region watch");
     const watchPlan = normalizeWatchPlan(body, session.id);
 
@@ -289,6 +307,9 @@ async function handleWatchPlansRoute({ request, response, url, segments }) {
 
   if (request.method === "PATCH") {
     const body = await readJsonBody(request);
+    if (body?.status === "active") {
+      requireFeatureAccess(session, "regionWatch", "Region watch");
+    }
     if (body?.status === "active" && !store.watchPlans[existingIndex].explicitOptIn && !hasExplicitOptIn(body)) {
       throw createHttpError(400, "Region watch requires explicit opt-in before it can be activated.");
     }
@@ -342,6 +363,7 @@ async function handleAgentJobsRoute({ request, response, url, segments }) {
 
   if (request.method === "POST" && !jobId) {
     const body = await readJsonBody(request);
+    requireFeatureAccess(session, "agentHandoff", "Agent handoff");
     requireExplicitOptIn(body, "Agent handoff");
     requireReviewedPayload(body);
     const agentJob = normalizeAgentJob(body, session.id);
@@ -442,6 +464,13 @@ function normalizeSessionRecord(session) {
     },
     createdAt: normalizeIsoDate(session.createdAt),
     updatedAt: normalizeIsoDate(session.updatedAt || session.createdAt)
+  };
+}
+
+function publicSession(session) {
+  return {
+    ...session,
+    entitlements: getEntitlementsForPlan(session.plan)
   };
 }
 
@@ -796,10 +825,6 @@ function normalizeEmail(value, fallback) {
   return text.includes("@") || !text ? text : fallback;
 }
 
-function normalizePlan(value) {
-  return normalizeStatus(value, ["free", "pro", "demo-pro", "team", "enterprise"], "free");
-}
-
 function normalizeStatus(value, allowed, fallback) {
   return allowed.includes(value) ? value : fallback;
 }
@@ -822,6 +847,22 @@ function requireReviewedPayload(body = {}) {
   }
 
   throw createHttpError(400, "Agent handoff requires a reviewed payload before queuing.");
+}
+
+function requireFeatureAccess(session, featureName, label) {
+  if (hasFeatureAccess(session?.plan, featureName)) {
+    return;
+  }
+
+  const entitlements = getEntitlementsForPlan(session?.plan || "free");
+  const requiredPlans = getFeatureRequiredPlans(featureName).filter((plan) => plan !== "demo-pro");
+
+  throw createHttpError(402, `${label} is locked for the ${entitlements.label} plan.`, {
+    code: "feature_locked",
+    feature: featureName,
+    plan: entitlements.plan,
+    requiredPlans
+  });
 }
 
 function normalizeInteger(value) {
@@ -887,9 +928,10 @@ function respondJson(response, statusCode, payload) {
   response.end(payload === null ? "" : JSON.stringify(payload));
 }
 
-function createHttpError(statusCode, message) {
+function createHttpError(statusCode, message, details = null) {
   const error = new Error(message);
   error.statusCode = statusCode;
+  error.details = details;
   return error;
 }
 
