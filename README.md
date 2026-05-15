@@ -34,8 +34,9 @@ The current build includes:
 16. local capture history with file, folder, summary, and Chrome download-handle metadata
 17. popup history actions to open the latest artifact or reveal it in the Downloads folder
 18. capture-time popup UI with run settings, cutaway state, a live stage timeline, and recent status log
-19. a local backend slice for demo session state and history sync when an API is reachable
-20. a GitHub Pages landing site in `docs/`
+19. an on-page usage HUD that appears during preparation and review setup, then hides before screenshots so exports stay clean
+20. a local backend slice for demo session state and history sync when an API is reachable
+21. a GitHub Pages landing site in `docs/`
 
 ## Current Limits
 
@@ -244,6 +245,7 @@ These are future layers:
 
 See `PRODUCT_ROADMAP.md` for the longer product direction and Chrome Web Store guardrails.
 See `STORE_READINESS.md` for the current submission checklist, permission rationale, and policy references.
+See `READINESS_CRITERIA.md` for how the personal use, Web Store beta, and paid product percentages are estimated.
 See `PRIVACY.md` for the local-first privacy disclosure that mirrors the public privacy page.
 See `CHROME_STORE_LISTING.md` for the current single-purpose listing draft, permission rationale, and screenshot checklist.
 

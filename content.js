@@ -53,7 +53,8 @@
     scrollContext: null,
     manualPicker: null,
     cutawayPicker: null,
-    annotationPicker: null
+    annotationPicker: null,
+    usageHud: null
   };
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -78,6 +79,23 @@
     if (message.type === "LUMEN_RESTORE_PAGE") {
       restorePageState()
         .then(() => sendResponse({ ok: true }))
+        .catch((error) => sendResponse({ ok: false, error: error.message }));
+      return true;
+    }
+
+    if (message.type === "LUMEN_SHOW_USAGE_HUD") {
+      Promise.resolve()
+        .then(() => sendResponse({ ok: true, hud: renderUsageHud(message.payload || {}) }))
+        .catch((error) => sendResponse({ ok: false, error: error.message }));
+      return true;
+    }
+
+    if (message.type === "LUMEN_HIDE_USAGE_HUD") {
+      Promise.resolve()
+        .then(() => {
+          hideUsageHud();
+          sendResponse({ ok: true });
+        })
         .catch((error) => sendResponse({ ok: false, error: error.message }));
       return true;
     }
@@ -169,6 +187,12 @@
 
   async function handlePrepareCapture(options = {}) {
     await restorePageState();
+    renderUsageHud({
+      stage: "prepare",
+      title: "Preparing clean capture",
+      detail: "Freezing motion, checking the scroll surface, and loading page media before export.",
+      progress: 0.14
+    });
 
     captureState.scrollContext = detectScrollContext();
     captureState.scrollRoot = captureState.scrollContext.node;
@@ -180,6 +204,12 @@
     releaseScrollLocks();
 
     if (options.forceLazyLoad) {
+      renderUsageHud({
+        stage: "load",
+        title: "Loading lazy content",
+        detail: "Sweeping the page so deferred images and sections are present before capture.",
+        progress: 0.24
+      });
       await runPreflightScroll();
     } else {
       setScrollTop(0);
@@ -191,6 +221,12 @@
     let hiddenCount = 0;
 
     if (options.removeStickyHeaders) {
+      renderUsageHud({
+        stage: "clean",
+        title: "Cleaning page chrome",
+        detail: "Hiding sticky headers, cookie banners, chat launchers, and late overlays.",
+        progress: 0.34
+      });
       hiddenCount = hideAggressiveLayers();
       startOverlayObserver();
       await pause(OVERLAY_SETTLE_MS);
@@ -199,6 +235,12 @@
     }
 
     captureState.prepared = true;
+    renderUsageHud({
+      stage: "ready",
+      title: "Capture surface ready",
+      detail: `${hiddenCount} overlay ${hiddenCount === 1 ? "item" : "items"} hidden. Lumen will hide this panel before taking screenshots.`,
+      progress: 0.46
+    });
 
     return {
       page: {
@@ -234,6 +276,7 @@
     teardownManualRedactionPicker(false);
     teardownCutawayRegionPicker(false);
     teardownAnnotationRegionPicker(false);
+    hideUsageHud();
     stopOverlayObserver();
     restoreHiddenNodes();
     restoreScrollLocks();
@@ -1297,6 +1340,7 @@
         !node.closest("#lumen-redaction-picker") &&
         !node.closest("#lumen-cutaway-picker") &&
         !node.closest("#lumen-annotation-picker") &&
+        !node.closest("#lumen-usage-hud") &&
         isElementScannable(node)
       ) || null;
     } finally {
@@ -1580,6 +1624,99 @@
     }
 
     picker.count.textContent = picker.region ? "1 callout" : "No callout";
+  }
+
+  function renderUsageHud({
+    stage = "prepare",
+    title = "Lumen is working",
+    detail = "Preparing the page for capture.",
+    progress = 0.08
+  } = {}) {
+    const root = ensureUsageHud();
+    const clampedProgress = Math.max(0.04, Math.min(1, Number(progress) || 0.08));
+
+    root.dataset.stage = stage;
+    root.style.setProperty("--lumen-progress", String(clampedProgress));
+    root.querySelector("[data-lumen-hud-title]").textContent = title;
+    root.querySelector("[data-lumen-hud-detail]").textContent = detail;
+
+    for (const step of root.querySelectorAll("[data-lumen-hud-step]")) {
+      step.classList.toggle("is-active", step.dataset.lumenHudStep === stage);
+    }
+
+    requestAnimationFrame(() => {
+      root.classList.add("is-visible");
+    });
+
+    return {
+      stage,
+      title,
+      progress: clampedProgress
+    };
+  }
+
+  function ensureUsageHud() {
+    if (captureState.usageHud?.isConnected) {
+      return captureState.usageHud;
+    }
+
+    injectUsageHudStyles();
+
+    const root = document.createElement("aside");
+    const topRow = document.createElement("div");
+    const mark = document.createElement("span");
+    const copy = document.createElement("div");
+    const label = document.createElement("span");
+    const title = document.createElement("strong");
+    const detail = document.createElement("p");
+    const progress = document.createElement("span");
+    const steps = document.createElement("div");
+
+    root.id = "lumen-usage-hud";
+    root.setAttribute("role", "status");
+    root.setAttribute("aria-live", "polite");
+    topRow.className = "lumen-usage-hud-row";
+    mark.className = "lumen-usage-hud-mark";
+    copy.className = "lumen-usage-hud-copy";
+    label.className = "lumen-usage-hud-label";
+    progress.className = "lumen-usage-hud-progress";
+    steps.className = "lumen-usage-hud-steps";
+    label.textContent = "Lumen capture";
+    title.dataset.lumenHudTitle = "true";
+    detail.dataset.lumenHudDetail = "true";
+
+    for (const [step, text] of [
+      ["prepare", "Prepare"],
+      ["load", "Load"],
+      ["clean", "Clean"],
+      ["review", "Review"],
+      ["ready", "Ready"],
+      ["save", "Save"]
+    ]) {
+      const node = document.createElement("span");
+      node.dataset.lumenHudStep = step;
+      node.textContent = text;
+      steps.appendChild(node);
+    }
+
+    copy.append(label, title, detail);
+    topRow.append(mark, copy);
+    root.append(topRow, progress, steps);
+    document.documentElement.appendChild(root);
+    captureState.usageHud = root;
+    return root;
+  }
+
+  function hideUsageHud() {
+    const root = captureState.usageHud || document.getElementById("lumen-usage-hud");
+
+    if (!root) {
+      return;
+    }
+
+    root.classList.remove("is-visible");
+    root.remove();
+    captureState.usageHud = null;
   }
 
   function persistManualRedactions() {
@@ -1973,6 +2110,162 @@
     captureState.freezeStyleNode = null;
   }
 
+  function injectUsageHudStyles() {
+    if (document.getElementById("lumen-usage-hud-style")) {
+      return;
+    }
+
+    const style = document.createElement("style");
+    style.id = "lumen-usage-hud-style";
+    style.textContent = `
+      #lumen-usage-hud {
+        --lumen-progress: 0.08;
+        position: fixed !important;
+        top: max(18px, env(safe-area-inset-top, 0px) + 14px) !important;
+        right: max(18px, env(safe-area-inset-right, 0px) + 14px) !important;
+        z-index: 2147483646 !important;
+        width: min(360px, calc(100vw - 32px)) !important;
+        padding: 14px !important;
+        border: 1px solid rgba(134, 221, 255, 0.22) !important;
+        border-radius: 18px !important;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
+          rgba(5, 11, 20, 0.9) !important;
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.36), 0 0 0 1px rgba(255, 255, 255, 0.04) inset !important;
+        color: #eef6ff !important;
+        font-family: "SF Pro Display", "Segoe UI Variable Display", "IBM Plex Sans", system-ui, sans-serif !important;
+        opacity: 0 !important;
+        transform: translate3d(0, -10px, 0) scale(0.98) !important;
+        transition: opacity 180ms ease, transform 180ms ease !important;
+        pointer-events: none !important;
+        isolation: isolate !important;
+      }
+
+      #lumen-usage-hud.is-visible {
+        opacity: 1 !important;
+        transform: translate3d(0, 0, 0) scale(1) !important;
+      }
+
+      #lumen-usage-hud .lumen-usage-hud-row {
+        display: flex !important;
+        gap: 12px !important;
+        align-items: flex-start !important;
+      }
+
+      #lumen-usage-hud .lumen-usage-hud-mark {
+        position: relative !important;
+        display: grid !important;
+        place-items: center !important;
+        flex: 0 0 auto !important;
+        width: 38px !important;
+        height: 38px !important;
+        border: 1px solid rgba(134, 221, 255, 0.28) !important;
+        border-radius: 14px !important;
+        background: linear-gradient(135deg, rgba(134, 221, 255, 0.34), rgba(66, 215, 197, 0.14)) !important;
+        box-shadow: 0 12px 30px rgba(37, 179, 255, 0.18) !important;
+      }
+
+      #lumen-usage-hud .lumen-usage-hud-mark::before {
+        content: "L" !important;
+        color: #f4fbff !important;
+        font-size: 15px !important;
+        font-weight: 900 !important;
+        letter-spacing: -0.04em !important;
+      }
+
+      #lumen-usage-hud .lumen-usage-hud-copy {
+        min-width: 0 !important;
+      }
+
+      #lumen-usage-hud .lumen-usage-hud-label {
+        display: block !important;
+        margin-bottom: 4px !important;
+        color: #86ddff !important;
+        font-size: 10px !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.14em !important;
+        line-height: 1 !important;
+        text-transform: uppercase !important;
+      }
+
+      #lumen-usage-hud strong {
+        display: block !important;
+        color: #f4f7ff !important;
+        font-size: 15px !important;
+        font-weight: 820 !important;
+        letter-spacing: -0.02em !important;
+        line-height: 1.12 !important;
+      }
+
+      #lumen-usage-hud p {
+        margin: 5px 0 0 !important;
+        color: rgba(234, 240, 255, 0.72) !important;
+        font-size: 12px !important;
+        font-weight: 560 !important;
+        line-height: 1.35 !important;
+      }
+
+      #lumen-usage-hud .lumen-usage-hud-progress {
+        position: relative !important;
+        display: block !important;
+        height: 4px !important;
+        margin: 13px 0 10px !important;
+        overflow: hidden !important;
+        border-radius: 999px !important;
+        background: rgba(255, 255, 255, 0.1) !important;
+      }
+
+      #lumen-usage-hud .lumen-usage-hud-progress::before {
+        content: "" !important;
+        position: absolute !important;
+        inset: 0 !important;
+        border-radius: inherit !important;
+        background: linear-gradient(90deg, #86ddff, #42d7c5) !important;
+        transform: scaleX(var(--lumen-progress)) !important;
+        transform-origin: left center !important;
+        transition: transform 220ms ease !important;
+      }
+
+      #lumen-usage-hud .lumen-usage-hud-steps {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+      }
+
+      #lumen-usage-hud .lumen-usage-hud-steps span {
+        display: inline-flex !important;
+        min-height: 22px !important;
+        align-items: center !important;
+        padding: 0 8px !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 999px !important;
+        background: rgba(255, 255, 255, 0.05) !important;
+        color: rgba(234, 240, 255, 0.58) !important;
+        font-size: 10px !important;
+        font-weight: 760 !important;
+        letter-spacing: 0.06em !important;
+        text-transform: uppercase !important;
+      }
+
+      #lumen-usage-hud .lumen-usage-hud-steps span.is-active {
+        border-color: rgba(134, 221, 255, 0.28) !important;
+        background: rgba(134, 221, 255, 0.13) !important;
+        color: #e8fbff !important;
+      }
+
+      @media (max-width: 560px) {
+        #lumen-usage-hud {
+          top: auto !important;
+          right: 12px !important;
+          bottom: max(12px, env(safe-area-inset-bottom, 0px) + 12px) !important;
+          left: 12px !important;
+          width: auto !important;
+        }
+      }
+    `;
+    document.documentElement.appendChild(style);
+  }
+
   function hideAggressiveLayers() {
     const walker = document.createTreeWalker(
       document.body || document.documentElement,
@@ -2100,6 +2393,10 @@
   }
 
   function shouldHideAggressiveLayer(node, rect, style) {
+    if (node.closest("#lumen-redaction-picker, #lumen-cutaway-picker, #lumen-annotation-picker, #lumen-usage-hud")) {
+      return false;
+    }
+
     if (node.dataset.lumenHidden === "true") {
       return false;
     }

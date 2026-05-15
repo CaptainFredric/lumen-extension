@@ -175,7 +175,10 @@ async function runDocumentCaptureSmoke(browser, contentScript) {
       lazySrc: document.querySelector("#lazy-proof")?.getAttribute("src") || "",
       scrollY: window.scrollY,
       htmlOverflow: document.documentElement.style.overflowY,
-      bodyOverflow: document.body.style.overflowY
+      bodyOverflow: document.body.style.overflowY,
+      hudStage: document.querySelector("#lumen-usage-hud")?.dataset.stage || "",
+      hudVisible: document.querySelector("#lumen-usage-hud")?.classList.contains("is-visible") || false,
+      hudHidden: document.querySelector("#lumen-usage-hud")?.dataset.lumenHidden === "true"
     }));
     const blueprint = await page.evaluate(() => window.__LUMEN_TEST_API__.extractBrandBlueprint());
     const redactions = await page.evaluate(() => window.__LUMEN_TEST_API__.scanSensitiveRegions());
@@ -205,7 +208,8 @@ async function runDocumentCaptureSmoke(browser, contentScript) {
       cookieHidden: document.querySelector(".cookie-banner")?.dataset.lumenHidden === "true",
       chatHidden: document.querySelector(".intercom-launcher")?.dataset.lumenHidden === "true",
       htmlInlineStyle: document.documentElement.getAttribute("style") || "",
-      bodyInlineStyle: document.body.getAttribute("style") || ""
+      bodyInlineStyle: document.body.getAttribute("style") || "",
+      hudExists: Boolean(document.querySelector("#lumen-usage-hud"))
     }));
 
     assert(prepare.page.scrollMode === "document", "Document fixture did not prepare as document", prepare);
@@ -214,9 +218,11 @@ async function runDocumentCaptureSmoke(browser, contentScript) {
     assert(state.lazySrc === svgPixel, "Expected lazy image source to be hydrated", state);
     assert(state.scrollY === 0, "Expected preflight scroll to return to top", state);
     assert(state.htmlOverflow === "auto" && state.bodyOverflow === "auto", "Expected capture prep to release document scroll locks", state);
+    assert(state.hudStage === "ready" && state.hudVisible && !state.hudHidden, "Expected usage HUD to remain visible during preparation without being cleaned as page chrome", state);
     assert(lateHidden, "Expected late overlay to be hidden after scroll");
     assert(!restored.stickyHidden && !restored.cookieHidden && !restored.chatHidden, "Expected hidden elements to restore", restored);
     assert(!restored.htmlInlineStyle && !restored.bodyInlineStyle, "Expected scroll lock inline overrides to restore", restored);
+    assert(!restored.hudExists, "Expected usage HUD to be removed on restore", restored);
     assert(blueprint.identity.navLabels.length >= 3, "Expected navigation labels to survive cleanup extraction", blueprint.identity);
     assert(redactions.count >= 4, "Expected redaction scanner to find visible and lower-page sensitive text", redactions);
     assert(redactions.breakdown.byKind.email >= 2, "Expected email redactions in breakdown", redactions.breakdown);

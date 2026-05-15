@@ -1643,6 +1643,12 @@ async function captureVariant({
     });
 
     await ensureContentScript(target.tab.id);
+    await showPageUsageHud(target.tab.id, {
+      stage: "prepare",
+      title: `Preparing ${variant.label.toLowerCase()} capture`,
+      detail: "Lumen is cleaning the page and checking the scroll surface. This panel is hidden before screenshots are taken.",
+      progress: 0.12
+    });
 
     const prepareResult = await chrome.tabs.sendMessage(target.tab.id, {
       type: "LUMEN_PREPARE_CAPTURE",
@@ -1662,6 +1668,13 @@ async function captureVariant({
     let blueprint = null;
 
     if (options.autoRedact) {
+      await showPageUsageHud(target.tab.id, {
+        stage: "review",
+        title: `Scanning ${variant.label.toLowerCase()} view`,
+        detail: "Checking visible text and filled inputs for sensitive data before export.",
+        progress: 0.42
+      });
+
       broadcastProgress({
         stage: "sanitize",
         title: `Scanning ${variant.label.toLowerCase()} view`,
@@ -1670,6 +1683,13 @@ async function captureVariant({
 
       redactionScan = await requestRedactionScan(target.tab.id);
     }
+
+    await showPageUsageHud(target.tab.id, {
+      stage: "review",
+      title: "Resolving review marks",
+      detail: "Projecting manual redactions, cutaways, and callouts into the current layout.",
+      progress: 0.52
+    });
 
     const manualResolution = await resolveManualRedactionsForTarget(target.tab.id, manualRedactions, page);
     const manualRegions = manualResolution.regions;
@@ -1696,7 +1716,22 @@ async function captureVariant({
       annotationRegion: annotationResolution.region
     });
 
+    await showPageUsageHud(target.tab.id, {
+      stage: "ready",
+      title: "Screenshot pass starting",
+      detail: "The on-page Lumen panel is being removed so the export stays clean.",
+      progress: 0.62
+    });
+    await sleep(120);
+    await hidePageUsageHud(target.tab.id);
     const segmentCount = await capturePageSegments(target, page, sessionId, variant);
+
+    await showPageUsageHud(target.tab.id, {
+      stage: "save",
+      title: `Compositing ${variant.label.toLowerCase()} output`,
+      detail: "The page capture is complete. Lumen is stitching and saving artifacts in the background.",
+      progress: 0.84
+    });
 
     broadcastProgress({
       stage: "stitch",
@@ -1951,6 +1986,27 @@ async function restoreTabState(tabId) {
     });
   } catch (error) {
     console.debug("Lumen restore skipped:", error);
+  }
+}
+
+async function showPageUsageHud(tabId, payload) {
+  try {
+    await chrome.tabs.sendMessage(tabId, {
+      type: "LUMEN_SHOW_USAGE_HUD",
+      payload
+    });
+  } catch (error) {
+    console.debug("Lumen usage HUD skipped:", error);
+  }
+}
+
+async function hidePageUsageHud(tabId) {
+  try {
+    await chrome.tabs.sendMessage(tabId, {
+      type: "LUMEN_HIDE_USAGE_HUD"
+    });
+  } catch (error) {
+    console.debug("Lumen usage HUD hide skipped:", error);
   }
 }
 
