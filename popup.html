@@ -87,6 +87,10 @@
             <span>Mark cutaway</span>
             <small>Save a reusable region</small>
           </button>
+          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="annotate">
+            <span>Mark callout</span>
+            <small>Draw one export annotation</small>
+          </button>
           <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="analyze">
             <span>Extract signals</span>
             <small>Palette, type, layout</small>
@@ -186,6 +190,19 @@
               placeholder="Example: Pricing hero shifts under the sticky nav after the first scroll."
             ></textarea>
             <p id="annotationCounter" class="field-meta">0 / 180</p>
+
+            <div class="annotation-region-panel">
+              <div>
+                <strong>Callout region</strong>
+                <small>Draw one area to highlight in the exported image. The note text becomes the callout label.</small>
+              </div>
+              <div class="annotation-region-actions">
+                <span id="annotationRegionStatus" class="tiny-note">No callout</span>
+                <button id="startAnnotationPickerButton" class="mini-action" type="button">Mark callout</button>
+                <button id="clearAnnotationButton" class="mini-action ghost-mini-action" type="button">Clear</button>
+              </div>
+              <p id="annotationRegionSummary" class="annotation-region-summary">Optional. Use this when a review note needs to point at a specific page area.</p>
+            </div>
 
             <div class="annotation-toolbar">
               <span class="field-label">Position</span>

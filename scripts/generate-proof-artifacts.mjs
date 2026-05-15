@@ -697,12 +697,38 @@ async function captureRedactionExample(browser, contentScript, regions, outputPa
       const cardPageLeft = cardRect.left + window.scrollX;
       const cardPageTop = cardRect.top + window.scrollY;
       const root = document.createElement("div");
+
+      if (window.getComputedStyle(card).position === "static") {
+        card.style.position = "relative";
+      }
+
+      card.style.overflow = "hidden";
       root.id = "lumen-proof-redactions";
       root.style.position = "absolute";
       root.style.inset = "0";
       root.style.pointerEvents = "none";
       root.style.zIndex = "5000";
       card.appendChild(root);
+      let overlayCount = 0;
+
+      function appendOverlay(relativeLeft, relativeTop, width, height) {
+        if (width < 2 || height < 2) {
+          return;
+        }
+
+        const overlay = document.createElement("div");
+        overlay.style.position = "absolute";
+        overlay.style.left = `${relativeLeft}px`;
+        overlay.style.top = `${relativeTop}px`;
+        overlay.style.width = `${width}px`;
+        overlay.style.height = `${height}px`;
+        overlay.style.background = "rgba(9, 17, 28, 0.72)";
+        overlay.style.backdropFilter = "blur(12px)";
+        overlay.style.border = "1px solid rgba(137, 241, 209, 0.24)";
+        overlay.style.borderRadius = "8px";
+        root.appendChild(overlay);
+        overlayCount += 1;
+      }
 
       for (const region of redactionRegions) {
         const relativeLeft = region.left - cardPageLeft;
@@ -717,21 +743,62 @@ async function captureRedactionExample(browser, contentScript, regions, outputPa
           continue;
         }
 
-        const overlay = document.createElement("div");
-        overlay.style.position = "absolute";
-        overlay.style.left = `${relativeLeft}px`;
-        overlay.style.top = `${relativeTop}px`;
-        overlay.style.width = `${region.width}px`;
-        overlay.style.height = `${region.height}px`;
-        overlay.style.background = "rgba(9, 17, 28, 0.72)";
-        overlay.style.backdropFilter = "blur(12px)";
-        overlay.style.border = "1px solid rgba(137, 241, 209, 0.24)";
-        overlay.style.borderRadius = "8px";
-        root.appendChild(overlay);
+        appendOverlay(relativeLeft, relativeTop, region.width, region.height);
+      }
+
+      if (!overlayCount) {
+        for (const node of card.querySelectorAll(".contact-row strong, .contact-row input")) {
+          const rect = node.getBoundingClientRect();
+          appendOverlay(
+            rect.left + window.scrollX - cardPageLeft,
+            rect.top + window.scrollY - cardPageTop,
+            rect.width,
+            rect.height
+          );
+        }
+      }
+
+      for (const node of card.querySelectorAll(".contact-row strong, .contact-row input")) {
+        node.style.color = "transparent";
+        node.style.webkitTextFillColor = "transparent";
+        node.style.textShadow = "0 0 10px rgba(238, 246, 255, 0.44)";
+        node.style.background = "rgba(9, 17, 28, 0.72)";
+        node.style.borderRadius = "8px";
       }
     }, regions);
 
-    await page.locator(".proof-contact").screenshot({ path: outputPath });
+    const contactCard = page.locator(".proof-contact");
+    await contactCard.scrollIntoViewIfNeeded();
+    const cardBox = await page.evaluate(() => {
+      const card = document.querySelector(".proof-contact");
+
+      if (!(card instanceof HTMLElement)) {
+        return null;
+      }
+
+      const rect = card.getBoundingClientRect();
+
+      return {
+        x: rect.left,
+        y: rect.top,
+        width: rect.width,
+        height: rect.height
+      };
+    });
+
+    if (!cardBox) {
+      throw new Error("Proof contact card was not available for redaction capture.");
+    }
+
+    await page.screenshot({
+      path: outputPath,
+      clip: {
+        x: Math.round(cardBox.x),
+        y: Math.round(cardBox.y),
+        width: Math.round(cardBox.width),
+        height: Math.round(cardBox.height)
+      }
+    });
   } finally {
     await page.close();
   }
@@ -1178,7 +1245,7 @@ async function openProofPage(browser, contentScript, device) {
     })
   );
 
-  await page.goto(PROOF_PAGE_URL, { waitUntil: "load" });
+  await page.goto(PROOF_PAGE_URL, { waitUntil: "domcontentloaded" });
   await page.waitForLoadState("networkidle").catch(() => null);
   await page.waitForTimeout(400);
   await page.addScriptTag({ content: contentScript });

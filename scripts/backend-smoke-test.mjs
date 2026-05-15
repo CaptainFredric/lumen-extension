@@ -85,10 +85,28 @@ try {
   const captureDetail = await requestJson("/v1/captures/capture-smoke-001", { sessionId });
   assert(captureDetail.status === 200 && captureDetail.body.capture.title === "Backend Smoke Capture", "Capture detail failed.", captureDetail);
 
+  const rejectedWatchPlan = await requestJson("/v1/watch-plans", {
+    method: "POST",
+    sessionId,
+    body: {
+      title: "Unapproved watch",
+      url: "https://example.com/pricing",
+      status: "active",
+      region: {
+        left: 100,
+        top: 220,
+        width: 640,
+        height: 320
+      }
+    }
+  });
+  assert(rejectedWatchPlan.status === 400, "Watch plan should require explicit opt-in.", rejectedWatchPlan);
+
   const watchPlan = await requestJson("/v1/watch-plans", {
     method: "POST",
     sessionId,
     body: {
+      explicitOptIn: true,
       title: "Pricing card watch",
       url: "https://example.com/pricing",
       status: "active",
@@ -120,6 +138,8 @@ try {
     method: "POST",
     sessionId,
     body: {
+      explicitOptIn: true,
+      payloadReviewed: true,
       task: "summarize-capture",
       captureId: "capture-smoke-001",
       watchPlanId: watchPlan.body.watchPlan.id,

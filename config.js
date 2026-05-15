@@ -6,6 +6,7 @@ export const LUMEN_CONFIG = {
     historyLimit: 12,
     manualRedactionLimit: 24,
     cutawayRegionLimit: 1,
+    annotationRegionLimit: 1,
     lateOverlaySettleMs: 140,
     mediaSettleTimeoutMs: 2200,
     maxStallRetries: 3,
@@ -74,7 +75,8 @@ export const STORAGE_KEYS = {
   session: "lumen.account.session",
   captureHistory: "lumen.capture.history",
   manualRedactions: "lumen.capture.manualRedactions",
-  cutawayRegions: "lumen.capture.cutawayRegions"
+  cutawayRegions: "lumen.capture.cutawayRegions",
+  annotationRegions: "lumen.capture.annotationRegions"
 };
 
 export function isRestrictedCaptureUrl(url = "") {

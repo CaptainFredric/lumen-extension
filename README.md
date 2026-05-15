@@ -19,22 +19,23 @@ The current build includes:
 1. sticky, fixed, and high-z cleanup before capture
 2. lazy-load preflight scrolling
 3. tail remeasurement and stalled-scroll retries for late-growing pages
-4. full-page stitching with offscreen composition
-5. desktop, tablet, mobile, and responsive-set capture modes
-6. export-time redaction for emails, phone numbers, token-like strings, and filled inputs across the current DOM
-7. redaction preview from the popup before export
-8. anchored manual redaction boxes for areas the scanner cannot infer, with projection into responsive captures when the source element still resolves
-9. a cutaway region picker that stores one reusable page area per URL and exports focused cutaway crops when that region resolves during capture
-10. a pre-export review screen that checks auto-redactions, manual projection, and cutaway resolution across the requested view set before saving
-11. anchored capture notes rendered into the exported image
-12. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
-13. bundle-manifest JSON exports with view, redaction, manual projection, cutaway, signal, output health, and note metadata
-14. dated per-run download folders so capture sets, tiles, and manifests stay together
-15. local capture history with file, folder, summary, and Chrome download-handle metadata
-16. popup history actions to open the latest artifact or reveal it in the Downloads folder
-17. capture-time popup UI with run settings, cutaway state, a live stage timeline, and recent status log
-18. a local backend slice for demo session state and history sync when an API is reachable
-19. a GitHub Pages landing site in `docs/`
+4. a last-reachable-viewport fallback for app-shell pages that stop scrolling after repeated tail rechecks
+5. full-page stitching with offscreen composition
+6. desktop, tablet, mobile, and responsive-set capture modes
+7. export-time redaction for emails, phone numbers, token-like strings, and filled inputs across the current DOM
+8. redaction preview from the popup before export
+9. anchored manual redaction boxes for areas the scanner cannot infer, with projection into responsive captures when the source element still resolves
+10. a cutaway region picker that stores one reusable page area per URL and exports focused cutaway crops when that region resolves during capture
+11. a pre-export review screen that checks auto-redactions, manual projection, and cutaway resolution across the requested view set before saving
+12. an anchored callout picker that marks one page area and renders it into the exported image with the capture note
+13. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
+14. bundle-manifest JSON exports with view, redaction, manual projection, cutaway, callout, signal, output health, and note metadata
+15. dated per-run download folders so capture sets, tiles, and manifests stay together
+16. local capture history with file, folder, summary, and Chrome download-handle metadata
+17. popup history actions to open the latest artifact or reveal it in the Downloads folder
+18. capture-time popup UI with run settings, cutaway state, a live stage timeline, and recent status log
+19. a local backend slice for demo session state and history sync when an API is reachable
+20. a GitHub Pages landing site in `docs/`
 
 ## Current Limits
 
@@ -43,7 +44,7 @@ These limits are important:
 1. redaction currently covers text and filled inputs present in the current DOM during export and should be reviewed before external sharing
 2. manual redaction boxes can project into responsive captures through DOM anchors, but the result still needs review before external sharing
 3. cutaway export works when the stored region can resolve in the captured view, but scheduled watch automation is not active yet
-4. the current annotation pass is one anchored capture note
+4. the current annotation pass is one anchored callout plus one capture note, not a full drawing suite
 5. cloud sync, billing, scheduled monitoring, and visual diffs remain future work
 6. highly dynamic sites with virtualization or unusual scroll behavior can still need site-specific fallback work
 7. the local backend slice remains a small demo path rather than a production account system
@@ -57,10 +58,10 @@ The current capture flow is:
 1. popup sends the selected capture options to the background worker
 2. background injects the content script and prepares the page
 3. content script freezes motion, runs the preflight scroll when enabled, and hides sticky or high-layer UI when enabled
-4. background scrolls the page in slices, remeasures the tail when the document grows, and retries a few stalled scrolls before failing
+4. background scrolls the page in slices, remeasures the tail when the document grows, and seals at the last reachable viewport if a complex page refuses to scroll farther after repeated rechecks
 5. background sends each visible segment to the offscreen document
-6. content script resolves manual redactions and any stored cutaway region against the current layout
-7. offscreen stitches the final output using device-pixel-ratio aware composition, renders one anchored capture note, and can export a cutaway crop from the stitched result
+6. content script resolves manual redactions, any stored cutaway region, and the optional callout region against the current layout
+7. offscreen stitches the final output using device-pixel-ratio aware composition, renders one capture note and callout marker, and can export a cutaway crop from the stitched result
 8. if the page is too large for one safe canvas, the export falls back to tiled raw output and skips cutaway cropping for that view
 9. background downloads the files, writes the bundle manifest, writes local history, and restores the page
 
@@ -157,7 +158,7 @@ npm run proof:assets
 npm run smoke:capture
 ```
 
-The smoke suite runs deterministic Playwright pages through the content-script capture path. It checks sticky and overlay cleanup, lazy media hydration, redaction scanning, navigation extraction, nested scroll containers, and anchored manual redaction projection.
+The smoke suite runs deterministic Playwright pages through the content-script capture path. It checks sticky and overlay cleanup, document scroll-lock release, lazy media hydration, redaction scanning, navigation extraction, nested scroll containers, anchored manual redaction projection, cutaway selection, and annotation callout selection.
 
 To verify the unpacked MV3 extension can boot, start its service worker, initialize settings, and render the popup:
 
@@ -198,6 +199,14 @@ npm run proof:install-browser
 The proof script depends on Playwright and a local Chromium install. It is reproducible and requires those local browser dependencies.
 
 The script also tries to create `docs/assets/proof-run-bundle.zip` with the system `zip` command. If `zip` is missing, the proof images and JSON files still generate, but the archive step is skipped.
+
+### Generate Store Screenshots
+
+```bash
+npm run store:screenshots
+```
+
+This creates Chrome Web Store sized screenshots in `store-assets/screenshots/` from the live extension popup plus the current proof output assets. The generated screenshots are 1280 by 800 PNGs.
 
 ### Build The Store Package
 
@@ -243,6 +252,6 @@ See `CHROME_STORE_LISTING.md` for the current single-purpose listing draft, perm
 The highest-leverage next steps are:
 
 1. improve capture reliability on difficult real-world sites
-2. prepare real Chrome Web Store screenshots and final listing copy
-3. add one real annotation tool that works on exported images
+2. review the generated Chrome Web Store screenshots against final listing copy
+3. expand annotation from one callout into arrows, labels, and lasso edits
 4. tighten the backend from demo session state into a real account path

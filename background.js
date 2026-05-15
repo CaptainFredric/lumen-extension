@@ -22,6 +22,7 @@ const SESSION_UPDATE_EVENT = "LUMEN_SESSION_UPDATED";
 const HISTORY_UPDATE_EVENT = "LUMEN_HISTORY_UPDATED";
 const MANUAL_REDACTIONS_UPDATE_EVENT = "LUMEN_MANUAL_REDACTIONS_UPDATED";
 const CUTAWAY_REGION_UPDATE_EVENT = "LUMEN_CUTAWAY_REGION_UPDATED";
+const ANNOTATION_REGION_UPDATE_EVENT = "LUMEN_ANNOTATION_REGION_UPDATED";
 
 let captureInFlight = false;
 let analyzeInFlight = false;
@@ -198,6 +199,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "LUMEN_START_ANNOTATION_PICKER") {
+    runAnnotationRegionPicker()
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_CLEAR_ANNOTATION_REGION") {
+    clearAnnotationRegionForActiveTab()
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_GET_ANNOTATION_REGION") {
+    getAnnotationRegionForActiveTab()
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
   if (message?.type === "LUMEN_OPEN_CAPTURE_DOWNLOAD") {
     runHistoryDownloadAction(message.payload, "open")
       .then((result) => sendResponse({ ok: true, ...result }))
@@ -224,6 +249,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message?.type === "LUMEN_CUTAWAY_REGION_UPDATED") {
     persistCutawayRegionFromContent(sender.tab, message.payload)
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_ANNOTATION_REGION_UPDATED") {
+    persistAnnotationRegionFromContent(sender.tab, message.payload)
       .then((result) => sendResponse({ ok: true, ...result }))
       .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
 
@@ -282,6 +315,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
   const variants = getCaptureVariants(options.devicePreset);
   const manualRedactions = await getManualRedactionsForTab(sourceTab);
   const cutawayRegion = await getCutawayRegionForTab(sourceTab);
+  const annotationRegion = await getAnnotationRegionForTab(sourceTab);
   const runContext = buildCaptureRunContext({
     title: sourceTab.title,
     url: sourceTab.url,
@@ -297,6 +331,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
       options,
       manualRedactions,
       cutawayRegion,
+      annotationRegion,
       runContext,
       extractBlueprint: index === 0
     });
@@ -314,6 +349,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
   const redactionBreakdown = mergeRedactionBreakdowns(results.map((result) => result.redactionBreakdown));
   const manualProjectionStats = mergeManualProjectionStats(results.map((result) => result.manualProjectionStats));
   const cutawayResolutionStats = mergeCutawayResolutionStats(results.map((result) => result.cutawayResolutionStats));
+  const annotationResolutionStats = mergeCutawayResolutionStats(results.map((result) => result.annotationResolutionStats));
   const artifactStats = buildArtifactStats(results.flatMap((result) => result.downloadRecords));
   const variantSummaries = results.map((result) => ({
     id: result.variant.id,
@@ -327,6 +363,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     cutawayCount: result.cutawayCount,
     manualProjectionStats: result.manualProjectionStats,
     cutawayResolutionStats: result.cutawayResolutionStats,
+    annotationResolutionStats: result.annotationResolutionStats,
     redactionBreakdown: result.redactionBreakdown,
     dimensions: result.dimensions
   }));
@@ -341,6 +378,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     archiveFolder: runContext.folder,
     options,
     annotation: captureNote.enabled && captureNote.text ? captureNote : null,
+    annotationRegion: annotationRegion.region || null,
     exportPreset: firstResult.exportPreset,
     variants: variantSummaries,
     redactionCount,
@@ -348,6 +386,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     cutawayCount,
     manualProjectionStats,
     cutawayResolutionStats,
+    annotationResolutionStats,
     redactionBreakdown,
     segmentCount,
     tileCount,
@@ -389,10 +428,12 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     cutawayCount,
     manualProjectionStats,
     cutawayResolutionStats,
+    annotationResolutionStats,
     redactionBreakdown,
     artifactStats,
     manifestFile,
     annotation: captureNote.enabled && captureNote.text ? captureNote : null,
+    annotationRegion: annotationRegion.region || null,
     variants: variantSummaries,
     dimensions: firstResult.dimensions,
     blueprintSummary: blueprint
@@ -424,7 +465,8 @@ async function runCaptureFlow(options = getDefaultSettings()) {
       cutawayResolutionStats,
       variantCount: variants.length,
       manifestSaved: Boolean(manifestFile),
-      annotationAdded: Boolean(captureNote.enabled && captureNote.text)
+      annotationAdded: Boolean(captureNote.enabled && captureNote.text),
+      annotationRegionApplied: annotationResolutionStats.appliedCount > 0
     }),
     progress: 1
   });
@@ -442,9 +484,11 @@ async function runCaptureFlow(options = getDefaultSettings()) {
     cutawayCount,
     manualProjectionStats,
     cutawayResolutionStats,
+    annotationResolutionStats,
     artifactStats,
     manifestFile,
     annotation: captureNote.enabled && captureNote.text ? captureNote : null,
+    annotationRegion: annotationRegion.region || null,
     variantCount: variants.length,
     dimensions: firstResult.dimensions
   };
@@ -1065,6 +1109,142 @@ async function clearCutawayRegionForTab(tab) {
   return buildEmptyCutawayRegionRecord(tab.url);
 }
 
+async function runAnnotationRegionPicker() {
+  const sourceTab = await getCurrentTab();
+
+  if (!sourceTab?.id || !sourceTab.url) {
+    throw createFriendlyError(
+      "No Active Page",
+      "Open a normal browser tab, then start the annotation picker again."
+    );
+  }
+
+  if (isRestrictedCaptureUrl(sourceTab.url)) {
+    throw createFriendlyError(
+      "This Page Cannot Be Marked",
+      "Chrome blocks script injection on internal pages, so the annotation picker cannot run here."
+    );
+  }
+
+  await ensureContentScript(sourceTab.id);
+  const record = await getAnnotationRegionForTab(sourceTab);
+  const response = await chrome.tabs.sendMessage(sourceTab.id, {
+    type: "LUMEN_START_ANNOTATION_REGION_PICKER",
+    payload: {
+      region: record.region || null
+    }
+  });
+
+  if (!response?.ok) {
+    throw createFriendlyError(
+      "Annotation Picker Failed",
+      response?.error || "Lumen could not start the annotation picker on this page."
+    );
+  }
+
+  const region = normalizeAnnotationRegion(response.picker?.region || record.region);
+
+  return {
+    record: {
+      ...record,
+      region,
+      regions: region ? [region] : []
+    }
+  };
+}
+
+async function clearAnnotationRegionForActiveTab() {
+  const sourceTab = await getCurrentTab();
+
+  if (!sourceTab?.url) {
+    return {
+      record: buildEmptyAnnotationRegionRecord()
+    };
+  }
+
+  const record = await clearAnnotationRegionForTab(sourceTab);
+
+  if (sourceTab.id) {
+    chrome.tabs.sendMessage(sourceTab.id, {
+      type: "LUMEN_CLEAR_ANNOTATION_REGION_PICKER"
+    }).catch(() => {});
+  }
+
+  broadcastAnnotationRegion(record);
+  return { record };
+}
+
+async function getAnnotationRegionForActiveTab() {
+  const sourceTab = await getCurrentTab();
+
+  if (!sourceTab?.url) {
+    return {
+      record: buildEmptyAnnotationRegionRecord()
+    };
+  }
+
+  return {
+    record: await getAnnotationRegionForTab(sourceTab)
+  };
+}
+
+async function persistAnnotationRegionFromContent(tab, payload = {}) {
+  if (!tab?.url) {
+    return {
+      record: buildEmptyAnnotationRegionRecord()
+    };
+  }
+
+  const store = await readAnnotationRegionStore();
+  const key = buildManualRedactionKey(tab.url);
+  const region = normalizeAnnotationRegion(payload.region || payload.regions?.[0]);
+  const record = {
+    url: tab.url,
+    host: new URL(tab.url).host,
+    updatedAt: new Date().toISOString(),
+    context: payload.context || null,
+    region,
+    regions: region ? [region] : []
+  };
+
+  if (region) {
+    store[key] = record;
+  } else {
+    delete store[key];
+  }
+
+  await writeAnnotationRegionStore(store);
+  broadcastAnnotationRegion(record);
+
+  return { record };
+}
+
+async function getAnnotationRegionForTab(tab) {
+  if (!tab?.url || isRestrictedCaptureUrl(tab.url)) {
+    return buildEmptyAnnotationRegionRecord();
+  }
+
+  const store = await readAnnotationRegionStore();
+  const stored = store[buildManualRedactionKey(tab.url)];
+
+  if (!stored) {
+    return buildEmptyAnnotationRegionRecord(tab.url);
+  }
+
+  return normalizeAnnotationRecord(stored, tab.url);
+}
+
+async function clearAnnotationRegionForTab(tab) {
+  if (!tab?.url) {
+    return buildEmptyAnnotationRegionRecord();
+  }
+
+  const store = await readAnnotationRegionStore();
+  delete store[buildManualRedactionKey(tab.url)];
+  await writeAnnotationRegionStore(store);
+  return buildEmptyAnnotationRegionRecord(tab.url);
+}
+
 function selectManualRedactionsForPage(record, page) {
   if (!record?.regions?.length) {
     return [];
@@ -1163,6 +1343,33 @@ function normalizeCutawayRegion(region) {
     ...(normalizeManualAnchor(region.anchor) ? {
       anchor: normalizeManualAnchor(region.anchor)
     } : {})
+  };
+}
+
+function normalizeAnnotationRecord(record = {}, fallbackUrl = "") {
+  const region = normalizeAnnotationRegion(record.region || record.regions?.[0]);
+  const rawUrl = record.url || fallbackUrl;
+
+  return {
+    url: rawUrl,
+    host: rawUrl ? new URL(rawUrl).host : "",
+    updatedAt: record.updatedAt || "",
+    context: record.context || null,
+    region,
+    regions: region ? [region] : []
+  };
+}
+
+function normalizeAnnotationRegion(region) {
+  const normalized = normalizeCutawayRegion(region);
+
+  if (!normalized) {
+    return null;
+  }
+
+  return {
+    ...normalized,
+    kind: "annotation"
   };
 }
 
@@ -1363,6 +1570,22 @@ async function writeCutawayRegionStore(store) {
   });
 }
 
+async function readAnnotationRegionStore() {
+  const stored = await chrome.storage.local.get(STORAGE_KEYS.annotationRegions);
+  const value = stored[STORAGE_KEYS.annotationRegions];
+  return value && typeof value === "object" ? value : {};
+}
+
+async function writeAnnotationRegionStore(store) {
+  const entries = Object.entries(store)
+    .sort((left, right) => new Date(right[1].updatedAt || 0) - new Date(left[1].updatedAt || 0))
+    .slice(0, 50);
+
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.annotationRegions]: Object.fromEntries(entries)
+  });
+}
+
 function buildManualRedactionKey(rawUrl) {
   const url = new URL(rawUrl);
   return `${url.origin}${url.pathname}${url.search}`;
@@ -1389,12 +1612,24 @@ function buildEmptyCutawayRegionRecord(rawUrl = "") {
   };
 }
 
+function buildEmptyAnnotationRegionRecord(rawUrl = "") {
+  return {
+    url: rawUrl,
+    host: rawUrl ? new URL(rawUrl).host : "",
+    updatedAt: "",
+    context: null,
+    region: null,
+    regions: []
+  };
+}
+
 async function captureVariant({
   sourceTab,
   variant,
   options,
   manualRedactions,
   cutawayRegion,
+  annotationRegion,
   runContext,
   extractBlueprint
 }) {
@@ -1439,6 +1674,7 @@ async function captureVariant({
     const manualResolution = await resolveManualRedactionsForTarget(target.tab.id, manualRedactions, page);
     const manualRegions = manualResolution.regions;
     const cutawayResolution = await resolveCutawayRegionForTarget(target.tab.id, cutawayRegion, page);
+    const annotationResolution = await resolveAnnotationRegionForTarget(target.tab.id, annotationRegion, page);
     const combinedRedactions = [
       ...redactionScan.regions,
       ...manualRegions
@@ -1456,7 +1692,8 @@ async function captureVariant({
         devicePreset: variant.id
       },
       redactions: combinedRedactions,
-      cutawayRegion: cutawayResolution.region
+      cutawayRegion: cutawayResolution.region,
+      annotationRegion: annotationResolution.region
     });
 
     const segmentCount = await capturePageSegments(target, page, sessionId, variant);
@@ -1502,6 +1739,7 @@ async function captureVariant({
       cutawayCount: stitched.cutawayCount || 0,
       manualProjectionStats: manualResolution.stats,
       cutawayResolutionStats: cutawayResolution.stats,
+      annotationResolutionStats: annotationResolution.stats,
       redactionBreakdown: buildRedactionBreakdown(combinedRedactions),
       exportPreset: stitched.appliedPreset,
       dimensions: {
@@ -1540,10 +1778,20 @@ async function capturePageSegments(target, page, sessionId, variant) {
 
     if (previousTop !== null && actualTop <= previousTop) {
       if (stallRetries >= LUMEN_CONFIG.capture.maxStallRetries) {
-        throw createFriendlyError(
-          "Capture Stalled",
-          "The page stopped moving before the full document could be captured. This usually points to a complex app shell, virtualized feed, or runtime layout that needs a site-specific fallback."
-        );
+        page.pageHeight = Math.max(page.viewportHeight, previousTop + page.viewportHeight);
+        await updateStitchSessionPage({
+          sessionId,
+          page
+        });
+
+        broadcastProgress({
+          stage: "capture",
+          title: `Finished reachable ${variant.label.toLowerCase()} area`,
+          detail: "The page would not scroll farther after repeated rechecks, so Lumen sealed the capture at the last reachable viewport.",
+          progress: 0.9
+        });
+
+        return segmentCount;
       }
 
       stallRetries += 1;
@@ -1613,6 +1861,10 @@ async function capturePageSegments(target, page, sessionId, variant) {
       page.viewportHeight = refreshedPage.viewportHeight ?? page.viewportHeight;
 
       if (actualTop + page.viewportHeight >= page.pageHeight - 1) {
+        await updateStitchSessionPage({
+          sessionId,
+          page
+        });
         return segmentCount;
       }
     }
@@ -1713,6 +1965,18 @@ async function initializeStitchSession(payload) {
 
   if (!response?.ok) {
     throw new Error("Offscreen stitch session could not start.");
+  }
+}
+
+async function updateStitchSessionPage(payload) {
+  const response = await chrome.runtime.sendMessage({
+    type: "LUMEN_UPDATE_STITCH_SESSION",
+    target: "offscreen",
+    payload
+  });
+
+  if (!response?.ok) {
+    throw new Error("Offscreen stitch session could not update.");
   }
 }
 
@@ -1832,6 +2096,57 @@ async function resolveCutawayRegionForTarget(tabId, cutawayRecord, page) {
   }
 
   const fallbackRegion = selectCutawayRegionForPage(cutawayRecord, page);
+
+  return {
+    region: fallbackRegion,
+    stats: buildCutawayResolutionStats({
+      storedCount,
+      appliedCount: fallbackRegion ? 1 : 0,
+      directCount: fallbackRegion ? 1 : 0,
+      projectedCount: 0,
+      skippedCount: fallbackRegion ? 0 : 1
+    })
+  };
+}
+
+async function resolveAnnotationRegionForTarget(tabId, annotationRecord, page) {
+  if (!annotationRecord?.region) {
+    return {
+      region: null,
+      stats: buildCutawayResolutionStats()
+    };
+  }
+
+  const storedCount = 1;
+
+  try {
+    const response = await chrome.tabs.sendMessage(tabId, {
+      type: "LUMEN_RESOLVE_ANNOTATION_REGION",
+      payload: {
+        region: annotationRecord.region,
+        context: annotationRecord.context || null
+      }
+    });
+
+    if (response?.ok) {
+      const region = normalizeAnnotationRegion(response.annotationRegion?.region);
+
+      return {
+        region,
+        stats: buildCutawayResolutionStats({
+          storedCount,
+          appliedCount: region ? 1 : 0,
+          directCount: response.annotationRegion?.directCount,
+          projectedCount: response.annotationRegion?.projectedCount,
+          skippedCount: response.annotationRegion?.skippedCount
+        })
+      };
+    }
+  } catch (error) {
+    console.debug("Lumen annotation projection skipped:", error);
+  }
+
+  const fallbackRegion = normalizeAnnotationRegion(selectCutawayRegionForPage(annotationRecord, page));
 
   return {
     region: fallbackRegion,
@@ -2090,7 +2405,8 @@ function buildCaptureCompletionDetail({
   cutawayResolutionStats,
   variantCount,
   manifestSaved,
-  annotationAdded
+  annotationAdded,
+  annotationRegionApplied
 }) {
   const sliceText = `${segmentCount} slice${segmentCount === 1 ? "" : "s"} stitched`;
   const fileText = `${fileCount} file${fileCount === 1 ? "" : "s"} saved`;
@@ -2105,7 +2421,8 @@ function buildCaptureCompletionDetail({
     !cutawayCount &&
     !cutawayProjectionText &&
     !manifestSaved &&
-    !annotationAdded
+    !annotationAdded &&
+    !annotationRegionApplied
   ) {
     return `${sliceText} and ${fileText} successfully.`;
   }
@@ -2142,6 +2459,10 @@ function buildCaptureCompletionDetail({
 
   if (annotationAdded) {
     fragments.push("capture note added");
+  }
+
+  if (annotationRegionApplied) {
+    fragments.push("callout region marked");
   }
 
   return `${fragments.join(", ")}.`;
@@ -2264,6 +2585,13 @@ function broadcastCutawayRegion(record) {
   }).catch(() => {});
 }
 
+function broadcastAnnotationRegion(record) {
+  chrome.runtime.sendMessage({
+    type: ANNOTATION_REGION_UPDATE_EVENT,
+    payload: record
+  }).catch(() => {});
+}
+
 async function closeWindowSafely(windowId) {
   try {
     if (typeof windowId === "number") {
@@ -2362,6 +2690,7 @@ function buildCaptureBundleManifest({
   archiveFolder,
   options,
   annotation,
+  annotationRegion,
   exportPreset,
   variants,
   redactionCount,
@@ -2369,6 +2698,7 @@ function buildCaptureBundleManifest({
   cutawayCount,
   manualProjectionStats,
   cutawayResolutionStats,
+  annotationResolutionStats,
   redactionBreakdown,
   segmentCount,
   tileCount,
@@ -2401,9 +2731,11 @@ function buildCaptureBundleManifest({
       cutawayCount,
       manualProjectionStats,
       cutawayResolutionStats,
+      annotationResolutionStats,
       redactionBreakdown,
       artifactStats,
-      annotation
+      annotation,
+      annotationRegion
     },
     variants: variants.map((variant, index) => {
       const outputs = variantOutputs[index] || [];
@@ -2422,6 +2754,7 @@ function buildCaptureBundleManifest({
         cutawayCount: variant.cutawayCount || 0,
         manualProjectionStats: variant.manualProjectionStats || buildManualProjectionStats(),
         cutawayResolutionStats: variant.cutawayResolutionStats || buildCutawayResolutionStats(),
+        annotationResolutionStats: variant.annotationResolutionStats || buildCutawayResolutionStats(),
         redactionBreakdown: variant.redactionBreakdown || buildRedactionBreakdown([]),
         dimensions: variant.dimensions
       };

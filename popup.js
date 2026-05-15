@@ -37,6 +37,10 @@ const ui = {
   annotationBlock: document.querySelector("#annotationBlock"),
   annotationText: document.querySelector("#annotationText"),
   annotationCounter: document.querySelector("#annotationCounter"),
+  annotationRegionStatus: document.querySelector("#annotationRegionStatus"),
+  startAnnotationPickerButton: document.querySelector("#startAnnotationPickerButton"),
+  clearAnnotationButton: document.querySelector("#clearAnnotationButton"),
+  annotationRegionSummary: document.querySelector("#annotationRegionSummary"),
   annotationPositionButtons: [...document.querySelectorAll("[data-annotation-position]")],
   deviceButtons: [...document.querySelectorAll("[data-device]")],
   exportButtons: [...document.querySelectorAll("[data-export]")],
@@ -111,6 +115,10 @@ let cutawayRegionRecord = {
   region: null,
   regions: []
 };
+let annotationRegionRecord = {
+  region: null,
+  regions: []
+};
 let statusEvents = [];
 let holdTimer = null;
 let suppressNextCaptureClick = false;
@@ -176,6 +184,10 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "LUMEN_CUTAWAY_REGION_UPDATED") {
     renderCutawayRegion(message.payload);
   }
+
+  if (message?.type === "LUMEN_ANNOTATION_REGION_UPDATED") {
+    renderAnnotationRegion(message.payload);
+  }
 });
 
 async function bootstrap() {
@@ -202,6 +214,8 @@ function bindEvents() {
   ui.startCutawayPickerButton.addEventListener("click", handleStartCutawayPicker);
   ui.clearCutawayButton.addEventListener("click", handleClearCutawayRegion);
   ui.explainCutawayPlanButton.addEventListener("click", handleExplainCutawayPlan);
+  ui.startAnnotationPickerButton.addEventListener("click", handleStartAnnotationPicker);
+  ui.clearAnnotationButton.addEventListener("click", handleClearAnnotationRegion);
 
   for (const button of ui.deviceButtons) {
     button.addEventListener("click", () => {
@@ -290,15 +304,27 @@ async function restoreAppState() {
   renderSession(response.session || currentSession);
   await refreshManualRedactions();
   await refreshCutawayRegion();
+  await refreshAnnotationRegion();
 }
 
 async function resolveActionTargetTab() {
   const tabs = await chrome.tabs.query({
     currentWindow: true
   });
-  const activeTab = tabs.find((tab) => tab.active);
+  const currentWindowTarget = selectBestCaptureTarget(tabs);
 
-  if (activeTab?.url && isOriginPermissionSupported(activeTab.url)) {
+  if (currentWindowTarget) {
+    return currentWindowTarget;
+  }
+
+  const allTabs = await chrome.tabs.query({});
+  return selectBestCaptureTarget(allTabs);
+}
+
+function selectBestCaptureTarget(tabs = []) {
+  const activeTab = tabs.find((tab) => tab.active && tab?.url && isOriginPermissionSupported(tab.url));
+
+  if (activeTab) {
     return activeTab;
   }
 
@@ -531,6 +557,11 @@ async function runQuickAction(action) {
 
   if (action === "cutaway") {
     await handleStartCutawayPicker();
+    return;
+  }
+
+  if (action === "annotate") {
+    await handleStartAnnotationPicker();
     return;
   }
 
@@ -1032,6 +1063,109 @@ async function handleClearCutawayRegion() {
   }
 }
 
+async function handleStartAnnotationPicker() {
+  if (actionBusy) {
+    return;
+  }
+
+  if (!(await ensureActionTargetReady("mark an annotation callout"))) {
+    return;
+  }
+
+  setActionBusy(true);
+
+  if (!ui.annotationEnabled.checked) {
+    ui.annotationEnabled.checked = true;
+    updateAnnotationControls();
+    await persistCurrentSettings();
+  }
+
+  showStatus({
+    tone: "neutral",
+    eyebrow: "Annotate",
+    title: "Opening callout picker",
+    detail: "Draw one box around the page area that should be highlighted in the exported image.",
+    badge: "Picker",
+    progress: 0.08
+  });
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "LUMEN_START_ANNOTATION_PICKER"
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error?.description || "Annotation picker could not start.");
+    }
+
+    renderAnnotationRegion(response.record);
+
+    showStatus({
+      tone: "success",
+      eyebrow: "Annotate",
+      title: "Callout picker ready",
+      detail: "The selected region is stored locally for this URL and rendered into the next export with the capture note.",
+      badge: "Ready",
+      progress: 1
+    });
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Annotate",
+      title: "Picker failed",
+      detail: error.message,
+      badge: "Failed",
+      progress: 0.12
+    });
+  } finally {
+    setActionBusy(false);
+  }
+}
+
+async function handleClearAnnotationRegion() {
+  if (actionBusy) {
+    return;
+  }
+
+  if (!(await ensureActionTargetReady("clear the annotation callout"))) {
+    return;
+  }
+
+  setActionBusy(true);
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "LUMEN_CLEAR_ANNOTATION_REGION"
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error?.description || "Annotation callout could not be cleared.");
+    }
+
+    renderAnnotationRegion(response.record);
+
+    showStatus({
+      tone: "neutral",
+      eyebrow: "Annotate",
+      title: "Callout cleared",
+      detail: "The next export will keep the note text but will not draw a highlighted page region.",
+      badge: "Cleared",
+      progress: 0.2
+    });
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Annotate",
+      title: "Clear failed",
+      detail: error.message,
+      badge: "Failed",
+      progress: 0.12
+    });
+  } finally {
+    setActionBusy(false);
+  }
+}
+
 function handleExplainCutawayPlan() {
   const hasRegion = Boolean(cutawayRegionRecord.region);
 
@@ -1457,6 +1591,32 @@ function renderCutawayRegion(record) {
     `Stored for ${record?.host || "this URL"}.`,
     `Top ${Math.round(region.top)}px, left ${Math.round(region.left)}px.`,
     "Captures can export focused cutaway PNGs when this region resolves."
+  ].join(" ");
+  updateActionDisabledState();
+  renderRunSummary(currentSettings);
+}
+
+function renderAnnotationRegion(record) {
+  const region = record?.region || record?.regions?.[0] || null;
+  annotationRegionRecord = {
+    ...(record || {}),
+    region,
+    regions: region ? [region] : []
+  };
+
+  if (!region) {
+    ui.annotationRegionStatus.textContent = "No callout";
+    ui.annotationRegionSummary.textContent = "Optional. Use this when a review note needs to point at a specific page area.";
+    updateActionDisabledState();
+    renderRunSummary(currentSettings);
+    return;
+  }
+
+  ui.annotationRegionStatus.textContent = `${Math.round(region.width)}x${Math.round(region.height)}`;
+  ui.annotationRegionSummary.textContent = [
+    `Stored for ${record?.host || "this URL"}.`,
+    `Top ${Math.round(region.top)}px, left ${Math.round(region.left)}px.`,
+    "The next export draws this as a callout when the region resolves."
   ].join(" ");
   updateActionDisabledState();
   renderRunSummary(currentSettings);
@@ -2155,7 +2315,8 @@ function renderRunSummary(settings = currentSettings) {
     settings.forceLazyLoad !== false ? "Lazy load" : "",
     settings.autoRedact ? "Redact" : "",
     manualRedactionRecord.regions?.length ? "Manual boxes" : "",
-    cutawayRegionRecord.region ? "Cutaway" : ""
+    cutawayRegionRecord.region ? "Cutaway" : "",
+    annotationRegionRecord.region ? "Callout" : ""
   ].filter(Boolean);
 
   ui.runViewSummary.textContent = viewLabel;
@@ -2259,6 +2420,8 @@ function updateActionDisabledState() {
   ui.startCutawayPickerButton.disabled = disabled;
   ui.clearCutawayButton.disabled = disabled || !cutawayRegionRecord.region;
   ui.explainCutawayPlanButton.disabled = disabled;
+  ui.startAnnotationPickerButton.disabled = disabled;
+  ui.clearAnnotationButton.disabled = disabled || !annotationRegionRecord.region;
   ui.exportReviewCancelButton.disabled = actionBusy;
   ui.exportReviewConfirmButton.disabled = actionBusy;
 
@@ -2635,6 +2798,18 @@ async function refreshCutawayRegion() {
     renderCutawayRegion(response?.record);
   } catch {
     renderCutawayRegion(null);
+  }
+}
+
+async function refreshAnnotationRegion() {
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "LUMEN_GET_ANNOTATION_REGION"
+    });
+
+    renderAnnotationRegion(response?.record);
+  } catch {
+    renderAnnotationRegion(null);
   }
 }
 

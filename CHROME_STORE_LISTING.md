@@ -21,8 +21,9 @@ The current extension helps you:
 3. Preview and apply redactions for visible sensitive text and filled inputs.
 4. Mark manual redaction boxes for areas the scanner cannot infer.
 5. Draw a reusable cutaway region and export focused crops beside the full-page image.
-6. Extract page signals such as colors, fonts, headline, CTA, navigation labels, and layout counts.
-7. Save a local capture history and bundle manifest so evidence can travel with context.
+6. Mark one callout region so a review note points at the relevant area in the exported image.
+7. Extract page signals such as colors, fonts, headline, CTA, navigation labels, and layout counts.
+8. Save a local capture history and bundle manifest so evidence can travel with context.
 
 Current redaction covers visible text and filled inputs during export and should be reviewed before external sharing.
 
@@ -65,17 +66,19 @@ Do not claim remote collection while the current build is local-first and does n
 
 Use real output from the extension, not concept art:
 
+Generated assets live in `store-assets/screenshots/` and can be refreshed with `npm run store:screenshots`.
+
 1. Popup ready state on a normal page.
-2. Pre-export review with redaction, cutaway, and warning status.
+2. Hold-action menu with review actions.
 3. Responsive output bundle showing desktop, tablet, and mobile.
-4. Redaction review before export.
-5. Local history detail with artifacts and manifest.
+4. Redaction and callout review.
+5. Signals and local history detail.
 
 ## Claims To Avoid Until Implemented
 
 1. Automated competitor monitoring.
 2. Cloud sync.
 3. Team workspaces.
-4. Agent handoff.
+4. Ungated agent handoff.
 5. Billing or pro plans.
 6. Guaranteed PII removal.

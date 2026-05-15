@@ -15,6 +15,8 @@ This file tracks what Lumen needs before a serious Chrome Web Store submission.
 9. Production manifest no longer requests the broad `tabs` permission.
 10. Public privacy policy exists at `https://captainfredric.github.io/lumen-extension/privacy.html`.
 11. Manifest declares the public homepage URL.
+12. Store screenshot generator creates 1280 by 800 PNGs from actual popup states and current proof assets.
+13. Backend watch and agent routes require explicit opt-in before creating future automation records.
 
 ## Public URLs
 
@@ -44,7 +46,7 @@ These are only needed for tablet, mobile, and responsive captures that open temp
 1. Keep the Chrome Web Store privacy fields consistent with `PRIVACY.md` and the public privacy URL.
 2. Keep continuous capture disabled until region watch has explicit schedule selection, visible pause controls, retention limits, and delete controls.
 3. Keep agent handoff disabled until the user can review exactly what will be sent and choose the destination.
-4. Prepare Chrome Web Store screenshots from real extension output, not concept art.
+4. Review generated Chrome Web Store screenshots from `store-assets/screenshots/` against final listing copy.
 5. Fill the single-purpose field from `CHROME_STORE_LISTING.md` without widening the product story.
 
 ## Package Validation
@@ -64,6 +66,16 @@ The script creates `dist/lumen-extension-0.2.0.zip` and checks:
 5. Permissions against the current approved list.
 6. Optional host permissions remain limited to `http://*/*` and `https://*/*`.
 7. Development paths such as docs, backend, scripts, node_modules, dist, and proof assets are not included.
+
+## Screenshot Generation
+
+Run:
+
+```bash
+npm run store:screenshots
+```
+
+The script writes `store-assets/screenshots/*.png`, validates each image is 1280 by 800, and removes its temporary extension profile afterward.
 
 Current known warning:
 

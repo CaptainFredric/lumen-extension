@@ -54,7 +54,10 @@ async function buildPatchedContentScript() {
         resolveManualRedactions,
         clearManualRedactionPicker,
         startCutawayRegionPicker,
-        clearCutawayRegionPicker
+        clearCutawayRegionPicker,
+        startAnnotationRegionPicker,
+        resolveAnnotationRegion,
+        clearAnnotationRegionPicker
       };
     })();
     `
@@ -83,7 +86,8 @@ async function runDocumentCaptureSmoke(browser, contentScript) {
         <meta name="description" content="A deterministic page for Lumen capture smoke tests." />
         <style>
           * { box-sizing: border-box; }
-          body { margin: 0; font-family: ui-sans-serif, system-ui, sans-serif; color: #102033; }
+          html { overflow-y: hidden; }
+          body { margin: 0; overflow-y: hidden; font-family: ui-sans-serif, system-ui, sans-serif; color: #102033; }
           #sticky-header {
             position: sticky;
             top: 0;
@@ -169,7 +173,9 @@ async function runDocumentCaptureSmoke(browser, contentScript) {
       cookieHidden: document.querySelector(".cookie-banner")?.dataset.lumenHidden === "true",
       chatHidden: document.querySelector(".intercom-launcher")?.dataset.lumenHidden === "true",
       lazySrc: document.querySelector("#lazy-proof")?.getAttribute("src") || "",
-      scrollY: window.scrollY
+      scrollY: window.scrollY,
+      htmlOverflow: document.documentElement.style.overflowY,
+      bodyOverflow: document.body.style.overflowY
     }));
     const blueprint = await page.evaluate(() => window.__LUMEN_TEST_API__.extractBrandBlueprint());
     const redactions = await page.evaluate(() => window.__LUMEN_TEST_API__.scanSensitiveRegions());
@@ -197,7 +203,9 @@ async function runDocumentCaptureSmoke(browser, contentScript) {
     const restored = await page.evaluate(() => ({
       stickyHidden: document.querySelector("#sticky-header")?.dataset.lumenHidden === "true",
       cookieHidden: document.querySelector(".cookie-banner")?.dataset.lumenHidden === "true",
-      chatHidden: document.querySelector(".intercom-launcher")?.dataset.lumenHidden === "true"
+      chatHidden: document.querySelector(".intercom-launcher")?.dataset.lumenHidden === "true",
+      htmlInlineStyle: document.documentElement.getAttribute("style") || "",
+      bodyInlineStyle: document.body.getAttribute("style") || ""
     }));
 
     assert(prepare.page.scrollMode === "document", "Document fixture did not prepare as document", prepare);
@@ -205,8 +213,10 @@ async function runDocumentCaptureSmoke(browser, contentScript) {
     assert(state.stickyHidden && state.cookieHidden && state.chatHidden, "Expected sticky and overlay elements to be hidden", state);
     assert(state.lazySrc === svgPixel, "Expected lazy image source to be hydrated", state);
     assert(state.scrollY === 0, "Expected preflight scroll to return to top", state);
+    assert(state.htmlOverflow === "auto" && state.bodyOverflow === "auto", "Expected capture prep to release document scroll locks", state);
     assert(lateHidden, "Expected late overlay to be hidden after scroll");
     assert(!restored.stickyHidden && !restored.cookieHidden && !restored.chatHidden, "Expected hidden elements to restore", restored);
+    assert(!restored.htmlInlineStyle && !restored.bodyInlineStyle, "Expected scroll lock inline overrides to restore", restored);
     assert(blueprint.identity.navLabels.length >= 3, "Expected navigation labels to survive cleanup extraction", blueprint.identity);
     assert(redactions.count >= 4, "Expected redaction scanner to find visible and lower-page sensitive text", redactions);
     assert(redactions.breakdown.byKind.email >= 2, "Expected email redactions in breakdown", redactions.breakdown);
@@ -406,6 +416,31 @@ async function runCutawayRegionSmoke(browser, contentScript) {
       selector: region.anchor.selector,
       width: region.width,
       height: region.height
+    });
+
+    await page.evaluate(() => window.__LUMEN_TEST_API__.startAnnotationRegionPicker());
+    await page.mouse.move(targetBox.x + 32, targetBox.y + 36);
+    await page.mouse.down();
+    await page.mouse.move(targetBox.x + targetBox.width - 42, targetBox.y + 126, { steps: 8 });
+    await page.mouse.up();
+
+    const annotationMessage = await page.evaluate(() => window.__LUMEN_LAST_RUNTIME_MESSAGE__);
+    const annotationRegion = annotationMessage?.payload?.region;
+    await page.getByRole("button", { name: "Done" }).click();
+    const resolvedAnnotation = await page.evaluate((payload) => window.__LUMEN_TEST_API__.resolveAnnotationRegion(payload), {
+      region: annotationRegion,
+      context: annotationMessage?.payload?.context
+    });
+
+    assert(annotationMessage?.type === "LUMEN_ANNOTATION_REGION_UPDATED", "Annotation picker did not publish its region.", annotationMessage);
+    assert(annotationRegion?.kind === "annotation", "Annotation picker did not store an annotation region kind.", annotationRegion);
+    assert(annotationRegion.anchor?.selector === "#pricing-card", "Annotation region did not store a stable DOM anchor.", annotationRegion);
+    assert(resolvedAnnotation.region?.kind === "annotation", "Annotation region did not resolve as an annotation.", resolvedAnnotation);
+
+    record("annotation callout picker", {
+      selector: annotationRegion.anchor.selector,
+      width: annotationRegion.width,
+      height: annotationRegion.height
     });
   });
 }

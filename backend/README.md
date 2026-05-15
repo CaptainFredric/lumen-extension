@@ -8,8 +8,8 @@ This is the first backend slice for Lumen. It is intentionally local-first, but 
 2. returns the current session
 3. accepts and validates capture history records
 4. returns, looks up, and deletes capture records for the active session
-5. stores cutaway watch-plan records for future opt-in region monitoring
-6. queues agent handoff jobs for future review automation
+5. stores cutaway watch-plan records only after explicit opt-in
+6. queues agent handoff jobs only after explicit opt-in and payload review confirmation
 7. returns simple session stats and planned integration descriptors
 
 ## Run it
@@ -48,10 +48,12 @@ LUMEN_API_PORT=8788 LUMEN_API_DATA_DIR=/tmp/lumen-api npm run api
 18. `GET /v1/agent-jobs/:id`
 19. `PATCH /v1/agent-jobs/:id`
 
+Watch plan creation requires `explicitOptIn: true` or `optIn: true`. Agent job creation also requires `payloadReviewed: true` or `reviewedPayload: true`.
+
 ## Smoke Test
 
 ```bash
 npm run smoke:backend
 ```
 
-The smoke test starts the API with a temporary data directory, creates a demo session, writes a capture, writes a watch plan, queues and completes an agent job, verifies stats, checks invalid-session rejection, deletes the capture, and removes the temporary store.
+The smoke test starts the API with a temporary data directory, creates a demo session, writes a capture, checks that watch plans reject missing opt-in, writes an opted-in watch plan, queues and completes a reviewed agent job, verifies stats, checks invalid-session rejection, deletes the capture, and removes the temporary store.

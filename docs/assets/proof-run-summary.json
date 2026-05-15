@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-01T04:44:14.644Z",
+  "generatedAt": "2026-05-15T19:30:14.545Z",
   "source": "Prototype proof page rendered with Lumen content-script cleanup, scan, and extraction logic.",
   "files": [
     "proof-run-desktop.png",
@@ -9,7 +9,7 @@
     "proof-run-bundle.zip",
     "proof-run-signals.json"
   ],
-  "hiddenCount": 0,
+  "hiddenCount": 3,
   "redactionCount": 4,
   "redactionBreakdown": {
     "total": 4,
@@ -21,7 +21,7 @@
   },
   "navLabelCount": 4,
   "blueprint": {
-    "generatedAt": "2026-05-01T04:44:05.709Z",
+    "generatedAt": "2026-05-15T19:30:06.074Z",
     "page": {
       "title": "Orbit Release Manager",
       "url": "http://proof.lumen.test/",
@@ -110,6 +110,6 @@
   "historyItem": {
     "title": "Orbit Release Manager",
     "exportPreset": "raw",
-    "metaLine": "proof.lumen.test · Apr 30, 11:44 PM · 3 views · 4 files · 4 redactions · Brochure site"
+    "metaLine": "proof.lumen.test · May 15, 2:30 PM · 3 views · 4 files · 4 redactions · Brochure site"
   }
 }

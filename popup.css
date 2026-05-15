@@ -423,7 +423,8 @@ h3 {
 }
 
 .manual-redaction-panel,
-.cutaway-panel {
+.cutaway-panel,
+.annotation-region-panel {
   display: grid;
   gap: 12px;
   padding: 13px;
@@ -441,25 +442,36 @@ h3 {
   border-color: rgba(127, 241, 197, 0.12);
 }
 
+.annotation-region-panel {
+  background:
+    linear-gradient(135deg, rgba(255, 210, 130, 0.1), transparent 48%),
+    rgba(255, 255, 255, 0.035);
+  border-color: rgba(255, 210, 130, 0.14);
+}
+
 .manual-redaction-copy,
-.cutaway-copy {
+.cutaway-copy,
+.annotation-region-panel > div:first-child {
   display: grid;
   gap: 4px;
 }
 
 .manual-redaction-copy strong,
-.cutaway-copy strong {
+.cutaway-copy strong,
+.annotation-region-panel strong {
   font-size: 0.9rem;
 }
 
 .manual-redaction-copy small,
-.cutaway-copy small {
+.cutaway-copy small,
+.annotation-region-panel small {
   color: var(--text-secondary);
   line-height: 1.5;
 }
 
 .manual-redaction-actions,
-.cutaway-actions {
+.cutaway-actions,
+.annotation-region-actions {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -467,12 +479,14 @@ h3 {
 }
 
 .manual-redaction-actions .tiny-note,
-.cutaway-actions .tiny-note {
+.cutaway-actions .tiny-note,
+.annotation-region-actions .tiny-note {
   margin-right: auto;
 }
 
 .redaction-preview-summary,
-.cutaway-summary {
+.cutaway-summary,
+.annotation-region-summary {
   color: var(--text-secondary);
   font-size: 0.78rem;
   line-height: 1.45;

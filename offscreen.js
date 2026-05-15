@@ -21,6 +21,8 @@ async function routeMessage(message) {
   switch (message.type) {
     case "LUMEN_INIT_STITCH_SESSION":
       return initializeSession(message.payload);
+    case "LUMEN_UPDATE_STITCH_SESSION":
+      return updateSession(message.payload);
     case "LUMEN_APPEND_CAPTURE_SEGMENT":
       return appendSegment(message.payload);
     case "LUMEN_FINALIZE_STITCH_SESSION":
@@ -33,12 +35,13 @@ async function routeMessage(message) {
   }
 }
 
-function initializeSession({ sessionId, page, options, redactions = [], cutawayRegion = null }) {
+function initializeSession({ sessionId, page, options, redactions = [], cutawayRegion = null, annotationRegion = null }) {
   stitchSessions.set(sessionId, {
     page,
     options,
     redactions,
     cutawayRegion,
+    annotationRegion,
     segments: []
   });
 
@@ -53,6 +56,23 @@ function appendSegment({ sessionId, segment }) {
   }
 
   session.segments.push(segment);
+  return {};
+}
+
+function updateSession({ sessionId, page }) {
+  const session = stitchSessions.get(sessionId);
+
+  if (!session) {
+    throw new Error("Stitch session not found.");
+  }
+
+  if (page && typeof page === "object") {
+    session.page = {
+      ...session.page,
+      ...page
+    };
+  }
+
   return {};
 }
 
@@ -143,10 +163,11 @@ async function renderSession(session) {
           text: renderModel.annotation.text
         }
       : {
-          enabled: false,
+          enabled: Boolean(renderModel.annotationRegion),
           position: "",
           text: ""
-        }
+        },
+    annotationRegion: renderModel.annotationRegion
   };
 }
 
@@ -184,6 +205,7 @@ async function buildRenderModel(session) {
     canvasHeight,
     effectiveScale,
     annotation,
+    annotationRegion: scaleAnnotationRegion(session.annotationRegion, effectiveScale, canvasWidth, canvasHeight),
     cutawayRegion: scaleCutawayRegion(session.cutawayRegion, effectiveScale, canvasWidth, canvasHeight),
     redactions: (session.redactions || []).map((region) => ({
       ...region,
@@ -237,6 +259,43 @@ function scaleCutawayRegion(region, effectiveScale, canvasWidth, canvasHeight) {
   return {
     id: region.id || "",
     kind: "cutaway",
+    left,
+    top,
+    width,
+    height,
+    ...(region.projected ? { projected: true } : {}),
+    ...(typeof region.projection === "string" ? { projection: region.projection } : {})
+  };
+}
+
+function scaleAnnotationRegion(region, effectiveScale, canvasWidth, canvasHeight) {
+  if (!region || typeof region !== "object") {
+    return null;
+  }
+
+  if (
+    !Number.isFinite(region.left) ||
+    !Number.isFinite(region.top) ||
+    !Number.isFinite(region.width) ||
+    !Number.isFinite(region.height)
+  ) {
+    return null;
+  }
+
+  const left = Math.max(0, Math.round(region.left * effectiveScale));
+  const top = Math.max(0, Math.round(region.top * effectiveScale));
+  const right = Math.min(canvasWidth, Math.round((region.left + region.width) * effectiveScale));
+  const bottom = Math.min(canvasHeight, Math.round((region.top + region.height) * effectiveScale));
+  const width = right - left;
+  const height = bottom - top;
+
+  if (width < 2 || height < 2) {
+    return null;
+  }
+
+  return {
+    id: region.id || "",
+    kind: "annotation",
     left,
     top,
     width,
@@ -311,6 +370,7 @@ function renderSliceCanvas(renderModel, sliceStart, sliceEnd) {
   }
 
   applyRedactionRegions(canvas, context, renderModel.redactions, sliceStart, sliceEnd);
+  applyRegionCallout(context, renderModel.annotationRegion, renderModel.annotation, sliceStart, sliceEnd);
   applyCaptureAnnotation(context, renderModel.annotation, sliceStart, sliceEnd);
 
   return canvas;
@@ -553,6 +613,55 @@ function applyCaptureAnnotation(context, annotation, sliceStart, sliceEnd) {
   }
 
   drawCaptureAnnotation(context, annotation, sliceStart);
+}
+
+function applyRegionCallout(context, region, annotation, sliceStart, sliceEnd) {
+  if (!region) {
+    return;
+  }
+
+  const drawStart = Math.max(sliceStart, region.top);
+  const drawEnd = Math.min(sliceEnd, region.top + region.height);
+
+  if (drawEnd <= drawStart) {
+    return;
+  }
+
+  const x = Math.max(0, region.left);
+  const y = drawStart - sliceStart;
+  const width = Math.max(1, region.width);
+  const height = Math.max(1, drawEnd - drawStart);
+  const radius = Math.min(20, Math.max(8, Math.round(Math.min(width, height) / 12)));
+
+  context.save();
+  context.font = "700 12px 'SF Pro Display', 'IBM Plex Sans', sans-serif";
+  const label = annotation?.text ? truncateLine(context, annotation.text, Math.max(80, width - 24)) : "Review callout";
+
+  roundPath(context, x, y, width, height, radius);
+  context.fillStyle = "rgba(134, 221, 255, 0.13)";
+  context.fill();
+  context.strokeStyle = "rgba(134, 221, 255, 0.9)";
+  context.lineWidth = Math.max(2, Math.round(Math.min(width, height) / 80));
+  context.stroke();
+
+  const badgeHeight = 28;
+  const badgeWidth = Math.min(Math.max(150, context.measureText(label).width + 34), Math.max(150, width));
+  const badgeX = Math.max(8, Math.min(x, context.canvas.width - badgeWidth - 8));
+  const badgeY = Math.max(8, y - badgeHeight - 10);
+
+  context.shadowColor = "rgba(4, 10, 18, 0.32)";
+  context.shadowBlur = 18;
+  context.shadowOffsetY = 8;
+  drawRoundedRect(context, badgeX, badgeY, badgeWidth, badgeHeight, 999, "rgba(8, 13, 24, 0.88)");
+  context.shadowColor = "transparent";
+  context.strokeStyle = "rgba(134, 221, 255, 0.32)";
+  context.lineWidth = 1;
+  roundPath(context, badgeX, badgeY, badgeWidth, badgeHeight, 999);
+  context.stroke();
+  context.fillStyle = "rgba(224, 250, 255, 0.96)";
+  context.textBaseline = "middle";
+  context.fillText(label, badgeX + 16, badgeY + badgeHeight / 2 + 0.5);
+  context.restore();
 }
 
 function pixelateRegion(canvas, context, x, y, width, height) {

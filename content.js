@@ -43,6 +43,7 @@
 
   const captureState = {
     hiddenNodes: [],
+    scrollLockNodes: [],
     originalScrollX: 0,
     originalScrollY: 0,
     freezeStyleNode: null,
@@ -51,7 +52,8 @@
     scrollRoot: null,
     scrollContext: null,
     manualPicker: null,
-    cutawayPicker: null
+    cutawayPicker: null,
+    annotationPicker: null
   };
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -115,6 +117,13 @@
       return true;
     }
 
+    if (message.type === "LUMEN_RESOLVE_ANNOTATION_REGION") {
+      Promise.resolve()
+        .then(() => sendResponse({ ok: true, annotationRegion: resolveAnnotationRegion(message.payload || {}) }))
+        .catch((error) => sendResponse({ ok: false, error: error.message }));
+      return true;
+    }
+
     if (message.type === "LUMEN_START_MANUAL_REDACTION_PICKER") {
       Promise.resolve()
         .then(() => sendResponse({ ok: true, picker: startManualRedactionPicker(message.payload || {}) }))
@@ -142,6 +151,20 @@
         .catch((error) => sendResponse({ ok: false, error: error.message }));
       return true;
     }
+
+    if (message.type === "LUMEN_START_ANNOTATION_REGION_PICKER") {
+      Promise.resolve()
+        .then(() => sendResponse({ ok: true, picker: startAnnotationRegionPicker(message.payload || {}) }))
+        .catch((error) => sendResponse({ ok: false, error: error.message }));
+      return true;
+    }
+
+    if (message.type === "LUMEN_CLEAR_ANNOTATION_REGION_PICKER") {
+      Promise.resolve()
+        .then(() => sendResponse({ ok: true, picker: clearAnnotationRegionPicker() }))
+        .catch((error) => sendResponse({ ok: false, error: error.message }));
+      return true;
+    }
   });
 
   async function handlePrepareCapture(options = {}) {
@@ -154,6 +177,7 @@
 
     freezeAnimationsAndSmoothScroll();
     primeLazyMedia(document);
+    releaseScrollLocks();
 
     if (options.forceLazyLoad) {
       await runPreflightScroll();
@@ -209,8 +233,10 @@
   async function restorePageState() {
     teardownManualRedactionPicker(false);
     teardownCutawayRegionPicker(false);
+    teardownAnnotationRegionPicker(false);
     stopOverlayObserver();
     restoreHiddenNodes();
+    restoreScrollLocks();
     removeFreezeStyle();
 
     if (captureState.prepared) {
@@ -294,6 +320,7 @@
 
   function startManualRedactionPicker({ regions = [] } = {}) {
     teardownCutawayRegionPicker(false);
+    teardownAnnotationRegionPicker(false);
     teardownManualRedactionPicker(false);
 
     const overlay = document.createElement("div");
@@ -405,6 +432,7 @@
 
   function startCutawayRegionPicker({ region = null } = {}) {
     teardownManualRedactionPicker(false);
+    teardownAnnotationRegionPicker(false);
     teardownCutawayRegionPicker(false);
 
     const overlay = document.createElement("div");
@@ -489,6 +517,111 @@
       region: null,
       regions: []
     };
+  }
+
+  function startAnnotationRegionPicker({ region = null } = {}) {
+    teardownManualRedactionPicker(false);
+    teardownCutawayRegionPicker(false);
+    teardownAnnotationRegionPicker(false);
+
+    const overlay = document.createElement("div");
+    const surface = document.createElement("div");
+    const toolbar = document.createElement("div");
+    const title = document.createElement("strong");
+    const hint = document.createElement("span");
+    const count = document.createElement("span");
+    const clearButton = document.createElement("button");
+    const doneButton = document.createElement("button");
+    const cancelButton = document.createElement("button");
+
+    overlay.id = "lumen-annotation-picker";
+    surface.className = "lumen-annotation-surface";
+    toolbar.className = "lumen-annotation-toolbar";
+    title.textContent = "Lumen annotation callout";
+    hint.textContent = "Drag one box around the area the capture note should point to.";
+    count.className = "lumen-annotation-count";
+    clearButton.textContent = "Clear";
+    doneButton.textContent = "Done";
+    cancelButton.textContent = "Cancel";
+
+    for (const button of [clearButton, doneButton, cancelButton]) {
+      button.type = "button";
+    }
+
+    toolbar.append(title, hint, count, clearButton, doneButton, cancelButton);
+    overlay.append(surface, toolbar);
+    document.documentElement.appendChild(overlay);
+
+    const picker = {
+      overlay,
+      surface,
+      count,
+      region: normalizeAnnotationRegion(region),
+      draft: null,
+      start: null,
+      moved: false
+    };
+
+    captureState.annotationPicker = picker;
+    injectAnnotationPickerStyles();
+    renderAnnotationRegionBox();
+
+    surface.addEventListener("pointerdown", handleAnnotationPickerPointerDown);
+    surface.addEventListener("pointermove", handleAnnotationPickerPointerMove);
+    surface.addEventListener("pointerup", handleAnnotationPickerPointerUp);
+    surface.addEventListener("pointercancel", handleAnnotationPickerPointerCancel);
+
+    clearButton.addEventListener("click", () => {
+      picker.region = null;
+      renderAnnotationRegionBox();
+      persistAnnotationRegion();
+    });
+    doneButton.addEventListener("click", () => {
+      persistAnnotationRegion();
+      teardownAnnotationRegionPicker(false);
+    });
+    cancelButton.addEventListener("click", () => teardownAnnotationRegionPicker(false));
+
+    window.addEventListener("keydown", handleAnnotationPickerKeydown, true);
+
+    persistAnnotationRegion();
+    return buildAnnotationPickerPayload();
+  }
+
+  function clearAnnotationRegionPicker() {
+    if (captureState.annotationPicker) {
+      captureState.annotationPicker.region = null;
+      renderAnnotationRegionBox();
+    }
+
+    chrome.runtime.sendMessage({
+      type: "LUMEN_ANNOTATION_REGION_UPDATED",
+      payload: {
+        region: null,
+        context: getPageMetrics()
+      }
+    }).catch(() => {});
+
+    return {
+      region: null,
+      regions: []
+    };
+  }
+
+  function teardownAnnotationRegionPicker(persist = true) {
+    const picker = captureState.annotationPicker;
+
+    if (!picker) {
+      return;
+    }
+
+    if (persist) {
+      persistAnnotationRegion();
+    }
+
+    window.removeEventListener("keydown", handleAnnotationPickerKeydown, true);
+    picker.overlay.remove();
+    captureState.annotationPicker = null;
   }
 
   function teardownCutawayRegionPicker(persist = true) {
@@ -659,6 +792,82 @@
     picker.moved = false;
   }
 
+  function handleAnnotationPickerPointerDown(event) {
+    const picker = captureState.annotationPicker;
+
+    if (!picker || event.button !== 0) {
+      return;
+    }
+
+    event.preventDefault();
+    picker.surface.setPointerCapture(event.pointerId);
+    picker.start = {
+      x: event.clientX,
+      y: event.clientY,
+      pointerId: event.pointerId
+    };
+    picker.moved = false;
+    picker.draft = document.createElement("div");
+    picker.draft.className = "lumen-annotation-box lumen-annotation-box-draft";
+    picker.surface.appendChild(picker.draft);
+  }
+
+  function handleAnnotationPickerPointerMove(event) {
+    const picker = captureState.annotationPicker;
+
+    if (!picker?.start || !picker.draft || event.pointerId !== picker.start.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+    picker.moved = true;
+    drawManualPickerBox(picker.draft, normalizeViewportRect(picker.start.x, picker.start.y, event.clientX, event.clientY));
+  }
+
+  function handleAnnotationPickerPointerUp(event) {
+    const picker = captureState.annotationPicker;
+
+    if (!picker?.start || event.pointerId !== picker.start.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const rect = normalizeViewportRect(picker.start.x, picker.start.y, event.clientX, event.clientY);
+    picker.surface.releasePointerCapture(event.pointerId);
+    picker.draft?.remove();
+    picker.draft = null;
+    picker.start = null;
+
+    if (!picker.moved || rect.width < 8 || rect.height < 8) {
+      picker.moved = false;
+      return;
+    }
+
+    const region = buildAnnotationRegion(rect);
+
+    if (region) {
+      picker.region = region;
+      renderAnnotationRegionBox();
+      persistAnnotationRegion();
+    }
+
+    picker.moved = false;
+  }
+
+  function handleAnnotationPickerPointerCancel(event) {
+    const picker = captureState.annotationPicker;
+
+    if (!picker?.start || event.pointerId !== picker.start.pointerId) {
+      return;
+    }
+
+    picker.draft?.remove();
+    picker.draft = null;
+    picker.start = null;
+    picker.moved = false;
+  }
+
   function handleManualPickerKeydown(event) {
     const picker = captureState.manualPicker;
 
@@ -701,6 +910,27 @@
     }
   }
 
+  function handleAnnotationPickerKeydown(event) {
+    const picker = captureState.annotationPicker;
+
+    if (!picker) {
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      teardownAnnotationRegionPicker(false);
+      return;
+    }
+
+    if ((event.key === "Backspace" || event.key === "Delete") && picker.region) {
+      event.preventDefault();
+      picker.region = null;
+      renderAnnotationRegionBox();
+      persistAnnotationRegion();
+    }
+  }
+
   function buildManualRedactionRegion(viewportRect) {
     const context = detectScrollContext();
     const region = buildRedactionRegion(viewportRect, context, "manual");
@@ -722,6 +952,24 @@
   function buildCutawayRegion(viewportRect) {
     const context = detectScrollContext();
     const region = buildRedactionRegion(viewportRect, context, "cutaway");
+
+    if (!region) {
+      return null;
+    }
+
+    const anchor = buildManualRedactionAnchor(viewportRect, region, context);
+
+    return {
+      ...region,
+      id: createLocalId(),
+      sourceViewport: getManualRedactionSourceViewport(context),
+      ...(anchor ? { anchor } : {})
+    };
+  }
+
+  function buildAnnotationRegion(viewportRect) {
+    const context = detectScrollContext();
+    const region = buildRedactionRegion(viewportRect, context, "annotation");
 
     if (!region) {
       return null;
@@ -776,6 +1024,17 @@
         anchor: normalizeManualRedactionAnchor(region.anchor)
       } : {})
     };
+  }
+
+  function normalizeAnnotationRegion(region) {
+    const normalized = normalizeCutawayRegion(region);
+
+    return normalized
+      ? {
+          ...normalized,
+          kind: "annotation"
+        }
+      : null;
   }
 
   function resolveManualRedactions({ regions = [], context: recordContext = null } = {}) {
@@ -867,6 +1126,25 @@
       projectedCount: 0,
       directCount: 0,
       skippedCount: 1
+    };
+  }
+
+  function resolveAnnotationRegion({ region = null, context: recordContext = null } = {}) {
+    const resolved = resolveCutawayRegion({
+      region: normalizeAnnotationRegion(region),
+      context: recordContext
+    });
+    const annotationRegion = resolved.region
+      ? {
+          ...resolved.region,
+          kind: "annotation"
+        }
+      : null;
+
+    return {
+      ...resolved,
+      region: annotationRegion,
+      regions: annotationRegion ? [annotationRegion] : []
     };
   }
 
@@ -999,7 +1277,10 @@
   function getElementUnderManualRect(viewportRect) {
     const centerX = viewportRect.left + viewportRect.width / 2;
     const centerY = viewportRect.top + viewportRect.height / 2;
-    const overlay = captureState.manualPicker?.overlay || captureState.cutawayPicker?.overlay;
+    const overlay =
+      captureState.manualPicker?.overlay ||
+      captureState.cutawayPicker?.overlay ||
+      captureState.annotationPicker?.overlay;
     const previousVisibility = overlay?.style.visibility || "";
     const previousPointerEvents = overlay?.style.pointerEvents || "";
 
@@ -1015,6 +1296,7 @@
         !["html", "body"].includes(node.tagName.toLowerCase()) &&
         !node.closest("#lumen-redaction-picker") &&
         !node.closest("#lumen-cutaway-picker") &&
+        !node.closest("#lumen-annotation-picker") &&
         isElementScannable(node)
       ) || null;
     } finally {
@@ -1277,6 +1559,29 @@
     picker.count.textContent = picker.region ? "1 region" : "No region";
   }
 
+  function renderAnnotationRegionBox() {
+    const picker = captureState.annotationPicker;
+
+    if (!picker) {
+      return;
+    }
+
+    picker.surface.querySelectorAll(".lumen-annotation-box:not(.lumen-annotation-box-draft)").forEach((node) => node.remove());
+
+    if (picker.region) {
+      const rect = fromScrollCoordinates(picker.region, detectScrollContext());
+
+      if (rect) {
+        const box = document.createElement("div");
+        box.className = "lumen-annotation-box";
+        drawManualPickerBox(box, rect);
+        picker.surface.appendChild(box);
+      }
+    }
+
+    picker.count.textContent = picker.region ? "1 callout" : "No callout";
+  }
+
   function persistManualRedactions() {
     const picker = captureState.manualPicker;
 
@@ -1314,6 +1619,29 @@
 
   function buildCutawayPickerPayload() {
     const picker = captureState.cutawayPicker;
+
+    return {
+      region: picker ? picker.region : null,
+      regions: picker?.region ? [picker.region] : [],
+      context: getPageMetrics()
+    };
+  }
+
+  function persistAnnotationRegion() {
+    const picker = captureState.annotationPicker;
+
+    if (!picker) {
+      return;
+    }
+
+    chrome.runtime.sendMessage({
+      type: "LUMEN_ANNOTATION_REGION_UPDATED",
+      payload: buildAnnotationPickerPayload()
+    }).catch(() => {});
+  }
+
+  function buildAnnotationPickerPayload() {
+    const picker = captureState.annotationPicker;
 
     return {
       region: picker ? picker.region : null,
@@ -1526,6 +1854,97 @@
     document.documentElement.appendChild(style);
   }
 
+  function injectAnnotationPickerStyles() {
+    if (document.getElementById("lumen-annotation-picker-style")) {
+      return;
+    }
+
+    const style = document.createElement("style");
+    style.id = "lumen-annotation-picker-style";
+    style.textContent = `
+      #lumen-annotation-picker {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 2147483647 !important;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+        color: #fff7df !important;
+        cursor: crosshair !important;
+      }
+
+      #lumen-annotation-picker .lumen-annotation-surface {
+        position: absolute !important;
+        inset: 0 !important;
+        background: rgba(2, 8, 16, 0.24) !important;
+      }
+
+      #lumen-annotation-picker .lumen-annotation-toolbar {
+        position: absolute !important;
+        left: 18px !important;
+        right: 18px !important;
+        bottom: 18px !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        padding: 12px !important;
+        border: 1px solid rgba(255, 210, 130, 0.26) !important;
+        border-radius: 14px !important;
+        background: rgba(5, 11, 20, 0.92) !important;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.34) !important;
+        cursor: default !important;
+      }
+
+      #lumen-annotation-picker strong {
+        color: #ffd282 !important;
+        font-size: 13px !important;
+        letter-spacing: 0.08em !important;
+        text-transform: uppercase !important;
+        white-space: nowrap !important;
+      }
+
+      #lumen-annotation-picker span {
+        color: rgba(255, 247, 223, 0.74) !important;
+        font-size: 13px !important;
+      }
+
+      #lumen-annotation-picker .lumen-annotation-count {
+        margin-left: auto !important;
+        white-space: nowrap !important;
+      }
+
+      #lumen-annotation-picker button {
+        min-height: 34px !important;
+        padding: 0 12px !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 10px !important;
+        background: rgba(255, 255, 255, 0.06) !important;
+        color: #fff7df !important;
+        font: inherit !important;
+        cursor: pointer !important;
+      }
+
+      #lumen-annotation-picker button:last-child {
+        color: rgba(255, 247, 223, 0.72) !important;
+      }
+
+      #lumen-annotation-picker .lumen-annotation-box {
+        position: fixed !important;
+        border: 2px solid #ffd282 !important;
+        border-radius: 12px !important;
+        background: rgba(255, 210, 130, 0.14) !important;
+        box-shadow:
+          0 0 0 9999px rgba(2, 8, 16, 0.05),
+          inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+          0 0 26px rgba(255, 210, 130, 0.18) !important;
+        pointer-events: none !important;
+      }
+
+      #lumen-annotation-picker .lumen-annotation-box-draft {
+        border-style: dashed !important;
+      }
+    `;
+    document.documentElement.appendChild(style);
+  }
+
   function freezeAnimationsAndSmoothScroll() {
     removeFreezeStyle();
 
@@ -1617,6 +2036,54 @@
     captureState.hiddenNodes = [];
   }
 
+  function releaseScrollLocks() {
+    const metrics = getPageMetrics();
+
+    if (metrics.scrollMode !== "document" || metrics.pageHeight <= metrics.viewportHeight + 12) {
+      return;
+    }
+
+    for (const node of [document.documentElement, document.body].filter(Boolean)) {
+      const style = window.getComputedStyle(node);
+      const locked =
+        /(hidden|clip)/.test(style.overflowY) ||
+        (node === document.body && style.position === "fixed");
+
+      if (!locked || captureState.scrollLockNodes.some((entry) => entry.node === node)) {
+        continue;
+      }
+
+      captureState.scrollLockNodes.push({
+        node,
+        originalStyle: node.getAttribute("style")
+      });
+
+      node.style.setProperty("overflow-y", "auto", "important");
+      node.style.setProperty("overscroll-behavior", "auto", "important");
+
+      if (node === document.body && style.position === "fixed") {
+        node.style.setProperty("position", "static", "important");
+        node.style.setProperty("width", "auto", "important");
+      }
+    }
+  }
+
+  function restoreScrollLocks() {
+    for (const entry of captureState.scrollLockNodes) {
+      if (!entry.node.isConnected) {
+        continue;
+      }
+
+      if (entry.originalStyle === null) {
+        entry.node.removeAttribute("style");
+      } else {
+        entry.node.setAttribute("style", entry.originalStyle);
+      }
+    }
+
+    captureState.scrollLockNodes = [];
+  }
+
   function hideNode(node) {
     if (captureState.hiddenNodes.some((entry) => entry.node === node)) {
       return false;
@@ -1679,6 +2146,10 @@
 
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
+        if (mutation.type === "attributes" && mutation.target instanceof HTMLElement) {
+          scanNodeForAggressiveLayers(mutation.target);
+        }
+
         for (const addedNode of mutation.addedNodes) {
           if (!(addedNode instanceof HTMLElement)) {
             continue;
@@ -1690,6 +2161,8 @@
     });
 
     observer.observe(root, {
+      attributes: true,
+      attributeFilter: ["class", "style", "open", "aria-hidden", "aria-modal", "role"],
       childList: true,
       subtree: true
     });

@@ -118,19 +118,19 @@ async function handleRequest(request, response) {
     }
 
     if (segments[0] === "v1" && segments[1] === "captures") {
-      return handleCapturesRoute({ request, response, url, segments });
+      return await handleCapturesRoute({ request, response, url, segments });
     }
 
     if (segments[0] === "v1" && segments[1] === "stats") {
-      return handleStatsRoute({ request, response });
+      return await handleStatsRoute({ request, response });
     }
 
     if (segments[0] === "v1" && segments[1] === "watch-plans") {
-      return handleWatchPlansRoute({ request, response, url, segments });
+      return await handleWatchPlansRoute({ request, response, url, segments });
     }
 
     if (segments[0] === "v1" && segments[1] === "agent-jobs") {
-      return handleAgentJobsRoute({ request, response, url, segments });
+      return await handleAgentJobsRoute({ request, response, url, segments });
     }
 
     return respondJson(response, 404, {
@@ -259,6 +259,7 @@ async function handleWatchPlansRoute({ request, response, url, segments }) {
 
   if (request.method === "POST" && !planId) {
     const body = await readJsonBody(request);
+    requireExplicitOptIn(body, "Region watch");
     const watchPlan = normalizeWatchPlan(body, session.id);
 
     store.watchPlans = [
@@ -288,6 +289,9 @@ async function handleWatchPlansRoute({ request, response, url, segments }) {
 
   if (request.method === "PATCH") {
     const body = await readJsonBody(request);
+    if (body?.status === "active" && !store.watchPlans[existingIndex].explicitOptIn && !hasExplicitOptIn(body)) {
+      throw createHttpError(400, "Region watch requires explicit opt-in before it can be activated.");
+    }
     const updated = normalizeWatchPlanUpdate(store.watchPlans[existingIndex], body);
     store.watchPlans[existingIndex] = updated;
     await writeStore(store);
@@ -338,6 +342,8 @@ async function handleAgentJobsRoute({ request, response, url, segments }) {
 
   if (request.method === "POST" && !jobId) {
     const body = await readJsonBody(request);
+    requireExplicitOptIn(body, "Agent handoff");
+    requireReviewedPayload(body);
     const agentJob = normalizeAgentJob(body, session.id);
 
     store.agentJobs = [
@@ -545,6 +551,8 @@ function normalizeWatchPlan(body, sessionId) {
     region,
     schedule: normalizeSchedule(body.schedule),
     destination: normalizeText(body.destination, "local", 80),
+    explicitOptIn: true,
+    consentAcceptedAt: normalizeIsoDate(body.consentAcceptedAt || now),
     lastRunAt: body.lastRunAt ? normalizeIsoDate(body.lastRunAt) : "",
     createdAt: normalizeIsoDate(body.createdAt || now),
     updatedAt: normalizeIsoDate(body.updatedAt || now)
@@ -557,7 +565,10 @@ function normalizeStoredWatchPlan(plan) {
   }
 
   try {
-    return normalizeWatchPlan(plan, plan.sessionId);
+    return normalizeWatchPlan({
+      ...plan,
+      explicitOptIn: plan.explicitOptIn === true || plan.optIn === true || Boolean(plan.consentAcceptedAt)
+    }, plan.sessionId);
   } catch {
     return null;
   }
@@ -571,6 +582,12 @@ function normalizeWatchPlanUpdate(existing, body) {
     ...(body.region ? { region: normalizeRegion(body.region) || existing.region } : {}),
     ...(body.schedule ? { schedule: normalizeSchedule(body.schedule) } : {}),
     ...(typeof body.destination === "string" ? { destination: normalizeText(body.destination, existing.destination, 80) } : {}),
+    ...(hasExplicitOptIn(body)
+      ? {
+          explicitOptIn: true,
+          consentAcceptedAt: normalizeIsoDate(body.consentAcceptedAt || existing.consentAcceptedAt || new Date().toISOString())
+        }
+      : {}),
     ...(typeof body.lastRunAt === "string" ? { lastRunAt: normalizeIsoDate(body.lastRunAt) } : {}),
     updatedAt: new Date().toISOString()
   };
@@ -596,6 +613,9 @@ function normalizeAgentJob(body, sessionId) {
     captureId: normalizeText(body.captureId, "", 120),
     watchPlanId: normalizeText(body.watchPlanId, "", 120),
     destination: normalizeText(body.destination, "local-agent", 120),
+    explicitOptIn: true,
+    payloadReviewed: true,
+    consentAcceptedAt: normalizeIsoDate(body.consentAcceptedAt || now),
     payloadPreview: normalizePlainObject(body.payloadPreview, 40),
     result: body.result && typeof body.result === "object" ? normalizePlainObject(body.result, 60) : null,
     error: normalizeText(body.error, "", 240),
@@ -610,7 +630,11 @@ function normalizeStoredAgentJob(job) {
   }
 
   try {
-    return normalizeAgentJob(job, job.sessionId);
+    return normalizeAgentJob({
+      ...job,
+      explicitOptIn: job.explicitOptIn === true || job.optIn === true || Boolean(job.consentAcceptedAt),
+      payloadReviewed: job.payloadReviewed === true || job.reviewedPayload === true
+    }, job.sessionId);
   } catch {
     return null;
   }
@@ -778,6 +802,26 @@ function normalizePlan(value) {
 
 function normalizeStatus(value, allowed, fallback) {
   return allowed.includes(value) ? value : fallback;
+}
+
+function hasExplicitOptIn(body = {}) {
+  return body.explicitOptIn === true || body.optIn === true;
+}
+
+function requireExplicitOptIn(body, label) {
+  if (hasExplicitOptIn(body)) {
+    return;
+  }
+
+  throw createHttpError(400, `${label} requires explicit opt-in.`);
+}
+
+function requireReviewedPayload(body = {}) {
+  if (body.payloadReviewed === true || body.reviewedPayload === true) {
+    return;
+  }
+
+  throw createHttpError(400, "Agent handoff requires a reviewed payload before queuing.");
 }
 
 function normalizeInteger(value) {
