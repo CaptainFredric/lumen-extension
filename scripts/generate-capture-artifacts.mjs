@@ -14,17 +14,17 @@ const assetDir = path.join(repoRoot, "docs", "assets");
 const contentScriptPath = path.join(repoRoot, "content.js");
 
 const OUTPUT_FILES = {
-  desktop: "proof-run-desktop.png",
-  tablet: "proof-run-tablet.png",
-  mobile: "proof-run-mobile.png",
-  redacted: "proof-run-redacted.png",
-  signalsPanel: "proof-run-signals.png",
-  historyPanel: "proof-run-history.png",
-  socialCard: "proof-social-card.png",
-  bundleJson: "proof-run-bundle.json",
-  bundleArchive: "proof-run-bundle.zip",
-  signalsJson: "proof-run-signals.json",
-  summaryJson: "proof-run-summary.json"
+  desktop: "capture-run-desktop.png",
+  tablet: "capture-run-tablet.png",
+  mobile: "capture-run-mobile.png",
+  redacted: "capture-run-redacted.png",
+  signalsPanel: "capture-run-signals.png",
+  historyPanel: "capture-run-history.png",
+  socialCard: "lumen-social-card.png",
+  bundleJson: "capture-run-bundle.json",
+  bundleArchive: "capture-run-bundle.zip",
+  signalsJson: "capture-run-signals.json",
+  summaryJson: "capture-run-summary.json"
 };
 
 const DEVICE_PRESETS = [
@@ -48,9 +48,9 @@ const DEVICE_PRESETS = [
   }
 ];
 
-const PROOF_PAGE_URL = "http://proof.lumen.test/";
+const SAMPLE_PAGE_URL = "http://capture.lumen.test/";
 
-const proofPageHtml = String.raw`<!doctype html>
+const samplePageHtml = String.raw`<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -218,10 +218,10 @@ const proofPageHtml = String.raw`<!doctype html>
       }
 
       .hero-aside,
-      .proof-card,
+      .sample-card,
       .stats,
-      .proof-contact,
-      .proof-section,
+      .sample-contact,
+      .sample-section,
       .quote-strip,
       .cookie-banner,
       .chat-widget {
@@ -256,7 +256,7 @@ const proofPageHtml = String.raw`<!doctype html>
         font-weight: 400;
       }
 
-      .proof-card {
+      .sample-card {
         display: grid;
         gap: 12px;
         padding: 18px;
@@ -271,21 +271,21 @@ const proofPageHtml = String.raw`<!doctype html>
         color: var(--muted);
       }
 
-      .proof-grid {
+      .sample-grid {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
         gap: 24px;
         margin-top: 24px;
       }
 
-      .proof-section {
+      .sample-section {
         display: grid;
         gap: 18px;
         padding: 28px;
         border-radius: 28px;
       }
 
-      .proof-section h2 {
+      .sample-section h2 {
         font-size: 2.5rem;
         line-height: 0.97;
       }
@@ -305,7 +305,7 @@ const proofPageHtml = String.raw`<!doctype html>
         line-height: 1.5;
       }
 
-      .proof-contact {
+      .sample-contact {
         position: relative;
         display: grid;
         gap: 12px;
@@ -313,8 +313,8 @@ const proofPageHtml = String.raw`<!doctype html>
         border-radius: 24px;
       }
 
-      .proof-contact h3,
-      .proof-section h3 {
+      .sample-contact h3,
+      .sample-section h3 {
         margin: 0;
         font-size: 1.16rem;
       }
@@ -344,12 +344,12 @@ const proofPageHtml = String.raw`<!doctype html>
         gap: 24px;
       }
 
-      .proof-body {
+      .sample-body {
         display: grid;
         gap: 20px;
       }
 
-      .proof-columns {
+      .sample-columns {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 18px;
@@ -389,8 +389,8 @@ const proofPageHtml = String.raw`<!doctype html>
 
       @media (max-width: 960px) {
         .hero,
-        .proof-grid,
-        .proof-columns {
+        .sample-grid,
+        .sample-columns {
           grid-template-columns: 1fr;
         }
       }
@@ -456,7 +456,7 @@ const proofPageHtml = String.raw`<!doctype html>
             </div>
           </div>
 
-          <article class="proof-card">
+          <article class="sample-card">
             <p class="mini-label">This week</p>
             <ul class="mini-list">
               <li>Homepage refresh scheduled for Thursday</li>
@@ -467,17 +467,17 @@ const proofPageHtml = String.raw`<!doctype html>
         </aside>
       </section>
 
-      <section class="proof-grid">
-        <article class="proof-section" id="workflow">
+      <section class="sample-grid">
+        <article class="sample-section" id="workflow">
           <p class="mini-label">Review board</p>
           <h2>Track the page, the message, and the release state together.</h2>
-          <div class="proof-body">
+          <div class="sample-body">
             <p>
               Product teams can check the live page, share changes, and keep launch context visible
               without turning every release review into a screenshot hunt.
             </p>
 
-            <div class="proof-columns">
+            <div class="sample-columns">
               <div class="plan-row">
                 <span>Lead</span>
                 <strong>Danielle Chen</strong>
@@ -494,8 +494,8 @@ const proofPageHtml = String.raw`<!doctype html>
           </div>
         </article>
 
-        <aside class="proof-contact" id="contact">
-          <p class="mini-label">Proof data</p>
+        <aside class="sample-contact" id="contact">
+          <p class="mini-label">Sample data</p>
           <h3>Review handoff details</h3>
 
           <div class="contact-row">
@@ -560,7 +560,7 @@ async function main() {
       `${JSON.stringify(bundleManifest, null, 2)}\n`,
       "utf8"
     );
-    await createProofArchive();
+    await createSampleArchive();
 
     await renderSignalsPanel(browser, desktopRun.blueprint, path.join(assetDir, OUTPUT_FILES.signalsPanel));
 
@@ -570,7 +570,7 @@ async function main() {
 
     const summary = {
       generatedAt: new Date().toISOString(),
-      source: "Prototype proof page rendered with Lumen content-script cleanup, scan, and extraction logic.",
+      source: "Sample capture page rendered with Lumen content-script cleanup, scan, and extraction logic.",
       files: [
         OUTPUT_FILES.desktop,
         OUTPUT_FILES.tablet,
@@ -597,7 +597,7 @@ async function main() {
   }
 }
 
-async function createProofArchive() {
+async function createSampleArchive() {
   const outputPath = path.join(assetDir, OUTPUT_FILES.bundleArchive);
   const archiveInputs = [
     OUTPUT_FILES.desktop,
@@ -613,7 +613,7 @@ async function createProofArchive() {
       cwd: assetDir
     });
   } catch (error) {
-    console.warn("Skipping proof archive creation:", error.message);
+    console.warn("Skipping sample archive creation:", error.message);
   }
 }
 
@@ -640,7 +640,7 @@ async function buildPatchedContentScript() {
 }
 
 async function captureResponsiveArtifact(browser, contentScript, device, outputName) {
-  const page = await openProofPage(browser, contentScript, device);
+  const page = await openSamplePage(browser, contentScript, device);
 
   try {
     const prepareResult = await page.evaluate(async () =>
@@ -676,7 +676,7 @@ async function captureResponsiveArtifact(browser, contentScript, device, outputN
 }
 
 async function captureRedactionExample(browser, contentScript, regions, outputPath) {
-  const page = await openProofPage(browser, contentScript, DEVICE_PRESETS[0]);
+  const page = await openSamplePage(browser, contentScript, DEVICE_PRESETS[0]);
 
   try {
     await page.evaluate(async () =>
@@ -687,7 +687,7 @@ async function captureRedactionExample(browser, contentScript, regions, outputPa
     );
 
     await page.evaluate((redactionRegions) => {
-      const card = document.querySelector(".proof-contact");
+      const card = document.querySelector(".sample-contact");
 
       if (!(card instanceof HTMLElement)) {
         return;
@@ -703,7 +703,7 @@ async function captureRedactionExample(browser, contentScript, regions, outputPa
       }
 
       card.style.overflow = "hidden";
-      root.id = "lumen-proof-redactions";
+      root.id = "lumen-sample-redactions";
       root.style.position = "absolute";
       root.style.inset = "0";
       root.style.pointerEvents = "none";
@@ -767,10 +767,10 @@ async function captureRedactionExample(browser, contentScript, regions, outputPa
       }
     }, regions);
 
-    const contactCard = page.locator(".proof-contact");
+    const contactCard = page.locator(".sample-contact");
     await contactCard.scrollIntoViewIfNeeded();
     const cardBox = await page.evaluate(() => {
-      const card = document.querySelector(".proof-contact");
+      const card = document.querySelector(".sample-contact");
 
       if (!(card instanceof HTMLElement)) {
         return null;
@@ -787,7 +787,7 @@ async function captureRedactionExample(browser, contentScript, regions, outputPa
     });
 
     if (!cardBox) {
-      throw new Error("Proof contact card was not available for redaction capture.");
+      throw new Error("Sample contact card was not available for redaction capture.");
     }
 
     await page.screenshot({
@@ -1127,8 +1127,8 @@ async function renderSocialCard(browser, outputPath) {
               <article class="panel">
                 <img src="${desktopSrc}" alt="" />
                 <div>
-                  <h2>Current output</h2>
-                  <small>Real cleaned capture from the proof run</small>
+                  <h2>Clean output</h2>
+                  <small>Real cleaned capture from the sample run</small>
                 </div>
               </article>
 
@@ -1174,7 +1174,7 @@ function buildHistoryItem(desktopRun) {
     title: desktopRun.blueprint.page?.title || "Untitled capture",
     exportPreset: "raw",
     metaLine: [
-      "proof.lumen.test",
+      "capture.lumen.test",
       timestamp,
       "3 views",
       "4 files",
@@ -1187,12 +1187,12 @@ function buildHistoryItem(desktopRun) {
 function buildBundleManifest(desktopRun) {
   return {
     schemaVersion: 1,
-    generator: "Lumen proof asset script",
+    generator: "Lumen sample asset script",
     capturedAt: new Date().toISOString(),
     page: {
       title: desktopRun.blueprint.page?.title || "Untitled capture",
-      url: PROOF_PAGE_URL,
-      host: "proof.lumen.test"
+      url: SAMPLE_PAGE_URL,
+      host: "capture.lumen.test"
     },
     capture: {
       devicePreset: "responsive",
@@ -1229,7 +1229,7 @@ function buildRedactionBreakdown(regions = []) {
   });
 }
 
-async function openProofPage(browser, contentScript, device) {
+async function openSamplePage(browser, contentScript, device) {
   const page = await browser.newPage({
     viewport: {
       width: device.width,
@@ -1237,15 +1237,15 @@ async function openProofPage(browser, contentScript, device) {
     }
   });
 
-  await page.route(PROOF_PAGE_URL, (route) =>
+  await page.route(SAMPLE_PAGE_URL, (route) =>
     route.fulfill({
       status: 200,
       contentType: "text/html",
-      body: proofPageHtml
+      body: samplePageHtml
     })
   );
 
-  await page.goto(PROOF_PAGE_URL, { waitUntil: "domcontentloaded" });
+  await page.goto(SAMPLE_PAGE_URL, { waitUntil: "domcontentloaded" });
   await page.waitForLoadState("networkidle").catch(() => null);
   await page.waitForTimeout(400);
   await page.addScriptTag({ content: contentScript });

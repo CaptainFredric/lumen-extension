@@ -16,24 +16,24 @@
           <div class="brand-mark">L</div>
           <div class="brand-copy">
             <p class="eyebrow">Lumen</p>
-            <p class="sub-eyebrow">Clean Capture Workflow</p>
+            <p class="sub-eyebrow">Capture workspace</p>
           </div>
           <span class="pill">MV3</span>
         </div>
 
-        <h1>Clean capture for review work.</h1>
+        <h1>Clean captures from busy pages.</h1>
         <p class="hero-copy">
-          Full-page capture, page cleanup, responsive views, and page signals in one control
-          surface for design review, QA, and product work.
+          Page cleanup, redaction, responsive views, timed captures, and a working shelf
+          for design, QA, and product review.
         </p>
 
         <div class="hero-ribbon">
           <span>Sticky cleanup</span>
-          <span>Late overlay watch</span>
+          <span>Timed capture</span>
           <span>Tail remeasure</span>
           <span>Retina stitch</span>
           <span>Responsive set</span>
-          <span>Bundle manifest</span>
+          <span>Page context</span>
           <span>Page signals</span>
           <span>Local history</span>
         </div>
@@ -57,43 +57,63 @@
             aria-expanded="false"
             aria-controls="holdMenu"
           >
-            <span>
-              <strong>Capture page</strong>
-              <small>Full page capture. Hold for actions.</small>
+            <span class="action-copy">
+              <span class="action-icon action-icon-capture" aria-hidden="true"></span>
+              <span>
+                <strong>Capture page</strong>
+                <small>Capture now. Hold for tools.</small>
+              </span>
             </span>
             <span id="holdProgress" class="hold-progress" aria-hidden="true"></span>
           </button>
 
           <button id="analyzeButton" class="secondary-action" type="button">
-            <span>Analyze Page</span>
-            <small>Signals only</small>
+            <span class="action-copy">
+              <span class="action-icon action-icon-analyze" aria-hidden="true"></span>
+              <span>
+                <span class="action-label">Analyze page</span>
+                <small>Signals only</small>
+              </span>
+            </span>
           </button>
+        </div>
+
+        <div class="capture-pipeline" aria-label="Capture pipeline">
+          <span><i class="pipeline-icon pipeline-icon-clean" aria-hidden="true"></i>Clean</span>
+          <span><i class="pipeline-icon pipeline-icon-scan" aria-hidden="true"></i>Scan</span>
+          <span><i class="pipeline-icon pipeline-icon-stitch" aria-hidden="true"></i>Stitch</span>
+          <span><i class="pipeline-icon pipeline-icon-save" aria-hidden="true"></i>Save</span>
+          <span><i class="pipeline-icon pipeline-icon-route" aria-hidden="true"></i>Route</span>
         </div>
 
         <div id="holdMenu" class="hold-menu" role="menu" aria-label="Quick capture actions" aria-hidden="true">
           <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="responsive">
-            <span>Responsive set</span>
-            <small>Desktop, tablet, and mobile</small>
+            <i class="action-icon action-icon-responsive" aria-hidden="true"></i>
+            <span><strong>Responsive set</strong><small>Desktop, tablet, and mobile</small></span>
           </button>
           <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="redact">
-            <span>Scan redactions</span>
-            <small>Preview sensitive regions</small>
+            <i class="action-icon action-icon-redact" aria-hidden="true"></i>
+            <span><strong>Scan redactions</strong><small>Preview sensitive regions</small></span>
           </button>
           <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="mark">
-            <span>Mark boxes</span>
-            <small>Open manual picker</small>
+            <i class="action-icon action-icon-box" aria-hidden="true"></i>
+            <span><strong>Mark boxes</strong><small>Open manual picker</small></span>
           </button>
           <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="cutaway">
-            <span>Mark cutaway</span>
-            <small>Save a reusable region</small>
+            <i class="action-icon action-icon-cutaway" aria-hidden="true"></i>
+            <span><strong>Mark cutaway</strong><small>Save a reusable region</small></span>
+          </button>
+          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="lasso">
+            <i class="action-icon action-icon-lasso" aria-hidden="true"></i>
+            <span><strong>Lasso area</strong><small>Draw an irregular region</small></span>
           </button>
           <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="annotate">
-            <span>Mark callout</span>
-            <small>Draw one export annotation</small>
+            <i class="action-icon action-icon-callout" aria-hidden="true"></i>
+            <span><strong>Mark callout</strong><small>Draw one capture note</small></span>
           </button>
           <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="analyze">
-            <span>Extract signals</span>
-            <small>Palette, type, layout</small>
+            <i class="action-icon action-icon-signals" aria-hidden="true"></i>
+            <span><strong>Extract signals</strong><small>Palette, type, layout</small></span>
           </button>
         </div>
       </section>
@@ -102,7 +122,7 @@
         <div class="panel-head">
           <div>
             <p class="section-label">Capture Settings</p>
-            <h2>Defaults for the next run</h2>
+            <h2>Capture setup</h2>
           </div>
           <span class="tiny-note">Downloads to Lumen/</span>
         </div>
@@ -110,7 +130,7 @@
         <label class="toggle-row">
           <span>
             <strong>Remove sticky headers</strong>
-            <small>Hide fixed, sticky, and high-layer UI before capture, then recheck for late overlays while the page scrolls.</small>
+            <small>Hide sticky bars and floating overlays before capture, then restore the page.</small>
           </span>
           <input id="removeStickyHeaders" type="checkbox" />
           <span class="toggle-shell"><span class="toggle-knob"></span></span>
@@ -119,7 +139,7 @@
         <label class="toggle-row">
           <span>
             <strong>Force lazy load</strong>
-            <small>Run a fast pre-flight scroll, nudge lazy assets toward eager loading, and give visible media a short settle window.</small>
+            <small>Pre-scroll the page so images and embedded media have time to load.</small>
           </span>
           <input id="forceLazyLoad" type="checkbox" />
           <span class="toggle-shell"><span class="toggle-knob"></span></span>
@@ -128,7 +148,7 @@
         <label class="toggle-row">
           <span>
             <strong>Auto-redact sensitive data</strong>
-            <small>Scan for emails, phone numbers, tokens, and filled fields before export, then sanitize the final image.</small>
+            <small>Find common private details and hide them before files are saved.</small>
           </span>
           <input id="autoRedact" type="checkbox" />
           <span class="toggle-shell"><span class="toggle-knob"></span></span>
@@ -137,7 +157,7 @@
         <div class="manual-redaction-panel">
           <div class="manual-redaction-copy">
             <strong>Manual redaction boxes</strong>
-            <small>Mark areas the scanner cannot infer. Boxes are anchored to the source element and can project into responsive captures when that element still resolves.</small>
+            <small>Hide custom areas in saved captures. Boxes stay anchored to the page when possible.</small>
           </div>
           <div class="manual-redaction-actions">
             <span id="manualRedactionCount" class="tiny-note">0 boxes</span>
@@ -145,27 +165,60 @@
             <button id="startRedactionPickerButton" class="mini-action" type="button">Mark boxes</button>
             <button id="clearManualRedactionsButton" class="mini-action ghost-mini-action" type="button">Clear</button>
           </div>
-          <p id="redactionPreviewSummary" class="redaction-preview-summary">Scan the current page before export to see detected sensitive regions.</p>
+          <p id="redactionPreviewSummary" class="redaction-preview-summary">Scan this page to preview detected private details.</p>
         </div>
 
         <div class="cutaway-panel">
           <div class="cutaway-copy">
-            <strong>Cutaway region</strong>
-            <small>Select one reusable page area. Captures export focused crops when the region resolves. Watch automation remains opt-in future work.</small>
+            <strong>Focused crop</strong>
+            <small>Select one reusable page area. Full captures still save normally.</small>
           </div>
           <div class="cutaway-actions">
-            <span id="cutawayRegionStatus" class="tiny-note">No region</span>
+            <span id="cutawayRegionStatus" class="tiny-note">Choose region</span>
             <button id="startCutawayPickerButton" class="mini-action" type="button">Mark cutaway</button>
+            <button id="startLassoPickerButton" class="mini-action ghost-mini-action" type="button">Lasso area</button>
             <button id="clearCutawayButton" class="mini-action ghost-mini-action" type="button">Clear</button>
-            <button id="explainCutawayPlanButton" class="mini-action ghost-mini-action" type="button">Plan</button>
+            <button id="explainCutawayPlanButton" class="mini-action ghost-mini-action" type="button">Details</button>
           </div>
-          <p id="cutawaySummary" class="cutaway-summary">A marked region is stored locally for this URL. The next capture can save cutaway PNGs beside the full-page artifact.</p>
+          <p id="cutawaySummary" class="cutaway-summary">The selected area is saved beside full-page captures when it is found.</p>
+        </div>
+
+        <div class="watch-panel">
+          <div class="watch-copy">
+            <strong>Timed capture</strong>
+            <small>Repeat a focused region on a schedule. Each run lands in the capture shelf.</small>
+          </div>
+          <div class="watch-actions">
+            <label class="watch-field" for="watchIntervalSelect">
+              <span>Cadence</span>
+              <select id="watchIntervalSelect">
+                <option value="15">Every 15 min</option>
+                <option value="60" selected>Hourly</option>
+                <option value="360">Every 6 hours</option>
+                <option value="1440">Daily</option>
+              </select>
+            </label>
+            <button id="saveWatchPlanButton" class="mini-action" type="button">Save timed capture</button>
+            <button id="runWatchPlanNowButton" class="mini-action ghost-mini-action" type="button">Run now</button>
+          </div>
+          <div id="watchPlanCard" class="watch-plan-card is-hidden" aria-live="polite">
+            <div class="watch-plan-card-copy">
+              <span id="watchPlanStatus" class="tiny-note">Timed capture</span>
+              <strong id="watchPlanTitle">Ready for setup</strong>
+              <small id="watchPlanMeta">Save a focused region to start timed captures.</small>
+            </div>
+            <div class="watch-plan-controls">
+              <button id="toggleWatchPlanButton" class="mini-action ghost-mini-action" type="button">Pause</button>
+              <button id="deleteWatchPlanButton" class="mini-action ghost-mini-action" type="button">Clear</button>
+            </div>
+          </div>
+          <p id="watchPlanSummary" class="cutaway-summary">Mark a region, then save it as a timed capture.</p>
         </div>
 
         <label class="toggle-row">
           <span>
-            <strong>Save bundle manifest</strong>
-            <small>Write a JSON sidecar with page metadata, responsive views, redaction counts, and extracted signals beside the capture files.</small>
+            <strong>Save page context</strong>
+            <small>Save a small JSON file with title, URL, selected views, marked areas, and page signals.</small>
           </span>
           <input id="exportManifest" type="checkbox" />
           <span class="toggle-shell"><span class="toggle-knob"></span></span>
@@ -175,7 +228,7 @@
           <label class="toggle-row toggle-row-tight">
             <span>
               <strong>Add capture note</strong>
-              <small>Render one anchored review note into the exported image so the capture can carry context with it.</small>
+              <small>Render one anchored note into the saved image so the capture can carry context with it.</small>
             </span>
             <input id="annotationEnabled" type="checkbox" />
             <span class="toggle-shell"><span class="toggle-knob"></span></span>
@@ -194,10 +247,10 @@
             <div class="annotation-region-panel">
               <div>
                 <strong>Callout region</strong>
-                <small>Draw one area to highlight in the exported image. The note text becomes the callout label.</small>
+                <small>Draw one area to highlight in the saved image. The note text becomes the callout label.</small>
               </div>
               <div class="annotation-region-actions">
-                <span id="annotationRegionStatus" class="tiny-note">No callout</span>
+                <span id="annotationRegionStatus" class="tiny-note">Choose target</span>
                 <button id="startAnnotationPickerButton" class="mini-action" type="button">Mark callout</button>
                 <button id="clearAnnotationButton" class="mini-action ghost-mini-action" type="button">Clear</button>
               </div>
@@ -219,7 +272,7 @@
         <div class="device-block">
           <div class="device-copy">
             <strong>Capture device</strong>
-            <small>Desktop uses the active tab. Tablet and Mobile open temporary viewports. Responsive captures the full set.</small>
+            <small>Desktop uses this tab. Tablet and Mobile open temporary viewports. Set captures all three.</small>
           </div>
           <div class="segmented-control segmented-control-device" id="devicePreset">
             <button type="button" class="segment is-active" data-device="desktop">Desktop</button>
@@ -231,8 +284,8 @@
 
         <div class="device-block">
           <div class="device-copy">
-            <strong>Export mode</strong>
-            <small>Raw keeps the original page. Browser and Phone turn the capture into a poster export.</small>
+            <strong>Presentation</strong>
+            <small>Raw keeps the page as captured. Browser and Phone add a simple frame for sharing.</small>
           </div>
           <div class="segmented-control segmented-control-wide" id="exportPreset">
             <button type="button" class="segment is-active" data-export="raw">Raw</button>
@@ -240,46 +293,59 @@
             <button type="button" class="segment" data-export="phone">Phone</button>
           </div>
         </div>
+
+        <div class="device-block">
+          <div class="device-copy">
+            <strong>Long page output</strong>
+            <small>Auto keeps one image when it stays readable. Tiles split tall pages. Print sheet adds a browser-printable file.</small>
+          </div>
+          <div class="segmented-control segmented-control-wide" id="longPageMode">
+            <button type="button" class="segment is-active" data-long-page="auto">Auto</button>
+            <button type="button" class="segment" data-long-page="tiles">Tiles</button>
+            <button type="button" class="segment" data-long-page="print">Print sheet</button>
+          </div>
+        </div>
       </section>
 
       <section id="exportReviewPanel" class="panel export-review-panel is-hidden" aria-live="polite">
         <div class="panel-head compact">
           <div>
-            <p class="section-label">Pre-export Review</p>
-            <h2>Check redactions and cutaways before saving.</h2>
+            <p class="section-label">Save check</p>
+            <h2>Check what will be saved.</h2>
           </div>
-          <span id="exportReviewBadge" class="status-badge">Review</span>
+          <span id="exportReviewBadge" class="status-badge">Ready</span>
         </div>
 
         <p id="exportReviewSummary" class="review-summary">
-          Lumen will check the requested view set before export.
+          Views, marked areas, and long-page output are checked before saving.
         </p>
 
-        <div class="review-metric-grid" aria-label="Pre-export review metrics">
+        <div class="review-metric-grid" aria-label="Save check metrics">
           <div class="review-metric">
             <span>Views</span>
             <strong id="reviewViewCount">0</strong>
           </div>
           <div class="review-metric">
-            <span>Auto</span>
+            <span>Detected</span>
             <strong id="reviewAutoCount">0</strong>
           </div>
           <div class="review-metric">
-            <span>Manual</span>
+            <span>Marked</span>
             <strong id="reviewManualCount">0</strong>
           </div>
           <div class="review-metric">
-            <span>Cutaway</span>
+            <span>Crop</span>
             <strong id="reviewCutawayCount">0</strong>
           </div>
         </div>
 
+        <div id="exportReviewOutputPlan" class="review-output-plan" aria-label="Output plan"></div>
         <div id="exportReviewVariants" class="review-variant-list"></div>
         <div id="exportReviewWarnings" class="review-warning-list"></div>
 
         <div class="review-actions">
           <button id="exportReviewCancelButton" class="mini-action ghost-mini-action" type="button">Back to settings</button>
-          <button id="exportReviewConfirmButton" class="mini-action review-confirm-action" type="button">Run export</button>
+          <button id="exportReviewConfirmButton" class="mini-action review-confirm-action" type="button">Save capture</button>
         </div>
       </section>
 
@@ -304,7 +370,7 @@
             <strong id="runViewSummary">Desktop</strong>
           </div>
           <div class="run-summary-item">
-            <span>Export</span>
+            <span>Output</span>
             <strong id="runExportSummary">Raw</strong>
           </div>
           <div class="run-summary-item">
@@ -312,8 +378,8 @@
             <strong id="runSafetySummary">Cleanup</strong>
           </div>
           <div class="run-summary-item">
-            <span>Sidecar</span>
-            <strong id="runManifestSummary">Manifest</strong>
+            <span>Context</span>
+            <strong id="runManifestSummary">Page context</strong>
           </div>
         </div>
 
@@ -341,7 +407,7 @@
           <div class="timeline-step" data-stage-step="stitch">
             <span class="step-dot"></span>
             <span>Stitch</span>
-            <small>Compose final artifact</small>
+            <small>Compose final files</small>
           </div>
           <div class="timeline-step" data-stage-step="save">
             <span class="step-dot"></span>
@@ -356,7 +422,7 @@
             <strong id="statusLogCount">0</strong>
           </div>
           <div id="statusLog" class="status-log">
-            <p>No active run yet.</p>
+            <p>Run status appears here.</p>
           </div>
         </div>
       </section>
@@ -367,12 +433,12 @@
             <p class="section-label">Inspector</p>
             <h2>Latest page signals</h2>
           </div>
-          <span id="blueprintTimestamp" class="tiny-note">No analysis yet</span>
+          <span id="blueprintTimestamp" class="tiny-note">Awaiting analysis</span>
         </div>
 
         <div id="blueprintEmpty" class="empty-state">
-          Run analysis or capture a page. Lumen will extract palette, fonts, layout,
-          headline, CTA, and navigation signals here.
+          Analyze or capture a page to see palette, fonts, layout, headline, CTA,
+          and navigation signals here.
         </div>
 
         <div id="blueprintContent" class="blueprint-shell is-hidden">
@@ -416,17 +482,17 @@
             </div>
             <div class="signal-block">
               <p class="field-label">Hero line</p>
-              <p id="blueprintHeadline" class="signal-copy">No hero headline detected.</p>
+              <p id="blueprintHeadline" class="signal-copy">Awaiting headline.</p>
             </div>
             <div class="signal-block">
               <p class="field-label">Primary CTA</p>
-              <p id="blueprintCta" class="signal-copy">No primary CTA detected.</p>
+              <p id="blueprintCta" class="signal-copy">Awaiting CTA.</p>
             </div>
           </div>
 
           <div class="signal-block">
             <p class="field-label">Navigation</p>
-            <p id="blueprintNav" class="signal-copy">No visible navigation labels detected.</p>
+            <p id="blueprintNav" class="signal-copy">Awaiting navigation.</p>
           </div>
 
           <div>
@@ -444,15 +510,15 @@
       <section class="panel studio-panel">
         <div class="panel-head">
           <div>
-            <p class="section-label">Prototype state</p>
-            <h2>Session and history state</h2>
+            <p class="section-label">Workspace</p>
+            <h2>Session and routing</h2>
           </div>
-          <span id="backendBadge" class="tiny-note">Local-first</span>
+          <span id="backendBadge" class="tiny-note">Local</span>
         </div>
 
         <div class="feature-row">
           <button class="feature-chip" data-pro-feature="beautify" type="button">
-            Browser export
+            Browser frame
           </button>
           <button class="feature-chip" data-pro-feature="autoRedact" type="button">
             Auto-redact
@@ -465,15 +531,15 @@
         <div class="auth-shell">
           <div class="auth-copy">
             <p class="section-label">Account</p>
-            <h3 id="accountTitle">Free local session</h3>
+            <h3 id="accountTitle">Local session</h3>
             <p id="accountDescription">
-              Start Demo Pro to test advanced local tools and history sync when a backend is reachable.
+              Enable advanced tools, routing, and history controls when the local service is available.
             </p>
           </div>
 
           <div class="account-meta">
             <div class="metric-item compact-metric">
-              <span>Plan</span>
+              <span>Mode</span>
               <strong id="accountPlan">Free</strong>
             </div>
             <div class="metric-item compact-metric">
@@ -484,10 +550,10 @@
 
           <div class="auth-actions">
             <button id="signInButton" class="secondary-button" type="button">
-              Start Demo Pro
+              Enable advanced tools
             </button>
             <button id="billingButton" class="ghost-button" type="button">
-              Billing hook
+              Access details
             </button>
             <button id="signOutButton" class="ghost-button is-hidden" type="button">
               Sign out
@@ -495,11 +561,43 @@
           </div>
         </div>
 
+        <div class="readiness-shell">
+          <div class="readiness-copy">
+            <p class="section-label">Workspace meter</p>
+            <strong>Capture readiness</strong>
+            <small id="destinationSummary">Local history is ready. Connected destinations appear after advanced tools are enabled.</small>
+          </div>
+
+          <div id="productReadinessList" class="readiness-list" aria-label="Product readiness meters">
+            <div class="readiness-item">
+              <span>Capture core</span>
+              <strong>Local</strong>
+              <i><b style="width: 66%"></b></i>
+            </div>
+            <div class="readiness-item">
+              <span>Save flow</span>
+              <strong>Ready</strong>
+              <i><b style="width: 58%"></b></i>
+            </div>
+            <div class="readiness-item">
+              <span>Automation</span>
+              <strong>Queued</strong>
+              <i><b style="width: 34%"></b></i>
+            </div>
+          </div>
+
+          <div class="routing-actions">
+            <button id="queueLatestDeliveryButton" class="mini-action" type="button">
+              Queue latest capture
+            </button>
+          </div>
+        </div>
+
         <div class="data-controls-shell">
           <div class="data-controls-copy">
             <p class="section-label">Data controls</p>
-            <strong>Retention and deletion</strong>
-            <small id="dataControlsSummary">Backend data controls are available after a demo session starts.</small>
+            <strong>Session data</strong>
+            <small id="dataControlsSummary">Retention and deletion controls appear after advanced tools start.</small>
           </div>
 
           <label class="data-control-field" for="retentionSelect">
@@ -517,29 +615,45 @@
           <label class="data-sync-row">
             <span>
               <strong>Allow cloud sync</strong>
-              <small>Locked until a plan includes real cloud destinations.</small>
+              <small>Available when a connected destination is configured.</small>
             </span>
             <input id="cloudSyncEnabled" type="checkbox" />
             <span class="toggle-shell"><span class="toggle-knob"></span></span>
           </label>
 
           <button id="deleteBackendDataButton" class="danger-button" type="button">
-            Delete backend data
+            Delete session data
           </button>
         </div>
+      </section>
+
+      <section class="panel capture-shelf-panel">
+        <div class="panel-head">
+          <div>
+            <p class="section-label">Capture shelf</p>
+            <h2>Recent captures and timed runs</h2>
+          </div>
+          <span id="captureShelfCount" class="tiny-note">0 items</span>
+        </div>
+
+        <div id="captureShelfEmpty" class="empty-state">
+          Captures and timed runs appear here for quick reuse.
+        </div>
+
+        <div id="captureShelfGrid" class="capture-shelf-grid is-hidden"></div>
       </section>
 
       <section class="panel history-panel">
         <div class="panel-head">
           <div>
             <p class="section-label">Archive</p>
-            <h2>Recent captures</h2>
+            <h2>Capture history</h2>
           </div>
           <span id="historyCount" class="tiny-note">0 items</span>
         </div>
 
         <div id="historyEmpty" class="empty-state">
-          Captures will appear here with export mode, files, and blueprint summary.
+          Saved captures appear here with files, output mode, and page summary.
         </div>
 
         <div id="historyList" class="history-list is-hidden"></div>

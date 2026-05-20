@@ -1,6 +1,7 @@
 import {
   LUMEN_CONFIG,
   STORAGE_KEYS,
+  buildOriginPattern,
   getDefaultSettings,
   getCaptureVariants,
   isRestrictedCaptureUrl,
@@ -10,10 +11,17 @@ import {
   bootstrapAppState,
   clearSession,
   deleteRemoteAccountData,
+  deleteRemoteWatchPlan,
+  queueRemoteDelivery,
   persistCaptureRecord,
+  readProductReadiness,
+  readRemoteDestinations,
   readRemoteDataControls,
   readLocalState,
+  persistWatchRunRecord,
+  saveRemoteWatchPlan,
   startDemoSession,
+  updateRemoteWatchPlan,
   updateRemoteDataControls
 } from "./lumen-backend.js";
 
@@ -23,9 +31,12 @@ const CAPTURE_PROGRESS_EVENT = "LUMEN_CAPTURE_PROGRESS";
 const BLUEPRINT_UPDATE_EVENT = "LUMEN_BLUEPRINT_UPDATED";
 const SESSION_UPDATE_EVENT = "LUMEN_SESSION_UPDATED";
 const HISTORY_UPDATE_EVENT = "LUMEN_HISTORY_UPDATED";
+const WATCH_PLAN_UPDATE_EVENT = "LUMEN_WATCH_PLANS_UPDATED";
+const WATCH_RUN_UPDATE_EVENT = "LUMEN_WATCH_RUNS_UPDATED";
 const MANUAL_REDACTIONS_UPDATE_EVENT = "LUMEN_MANUAL_REDACTIONS_UPDATED";
 const CUTAWAY_REGION_UPDATE_EVENT = "LUMEN_CUTAWAY_REGION_UPDATED";
 const ANNOTATION_REGION_UPDATE_EVENT = "LUMEN_ANNOTATION_REGION_UPDATED";
+const WATCH_ALARM_PREFIX = "lumen.watch.";
 
 let captureInFlight = false;
 let analyzeInFlight = false;
@@ -34,7 +45,12 @@ let offscreenCreationPromise = null;
 chrome.runtime.onInstalled.addListener(async () => {
   const [syncState, localState] = await Promise.all([
     chrome.storage.sync.get(STORAGE_KEYS.settings),
-    chrome.storage.local.get([STORAGE_KEYS.session, STORAGE_KEYS.captureHistory])
+    chrome.storage.local.get([
+      STORAGE_KEYS.session,
+      STORAGE_KEYS.captureHistory,
+      STORAGE_KEYS.watchPlans,
+      STORAGE_KEYS.watchRuns
+    ])
   ]);
 
   if (!syncState[STORAGE_KEYS.settings]) {
@@ -43,7 +59,12 @@ chrome.runtime.onInstalled.addListener(async () => {
     });
   }
 
-  if (!localState[STORAGE_KEYS.session] || !Array.isArray(localState[STORAGE_KEYS.captureHistory])) {
+  if (
+    !localState[STORAGE_KEYS.session] ||
+    !Array.isArray(localState[STORAGE_KEYS.captureHistory]) ||
+    !Array.isArray(localState[STORAGE_KEYS.watchPlans]) ||
+    !Array.isArray(localState[STORAGE_KEYS.watchRuns])
+  ) {
     const snapshot = await readLocalState();
     const localPatch = {};
 
@@ -55,9 +76,31 @@ chrome.runtime.onInstalled.addListener(async () => {
       localPatch[STORAGE_KEYS.captureHistory] = snapshot.captureHistory;
     }
 
+    if (!Array.isArray(localState[STORAGE_KEYS.watchPlans])) {
+      localPatch[STORAGE_KEYS.watchPlans] = snapshot.watchPlans || [];
+    }
+
+    if (!Array.isArray(localState[STORAGE_KEYS.watchRuns])) {
+      localPatch[STORAGE_KEYS.watchRuns] = snapshot.watchRuns || [];
+    }
+
     await chrome.storage.local.set(localPatch);
   }
+
+  await restoreWatchAlarms();
 });
+
+if (chrome.alarms?.onAlarm) {
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (!alarm?.name?.startsWith(WATCH_ALARM_PREFIX)) {
+      return;
+    }
+
+    handleWatchAlarm(alarm).catch((error) => {
+      console.debug("Lumen watch alarm skipped:", error);
+    });
+  });
+}
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "LUMEN_BOOTSTRAP_APP") {
@@ -179,7 +222,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message?.type === "LUMEN_START_CUTAWAY_PICKER") {
-    runCutawayRegionPicker()
+    runCutawayRegionPicker(message.payload || {})
       .then((result) => sendResponse({ ok: true, ...result }))
       .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
 
@@ -274,7 +317,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({
           ok: true,
           session,
-          captureHistory: localState.captureHistory
+          captureHistory: localState.captureHistory,
+          watchRuns: localState.watchRuns || []
         });
       })
       .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
@@ -296,6 +340,132 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "LUMEN_GET_DATA_CONTROLS") {
     readRemoteDataControls()
       .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_GET_PRODUCT_READINESS") {
+    readProductReadiness()
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_GET_DESTINATIONS") {
+    readRemoteDestinations()
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_QUEUE_DELIVERY") {
+    queueRemoteDelivery(message.payload || {})
+      .then((result) => sendResponse(result.ok ? result : {
+        ok: false,
+        error: createFriendlyError("Delivery Unavailable", result.error)
+      }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_SAVE_WATCH_PLAN") {
+    saveRemoteWatchPlan(message.payload || {})
+      .then(async (result) => {
+        if (!result.ok) {
+          sendResponse({
+            ok: false,
+            error: createFriendlyError("Timed Capture Unavailable", result.error)
+          });
+          return;
+        }
+
+        await registerWatchPlanAlarm(result.watchPlan);
+        const localState = await readLocalState();
+        broadcastWatchPlans(localState.watchPlans || []);
+        sendResponse({
+          ...result,
+          watchPlans: localState.watchPlans || [],
+          watchRuns: localState.watchRuns || []
+        });
+      })
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_UPDATE_WATCH_PLAN") {
+    const watchPlanId = message.payload?.watchPlanId || "";
+    const patch = message.payload?.patch || {};
+    updateRemoteWatchPlan(watchPlanId, patch)
+      .then(async (result) => {
+        if (!result.ok) {
+          sendResponse({
+            ok: false,
+            error: createFriendlyError("Timed Capture Unavailable", result.error)
+          });
+          return;
+        }
+
+        await registerWatchPlanAlarm(result.watchPlan);
+        const localState = await readLocalState();
+        broadcastWatchPlans(localState.watchPlans || []);
+        sendResponse({
+          ...result,
+          watchPlans: localState.watchPlans || [],
+          watchRuns: localState.watchRuns || []
+        });
+      })
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_DELETE_WATCH_PLAN") {
+    const watchPlanId = message.payload?.watchPlanId || "";
+    deleteRemoteWatchPlan(watchPlanId)
+      .then(async (result) => {
+        if (!result.ok) {
+          sendResponse({
+            ok: false,
+            error: createFriendlyError("Timed Capture Unavailable", result.error)
+          });
+          return;
+        }
+
+        if (chrome.alarms?.clear) {
+          await chrome.alarms.clear(`${WATCH_ALARM_PREFIX}${watchPlanId}`);
+        }
+
+        const localState = await readLocalState();
+        broadcastWatchPlans(localState.watchPlans || []);
+        sendResponse({
+          ...result,
+          watchPlans: localState.watchPlans || [],
+          watchRuns: localState.watchRuns || []
+        });
+      })
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_RUN_WATCH_PLAN_NOW") {
+    const watchPlanId = message.payload?.watchPlanId || "";
+    handleWatchAlarm({
+      name: `${WATCH_ALARM_PREFIX}${watchPlanId}`
+    })
+      .then(async () => {
+        const localState = await readLocalState();
+        sendResponse({
+          ok: true,
+          watchPlans: localState.watchPlans || [],
+          watchRuns: localState.watchRuns || []
+        });
+      })
       .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
 
     return true;
@@ -338,9 +508,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 });
 
-async function runCaptureFlow(options = getDefaultSettings()) {
+async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
   const captureNote = normalizeCaptureNoteOptions(options);
-  const sourceTab = await getCurrentTab();
+  const sourceTab = context.sourceTab || await getCurrentTab();
   const capturedAt = new Date().toISOString();
   const captureId = createLocalId();
 
@@ -359,9 +529,9 @@ async function runCaptureFlow(options = getDefaultSettings()) {
   }
 
   const variants = getCaptureVariants(options.devicePreset);
-  const manualRedactions = await getManualRedactionsForTab(sourceTab);
-  const cutawayRegion = await getCutawayRegionForTab(sourceTab);
-  const annotationRegion = await getAnnotationRegionForTab(sourceTab);
+  const manualRedactions = context.manualRedactionsOverride || await getManualRedactionsForTab(sourceTab);
+  const cutawayRegion = context.cutawayRegionOverride || await getCutawayRegionForTab(sourceTab);
+  const annotationRegion = context.annotationRegionOverride || await getAnnotationRegionForTab(sourceTab);
   const runContext = buildCaptureRunContext({
     title: sourceTab.title,
     url: sourceTab.url,
@@ -493,7 +663,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
 
   broadcastHistory(captureHistory);
 
-  // Future SaaS hook:
+  // Backend hook:
   // POST metadata, page metrics, and the final asset reference to
   // `${LUMEN_CONFIG.api.baseUrl}${LUMEN_CONFIG.api.endpoints.captures}`
   // once auth and cloud persistence are wired in.
@@ -518,6 +688,7 @@ async function runCaptureFlow(options = getDefaultSettings()) {
   });
 
   return {
+    captureId,
     fileName: downloadedFiles[0] || "",
     files: downloadedFiles,
     downloads: downloadedRecords,
@@ -666,9 +837,9 @@ async function runExportReviewFlow(options = getDefaultSettings()) {
         manualResolution,
         cutawayResolution,
         manualRedactions,
-      cutawayRegion
-    }));
-  } finally {
+        cutawayRegion
+      }));
+    } finally {
       if (target.kind === "viewport") {
         await closeWindowSafely(target.windowId);
       }
@@ -700,7 +871,8 @@ async function runExportReviewFlow(options = getDefaultSettings()) {
       devicePreset: options.devicePreset || "desktop",
       exportPreset: options.exportPreset || "raw",
       autoRedact: Boolean(options.autoRedact),
-      exportManifest: options.exportManifest !== false
+      exportManifest: options.exportManifest !== false,
+      longPageMode: options.longPageMode || "auto"
     },
     variants: variantReviews,
     variantCount: variants.length,
@@ -713,8 +885,93 @@ async function runExportReviewFlow(options = getDefaultSettings()) {
     cutawayResolutionStats,
     redactionCount: autoRedactionCount + manualAppliedCount,
     redactionBreakdown,
+    outputPlan: buildExportReviewOutputPlan({
+      variants: variantReviews,
+      variantCount: variants.length,
+      cutawayAppliedCount,
+      warnings,
+      options
+    }),
     warnings
   };
+}
+
+function buildExportReviewOutputPlan({ variants = [], variantCount = 1, cutawayAppliedCount = 0, warnings = [], options = {} } = {}) {
+  const longPageMode = options.longPageMode || "auto";
+  const viewCount = variantCount || variants.length || 1;
+  const tileCount = estimateReviewTileCount(variants, longPageMode);
+  const baseImageCount = longPageMode === "auto"
+    ? Math.max(viewCount, tileCount)
+    : tileCount;
+  const printSheetCount = longPageMode === "print" ? viewCount : 0;
+  const contextCount = options.exportManifest === false ? 0 : 1;
+  const totalFiles = baseImageCount + printSheetCount + contextCount + cutawayAppliedCount;
+
+  return [
+    {
+      label: "Files",
+      value: `${totalFiles} planned`,
+      detail: [
+        `${baseImageCount} image${baseImageCount === 1 ? "" : "s"}`,
+        cutawayAppliedCount ? `${cutawayAppliedCount} crop${cutawayAppliedCount === 1 ? "" : "s"}` : "",
+        printSheetCount ? `${printSheetCount} print sheet${printSheetCount === 1 ? "" : "s"}` : "",
+        contextCount ? "page context" : ""
+      ].filter(Boolean).join(", ")
+    },
+    {
+      label: "Long Pages",
+      value: formatLongPagePlanLabel(longPageMode, tileCount, viewCount),
+      detail: buildLongPagePlanDetail(longPageMode, tileCount, viewCount)
+    },
+    {
+      label: "Review",
+      value: warnings.length ? `${warnings.length} note${warnings.length === 1 ? "" : "s"}` : "Ready",
+      detail: warnings.length
+        ? "Check the notes before saving."
+        : "Marked areas and output choices are ready."
+    }
+  ];
+}
+
+function estimateReviewTileCount(variants, longPageMode) {
+  const viewCount = variants.length || 1;
+
+  if (longPageMode === "auto") {
+    return viewCount;
+  }
+
+  const maxTileHeight = Math.max(1, Number(LUMEN_CONFIG.capture.tileMaxOutputHeight) || 12000);
+
+  return variants.reduce((sum, variant) => {
+    const pageHeight = Math.max(1, Number(variant.dimensions?.pageHeight) || 1);
+    return sum + Math.max(1, Math.ceil(pageHeight / maxTileHeight));
+  }, 0) || viewCount;
+}
+
+function formatLongPagePlanLabel(mode, tileCount, viewCount) {
+  if (mode === "print") {
+    return "Print sheets";
+  }
+
+  if (mode === "tiles") {
+    return `${tileCount} tile${tileCount === 1 ? "" : "s"}`;
+  }
+
+  return tileCount > viewCount ? "Tiles if needed" : "Single images";
+}
+
+function buildLongPagePlanDetail(mode, tileCount, viewCount) {
+  if (mode === "print") {
+    return "Saves readable image tiles and browser-printable sheets for PDF export.";
+  }
+
+  if (mode === "tiles") {
+    return `Splits tall pages into ${tileCount} readable image tile${tileCount === 1 ? "" : "s"}.`;
+  }
+
+  return tileCount > viewCount
+    ? "Keeps normal pages as one image and splits very tall pages."
+    : "Keeps each view as one image when browser limits allow.";
 }
 
 function buildExportReviewVariant({
@@ -812,11 +1069,11 @@ function buildExportReviewWarnings({
   const manualCount = manualRedactions.regions?.length || 0;
 
   if (!options.autoRedact && !manualCount) {
-    warnings.push("No redaction layer is enabled for this export.");
+    warnings.push("Redaction is off for this save.");
   }
 
   if (options.autoRedact) {
-    warnings.push("Current redaction covers visible text and filled inputs during export and should be reviewed before external sharing.");
+    warnings.push("Auto-redaction covers visible text and filled inputs. Check the saved image before sharing.");
   }
 
   if (manualProjectionStats.skippedCount) {
@@ -828,7 +1085,7 @@ function buildExportReviewWarnings({
   }
 
   if ((manualCount || cutawayRegion.region) && variants.length > 1) {
-    warnings.push("Responsive projection is checked per viewport before export. The final manifest records the capture-time result for each view.");
+    warnings.push("Responsive projection is checked per viewport. The page context file records the saved result for each view.");
   }
 
   return warnings;
@@ -882,7 +1139,7 @@ async function runHistoryDownloadAction(payload = {}, action = "show") {
   } catch (error) {
     throw createFriendlyError(
       action === "open" ? "File Could Not Open" : "File Could Not Be Revealed",
-      error.message || "Chrome could not access this downloaded artifact. It may have been moved or deleted."
+      error.message || "Chrome could not access this saved file. It may have been moved or deleted."
     );
   }
 
@@ -1019,7 +1276,7 @@ async function clearManualRedactionsForTab(tab) {
   return buildEmptyManualRedactionRecord(tab.url);
 }
 
-async function runCutawayRegionPicker() {
+async function runCutawayRegionPicker(options = {}) {
   const sourceTab = await getCurrentTab();
 
   if (!sourceTab?.id || !sourceTab.url) {
@@ -1041,7 +1298,8 @@ async function runCutawayRegionPicker() {
   const response = await chrome.tabs.sendMessage(sourceTab.id, {
     type: "LUMEN_START_CUTAWAY_REGION_PICKER",
     payload: {
-      region: record.region || null
+      region: record.region || null,
+      selectionMode: options.selectionMode === "lasso" ? "lasso" : "rect"
     }
   });
 
@@ -1383,6 +1641,8 @@ function normalizeCutawayRegion(region) {
     top: Math.max(0, Math.round(region.top)),
     width: Math.max(1, Math.round(region.width || 1)),
     height: Math.max(1, Math.round(region.height || 1)),
+    shape: region.shape === "lasso" ? "lasso" : "rect",
+    points: normalizeRegionPoints(region.points),
     ...(normalizeManualSourceViewport(region.sourceViewport) ? {
       sourceViewport: normalizeManualSourceViewport(region.sourceViewport)
     } : {}),
@@ -1390,6 +1650,16 @@ function normalizeCutawayRegion(region) {
       anchor: normalizeManualAnchor(region.anchor)
     } : {})
   };
+}
+
+function normalizeRegionPoints(points) {
+  return (Array.isArray(points) ? points : [])
+    .map((point) => ({
+      x: Math.max(0, Math.round(Number(point?.x) || 0)),
+      y: Math.max(0, Math.round(Number(point?.y) || 0))
+    }))
+    .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+    .slice(0, 120);
 }
 
 function normalizeAnnotationRecord(record = {}, fallbackUrl = "") {
@@ -1775,7 +2045,7 @@ async function captureVariant({
     await showPageUsageHud(target.tab.id, {
       stage: "save",
       title: `Compositing ${variant.label.toLowerCase()} output`,
-      detail: "The page capture is complete. Lumen is stitching and saving artifacts in the background.",
+      detail: "The page capture is complete. Lumen is stitching and saving files in the background.",
       progress: 0.84
     });
 
@@ -1805,6 +2075,17 @@ async function captureVariant({
       variantId: variant.id,
       exportPreset: stitched.appliedPreset
     });
+
+    if (options.longPageMode === "print") {
+      downloadRecords.push(await downloadPrintSheet(stitched.outputs, {
+        folder: runContext.folder,
+        fileBaseName,
+        variantId: variant.id,
+        exportPreset: stitched.appliedPreset,
+        page
+      }));
+    }
+
     const downloadedFiles = downloadRecords.map((record) => record.filename);
 
     return {
@@ -2403,7 +2684,7 @@ function buildManifestFileBaseName(page, options, exportPreset) {
   const host = new URL(page.url).hostname.replace(/^www\./, "");
   const safeTitle = sanitizeSegment(page.title || host).slice(0, 48);
 
-  return `${safeTitle || "capture"}-bundle-${options.devicePreset || "desktop"}-${exportPreset}`;
+  return `${safeTitle || "capture"}-context-${options.devicePreset || "desktop"}-${exportPreset}`;
 }
 
 function buildCaptureRunContext({ title, url, capturedAt }) {
@@ -2544,7 +2825,7 @@ function buildCaptureCompletionDetail({
   }
 
   if (cutawayCount) {
-    fragments.push(`${cutawayCount} cutaway crop${cutawayCount === 1 ? "" : "s"} exported`);
+    fragments.push(`${cutawayCount} cutaway crop${cutawayCount === 1 ? "" : "s"} saved`);
   }
 
   if (projectionText) {
@@ -2556,7 +2837,7 @@ function buildCaptureCompletionDetail({
   }
 
   if (manifestSaved) {
-    fragments.push("bundle manifest saved");
+    fragments.push("context file saved");
   }
 
   if (annotationAdded) {
@@ -2694,6 +2975,204 @@ function broadcastAnnotationRegion(record) {
   }).catch(() => {});
 }
 
+function broadcastWatchPlans(watchPlans) {
+  chrome.runtime.sendMessage({
+    type: WATCH_PLAN_UPDATE_EVENT,
+    payload: watchPlans
+  }).catch(() => {});
+}
+
+function broadcastWatchRuns(watchRuns) {
+  chrome.runtime.sendMessage({
+    type: WATCH_RUN_UPDATE_EVENT,
+    payload: watchRuns
+  }).catch(() => {});
+}
+
+async function broadcastWatchState(watchRuns) {
+  broadcastWatchRuns(watchRuns);
+  const localState = await readLocalState();
+  broadcastWatchPlans(localState.watchPlans || []);
+}
+
+async function restoreWatchAlarms() {
+  if (!chrome.alarms?.create) {
+    return;
+  }
+
+  const localState = await readLocalState();
+  const plans = Array.isArray(localState.watchPlans) ? localState.watchPlans : [];
+
+  for (const plan of plans) {
+    await registerWatchPlanAlarm(plan);
+  }
+}
+
+async function registerWatchPlanAlarm(plan = {}) {
+  if (!chrome.alarms?.create || !plan?.id) {
+    return;
+  }
+
+  const alarmName = `${WATCH_ALARM_PREFIX}${plan.id}`;
+  await chrome.alarms.clear(alarmName);
+
+  if (plan.status !== "active") {
+    return;
+  }
+
+  const intervalMinutes = Math.max(1, Math.round(Number(plan.schedule?.intervalMinutes) || 60));
+
+  await chrome.alarms.create(alarmName, {
+    delayInMinutes: Math.min(intervalMinutes, 1),
+    periodInMinutes: intervalMinutes
+  });
+}
+
+async function handleWatchAlarm(alarm) {
+  const planId = alarm.name.slice(WATCH_ALARM_PREFIX.length);
+  const localState = await readLocalState();
+  const plan = (localState.watchPlans || []).find((entry) => entry.id === planId);
+
+  if (!plan || plan.status !== "active") {
+    await chrome.alarms.clear(alarm.name);
+    return;
+  }
+
+  const scheduledAt = new Date().toISOString();
+  const runId = `watch-run-${createLocalId()}`;
+
+  if (captureInFlight || analyzeInFlight) {
+    const watchRuns = await persistWatchRunRecord({
+      id: runId,
+      watchPlanId: plan.id,
+      title: plan.title,
+      url: plan.url,
+      status: "skipped",
+      scheduledAt,
+      completedAt: scheduledAt,
+      error: "Another Lumen run was active."
+    });
+    await broadcastWatchState(watchRuns);
+    return;
+  }
+
+  captureInFlight = true;
+  let sourceWindowId = null;
+
+  try {
+    let watchRuns = await persistWatchRunRecord({
+      id: runId,
+      watchPlanId: plan.id,
+      title: plan.title,
+      url: plan.url,
+      status: "running",
+      scheduledAt,
+      startedAt: new Date().toISOString()
+    });
+    await broadcastWatchState(watchRuns);
+
+    const source = await createWatchSource(plan);
+    sourceWindowId = source.windowId;
+    const result = await runCaptureFlow({
+      ...getDefaultSettings(),
+      devicePreset: "desktop",
+      exportPreset: "raw",
+      exportManifest: true,
+      longPageMode: "tiles"
+    }, {
+      sourceTab: source.tab,
+      cutawayRegionOverride: buildWatchCutawayRecord(plan)
+    });
+
+    watchRuns = await persistWatchRunRecord({
+      id: runId,
+      watchPlanId: plan.id,
+      captureId: result.captureId || "",
+      title: plan.title,
+      url: plan.url,
+      status: "captured",
+      scheduledAt,
+      startedAt: scheduledAt,
+      completedAt: new Date().toISOString(),
+      fileCount: result.files?.length || 0,
+      files: result.files || []
+    });
+    await broadcastWatchState(watchRuns);
+  } catch (error) {
+    const watchRuns = await persistWatchRunRecord({
+      id: runId,
+      watchPlanId: plan.id,
+      title: plan.title,
+      url: plan.url,
+      status: "failed",
+      scheduledAt,
+      completedAt: new Date().toISOString(),
+      error: error?.message || "Timed capture failed."
+    });
+    await broadcastWatchState(watchRuns);
+  } finally {
+    captureInFlight = false;
+    await closeWindowSafely(sourceWindowId);
+  }
+}
+
+async function createWatchSource(plan = {}) {
+  if (!plan.url) {
+    throw createFriendlyError("Timed Capture Missing URL", "The saved timed capture does not include a capturable URL.");
+  }
+
+  const origin = buildOriginPattern(plan.url);
+  const hasPermission = await chrome.permissions.contains({
+    origins: [origin]
+  });
+
+  if (!hasPermission) {
+    throw createFriendlyError(
+      "Timed Capture Needs Site Access",
+      "Open Lumen on that page and save the timed capture again so Chrome can grant site access."
+    );
+  }
+
+  const width = Math.max(900, Math.round(Number(plan.region?.sourceViewport?.width) || 1280));
+  const height = Math.max(720, Math.round(Number(plan.region?.sourceViewport?.height) || 900));
+  const createdWindow = await chrome.windows.create({
+    url: plan.url,
+    type: "popup",
+    width,
+    height,
+    focused: false
+  });
+  const tab = createdWindow.tabs?.[0] || (await chrome.tabs.query({
+    windowId: createdWindow.id,
+    active: true
+  }))[0];
+
+  if (!tab?.id) {
+    throw createFriendlyError("Timed Capture Failed", "Chrome could not open the saved page for timed capture.");
+  }
+
+  await waitForTabComplete(tab.id);
+  await sleep(260);
+
+  return {
+    tab,
+    windowId: createdWindow.id
+  };
+}
+
+function buildWatchCutawayRecord(plan = {}) {
+  const region = plan.region || null;
+
+  return {
+    url: plan.url || "",
+    host: plan.host || "",
+    updatedAt: plan.updatedAt || "",
+    context: null,
+    region,
+    regions: region ? [region] : []
+  };
+}
+
 async function closeWindowSafely(windowId) {
   try {
     if (typeof windowId === "number") {
@@ -2755,6 +3234,87 @@ async function downloadRenderedOutputs(outputs, { folder, fileBaseName, variantI
   return downloadRecords;
 }
 
+async function downloadPrintSheet(outputs, { folder, fileBaseName, variantId, exportPreset, page }) {
+  const fullPageOutputs = (outputs || []).filter((output) => (output.role || "full-page") === "full-page");
+  const filename = `${folder}/${fileBaseName}-print-sheet.html`;
+  const html = buildPrintSheetHtml(fullPageOutputs, page);
+  const downloadId = await chrome.downloads.download({
+    url: `data:text/html;charset=utf-8,${encodeURIComponent(html)}`,
+    filename,
+    conflictAction: "uniquify",
+    saveAs: false
+  });
+  const downloadItem = await waitForDownloadComplete(downloadId);
+
+  return {
+    downloadId,
+    filename,
+    bytesReceived: downloadItem.bytesReceived || 0,
+    complete: (downloadItem.bytesReceived || 0) > 0,
+    kind: "html",
+    role: "print-sheet",
+    variantId,
+    exportPreset,
+    partIndex: 1,
+    partTotal: 1,
+    width: page?.viewportWidth || 0,
+    height: page?.pageHeight || 0,
+    cutawayRegion: null
+  };
+}
+
+function buildPrintSheetHtml(outputs = [], page = {}) {
+  const title = escapeHtml(page.title || "Lumen capture");
+  const source = escapeHtml(page.url || "");
+  const outputMarkup = outputs.map((output, index) => `
+    <figure>
+      <figcaption>Part ${index + 1} of ${outputs.length}</figcaption>
+      <img src="${output.dataUrl}" alt="${title} part ${index + 1}" />
+    </figure>
+  `).join("");
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>${title} | Lumen print sheet</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #f6f7f8; color: #101418; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      header { padding: 18px 24px; border-bottom: 1px solid #d8dde3; background: white; }
+      h1 { margin: 0 0 4px; font-size: 18px; }
+      p { margin: 0; color: #5b6470; }
+      main { display: grid; gap: 18px; padding: 18px; }
+      figure { margin: 0 auto; width: min(100%, 1200px); padding: 14px; background: white; border: 1px solid #d8dde3; page-break-after: always; }
+      figcaption { margin-bottom: 10px; color: #5b6470; font-weight: 700; }
+      img { display: block; width: 100%; height: auto; }
+      @media print {
+        body { background: white; }
+        header { position: static; }
+        main { padding: 0; gap: 0; }
+        figure { width: 100%; border: 0; padding: 0; }
+        figcaption { padding: 8px 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>${title}</h1>
+      <p>${source}</p>
+    </header>
+    <main>${outputMarkup || "<p>Image parts were unavailable.</p>"}</main>
+  </body>
+</html>`;
+}
+
+function escapeHtml(value = "") {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
 function buildPartFilenameSuffix(partIndex, partTotal) {
   if (partTotal <= 1) {
     return "";
@@ -2811,7 +3371,7 @@ function buildCaptureBundleManifest({
 
   return {
     schemaVersion: 1,
-    generator: "Lumen prototype",
+    generator: "Lumen",
     capturedAt,
     page: {
       title: page.title || "",
@@ -2822,6 +3382,7 @@ function buildCaptureBundleManifest({
       archiveFolder,
       devicePreset: options.devicePreset || "desktop",
       exportPreset,
+      longPageMode: options.longPageMode || "auto",
       removeStickyHeaders: options.removeStickyHeaders !== false,
       forceLazyLoad: options.forceLazyLoad !== false,
       autoRedact: Boolean(options.autoRedact),
@@ -2894,11 +3455,14 @@ function buildPortableOutputRecords(downloads = []) {
 function buildArtifactStats(outputs = []) {
   const bytesReceived = outputs.reduce((sum, output) => sum + Math.max(0, output.bytesReceived || 0), 0);
   const imageCount = outputs.filter((output) => output.kind === "image").length;
+  const htmlCount = outputs.filter((output) => output.kind === "html").length;
 
   return {
     outputCount: outputs.length,
     imageCount,
+    htmlCount,
     cutawayCount: outputs.filter((output) => output.role === "cutaway").length,
+    printSheetCount: outputs.filter((output) => output.role === "print-sheet").length,
     bytesReceived,
     complete: outputs.length > 0 && outputs.every((output) => output.complete),
     tiled: outputs.some((output) => (output.partTotal || 1) > 1)

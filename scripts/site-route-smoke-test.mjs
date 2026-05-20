@@ -10,13 +10,15 @@ const siteRoots = [
     name: "docs artifact root",
     root: path.join(repoRoot, "docs"),
     legacyDocsMode: "redirect",
-    assetPath: "/assets/proof-social-card.png"
+    assetPath: "/assets/lumen-social-card.png",
+    storeAssetPath: "/assets/store-control-surface.png"
   },
   {
     name: "repository root",
     root: repoRoot,
     legacyDocsMode: "landing",
-    assetPath: "/assets/proof-social-card.png"
+    assetPath: "/assets/lumen-social-card.png",
+    storeAssetPath: "/assets/store-control-surface.png"
   }
 ];
 const results = [];
@@ -45,7 +47,7 @@ async function runRouteChecks(target) {
   try {
     const root = await fetchText(`${fixture.origin}/`);
     assert(root.status === 200, `Expected ${target.name} root route to load.`, root);
-    assert(root.body.includes("Clean, responsive"), `Expected ${target.name} root route to serve the Lumen landing page.`, {
+    assert(root.body.includes("Clean captures from busy webpages."), `Expected ${target.name} root route to serve the Lumen landing page.`, {
       sample: root.body.slice(0, 240)
     });
 
@@ -69,7 +71,7 @@ async function runRouteChecks(target) {
         sample: legacyDocs.body.slice(0, 240)
       });
     } else {
-      assert(legacyDocs.body.includes("Clean, responsive"), "Expected repository-root docs route to serve the landing page.", {
+      assert(legacyDocs.body.includes("Clean captures from busy webpages."), "Expected repository-root docs route to serve the landing page.", {
         sample: legacyDocs.body.slice(0, 240)
       });
     }
@@ -84,6 +86,10 @@ async function runRouteChecks(target) {
     assert(socialCard.status === 200, `Expected ${target.name} social image asset to load.`, socialCard);
     assert(socialCard.bytes > 1024, `Expected ${target.name} social image asset to contain data.`, socialCard);
 
+    const storeAsset = await fetchBytes(`${fixture.origin}${target.storeAssetPath}`);
+    assert(storeAsset.status === 200, `Expected ${target.name} store screenshot asset to load.`, storeAsset);
+    assert(storeAsset.bytes > 1024, `Expected ${target.name} store screenshot asset to contain data.`, storeAsset);
+
     return {
       name: target.name,
       origin: fixture.origin,
@@ -92,7 +98,8 @@ async function runRouteChecks(target) {
         "/privacy.html",
         "/docs/",
         "/missing-route",
-        target.assetPath
+        target.assetPath,
+        target.storeAssetPath
       ]
     };
   } finally {

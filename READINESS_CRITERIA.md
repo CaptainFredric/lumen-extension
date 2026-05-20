@@ -12,33 +12,34 @@ Readiness is split into three tracks:
 
 Each percentage combines:
 
-1. Implemented behavior: Does the feature exist in code and produce artifacts?
+1. Implemented behavior: Does the feature exist in code and produce useful files?
 2. User path quality: Does the UI explain what is happening before, during, and after capture?
 3. Test coverage: Is the behavior covered by static checks, content-script smoke, extension smoke, e2e capture, site routes, and real-site capture?
 4. Policy and privacy fit: Does the extension avoid broad permissions, hidden collection, and overclaiming?
-5. Recovery behavior: Does a difficult site fail clearly or produce a useful partial artifact?
+5. Recovery behavior: Does a difficult site fail clearly or produce useful partial output?
 6. Maintenance cost: Can the result be regenerated, packaged, and debugged without manual guessing?
 
 ## Current Track Estimates
 
-### Personal Use: 78 percent
+### Personal Use: 81 percent
 
 Current positives:
 
 1. Full-page capture works on local fixtures and two real project pages.
 2. Responsive desktop, tablet, and mobile export works in e2e.
-3. Auto-redaction, manual redaction, cutaway, callout, manifest, and history are implemented.
+3. Auto-redaction, manual redaction, cutaway, callout, page context, shelf, and history are implemented.
 4. The page now shows a usage HUD during preparation and review setup, then removes it before screenshots.
-5. Temporary test profiles and downloads are cleaned by scripts.
+5. Timed runs now appear in the shelf with copyable summaries and file actions when files exist.
+6. Temporary test profiles and downloads are cleaned by scripts.
 
 Remaining gaps:
 
 1. Annotation is still one callout plus note, not arrows, lasso, labels, and editable shapes.
 2. Some hostile pages will still need capture fallbacks beyond the last-reachable-viewport seal.
-3. Manual review remains required before sharing redacted artifacts.
+3. Manual review remains required before sharing redacted files.
 4. There is no guided first-run onboarding inside the extension yet.
 
-### Chrome Web Store Beta: 67 percent
+### Chrome Web Store Beta: 70 percent
 
 Current positives:
 
@@ -46,7 +47,7 @@ Current positives:
 2. Runtime ZIP excludes docs, backend, scripts, and test assets.
 3. Permissions are narrow and optional host permissions are reserved for responsive captures.
 4. Public homepage and privacy policy exist.
-5. Store screenshots are generated from real popup states and proof artifacts at 1280 by 800.
+5. Store screenshots are generated from real popup states and sample capture files at 1280 by 800.
 6. Listing copy stays aligned with the current local-first product.
 
 Remaining gaps:
@@ -61,16 +62,16 @@ Remaining gaps:
 Current positives:
 
 1. The product wedge is real: clean, responsive, safer evidence capture.
-2. A local backend models sessions, captures, watch plans, agent jobs, integrations, and stats.
-3. Future watch and agent records require explicit opt-in.
-4. A shared entitlement contract now gates advanced local tools in the popup and paid-path watch or agent records in the backend.
-5. Backend retention and delete controls now exist for session-owned captures, watch records, agent jobs, and saved data-control settings.
+2. A local service models sessions, captures, timed capture plans, agent jobs, integrations, and stats.
+3. Timed capture and agent records require explicit opt-in.
+4. A shared entitlement contract now gates advanced local tools in the popup and paid-path timed capture or agent records in the service.
+5. Session retention and delete controls now exist for captures, timed runs, agent jobs, and saved data-control settings.
 
 Remaining gaps:
 
 1. No production auth, billing provider, support workflow, or account recovery.
 2. No cloud storage, sync provider integration, or cloud-side deletion verification.
-3. No durable watch scheduler, automated retention enforcement, or visual diff review workflow.
+3. No production-grade scheduler, automated retention enforcement, or visual diff review workflow.
 4. No customer-facing reliability matrix or support path.
 
 ## Next Readiness Gates
@@ -95,4 +96,4 @@ To move paid product above 50 percent:
 2. Add one opt-in destination, likely Google Drive or Slack, after export review.
 3. Verify cloud-side deletion and retention behavior against that destination.
 4. Connect entitlements to billing, receipts, support state, and plan change events.
-5. Build region watch only after pause, schedule, retention, and review controls exist.
+5. Expand timed capture only after destination review, retention enforcement, and support flows exist.

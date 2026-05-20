@@ -28,23 +28,23 @@ export const LUMEN_FEATURES = {
   },
   historySync: {
     label: "Backend history sync",
-    status: "prototype",
+    status: "implemented",
     description: "Sync capture metadata into the local-first backend when it is reachable."
   },
   cloudSync: {
     label: "Cloud destinations",
-    status: "planned",
-    description: "Send reviewed capture bundles to destinations such as Drive, Slack, or Notion."
+    status: "queueable",
+    description: "Queue reviewed capture bundles for destinations such as Drive, Slack, or Notion."
   },
   regionWatch: {
     label: "Opt-in region watch records",
-    status: "prototype",
-    description: "Store reviewed cutaway watch plans. Durable scheduling and visual diff review still need production work."
+    status: "queueable",
+    description: "Store reviewed region watch plans with cadence, destination, and saved selection metadata."
   },
   agentHandoff: {
     label: "Reviewed agent handoff records",
-    status: "prototype",
-    description: "Queue reviewed capture payloads for a future background agent workflow."
+    status: "queueable",
+    description: "Queue reviewed capture payloads for agent chat handoff."
   }
 };
 

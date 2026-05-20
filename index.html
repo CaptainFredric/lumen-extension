@@ -3,38 +3,38 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Lumen | Clean Browser Capture For Design Review And QA</title>
+    <title>Lumen | Clean Webpage Capture</title>
     <meta
       name="description"
-      content="Lumen is an early browser capture workflow for design review, QA, and product work. It cleans the page before capture, generates responsive sets, redacts sensitive data, and extracts useful page signals."
+      content="Lumen helps teams capture cleaner webpages for design review, QA, and product work. Remove page clutter, save responsive views, check sensitive details, and keep useful page context attached."
     />
     <link rel="canonical" href="https://captainfredric.github.io/lumen-extension/" />
     <meta property="og:site_name" content="Lumen" />
-    <meta property="og:title" content="Lumen | Clean Browser Capture For Design Review And QA" />
+    <meta property="og:title" content="Lumen | Clean Webpage Capture" />
     <meta
       property="og:description"
-      content="Page cleanup, responsive capture sets, sensitive-data redaction, and useful page signals in one browser capture workflow."
+      content="Clean webpage capture for design review, QA, and product work."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://captainfredric.github.io/lumen-extension/" />
     <meta
       property="og:image"
-      content="https://captainfredric.github.io/lumen-extension/assets/proof-social-card.png"
+      content="https://captainfredric.github.io/lumen-extension/assets/lumen-social-card.png"
     />
-    <meta property="og:image:alt" content="Lumen proof card showing a real cleaned capture, redaction example, and extracted signals." />
+    <meta property="og:image:alt" content="Lumen browser capture workflow interface." />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Lumen | Clean Browser Capture For Design Review And QA" />
+    <meta name="twitter:title" content="Lumen | Clean Webpage Capture" />
     <meta
       name="twitter:description"
-      content="Browser capture that cleans the page, generates responsive sets, redacts sensitive data, and keeps useful page context attached."
+      content="Capture cleaner webpages with responsive views, redaction review, and local history."
     />
     <meta
       name="twitter:image"
-      content="https://captainfredric.github.io/lumen-extension/assets/proof-social-card.png"
+      content="https://captainfredric.github.io/lumen-extension/assets/lumen-social-card.png"
     />
-    <meta name="twitter:image:alt" content="Lumen proof card showing a real cleaned capture, redaction example, and extracted signals." />
+    <meta name="twitter:image:alt" content="Lumen browser capture workflow interface." />
     <link rel="icon" href="brandmark.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/brandmark-512.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -43,10 +43,10 @@
       href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260512-readiness" />
+    <link rel="stylesheet" href="styles.css?v=20260516-public" />
   </head>
   <body>
-    <a class="skip-link" href="#product">Skip to content</a>
+    <a class="skip-link" href="#features">Skip to content</a>
     <div class="noise"></div>
 
     <header class="site-header">
@@ -54,35 +54,27 @@
         <span class="brand-mark">L</span>
         <span class="brand-copy">
           <strong>Lumen</strong>
-          <span>Browser capture workflow</span>
+          <span>Capture workflow</span>
         </span>
       </a>
 
       <nav class="site-nav" aria-label="Primary">
-        <a href="#product">Product</a>
-        <a href="#proof">Proof</a>
-        <a href="#workflow">How it works</a>
-        <a href="#mechanics">Implementation</a>
-        <a href="#scope">Roadmap</a>
-        <a href="#docs">Docs</a>
+        <a href="#features">Features</a>
+        <a href="#cleanup-demo">Demo</a>
+        <a href="#workflow">Workflow</a>
+        <a href="#product-system">Plans</a>
+        <a href="#chrome-store">Store</a>
+        <a href="#privacy">Privacy</a>
       </nav>
 
       <div class="header-actions">
         <a
-          class="nav-link nav-link-split"
-          href="https://github.com/CaptainFredric/lumen-extension"
+          class="nav-link nav-link-accent"
+          href="https://github.com/CaptainFredric/lumen-extension#load-the-extension-locally"
           target="_blank"
           rel="noreferrer"
         >
-          <span>Star on GitHub</span>
-          <span class="nav-link-chip">Repository</span>
-        </a>
-        <a
-          class="nav-link nav-link-accent"
-          href="assets/proof-run-bundle.zip"
-          download
-        >
-          Download sample
+          Install locally
         </a>
       </div>
     </header>
@@ -90,12 +82,11 @@
     <main>
       <section class="hero" id="top">
         <div class="hero-copy" data-reveal>
-          <p class="hero-kicker">Browser capture for design review, QA, and product work</p>
-          <h1>Clean, responsive,<br />safer evidence<br />from <span>any webpage.</span></h1>
+          <p class="hero-kicker">Clean browser capture for design review, QA, and product work</p>
+          <h1>Clean captures from busy webpages.</h1>
           <p class="hero-body">
-            Lumen removes page noise before capture, generates responsive sets, redacts sensitive
-            data, marks reusable regions, and attaches useful signals so a screenshot becomes
-            usable review evidence.
+            Lumen clears floating UI, captures responsive views, checks sensitive details, and keeps
+            useful page context with every saved file.
           </p>
 
           <div class="hero-actions">
@@ -105,24 +96,31 @@
               target="_blank"
               rel="noreferrer"
             >
-              Add to Chrome, local build
+              Install locally
             </a>
-            <a class="secondary-link" href="https://github.com/CaptainFredric/lumen-extension" target="_blank" rel="noreferrer">View on GitHub</a>
+            <a
+              class="secondary-link"
+              href="https://github.com/CaptainFredric/lumen-extension"
+              target="_blank"
+              rel="noreferrer"
+            >
+              View source
+            </a>
           </div>
 
           <p class="hero-inline-note">
-            Works locally. No sign-up required. Proof assets come from the current prototype run.
+            Runs in Chrome. Captures, settings, and local history stay under your control.
           </p>
         </div>
 
-        <div class="hero-stage" data-tilt data-reveal>
+        <div class="hero-stage" data-tilt>
           <div class="product-demo-shell">
             <div class="product-demo-head">
               <div>
-                <p class="support-label">Extension control surface</p>
-                <strong>Live workflow model</strong>
+                <p class="support-label">Lumen</p>
+                <strong>Capture control</strong>
               </div>
-              <span>Prototype state</span>
+              <span>Ready</span>
             </div>
 
             <div class="product-demo-grid">
@@ -131,23 +129,23 @@
                   <div class="demo-brand-row">
                     <span class="demo-brand-mark">L</span>
                     <div>
-                      <p class="support-label">Lumen</p>
-                      <h3>Clean capture for review work.</h3>
+                      <p class="support-label">Current page</p>
+                      <h3>Clean capture from a busy page.</h3>
                     </div>
                     <span class="demo-pill">MV3</span>
                   </div>
 
                   <p>
-                    One control surface for cleanup, responsive capture, redaction review,
-                    cutaways, signals, and local history.
+                    Capture the page after sticky headers, overlays, and sensitive details have
+                    been checked.
                   </p>
 
-                  <div class="demo-chip-row" aria-label="Implemented capture capabilities">
-                    <span>Cleanup</span>
-                    <span>Lazy load</span>
+                  <div class="demo-chip-row" aria-label="Capture capabilities">
+                    <span>Clean</span>
                     <span>Responsive</span>
                     <span>Redact</span>
-                    <span>Signals</span>
+                    <span>Annotate</span>
+                    <span>History</span>
                   </div>
                 </div>
 
@@ -155,8 +153,8 @@
                   <div class="demo-launch-status" data-demo-status>
                     <span class="demo-ready-orb" aria-hidden="true"></span>
                     <div>
-                      <strong data-demo-status-title>captainfredric.github.io ready</strong>
-                      <small data-demo-status-detail>Hold capture to choose a focused action.</small>
+                      <strong data-demo-status-title>example.com ready</strong>
+                      <small data-demo-status-detail>Choose the capture you need.</small>
                     </div>
                   </div>
 
@@ -170,33 +168,52 @@
                     >
                       <span>
                         <strong>Capture page</strong>
-                        <small>Full page capture. Hold for actions.</small>
+                        <small>Full page or responsive set</small>
                       </span>
                       <span class="demo-hold-progress" aria-hidden="true"></span>
                     </button>
 
                     <button class="demo-secondary-action" type="button">
-                      <span>Analyze Page</span>
-                      <small>Signals only</small>
+                      <span>Analyze page</span>
+                      <small>Colors, type, layout</small>
                     </button>
                   </div>
 
-                  <div class="demo-hold-menu" role="menu" aria-label="Quick capture actions" aria-hidden="true">
+                  <div class="demo-hold-menu" role="menu" aria-label="Capture actions" aria-hidden="true">
                     <button type="button" role="menuitem">
+                      <i class="demo-action-icon demo-action-responsive" aria-hidden="true"></i>
                       <span>Responsive set</span>
                       <small>Desktop, tablet, mobile</small>
                     </button>
                     <button type="button" role="menuitem">
+                      <i class="demo-action-icon demo-action-redact" aria-hidden="true"></i>
                       <span>Scan redactions</span>
-                      <small>Preview sensitive regions</small>
+                      <small>Check sensitive regions</small>
                     </button>
                     <button type="button" role="menuitem">
+                      <i class="demo-action-icon demo-action-box" aria-hidden="true"></i>
                       <span>Mark boxes</span>
-                      <small>Manual redactions</small>
+                      <small>Hide custom areas</small>
                     </button>
                     <button type="button" role="menuitem">
+                      <i class="demo-action-icon demo-action-cutaway" aria-hidden="true"></i>
                       <span>Mark cutaway</span>
-                      <small>Save a reusable crop</small>
+                      <small>Save a focused crop</small>
+                    </button>
+                    <button type="button" role="menuitem">
+                      <i class="demo-action-icon demo-action-lasso" aria-hidden="true"></i>
+                      <span>Lasso area</span>
+                      <small>Trace a flexible region</small>
+                    </button>
+                    <button type="button" role="menuitem">
+                      <i class="demo-action-icon demo-action-callout" aria-hidden="true"></i>
+                      <span>Mark callout</span>
+                      <small>Add capture context</small>
+                    </button>
+                    <button type="button" role="menuitem">
+                      <i class="demo-action-icon demo-action-signals" aria-hidden="true"></i>
+                      <span>Extract signals</span>
+                      <small>Colors, type, layout</small>
                     </button>
                   </div>
                 </div>
@@ -204,198 +221,263 @@
                 <div class="demo-panel demo-review-panel">
                   <div class="demo-panel-head">
                     <div>
-                      <p class="support-label">Pre-export review</p>
-                      <h3>Check before saving.</h3>
+                      <p class="support-label">Save check</p>
+                      <h3>Ready to save.</h3>
                     </div>
-                    <span class="demo-pill">Review</span>
+                    <span class="demo-pill">Ready</span>
                   </div>
 
                   <div class="demo-review-metrics">
                     <div><span>Views</span><strong>3</strong></div>
-                    <div><span>Auto</span><strong>9</strong></div>
+                    <div><span>Sensitive</span><strong>9</strong></div>
                     <div><span>Manual</span><strong>2</strong></div>
-                    <div><span>Cutaway</span><strong>3</strong></div>
+                    <div><span>Crop</span><strong>1</strong></div>
                   </div>
 
-                  <div class="demo-preview-map" aria-label="Preview map showing redaction and cutaway regions">
-                    <span class="demo-map-box demo-map-auto demo-map-auto-one"></span>
-                    <span class="demo-map-box demo-map-auto demo-map-auto-two"></span>
-                    <span class="demo-map-box demo-map-manual"></span>
-                    <span class="demo-map-box demo-map-cutaway"></span>
+                  <div class="demo-save-list" aria-label="Saved output preview">
+                    <span><strong>Desktop, tablet, mobile</strong><small>Responsive views</small></span>
+                    <span><strong>Sensitive regions marked</strong><small>Detected and manual areas</small></span>
+                    <span><strong>Focused crop included</strong><small>Ready for quick paste</small></span>
                   </div>
 
                   <p>
-                    Current redaction covers visible text and filled inputs during export and
-                    should be reviewed before external sharing.
+                    The saved set includes the views, marked areas, focused crop, and page context
+                    needed for handoff.
                   </p>
                 </div>
               </div>
 
-              <aside class="demo-artifact-rail" aria-label="Current output summary">
-                <div class="demo-artifact-card">
-                  <p class="support-label">Current output</p>
-                  <img
-                    src="assets/proof-run-history.png"
-                    loading="lazy"
-                    decoding="async"
-                    alt="Local history output from a Lumen capture run."
-                  />
+              <aside class="demo-artifact-rail" aria-label="Saved capture example">
+                <div class="demo-artifact-card demo-saved-card">
+                  <p class="support-label">Saved example</p>
+                  <div class="saved-output-card">
+                    <div>
+                      <strong>landing-page-capture</strong>
+                      <span>Cleaned webpage capture</span>
+                    </div>
+                    <em>PNG</em>
+                  </div>
+                  <div class="saved-output-card saved-output-card-soft">
+                    <div>
+                      <strong>page-context</strong>
+                      <span>Title, URL, colors, type, and notes</span>
+                    </div>
+                    <em>JSON</em>
+                  </div>
                 </div>
 
                 <div class="demo-artifact-list">
                   <div>
-                    <span>Artifacts</span>
-                    <strong>3 images plus JSON</strong>
+                    <span>Views</span>
+                    <strong>Desktop, tablet, mobile</strong>
                   </div>
                   <div>
-                    <span>Region work</span>
-                    <strong>Cutaway saved locally</strong>
+                    <span>Sensitive details</span>
+                    <strong>Checked before saving</strong>
                   </div>
                   <div>
-                    <span>Signals</span>
-                    <strong>Palette, fonts, CTA, nav</strong>
+                    <span>Context</span>
+                    <strong>Notes and page signals</strong>
                   </div>
                 </div>
-
-                <a class="demo-proof-link" href="assets/proof-run-bundle.zip" download>
-                  Download proof bundle
-                </a>
               </aside>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="proof-strip-section" id="proof" data-reveal>
-        <div class="proof-strip-grid">
-          <div class="proof-metrics-card">
-            <p class="proof-label proof-card-label">Proof: real run output</p>
-            <div class="proof-metric">
-              <strong>3</strong>
-              <span>Image exports</span>
-              <p>Desktop, tablet, mobile</p>
-            </div>
-            <div class="proof-metric">
-              <strong>1</strong>
-              <span>Bundle manifest</span>
-              <p>JSON sidecar included</p>
-            </div>
-            <div class="proof-metric">
-              <strong>4</strong>
-              <span>Redactions applied</span>
-              <p>Visible text and inputs</p>
-            </div>
-            <div class="proof-metric">
-              <strong>1</strong>
-              <span>History entry</span>
-              <p>Stored with local file actions</p>
-            </div>
-          </div>
+      <section class="cleanup-demo-section" id="cleanup-demo">
+        <div class="section-head" data-reveal>
+          <p class="kicker">Demo</p>
+          <h2>Watch a busy article become a clean capture.</h2>
+          <p class="section-body">
+            A crowded page comes in. Lumen clears floating UI, loads deferred media, flags sensitive
+            details, and saves a calmer reference to share.
+          </p>
+        </div>
 
-          <div class="proof-summary-card">
-            <p class="proof-label">Run summary</p>
-            <div class="proof-summary-grid">
-              <span>URL</span>
-              <strong>proof.lumen.test</strong>
-              <span>Files</span>
-              <strong>4</strong>
-              <span>Views</span>
-              <strong>3</strong>
-              <span>Redactions</span>
-              <strong>4</strong>
-            </div>
-          </div>
-
-          <div class="proof-download-card">
-            <p class="proof-label">Try the artifact</p>
-            <h3>Inspect the current sample bundle.</h3>
-            <p class="card-note">
-              Download the same proof package shown on this page and inspect the images, bundle
-              manifest, and extracted signals directly.
+        <div class="cleanup-demo" data-cleanup-demo data-reveal>
+          <div class="cleanup-demo-copy">
+            <p class="support-label">Animated example</p>
+            <h3>From cluttered page to clean capture.</h3>
+            <p>
+              The article keeps its headline, layout, and useful page context. Cookie banners, ads,
+              chat launchers, and sticky bars get cleared from the final capture.
             </p>
-            <div class="proof-actions">
-              <a class="proof-link proof-link-strong" href="assets/proof-run-bundle.zip" download>
-                Download proof bundle
-              </a>
-              <a class="proof-link" href="assets/proof-run-summary.json" target="_blank" rel="noreferrer">
-                Open run summary
-              </a>
+            <button class="cleanup-replay-button" type="button" data-cleanup-replay>
+              Replay cleanup
+            </button>
+            <div class="cleanup-mode-controls" aria-label="Demo stage">
+              <button type="button" data-cleanup-mode="cluttered">Cluttered</button>
+              <button type="button" data-cleanup-mode="cleaning">Cleaning</button>
+              <button type="button" data-cleanup-mode="review">Ready</button>
+            </div>
+          </div>
+
+          <div class="cleanup-browser" aria-label="Animated cluttered article cleanup">
+            <div class="cleanup-browser-head">
+              <span></span>
+              <span></span>
+              <span></span>
+              <strong>daily-desk.example</strong>
+            </div>
+
+            <div class="clutter-page">
+              <div class="clutter-sticky clutter-floating">Live updates</div>
+              <article class="news-article">
+                <p class="news-section">City Desk</p>
+                <h3>Transit plan clears final vote after a long budget session</h3>
+                <div class="article-meta">
+                  <span>By Maya Chen</span>
+                  <span>May 16, 2026</span>
+                </div>
+                <div class="article-lines">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <div class="article-photo">
+                  <span></span>
+                </div>
+                <div class="article-lines article-lines-short">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              </article>
+
+              <aside class="clutter-ad clutter-floating">
+                <span>Ad</span>
+                <strong>Subscribe today</strong>
+              </aside>
+
+              <div class="clutter-cookie clutter-floating">
+                <span>Cookie preferences</span>
+                <button type="button">Accept</button>
+              </div>
+
+              <div class="clutter-chat clutter-floating" aria-hidden="true">?</div>
+
+              <span class="cleanup-redaction cleanup-redaction-name">Private name</span>
+              <span class="cleanup-redaction cleanup-redaction-email">Contact detail</span>
+              <span class="cleanup-sweep"></span>
+              <span class="cleanup-capture-frame"></span>
+              <span class="cleanup-complete-badge">Clean capture ready</span>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="support-section" id="product">
+      <section class="support-section" id="features">
         <div class="section-head" data-reveal>
-          <p class="kicker">Current product scope</p>
-          <h2>What the build already does, and what still needs product work.</h2>
+          <p class="kicker">Features</p>
+          <h2>A better capture starts before the screenshot.</h2>
           <p class="section-body">
-            The current prototype already covers the capture workflow itself. The remaining work is
-            around editing, sync, and broader product layers.
+            Lumen is built for the moment when a screenshot has to explain what happened and keep
+            the page context close by.
           </p>
         </div>
 
-        <div class="support-grid">
-          <div class="support-flow-card" data-reveal>
-            <p class="support-label">How it works</p>
-            <div class="support-flow-steps">
-              <article>
-                <strong>1</strong>
-                <h3>Clean the page</h3>
-                <p>Remove sticky headers, banners, chat launchers, and overlay chrome.</p>
-              </article>
-              <article>
-                <strong>2</strong>
-                <h3>Load everything</h3>
-                <p>Force lazy content to render before the stitched capture starts.</p>
-              </article>
-              <article>
-                <strong>3</strong>
-                <h3>Capture responsive</h3>
-                <p>Generate desktop, tablet, and mobile outputs in one grouped bundle.</p>
-              </article>
-              <article>
-                <strong>4</strong>
-                <h3>Redact and extract</h3>
-                <p>Blur visible sensitive data and keep colors, fonts, CTA, and nav attached.</p>
-              </article>
+        <div class="function-grid">
+          <article class="function-card" data-reveal>
+            <div class="function-demo demo-clean-page" aria-hidden="true">
+              <span class="demo-window-bar"></span>
+              <span class="demo-noise-chip demo-noise-one">Cookie banner</span>
+              <span class="demo-noise-chip demo-noise-two">Chat</span>
+              <span class="demo-clean-line demo-clean-title"></span>
+              <span class="demo-clean-line"></span>
+              <span class="demo-clean-line short"></span>
+              <span class="demo-clean-sweep"></span>
             </div>
-          </div>
+            <span>Clean page</span>
+            <h3>Clear the page before saving.</h3>
+            <p>Hide sticky bars, cookie banners, ads, and chat widgets so the capture shows the page itself.</p>
+          </article>
 
-          <div class="support-visual" data-reveal>
-            <div class="support-panel support-panel-split">
-              <div class="support-split-block">
-                <p class="support-label">Implemented now</p>
-                <ul class="support-notes support-notes-tight">
-                  <li>Sticky and overlay cleanup</li>
-                  <li>Lazy-load forcing</li>
-                  <li>Responsive capture sets</li>
-                  <li>Auto-redaction on export</li>
-                  <li>Popup redaction preview</li>
-                  <li>Anchored manual redaction boxes</li>
-                  <li>Cutaway region picker with focused export artifacts</li>
-                  <li>Pre-export review for manual projection and cutaway resolution</li>
-                  <li>Anchored capture note</li>
-                  <li>Signals extraction</li>
-                  <li>Bundle manifest JSON sidecar with output health</li>
-                  <li>Local history with expanded run details and copyable summaries</li>
-                  <li>Tail remeasurement and stall retry</li>
-                </ul>
-              </div>
-
-              <div class="support-split-block support-split-next">
-                <p class="support-label">Next</p>
-                <ul class="support-notes support-notes-tight">
-                  <li>Freeform annotations</li>
-                  <li>Opt-in region watch</li>
-                  <li>Explicit agent handoff</li>
-                  <li>Cloud sync and team handoff</li>
-                  <li>Visual diffs</li>
-                  <li>Auth, billing, and plans</li>
-                </ul>
-              </div>
+          <article class="function-card" data-reveal>
+            <div class="function-demo demo-responsive-set" aria-hidden="true">
+              <span class="demo-device demo-device-desktop"></span>
+              <span class="demo-device demo-device-tablet"></span>
+              <span class="demo-device demo-device-phone"></span>
             </div>
-          </div>
+            <span>Responsive set</span>
+            <h3>Save the layouts people compare.</h3>
+            <p>Capture desktop, tablet, and mobile views together when the layout shift matters.</p>
+          </article>
+
+          <article class="function-card" data-reveal>
+            <div class="function-demo demo-redaction-scan" aria-hidden="true">
+              <span class="demo-redact-line wide"></span>
+              <span class="demo-redact-line"></span>
+              <span class="demo-redact-line short"></span>
+              <span class="demo-redact-mask mask-one">Email</span>
+              <span class="demo-redact-mask mask-two">Token</span>
+            </div>
+            <span>Redaction</span>
+            <h3>Mark sensitive details before saving.</h3>
+            <p>Find visible emails, phone numbers, tokens, and filled fields before the image leaves Chrome.</p>
+          </article>
+
+          <article class="function-card" data-reveal>
+            <div class="function-demo demo-lasso-select" aria-hidden="true">
+              <span class="demo-lasso-card"></span>
+              <span class="demo-lasso-path"></span>
+              <span class="demo-lasso-crop">Crop</span>
+            </div>
+            <span>Lasso crop</span>
+            <h3>Trace the useful part.</h3>
+            <p>Draw around a chart, card, image, or irregular region and save that focused crop beside the page.</p>
+          </article>
+
+          <article class="function-card" data-reveal>
+            <div class="function-demo demo-timed-capture" aria-hidden="true">
+              <span class="demo-clock"><i></i></span>
+              <span class="demo-timed-shot shot-one"></span>
+              <span class="demo-timed-shot shot-two"></span>
+              <span class="demo-timed-shot shot-three"></span>
+            </div>
+            <span>Timed capture</span>
+            <h3>Watch a saved area.</h3>
+            <p>Run the same region on a cadence, pause it anytime, and collect each result in the capture shelf.</p>
+          </article>
+
+          <article class="function-card" data-reveal>
+            <div class="function-demo demo-long-page" aria-hidden="true">
+              <span class="demo-tall-page"></span>
+              <span class="demo-page-tile tile-one"></span>
+              <span class="demo-page-tile tile-two"></span>
+              <span class="demo-page-tile tile-three"></span>
+            </div>
+            <span>Long pages</span>
+            <h3>Keep tall pages readable.</h3>
+            <p>Save one image when it fits, split into tiles when it helps, or add a print sheet for PDF.</p>
+          </article>
+
+          <article class="function-card" data-reveal>
+            <div class="function-demo demo-capture-shelf" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <span>Capture shelf</span>
+            <h3>Pick up the latest files fast.</h3>
+            <p>Browse recent captures and timed runs in a compact grid, then copy, open, or show the files.</p>
+          </article>
+
+          <article class="function-card" data-reveal>
+            <div class="function-demo demo-destination-route" aria-hidden="true">
+              <span class="demo-route-file"></span>
+              <span class="demo-route-line"></span>
+              <span class="demo-route-target target-chat">Chat</span>
+              <span class="demo-route-target target-agent">Agent</span>
+            </div>
+            <span>Destinations</span>
+            <h3>Send captures where work happens.</h3>
+            <p>Queue captures for a team space, document, webhook, or agent chat after the final check.</p>
+          </article>
         </div>
       </section>
 
@@ -411,14 +493,14 @@
 
               <div class="workflow-layer layer-clean">
                 <p class="workflow-caption">Before capture</p>
-              <ul class="workflow-points">
-                <li>Sticky header hidden</li>
-                <li>Cookie banner suppressed</li>
-                <li>Chat widget suppressed</li>
-                <li>Lazy media forced</li>
-                <li>Late overlays checked again after scroll</li>
-              </ul>
-            </div>
+                <ul class="workflow-points">
+                  <li>Sticky header hidden</li>
+                  <li>Cookie banner removed</li>
+                  <li>Chat widget hidden</li>
+                  <li>Lazy media loaded</li>
+                  <li>Late overlays checked again</li>
+                </ul>
+              </div>
 
               <div class="workflow-layer layer-responsive">
                 <p class="workflow-caption">Responsive set</p>
@@ -430,24 +512,24 @@
               </div>
 
               <div class="workflow-layer layer-redact">
-                <p class="workflow-caption">Sensitive regions blurred</p>
+                <p class="workflow-caption">Redaction check</p>
                 <div class="workflow-chip-row">
                   <span>Email</span>
                   <span>Phone</span>
                   <span>Token</span>
-                  <span>Filled field</span>
+                  <span>Field</span>
                 </div>
               </div>
 
               <div class="workflow-layer layer-inspect">
-                <p class="workflow-caption">Page context attached</p>
+                <p class="workflow-caption">Page context</p>
                 <div class="workflow-signal-grid">
                   <span>Palette</span>
                   <span>Fonts</span>
-                  <span>Hero line</span>
+                  <span>Headline</span>
                   <span>CTA</span>
                   <span>Navigation</span>
-                  <span>Layout density</span>
+                  <span>Layout</span>
                 </div>
               </div>
             </div>
@@ -457,304 +539,164 @@
         <div class="workflow-rail">
           <div class="section-head" data-reveal>
             <p class="kicker">Workflow</p>
-            <h2>Capture with the context still attached.</h2>
+            <h2>Capture the page and the reason it matters.</h2>
             <p class="section-body">
-              Lumen is most useful when it removes downstream cleanup work. A useful capture
-              should hand over a better artifact than a plain PNG.
+              A useful capture should be clean enough to share and detailed enough to understand
+              later.
             </p>
           </div>
 
           <article class="workflow-step is-active" data-step="clean" data-reveal>
             <span>Clean</span>
-            <h3>Remove page chrome before the first pixel is saved.</h3>
+            <h3>Remove the noise that gets in the way.</h3>
             <p>
-              Sticky layers, floating widgets, lazy-loaded media, and custom scroll roots are
-              handled as part of capture. New overlays inserted after initial cleanup are checked
-              again before slices are saved.
+              Lumen prepares the page by hiding common blockers and loading deferred content before
+              the screenshot pass begins.
             </p>
           </article>
 
           <article class="workflow-step" data-step="responsive" data-reveal>
-            <span>Capture set</span>
-            <h3>Generate the layout set across key viewports.</h3>
+            <span>Capture</span>
+            <h3>Save the layouts people compare.</h3>
             <p>
-              The current build can produce desktop, tablet, and mobile outputs in one grouped
-              bundle so review threads have the right layout context from the start.
+              Capture the active page, a specific device size, or a responsive set when a project
+              needs more than one viewport.
             </p>
           </article>
 
           <article class="workflow-step" data-step="redact" data-reveal>
-            <span>Sanitize</span>
-            <h3>Protect the export before it is passed around.</h3>
+            <span>Check</span>
+            <h3>Check sensitive details before sharing.</h3>
             <p>
-              Sensitive visible text and filled fields can be blurred in the export pipeline.
-              Current redaction should be reviewed before external sharing.
+              Redaction is part of the save flow, with detected regions and manual boxes ready
+              before saving.
             </p>
           </article>
 
           <article class="workflow-step" data-step="inspect" data-reveal>
-            <span>Attach context</span>
-            <h3>Keep page signals beside the image.</h3>
+            <span>Context</span>
+            <h3>Keep the page signals close to the image.</h3>
             <p>
-              Palette, fonts, hero copy, CTA language, and navigation signals make the capture more
-              useful in design review, QA, and product documentation.
+              The saved capture can include the page title, URL, colors, fonts, headline, CTA, and
+              navigation labels.
             </p>
           </article>
         </div>
       </section>
 
-      <section class="mechanics-section" id="mechanics">
+      <section class="product-system-section" id="product-system">
         <div class="section-head" data-reveal>
-          <p class="kicker">Mechanics</p>
-          <h2>Implementation details that matter.</h2>
+          <p class="kicker">Plans</p>
+          <h2>Use Lumen where capture work actually happens.</h2>
           <p class="section-body">
-            The value depends on capture reliability. These details are where the product either
-            works or falls apart.
+            Start with local clean captures. Add responsive sets, timed areas, and shared
+            destinations when the workflow needs more structure.
           </p>
         </div>
 
-        <div class="mechanics-grid">
-          <article class="mechanic-row" data-reveal>
-            <strong>DOM cleanup</strong>
-            <p>
-              Fixed, sticky, and high-z layers are hidden before the stitched pass, tracked during
-              capture, and restored afterward.
-            </p>
+        <div class="plan-grid">
+          <article class="plan-card" data-reveal>
+            <p class="support-label">Local Free</p>
+            <h3>Capture a page cleanly.</h3>
+            <p>Page cleanup, manual boxes, focused crops, notes, page context, and local history.</p>
           </article>
 
-          <article class="mechanic-row" data-reveal>
-            <strong>Late overlay suppression</strong>
-            <p>
-              A mutation observer watches for cookie banners, chat launchers, and other high-layer
-              UI that appears after the first cleanup pass.
-            </p>
+          <article class="plan-card plan-card-featured" data-reveal>
+            <p class="support-label">Pro</p>
+            <h3>Handle multi-view review.</h3>
+            <p>Responsive sets, auto-redaction, framed outputs, long-page tiles, and saved print sheets.</p>
           </article>
 
-          <article class="mechanic-row" data-reveal>
-            <strong>Lazy-load preflight</strong>
-            <p>
-              The page is force-scrolled before capture, lazy media is nudged toward eager loading,
-              and visible assets are given a short settle window before slices are taken.
-            </p>
-          </article>
-
-          <article class="mechanic-row" data-reveal>
-            <strong>Nested scroll support</strong>
-            <p>
-              Lumen detects custom scroll containers and captures against the active scroll root
-              instead of assuming the entire document.
-            </p>
-          </article>
-
-          <article class="mechanic-row" data-reveal>
-            <strong>Adaptive page height</strong>
-            <p>
-              The capture loop updates page height while it scrolls, so late-loading content can
-              extend the document without being clipped from the final export.
-            </p>
-          </article>
-
-          <article class="mechanic-row" data-reveal>
-            <strong>Tail remeasurement and stall retry</strong>
-            <p>
-              Before Lumen marks a page complete, it remeasures the scroll surface and retries a
-              few stalled advances. That catches late-growing bottoms and reduces premature stops.
-            </p>
-          </article>
-
-          <article class="mechanic-row" data-reveal>
-            <strong>Retina stitcher with tile fallback</strong>
-            <p>
-              Offscreen compositing respects device pixel ratio and falls back to tiled raw exports
-              on very tall pages.
-            </p>
-          </article>
-
-          <article class="mechanic-row" data-reveal>
-            <strong>Responsive capture bundle</strong>
-            <p>
-              Desktop, tablet, and mobile viewports can be generated in one run and archived
-              together.
-            </p>
-          </article>
-
-          <article class="mechanic-row" data-reveal>
-            <strong>Cutaway export foundation</strong>
-            <p>
-              The popup can open a page overlay, let the user draw one focused region, and store
-              that region locally for the current URL. Captures can export focused cutaway crops
-              when that region resolves. Scheduled watch remains a later opt-in layer.
-            </p>
-          </article>
-
-          <article class="mechanic-row" data-reveal>
-            <strong>Local-first history</strong>
-            <p>
-              New captures are saved into dated folders, then listed in popup history with artifact
-              counts, views, redactions, notes, page signals, and actions to open or reveal the
-              saved output. Sync, auth, and billing still need product work.
-            </p>
+          <article class="plan-card" data-reveal>
+            <p class="support-label">Team</p>
+            <h3>Keep repeated captures moving.</h3>
+            <p>Timed captures, shared destinations, review handoff, and longer retention controls.</p>
           </article>
         </div>
       </section>
 
-      <section class="audience-section">
+      <section class="store-section" id="chrome-store">
         <div class="section-head" data-reveal>
-          <p class="kicker">Use cases</p>
-          <h2>Start where screenshots already move through review.</h2>
+          <p class="kicker">Chrome Store</p>
+          <h2>A Chrome Store page that shows the real product.</h2>
           <p class="section-body">
-            The first buyer story is narrow on purpose: teams that already capture pages and then
-            spend time cleaning, explaining, and reformatting them.
+            The listing leads with the control surface, plain permission language, and screenshots
+            that match the extension people install.
           </p>
         </div>
 
-        <div class="audience-list">
-          <article class="audience-row" data-reveal>
-            <h3>Design review</h3>
-            <p>
-              Clean responsive references and attached page signals help design teams compare
-              layouts without rebuilding context from scratch.
-            </p>
-          </article>
-
-          <article class="audience-row" data-reveal>
-            <h3>QA evidence</h3>
-            <p>
-              Cleaner exports, responsive bundles, and safer redaction make bug reporting and
-              environment capture more usable.
-            </p>
-          </article>
-
-          <article class="audience-row" data-reveal>
-            <h3>Product review</h3>
-            <p>
-              Product teams can capture the live page with headline, CTA, and navigation context
-              intact instead of passing around flat screenshots.
-            </p>
-          </article>
+        <div class="store-showcase" data-reveal>
+          <figure class="store-shot store-shot-large">
+            <img src="assets/store-control-surface.png" alt="Lumen extension control surface screenshot" />
+            <figcaption>Control surface</figcaption>
+          </figure>
+          <div class="store-shot-stack">
+            <figure class="store-shot">
+              <img src="assets/store-review-actions.png" alt="Lumen quick capture actions screenshot" />
+              <figcaption>Quick actions</figcaption>
+            </figure>
+            <figure class="store-shot">
+              <img src="assets/store-responsive-set.png" alt="Responsive capture set screenshot" />
+              <figcaption>Responsive set</figcaption>
+            </figure>
+          </div>
         </div>
 
-        <p class="section-note" data-reveal>
-          Broader archive, sync, and monitoring workflows remain future direction. The main story
-          here is cleaner review evidence.
-        </p>
+        <div class="store-readiness-grid">
+          <article class="store-readiness-card" data-reveal>
+            <span>Single purpose</span>
+            <h3>Capture cleaner webpage references.</h3>
+            <p>Page cleanup, responsive screenshots, redaction checks, notes, signals, and local history stay in one workflow.</p>
+          </article>
+
+          <article class="store-readiness-card" data-reveal>
+            <span>Clear permissions</span>
+            <h3>Capture starts from the toolbar.</h3>
+            <p>Active tab access is used for the current page. Site access for responsive views is requested only when that workflow needs it.</p>
+          </article>
+
+          <article class="store-readiness-card" data-reveal>
+            <span>Store page</span>
+            <h3>Screenshots match the product.</h3>
+            <p>The screenshots show the popup, quick actions, responsive views, and saved outputs.</p>
+          </article>
+        </div>
       </section>
 
-      <section class="region-section">
-        <div class="section-head" data-reveal>
-          <p class="kicker">Focused region work</p>
-          <h2>A practical path from cutaway capture to watch and agent handoff.</h2>
-          <p class="section-body">
-            The current build stores a selected page region and exports focused crops when that
-            region resolves during capture. Watch and external handoff stay later opt-in layers.
-          </p>
-        </div>
-
+      <section class="privacy-section" id="privacy">
         <div class="scope-grid">
-          <article class="scope-panel" data-reveal>
-            <p class="support-label">Implemented now</p>
-            <h3>Reusable region selection</h3>
+          <article class="scope-panel privacy-panel" data-reveal>
+            <p class="support-label">Local by default</p>
+            <h2>Your captures stay with you.</h2>
             <p class="card-note">
-              The extension can open a page overlay and save one rectangular cutaway region for the
-              current URL. The next capture adds cutaway PNGs for views where the region resolves.
+              Lumen stores settings and history in Chrome extension storage. Image files are saved
+              through Chrome Downloads so you control where they are stored.
+            </p>
+            <a class="text-link" href="privacy.html">Read the privacy policy</a>
+          </article>
+
+          <article class="scope-panel privacy-panel" data-reveal>
+            <p class="support-label">Share with care</p>
+            <h2>Care stays part of the flow.</h2>
+            <p class="card-note">
+              Redaction highlights visible sensitive details during the save check. Check each capture
+              before sending it outside your workspace.
             </p>
           </article>
-
-          <article class="scope-panel" data-reveal>
-            <p class="support-label">Next product layer</p>
-            <h3>Review before automation</h3>
-            <p class="card-note">
-              Continuous watch should wait until pause controls, retention, and review flow are in
-              place. The current cutaway export gives that workflow a concrete artifact first.
-            </p>
-          </article>
         </div>
       </section>
 
-      <section class="scope-section" id="scope">
-        <div class="section-head" data-reveal>
-          <p class="kicker">Current scope</p>
-          <h2>Separate present proof from later product layers.</h2>
-            <p class="section-body">
-              The current prototype already supports the capture workflow described on this page. The
-            next product layer is most likely studio output and team handoff rather than a broad
-            monitoring suite.
-          </p>
-        </div>
-
-        <div class="scope-grid">
-          <article class="scope-panel" data-reveal>
-            <p class="support-label">Present day</p>
-            <h3>What the build already does</h3>
-            <ul class="scope-list">
-              <li>Clean sticky, fixed, and overlay page chrome before capture</li>
-              <li>Generate desktop, tablet, and mobile bundles in one run</li>
-              <li>Preview and blur sensitive text and filled fields in exports</li>
-              <li>Project anchored manual redaction boxes into responsive captures when the source element still resolves</li>
-              <li>Review auto-redaction counts, manual projection, and cutaway resolution before export</li>
-              <li>Add one anchored capture note into the export</li>
-              <li>Extract palette, font, hero, CTA, and navigation signals</li>
-              <li>Store one cutaway region per URL and export focused cutaway PNGs when it resolves</li>
-              <li>Store local capture history with bundle metadata, run details, copyable summaries, and file actions</li>
-            </ul>
-          </article>
-
-          <article class="scope-panel" data-reveal>
-            <p class="support-label">Future direction</p>
-            <h3>What still needs product work</h3>
-            <ul class="scope-list">
-              <li>Freeform annotation tools and visual pre-export box previews</li>
-              <li>Explicit region watch controls with pause, retention, and review flow</li>
-              <li>Agent handoff with redaction review before sending</li>
-              <li>Cloud sync and team handoff workflows</li>
-              <li>User accounts, billing, and plan gating</li>
-              <li>Visual diffs after the capture workflow is stronger</li>
-            </ul>
-          </article>
-        </div>
-      </section>
-
-      <section class="cta-section" id="docs" data-reveal>
-        <p class="kicker">Implemented now</p>
-        <h2>Lumen is early. The current build already handles cleanup, capture, redaction preview, manual boxes, pre-export review, cutaway export, anchored notes, signals, local run details, and a portable bundle manifest.</h2>
-        <p>
-          The repository already covers page cleanup, responsive capture bundles, redaction preview,
-          export redaction, anchored manual redaction boxes, pre-export projection review, focused
-          cutaway PNGs, capture notes, page-signal extraction, bundle metadata with output health,
-          dated download folders, local history actions, and copyable capture summaries. The next
-          work is visual box previews, freeform annotation, sync, auth, and billing.
-        </p>
-
-        <div class="cta-actions">
-          <a
-            class="primary-link"
-            href="https://github.com/CaptainFredric/lumen-extension"
-            target="_blank"
-            rel="noreferrer"
-          >
-            View the code
-          </a>
-          <a
-            class="secondary-link"
-            href="https://github.com/CaptainFredric"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Follow Dan DeBugger
-          </a>
-        </div>
-      </section>
     </main>
 
     <footer class="site-footer">
       <p>Lumen</p>
       <span>
-        Browser capture workflow for design review, QA, and product work.
+        Clean webpage capture for design review, QA, and product work.
         <a href="privacy.html">Privacy</a>
         <a href="https://github.com/CaptainFredric/lumen-extension" target="_blank" rel="noreferrer">GitHub</a>
       </span>
     </footer>
 
-    <script src="script.js?v=20260511-control-surface"></script>
+    <script src="script.js?v=20260516-public"></script>
   </body>
 </html>

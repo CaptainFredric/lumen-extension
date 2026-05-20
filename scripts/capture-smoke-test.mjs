@@ -337,8 +337,26 @@ async function runManualProjectionSmoke(browser, contentScript) {
 
     const stored = await page.evaluate(() => window.__LUMEN_LAST_RUNTIME_MESSAGE__?.payload?.regions?.[0]);
     const recordContext = await page.evaluate(() => window.__LUMEN_LAST_RUNTIME_MESSAGE__?.payload?.context);
-    await page.keyboard.press("Escape");
+    const manualPickerUi = await page.evaluate(() => ({
+      title: document.querySelector("#lumen-redaction-picker .lumen-picker-title")?.textContent?.trim() || "",
+      hint: document.querySelector("#lumen-redaction-picker .lumen-picker-hint")?.textContent?.trim() || "",
+      count: document.querySelector("#lumen-redaction-picker .lumen-picker-count")?.textContent?.trim() || "",
+      primary: document.querySelector("#lumen-redaction-picker .lumen-picker-primary")?.textContent?.trim() || "",
+      label: document.querySelector("#lumen-redaction-picker .lumen-redaction-box")?.dataset.label || ""
+    }));
+    await page.keyboard.press("Enter");
+    const manualPickerClosed = await page.evaluate(() => !document.querySelector("#lumen-redaction-picker"));
     assert(stored?.anchor?.selector === "#secret-card", "Manual box did not store a usable DOM anchor", stored);
+    assert(
+      manualPickerUi.title === "Manual redaction" &&
+        manualPickerUi.hint === "Marked areas are hidden in saved captures." &&
+        manualPickerUi.count === "1 area" &&
+        manualPickerUi.primary === "Save" &&
+        manualPickerUi.label === "Hidden",
+      "Manual picker UI did not render the polished controls.",
+      manualPickerUi
+    );
+    assert(manualPickerClosed, "Manual picker did not close on Enter.");
 
     await page.setViewportSize({ width: 390, height: 900 });
     await page.evaluate(() =>
@@ -411,17 +429,66 @@ async function runCutawayRegionSmoke(browser, contentScript) {
 
     const message = await page.evaluate(() => window.__LUMEN_LAST_RUNTIME_MESSAGE__);
     const region = message?.payload?.region;
-    await page.getByRole("button", { name: "Done" }).click();
+    const cutawayPickerUi = await page.evaluate(() => ({
+      title: document.querySelector("#lumen-cutaway-picker .lumen-picker-title")?.textContent?.trim() || "",
+      count: document.querySelector("#lumen-cutaway-picker .lumen-picker-count")?.textContent?.trim() || "",
+      primary: document.querySelector("#lumen-cutaway-picker .lumen-picker-primary")?.textContent?.trim() || "",
+      label: document.querySelector("#lumen-cutaway-picker .lumen-cutaway-box")?.dataset.label || ""
+    }));
+    await page.getByRole("button", { name: "Save" }).click();
 
     assert(message?.type === "LUMEN_CUTAWAY_REGION_UPDATED", "Cutaway picker did not publish its region.", message);
     assert(region?.kind === "cutaway", "Cutaway picker did not store a cutaway region kind.", region);
     assert(region.width > 240 && region.height > 120, "Cutaway region geometry is too small.", region);
     assert(region.anchor?.selector === "#pricing-card", "Cutaway region did not store a stable DOM anchor.", region);
+    assert(
+      cutawayPickerUi.title === "Focused crop" &&
+        cutawayPickerUi.count === "Region selected" &&
+        cutawayPickerUi.primary === "Save" &&
+        cutawayPickerUi.label === "Capture area",
+      "Cutaway picker UI did not render the polished controls.",
+      cutawayPickerUi
+    );
 
     record("cutaway region picker", {
       selector: region.anchor.selector,
       width: region.width,
       height: region.height
+    });
+
+    await page.evaluate(() => window.__LUMEN_TEST_API__.startCutawayRegionPicker({ selectionMode: "lasso" }));
+    await page.mouse.move(targetBox.x + 34, targetBox.y + 34);
+    await page.mouse.down();
+    await page.mouse.move(targetBox.x + targetBox.width - 42, targetBox.y + 40, { steps: 6 });
+    await page.mouse.move(targetBox.x + targetBox.width - 34, targetBox.y + 150, { steps: 6 });
+    await page.mouse.move(targetBox.x + 48, targetBox.y + 156, { steps: 6 });
+    await page.mouse.move(targetBox.x + 34, targetBox.y + 34, { steps: 6 });
+    await page.mouse.up();
+
+    const lassoMessage = await page.evaluate(() => window.__LUMEN_LAST_RUNTIME_MESSAGE__);
+    const lassoRegion = lassoMessage?.payload?.region;
+    const lassoPickerUi = await page.evaluate(() => ({
+      title: document.querySelector("#lumen-cutaway-picker .lumen-picker-title")?.textContent?.trim() || "",
+      count: document.querySelector("#lumen-cutaway-picker .lumen-picker-count")?.textContent?.trim() || "",
+      primary: document.querySelector("#lumen-cutaway-picker .lumen-picker-primary")?.textContent?.trim() || "",
+      label: document.querySelector("#lumen-cutaway-picker .lumen-cutaway-box")?.dataset.label || ""
+    }));
+    await page.getByRole("button", { name: "Save" }).click();
+
+    assert(lassoRegion?.shape === "lasso", "Lasso picker did not store lasso geometry.", lassoRegion);
+    assert(lassoRegion.points?.length >= 4, "Lasso picker did not retain the drawn points.", lassoRegion);
+    assert(
+      lassoPickerUi.title === "Lasso capture" &&
+        lassoPickerUi.count === "Lasso selected" &&
+        lassoPickerUi.primary === "Save" &&
+        lassoPickerUi.label === "Lasso area",
+      "Lasso picker UI did not render the polished controls.",
+      lassoPickerUi
+    );
+
+    record("lasso region picker", {
+      selector: lassoRegion.anchor.selector,
+      pointCount: lassoRegion.points.length
     });
 
     await page.evaluate(() => window.__LUMEN_TEST_API__.startAnnotationRegionPicker());
@@ -432,7 +499,13 @@ async function runCutawayRegionSmoke(browser, contentScript) {
 
     const annotationMessage = await page.evaluate(() => window.__LUMEN_LAST_RUNTIME_MESSAGE__);
     const annotationRegion = annotationMessage?.payload?.region;
-    await page.getByRole("button", { name: "Done" }).click();
+    const annotationPickerUi = await page.evaluate(() => ({
+      title: document.querySelector("#lumen-annotation-picker .lumen-picker-title")?.textContent?.trim() || "",
+      count: document.querySelector("#lumen-annotation-picker .lumen-picker-count")?.textContent?.trim() || "",
+      primary: document.querySelector("#lumen-annotation-picker .lumen-picker-primary")?.textContent?.trim() || "",
+      label: document.querySelector("#lumen-annotation-picker .lumen-annotation-box")?.dataset.label || ""
+    }));
+    await page.getByRole("button", { name: "Save" }).click();
     const resolvedAnnotation = await page.evaluate((payload) => window.__LUMEN_TEST_API__.resolveAnnotationRegion(payload), {
       region: annotationRegion,
       context: annotationMessage?.payload?.context
@@ -442,6 +515,14 @@ async function runCutawayRegionSmoke(browser, contentScript) {
     assert(annotationRegion?.kind === "annotation", "Annotation picker did not store an annotation region kind.", annotationRegion);
     assert(annotationRegion.anchor?.selector === "#pricing-card", "Annotation region did not store a stable DOM anchor.", annotationRegion);
     assert(resolvedAnnotation.region?.kind === "annotation", "Annotation region did not resolve as an annotation.", resolvedAnnotation);
+    assert(
+      annotationPickerUi.title === "Capture note" &&
+        annotationPickerUi.count === "Callout selected" &&
+        annotationPickerUi.primary === "Save" &&
+        annotationPickerUi.label === "Note target",
+      "Annotation picker UI did not render the polished controls.",
+      annotationPickerUi
+    );
 
     record("annotation callout picker", {
       selector: annotationRegion.anchor.selector,

@@ -23,7 +23,10 @@ const MAX_BODY_BYTES = 1_000_000;
 const MAX_CAPTURE_HISTORY = 500;
 const MAX_SESSION_CAPTURES = 200;
 const MAX_WATCH_PLANS = 100;
+const MAX_WATCH_RUNS = 300;
 const MAX_AGENT_JOBS = 200;
+const MAX_DESTINATIONS = 100;
+const MAX_DELIVERIES = 500;
 const ALLOWED_RETENTION_DAYS = new Set([0, 7, 30, 90, 180, 365]);
 const DELETE_CONFIRMATION = "DELETE LUMEN DATA";
 
@@ -31,7 +34,10 @@ const defaultStore = {
   sessions: [],
   captures: [],
   watchPlans: [],
+  watchRuns: [],
   agentJobs: [],
+  destinations: [],
+  deliveries: [],
   dataControls: [],
   integrations: buildDefaultIntegrations()
 };
@@ -62,7 +68,10 @@ async function handleRequest(request, response) {
           sessions: store.sessions.length,
           captures: store.captures.length,
           watchPlans: store.watchPlans.length,
-          agentJobs: store.agentJobs.length
+          watchRuns: store.watchRuns.length,
+          agentJobs: store.agentJobs.length,
+          destinations: store.destinations.length,
+          deliveries: store.deliveries.length
         }
       });
     }
@@ -136,6 +145,12 @@ async function handleRequest(request, response) {
       });
     }
 
+    if (request.method === "GET" && url.pathname === "/v1/product-readiness") {
+      const store = await readStore();
+      const session = findSession(store, request.headers["x-lumen-session"]);
+      return respondJson(response, 200, buildProductReadinessPayload(store, session));
+    }
+
     if (segments[0] === "v1" && segments[1] === "data-controls") {
       return await handleDataControlsRoute({ request, response });
     }
@@ -156,8 +171,20 @@ async function handleRequest(request, response) {
       return await handleWatchPlansRoute({ request, response, url, segments });
     }
 
+    if (segments[0] === "v1" && segments[1] === "watch-runs") {
+      return await handleWatchRunsRoute({ request, response, url, segments });
+    }
+
     if (segments[0] === "v1" && segments[1] === "agent-jobs") {
       return await handleAgentJobsRoute({ request, response, url, segments });
+    }
+
+    if (segments[0] === "v1" && segments[1] === "destinations") {
+      return await handleDestinationsRoute({ request, response, url, segments });
+    }
+
+    if (segments[0] === "v1" && segments[1] === "deliveries") {
+      return await handleDeliveriesRoute({ request, response, url, segments });
     }
 
     return respondJson(response, 404, {
@@ -348,6 +375,94 @@ async function handleWatchPlansRoute({ request, response, url, segments }) {
   });
 }
 
+async function handleWatchRunsRoute({ request, response, url, segments }) {
+  const store = await readStore();
+  const session = requireSession(store, request);
+
+  if (!session) {
+    return respondJson(response, 401, {
+      error: "Missing or invalid session."
+    });
+  }
+
+  const runId = segments[2] || "";
+
+  if (request.method === "GET" && !runId) {
+    const limit = parseLimit(url.searchParams.get("limit"), MAX_WATCH_RUNS, MAX_WATCH_RUNS);
+    const watchPlanId = normalizeText(url.searchParams.get("watchPlanId"), "", 120);
+    const watchRuns = store.watchRuns
+      .filter((entry) => entry.sessionId === session.id)
+      .filter((entry) => !watchPlanId || entry.watchPlanId === watchPlanId)
+      .slice(0, limit)
+      .map(publicWatchRun);
+
+    return respondJson(response, 200, {
+      watchRuns
+    });
+  }
+
+  if (request.method === "POST" && !runId) {
+    const body = await readJsonBody(request);
+    requireFeatureAccess(session, "regionWatch", "Timed capture");
+    const watchRun = normalizeWatchRun(body, session.id);
+
+    if (watchRun.watchPlanId) {
+      const planExists = store.watchPlans.some((entry) => entry.sessionId === session.id && entry.id === watchRun.watchPlanId);
+
+      if (!planExists) {
+        throw createHttpError(404, "Watch plan not found for this run.");
+      }
+    }
+
+    store.watchRuns = [
+      watchRun,
+      ...store.watchRuns.filter((entry) => !(entry.sessionId === session.id && entry.id === watchRun.id))
+    ].slice(0, MAX_WATCH_RUNS);
+    store.watchPlans = store.watchPlans.map((plan) => (
+      plan.sessionId === session.id && plan.id === watchRun.watchPlanId
+        ? {
+            ...plan,
+            lastRunAt: watchRun.completedAt || watchRun.startedAt || watchRun.scheduledAt,
+            updatedAt: new Date().toISOString()
+          }
+        : plan
+    ));
+    await writeStore(store);
+
+    return respondJson(response, 201, {
+      watchRun: publicWatchRun(watchRun)
+    });
+  }
+
+  const existingIndex = store.watchRuns.findIndex((entry) => entry.sessionId === session.id && entry.id === runId);
+
+  if (existingIndex === -1) {
+    return respondJson(response, 404, {
+      error: "Watch run not found."
+    });
+  }
+
+  if (request.method === "GET") {
+    return respondJson(response, 200, {
+      watchRun: publicWatchRun(store.watchRuns[existingIndex])
+    });
+  }
+
+  if (request.method === "DELETE") {
+    store.watchRuns.splice(existingIndex, 1);
+    await writeStore(store);
+
+    return respondJson(response, 200, {
+      ok: true,
+      deletedId: runId
+    });
+  }
+
+  return respondJson(response, 405, {
+    error: "Method not allowed."
+  });
+}
+
 async function handleAgentJobsRoute({ request, response, url, segments }) {
   const store = await readStore();
   const session = requireSession(store, request);
@@ -412,6 +527,160 @@ async function handleAgentJobsRoute({ request, response, url, segments }) {
 
     return respondJson(response, 200, {
       agentJob: publicAgentJob(updated)
+    });
+  }
+
+  return respondJson(response, 405, {
+    error: "Method not allowed."
+  });
+}
+
+async function handleDestinationsRoute({ request, response, url, segments }) {
+  const store = await readStore();
+  const session = requireSession(store, request);
+
+  if (!session) {
+    return respondJson(response, 401, {
+      error: "Missing or invalid session."
+    });
+  }
+
+  const destinationId = segments[2] || "";
+
+  if (request.method === "GET" && !destinationId) {
+    const limit = parseLimit(url.searchParams.get("limit"), MAX_DESTINATIONS, MAX_DESTINATIONS);
+    const destinations = store.destinations
+      .filter((entry) => entry.sessionId === session.id)
+      .slice(0, limit)
+      .map(publicDestination);
+
+    return respondJson(response, 200, {
+      destinations
+    });
+  }
+
+  if (request.method === "POST" && !destinationId) {
+    const body = await readJsonBody(request);
+    requireDestinationFeatureAccess(session, body?.type || "local");
+    const destination = normalizeDestination(body, session.id);
+
+    store.destinations = [
+      destination,
+      ...store.destinations.filter((entry) => !(entry.sessionId === session.id && entry.id === destination.id))
+    ].slice(0, MAX_DESTINATIONS);
+    await writeStore(store);
+
+    return respondJson(response, 201, {
+      destination: publicDestination(destination)
+    });
+  }
+
+  const existingIndex = store.destinations.findIndex((entry) => entry.sessionId === session.id && entry.id === destinationId);
+
+  if (existingIndex === -1) {
+    return respondJson(response, 404, {
+      error: "Destination not found."
+    });
+  }
+
+  if (request.method === "GET") {
+    return respondJson(response, 200, {
+      destination: publicDestination(store.destinations[existingIndex])
+    });
+  }
+
+  if (request.method === "PATCH") {
+    const body = await readJsonBody(request);
+    const updated = normalizeDestinationUpdate(store.destinations[existingIndex], body);
+    requireDestinationFeatureAccess(session, updated.type);
+    store.destinations[existingIndex] = updated;
+    await writeStore(store);
+
+    return respondJson(response, 200, {
+      destination: publicDestination(updated)
+    });
+  }
+
+  if (request.method === "DELETE") {
+    store.destinations.splice(existingIndex, 1);
+    await writeStore(store);
+
+    return respondJson(response, 200, {
+      ok: true,
+      deletedId: destinationId
+    });
+  }
+
+  return respondJson(response, 405, {
+    error: "Method not allowed."
+  });
+}
+
+async function handleDeliveriesRoute({ request, response, url, segments }) {
+  const store = await readStore();
+  const session = requireSession(store, request);
+
+  if (!session) {
+    return respondJson(response, 401, {
+      error: "Missing or invalid session."
+    });
+  }
+
+  const deliveryId = segments[2] || "";
+
+  if (request.method === "GET" && !deliveryId) {
+    const limit = parseLimit(url.searchParams.get("limit"), MAX_DELIVERIES, MAX_DELIVERIES);
+    const deliveries = store.deliveries
+      .filter((entry) => entry.sessionId === session.id)
+      .slice(0, limit)
+      .map(publicDelivery);
+
+    return respondJson(response, 200, {
+      deliveries
+    });
+  }
+
+  if (request.method === "POST" && !deliveryId) {
+    const body = await readJsonBody(request);
+    requireExplicitOptIn(body, "Capture delivery");
+    requireReviewedPayload(body, "Capture delivery");
+    const destination = resolveDeliveryDestination(store, session.id, body?.destinationId || body?.destination || "local");
+    requireDestinationFeatureAccess(session, destination.type);
+    const delivery = normalizeDelivery(body, session.id, destination);
+
+    store.deliveries = [
+      delivery,
+      ...store.deliveries.filter((entry) => !(entry.sessionId === session.id && entry.id === delivery.id))
+    ].slice(0, MAX_DELIVERIES);
+    await writeStore(store);
+
+    return respondJson(response, 201, {
+      delivery: publicDelivery(delivery)
+    });
+  }
+
+  const existingIndex = store.deliveries.findIndex((entry) => entry.sessionId === session.id && entry.id === deliveryId);
+
+  if (existingIndex === -1) {
+    return respondJson(response, 404, {
+      error: "Delivery not found."
+    });
+  }
+
+  if (request.method === "GET") {
+    return respondJson(response, 200, {
+      delivery: publicDelivery(store.deliveries[existingIndex])
+    });
+  }
+
+  if (request.method === "PATCH") {
+    const body = await readJsonBody(request);
+    const updated = normalizeDeliveryUpdate(store.deliveries[existingIndex], body);
+    store.deliveries[existingIndex] = updated;
+    await writeStore(store);
+
+    return respondJson(response, 200, {
+      delivery: publicDelivery(updated)
     });
   }
 
@@ -524,7 +793,10 @@ function normalizeStore(store = {}) {
     sessions: Array.isArray(store.sessions) ? store.sessions.map(normalizeSessionRecord).filter(Boolean).slice(0, 100) : [],
     captures: Array.isArray(store.captures) ? store.captures.map(normalizeStoredCapture).filter(Boolean).slice(0, MAX_CAPTURE_HISTORY) : [],
     watchPlans: Array.isArray(store.watchPlans) ? store.watchPlans.map(normalizeStoredWatchPlan).filter(Boolean).slice(0, MAX_WATCH_PLANS) : [],
+    watchRuns: Array.isArray(store.watchRuns) ? store.watchRuns.map(normalizeStoredWatchRun).filter(Boolean).slice(0, MAX_WATCH_RUNS) : [],
     agentJobs: Array.isArray(store.agentJobs) ? store.agentJobs.map(normalizeStoredAgentJob).filter(Boolean).slice(0, MAX_AGENT_JOBS) : [],
+    destinations: Array.isArray(store.destinations) ? store.destinations.map(normalizeStoredDestination).filter(Boolean).slice(0, MAX_DESTINATIONS) : [],
+    deliveries: Array.isArray(store.deliveries) ? store.deliveries.map(normalizeStoredDelivery).filter(Boolean).slice(0, MAX_DELIVERIES) : [],
     dataControls: Array.isArray(store.dataControls) ? store.dataControls.map(normalizeStoredDataControls).filter(Boolean).slice(0, 100) : [],
     integrations: Array.isArray(store.integrations) && store.integrations.length ? store.integrations : buildDefaultIntegrations()
   };
@@ -625,19 +897,28 @@ function deleteSessionData(store, sessionId) {
   const before = {
     captures: store.captures.length,
     watchPlans: store.watchPlans.length,
+    watchRuns: store.watchRuns.length,
     agentJobs: store.agentJobs.length,
+    destinations: store.destinations.length,
+    deliveries: store.deliveries.length,
     dataControls: store.dataControls.length
   };
 
   store.captures = store.captures.filter((entry) => entry.sessionId !== sessionId);
   store.watchPlans = store.watchPlans.filter((entry) => entry.sessionId !== sessionId);
+  store.watchRuns = store.watchRuns.filter((entry) => entry.sessionId !== sessionId);
   store.agentJobs = store.agentJobs.filter((entry) => entry.sessionId !== sessionId);
+  store.destinations = store.destinations.filter((entry) => entry.sessionId !== sessionId);
+  store.deliveries = store.deliveries.filter((entry) => entry.sessionId !== sessionId);
   store.dataControls = store.dataControls.filter((entry) => entry.sessionId !== sessionId);
 
   return {
     captures: before.captures - store.captures.length,
     watchPlans: before.watchPlans - store.watchPlans.length,
+    watchRuns: before.watchRuns - store.watchRuns.length,
     agentJobs: before.agentJobs - store.agentJobs.length,
+    destinations: before.destinations - store.destinations.length,
+    deliveries: before.deliveries - store.deliveries.length,
     dataControls: before.dataControls - store.dataControls.length
   };
 }
@@ -745,6 +1026,7 @@ function normalizeWatchPlan(body, sessionId) {
     url: url.href,
     host: url.host,
     status: normalizeStatus(body.status, ["active", "paused"], "paused"),
+    selectionMode: normalizeStatus(body.selectionMode || region.shape, ["rect", "lasso", "viewport"], "rect"),
     region,
     schedule: normalizeSchedule(body.schedule),
     destination: normalizeText(body.destination, "local", 80),
@@ -776,6 +1058,7 @@ function normalizeWatchPlanUpdate(existing, body) {
     ...existing,
     ...(typeof body.title === "string" ? { title: normalizeText(body.title, existing.title, 160) } : {}),
     ...(typeof body.status === "string" ? { status: normalizeStatus(body.status, ["active", "paused"], existing.status) } : {}),
+    ...(typeof body.selectionMode === "string" ? { selectionMode: normalizeStatus(body.selectionMode, ["rect", "lasso", "viewport"], existing.selectionMode || "rect") } : {}),
     ...(body.region ? { region: normalizeRegion(body.region) || existing.region } : {}),
     ...(body.schedule ? { schedule: normalizeSchedule(body.schedule) } : {}),
     ...(typeof body.destination === "string" ? { destination: normalizeText(body.destination, existing.destination, 80) } : {}),
@@ -792,6 +1075,51 @@ function normalizeWatchPlanUpdate(existing, body) {
 
 function publicWatchPlan(plan) {
   const { sessionId, ...publicRecord } = plan;
+  return publicRecord;
+}
+
+function normalizeWatchRun(body, sessionId) {
+  if (!body || typeof body !== "object") {
+    throw createHttpError(400, "Watch run payload is required.");
+  }
+
+  const url = safeUrl(body.url);
+  const now = new Date().toISOString();
+
+  return {
+    id: normalizeText(body.id, `watch-run-${randomUUID()}`, 120),
+    sessionId,
+    watchPlanId: normalizeText(body.watchPlanId, "", 120),
+    captureId: normalizeText(body.captureId, "", 120),
+    title: normalizeText(body.title, url?.hostname || "Timed capture", 160),
+    url: url?.href || "",
+    host: url?.host || "",
+    status: normalizeStatus(body.status, ["queued", "running", "captured", "skipped", "failed"], "queued"),
+    scheduledAt: normalizeIsoDate(body.scheduledAt || now),
+    startedAt: body.startedAt ? normalizeIsoDate(body.startedAt) : "",
+    completedAt: body.completedAt ? normalizeIsoDate(body.completedAt) : "",
+    fileCount: normalizeInteger(body.fileCount),
+    files: normalizeStringArray(body.files, 20, 240),
+    error: normalizeText(body.error, "", 240),
+    createdAt: normalizeIsoDate(body.createdAt || now),
+    updatedAt: normalizeIsoDate(body.updatedAt || now)
+  };
+}
+
+function normalizeStoredWatchRun(run) {
+  if (!run || typeof run !== "object" || !run.sessionId) {
+    return null;
+  }
+
+  try {
+    return normalizeWatchRun(run, run.sessionId);
+  } catch {
+    return null;
+  }
+}
+
+function publicWatchRun(run) {
+  const { sessionId, ...publicRecord } = run;
   return publicRecord;
 }
 
@@ -852,10 +1180,238 @@ function publicAgentJob(job) {
   return publicRecord;
 }
 
+const DESTINATION_TYPES = new Set([
+  "local",
+  "webhook",
+  "slack",
+  "agent-chat",
+  "google-drive",
+  "notion",
+  "teams",
+  "email"
+]);
+
+function normalizeDestination(body, sessionId) {
+  if (!body || typeof body !== "object") {
+    throw createHttpError(400, "Destination payload is required.");
+  }
+
+  const type = normalizeDestinationType(body.type);
+
+  if (type !== "local") {
+    requireExplicitOptIn(body, "Capture destination");
+  }
+
+  const now = new Date().toISOString();
+  const endpointUrl = safeUrl(body.endpointUrl || body.webhookUrl || body.url || "");
+  const endpointHost = endpointUrl?.host || normalizeText(body.endpointHost, "", 160);
+  const endpointLabel = normalizeText(
+    body.endpointLabel || body.channel || body.room || endpointHost,
+    type === "local" ? "Local history" : "Connected destination",
+    160
+  );
+
+  return {
+    id: normalizeText(body.id, `destination-${randomUUID()}`, 120),
+    sessionId,
+    type,
+    label: normalizeText(body.label, defaultDestinationLabel(type), 120),
+    status: normalizeStatus(body.status, ["active", "paused"], "active"),
+    endpointLabel,
+    endpointHost,
+    deliveryMode: normalizeStatus(body.deliveryMode, ["manual", "capture", "watch"], "manual"),
+    includeImages: body.includeImages !== false,
+    includeManifest: body.includeManifest !== false,
+    includeSummary: body.includeSummary !== false,
+    explicitOptIn: type === "local" || hasExplicitOptIn(body),
+    consentAcceptedAt: type === "local" ? "" : normalizeIsoDate(body.consentAcceptedAt || now),
+    routing: normalizePlainObject(body.routing, 20),
+    createdAt: normalizeIsoDate(body.createdAt || now),
+    updatedAt: normalizeIsoDate(body.updatedAt || now)
+  };
+}
+
+function normalizeStoredDestination(destination) {
+  if (!destination || typeof destination !== "object" || !destination.sessionId) {
+    return null;
+  }
+
+  try {
+    return normalizeDestination({
+      ...destination,
+      explicitOptIn: destination.type === "local" || destination.explicitOptIn === true || Boolean(destination.consentAcceptedAt)
+    }, destination.sessionId);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeDestinationUpdate(existing, body = {}) {
+  const candidate = {
+    ...existing,
+    ...body,
+    type: body.type || existing.type,
+    explicitOptIn: existing.explicitOptIn || hasExplicitOptIn(body),
+    consentAcceptedAt: hasExplicitOptIn(body)
+      ? normalizeIsoDate(body.consentAcceptedAt || existing.consentAcceptedAt || new Date().toISOString())
+      : existing.consentAcceptedAt,
+    updatedAt: new Date().toISOString()
+  };
+
+  return normalizeDestination(candidate, existing.sessionId);
+}
+
+function publicDestination(destination) {
+  const { sessionId, ...publicRecord } = destination;
+  return publicRecord;
+}
+
+function normalizeDelivery(body, sessionId, destination) {
+  if (!body || typeof body !== "object") {
+    throw createHttpError(400, "Delivery payload is required.");
+  }
+
+  const captureId = normalizeText(body.captureId, "", 120);
+  const watchPlanId = normalizeText(body.watchPlanId, "", 120);
+
+  if (!captureId && !watchPlanId) {
+    throw createHttpError(400, "Delivery requires a captureId or watchPlanId.");
+  }
+
+  const now = new Date().toISOString();
+
+  return {
+    id: normalizeText(body.id, `delivery-${randomUUID()}`, 120),
+    sessionId,
+    status: normalizeStatus(body.status, ["queued", "sending", "delivered", "failed", "cancelled"], "queued"),
+    trigger: normalizeStatus(body.trigger, ["manual", "capture", "watch"], "manual"),
+    destinationId: destination.id,
+    destinationType: destination.type,
+    destinationLabel: destination.label,
+    captureId,
+    watchPlanId,
+    explicitOptIn: true,
+    payloadReviewed: true,
+    files: normalizeStringArray(body.files, 80, 320),
+    payloadSummary: normalizePlainObject(body.payloadSummary || body.payloadPreview, 40),
+    attempts: normalizeInteger(body.attempts),
+    lastAttemptAt: body.lastAttemptAt ? normalizeIsoDate(body.lastAttemptAt) : "",
+    result: body.result && typeof body.result === "object" ? normalizePlainObject(body.result, 60) : null,
+    error: normalizeText(body.error, "", 240),
+    createdAt: normalizeIsoDate(body.createdAt || now),
+    updatedAt: normalizeIsoDate(body.updatedAt || now)
+  };
+}
+
+function normalizeStoredDelivery(delivery) {
+  if (!delivery || typeof delivery !== "object" || !delivery.sessionId) {
+    return null;
+  }
+
+  try {
+    return {
+      id: normalizeText(delivery.id, `delivery-${randomUUID()}`, 120),
+      sessionId: normalizeText(delivery.sessionId, "", 96),
+      status: normalizeStatus(delivery.status, ["queued", "sending", "delivered", "failed", "cancelled"], "queued"),
+      trigger: normalizeStatus(delivery.trigger, ["manual", "capture", "watch"], "manual"),
+      destinationId: normalizeText(delivery.destinationId, "local", 120),
+      destinationType: normalizeDestinationType(delivery.destinationType || delivery.type),
+      destinationLabel: normalizeText(delivery.destinationLabel, defaultDestinationLabel(delivery.destinationType || delivery.type), 120),
+      captureId: normalizeText(delivery.captureId, "", 120),
+      watchPlanId: normalizeText(delivery.watchPlanId, "", 120),
+      explicitOptIn: delivery.explicitOptIn === true || Boolean(delivery.consentAcceptedAt),
+      payloadReviewed: delivery.payloadReviewed === true || delivery.reviewedPayload === true,
+      files: normalizeStringArray(delivery.files, 80, 320),
+      payloadSummary: normalizePlainObject(delivery.payloadSummary || delivery.payloadPreview, 40),
+      attempts: normalizeInteger(delivery.attempts),
+      lastAttemptAt: delivery.lastAttemptAt ? normalizeIsoDate(delivery.lastAttemptAt) : "",
+      result: delivery.result && typeof delivery.result === "object" ? normalizePlainObject(delivery.result, 60) : null,
+      error: normalizeText(delivery.error, "", 240),
+      createdAt: normalizeIsoDate(delivery.createdAt),
+      updatedAt: normalizeIsoDate(delivery.updatedAt || delivery.createdAt)
+    };
+  } catch {
+    return null;
+  }
+}
+
+function normalizeDeliveryUpdate(existing, body = {}) {
+  return {
+    ...existing,
+    ...(typeof body.status === "string" ? { status: normalizeStatus(body.status, ["queued", "sending", "delivered", "failed", "cancelled"], existing.status) } : {}),
+    ...(typeof body.attempts !== "undefined" ? { attempts: normalizeInteger(body.attempts) } : {}),
+    ...(typeof body.lastAttemptAt === "string" ? { lastAttemptAt: normalizeIsoDate(body.lastAttemptAt) } : {}),
+    ...(body.result && typeof body.result === "object" ? { result: normalizePlainObject(body.result, 60) } : {}),
+    ...(typeof body.error === "string" ? { error: normalizeText(body.error, "", 240) } : {}),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function publicDelivery(delivery) {
+  const { sessionId, ...publicRecord } = delivery;
+  return publicRecord;
+}
+
+function resolveDeliveryDestination(store, sessionId, destinationId) {
+  const normalized = normalizeText(destinationId, "local", 120);
+
+  if (normalized === "local") {
+    return {
+      id: "local",
+      type: "local",
+      label: "Local history"
+    };
+  }
+
+  const destination = store.destinations.find((entry) => entry.sessionId === sessionId && entry.id === normalized);
+
+  if (!destination) {
+    throw createHttpError(404, "Delivery destination not found.");
+  }
+
+  return destination;
+}
+
+function requireDestinationFeatureAccess(session, type) {
+  const normalizedType = normalizeDestinationType(type);
+
+  if (normalizedType === "local") {
+    return;
+  }
+
+  if (normalizedType === "agent-chat") {
+    requireFeatureAccess(session, "agentHandoff", "Agent handoff");
+    return;
+  }
+
+  requireFeatureAccess(session, "cloudSync", "Capture destinations");
+}
+
+function normalizeDestinationType(type) {
+  const normalized = normalizeText(type, "local", 40);
+  return DESTINATION_TYPES.has(normalized) ? normalized : "local";
+}
+
+function defaultDestinationLabel(type) {
+  return {
+    local: "Local history",
+    webhook: "Webhook",
+    slack: "Slack",
+    "agent-chat": "Agent chat",
+    "google-drive": "Google Drive",
+    notion: "Notion",
+    teams: "Teams",
+    email: "Email"
+  }[normalizeDestinationType(type)] || "Destination";
+}
+
 function buildSessionStats(store, sessionId) {
   const captures = store.captures.filter((entry) => entry.sessionId === sessionId);
   const watchPlans = store.watchPlans.filter((entry) => entry.sessionId === sessionId);
+  const watchRuns = store.watchRuns.filter((entry) => entry.sessionId === sessionId);
   const agentJobs = store.agentJobs.filter((entry) => entry.sessionId === sessionId);
+  const destinations = store.destinations.filter((entry) => entry.sessionId === sessionId);
+  const deliveries = store.deliveries.filter((entry) => entry.sessionId === sessionId);
   const downloads = captures.flatMap((capture) => Array.isArray(capture.downloads) ? capture.downloads : []);
   const artifactBytes = downloads.reduce((sum, download) => sum + normalizeInteger(download.bytesReceived), 0);
 
@@ -863,13 +1419,101 @@ function buildSessionStats(store, sessionId) {
     captureCount: captures.length,
     watchPlanCount: watchPlans.length,
     activeWatchPlanCount: watchPlans.filter((plan) => plan.status === "active").length,
+    watchRunCount: watchRuns.length,
+    capturedWatchRunCount: watchRuns.filter((run) => run.status === "captured").length,
     agentJobCount: agentJobs.length,
     queuedAgentJobCount: agentJobs.filter((job) => job.status === "queued").length,
+    destinationCount: destinations.length,
+    activeDestinationCount: destinations.filter((destination) => destination.status === "active").length,
+    deliveryCount: deliveries.length,
+    queuedDeliveryCount: deliveries.filter((delivery) => delivery.status === "queued").length,
     fileCount: captures.reduce((sum, capture) => sum + capture.files.length, 0),
     imageCount: downloads.filter((download) => download.kind === "image").length,
     bytesReceived: artifactBytes,
     redactionCount: captures.reduce((sum, capture) => sum + capture.redactionCount, 0),
-    latestCaptureAt: captures[0]?.capturedAt || ""
+    latestCaptureAt: captures[0]?.capturedAt || "",
+    latestWatchRunAt: watchRuns[0]?.completedAt || watchRuns[0]?.startedAt || ""
+  };
+}
+
+function buildProductReadinessPayload(store, session) {
+  const entitlements = getEntitlementsForPlan(session?.plan || "free");
+  const sessionStats = session ? buildSessionStats(store, session.id) : null;
+
+  return {
+    readiness: [
+      {
+        id: "capture-core",
+        label: "Capture core",
+        score: 88,
+        status: "strong",
+        signals: [
+          "Clean full-page capture",
+          "Responsive view set",
+          "Redaction checks",
+          "Focused crop output",
+          "Local history"
+        ]
+      },
+      {
+        id: "review-loop",
+        label: "Save flow",
+        score: 78,
+        status: "solid",
+        signals: [
+          "Manual boxes",
+          "Callout notes",
+          "Page context",
+          "Backend history sync"
+        ]
+      },
+      {
+        id: "team-automation",
+        label: "Team automation",
+        score: 62,
+        status: "forming",
+        signals: [
+          "Timed region watch records",
+          "Timed run shelf",
+          "Destination queue",
+          "Agent handoff queue",
+          "Retention controls"
+        ]
+      }
+    ],
+    completeness: {
+      capture: ["page cleanup", "lazy-load preflight", "responsive views", "framed output"],
+      review: ["auto-redaction", "manual boxes", "focused crop", "callout note"],
+      operations: ["local history", "backend sync", "watch plans", "watch run shelf", "delivery queue", "agent jobs"]
+    },
+    monetization: [
+      {
+        plan: "free",
+        label: "Local Free",
+        buyer: "Individual reviewer",
+        value: "Clean single-page capture, manual boxes, local history."
+      },
+      {
+        plan: "pro",
+        label: "Pro",
+        buyer: "Designer, QA, or product lead",
+        value: "Responsive sets, auto-redaction, framed output, and backend history sync."
+      },
+      {
+        plan: "team",
+        label: "Team",
+        buyer: "Capture-heavy product team",
+        value: "Shared destinations, timed watch records, agent handoff jobs, and higher retention."
+      }
+    ],
+    session: session
+      ? {
+          id: session.id,
+          plan: entitlements.plan,
+          label: entitlements.label,
+          stats: sessionStats
+        }
+      : null
   };
 }
 
@@ -890,10 +1534,12 @@ function normalizeRegion(region) {
   return {
     id: normalizeText(region.id, `region-${randomUUID()}`, 120),
     kind: "cutaway",
+    shape: normalizeStatus(region.shape, ["rect", "lasso"], Array.isArray(region.points) && region.points.length ? "lasso" : "rect"),
     left,
     top,
     width,
     height,
+    points: normalizeRegionPoints(region.points),
     sourceViewport: region.sourceViewport && typeof region.sourceViewport === "object"
       ? normalizePlainObject(region.sourceViewport, 12)
       : null,
@@ -901,6 +1547,16 @@ function normalizeRegion(region) {
       ? normalizePlainObject(region.anchor, 20)
       : null
   };
+}
+
+function normalizeRegionPoints(points) {
+  return (Array.isArray(points) ? points : [])
+    .map((point) => ({
+      x: normalizeInteger(point?.x),
+      y: normalizeInteger(point?.y)
+    }))
+    .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+    .slice(0, 120);
 }
 
 function normalizeSchedule(schedule = {}) {
@@ -1009,12 +1665,12 @@ function requireExplicitOptIn(body, label) {
   throw createHttpError(400, `${label} requires explicit opt-in.`);
 }
 
-function requireReviewedPayload(body = {}) {
+function requireReviewedPayload(body = {}, label = "Agent handoff") {
   if (body.payloadReviewed === true || body.reviewedPayload === true) {
     return;
   }
 
-  throw createHttpError(400, "Agent handoff requires a reviewed payload before queuing.");
+  throw createHttpError(400, `${label} requires a reviewed payload before queuing.`);
 }
 
 function requireFeatureAccess(session, featureName, label) {
@@ -1117,28 +1773,34 @@ function buildDefaultIntegrations() {
       description: "Keep captures, watch plans, and agent jobs on this machine."
     },
     {
+      id: "webhook",
+      label: "Webhook queue",
+      status: "queueable",
+      description: "Queue reviewed capture payloads for a configured endpoint."
+    },
+    {
+      id: "agent-chat",
+      label: "Agent chat",
+      status: "queueable",
+      description: "Queue reviewed captures for an explicit agent handoff."
+    },
+    {
       id: "google-drive",
       label: "Google Drive",
-      status: "planned",
-      description: "Future destination for reviewed capture bundles."
+      status: "connectable",
+      description: "Destination profile for reviewed capture bundles."
     },
     {
       id: "slack",
       label: "Slack",
-      status: "planned",
-      description: "Future destination for selected review summaries."
+      status: "connectable",
+      description: "Destination profile for selected review summaries."
     },
     {
       id: "notion",
       label: "Notion",
-      status: "planned",
-      description: "Future destination for swipe files and product notes."
-    },
-    {
-      id: "agent",
-      label: "Agent handoff",
-      status: "planned",
-      description: "Future explicit handoff for selected captures after redaction review."
+      status: "connectable",
+      description: "Destination profile for swipe files and product notes."
     }
   ];
 }

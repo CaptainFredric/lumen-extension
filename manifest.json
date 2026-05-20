@@ -2,11 +2,12 @@
   "manifest_version": 3,
   "name": "Lumen",
   "version": "0.2.0",
-  "description": "Clean browser capture for review work: remove page chrome, capture responsive sets, redact data, extract signals, and mark regions.",
+  "description": "Clean webpage capture for review work: cleanup, responsive views, redaction review, notes, signals, and local history.",
   "homepage_url": "https://captainfredric.github.io/lumen-extension/",
   "minimum_chrome_version": "109",
   "permissions": [
     "activeTab",
+    "alarms",
     "downloads",
     "offscreen",
     "scripting",
@@ -24,7 +25,8 @@
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
     "48": "icons/icon-48.png",
-    "128": "icons/icon-128.png"
+    "128": "icons/icon-128.png",
+    "512": "icons/icon-512.png"
   },
   "action": {
     "default_title": "Lumen",

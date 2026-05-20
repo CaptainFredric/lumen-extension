@@ -93,12 +93,13 @@ async function renderSession(session) {
   const renderModel = await buildRenderModel(session);
   const requestedPreset = session.options?.exportPreset || "raw";
   const canRenderSingle = canFitCanvas(renderModel.canvasWidth, renderModel.canvasHeight);
+  const forceTiled = ["tiles", "print"].includes(session.options?.longPageMode);
 
   let outputItems = [];
   let appliedPreset = requestedPreset;
   let tileCount = 0;
 
-  if (canRenderSingle) {
+  if (canRenderSingle && !forceTiled) {
     const baseCanvas = renderSliceCanvas(renderModel, 0, renderModel.canvasHeight);
     const enhancedCanvas = renderPresentationCanvas(baseCanvas, {
       preset: requestedPreset,
@@ -135,6 +136,23 @@ async function renderSession(session) {
       index,
       total: tiledCanvases.length
     }));
+
+    if (canRenderSingle) {
+      const cutawayCanvas = renderCutawayCanvas(
+        renderSliceCanvas(renderModel, 0, renderModel.canvasHeight),
+        renderModel.cutawayRegion
+      );
+
+      if (cutawayCanvas) {
+        outputItems.push({
+          canvas: cutawayCanvas,
+          role: "cutaway",
+          index: 0,
+          total: 1,
+          cutawayRegion: renderModel.cutawayRegion
+        });
+      }
+    }
   }
 
   return {

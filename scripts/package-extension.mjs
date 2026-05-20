@@ -178,7 +178,7 @@ function validateManifest(manifest, errors, warnings) {
     errors.push("Manifest should not request broad host_permissions for the current activeTab posture.");
   }
 
-  const allowedPermissions = new Set(["activeTab", "downloads", "offscreen", "scripting", "storage"]);
+  const allowedPermissions = new Set(["activeTab", "alarms", "downloads", "offscreen", "scripting", "storage"]);
   const unexpectedPermissions = (manifest.permissions || []).filter((permission) => !allowedPermissions.has(permission));
 
   if (unexpectedPermissions.length) {

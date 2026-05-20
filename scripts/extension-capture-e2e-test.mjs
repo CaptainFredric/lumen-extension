@@ -89,6 +89,9 @@ try {
   assert(review.autoRedactionCount >= expectedVariantCount * 3, "Expected pre-export review to scan sensitive regions.", review);
   assert(review.variants?.every((variant) => variant.cutawayApplied), "Expected every reviewed variant to have a cutaway crop ready.", review.variants);
   assert(review.variants?.every((variant) => variant.preview?.pageWidth > 0 && variant.preview?.pageHeight > 0), "Expected every review variant to include preview dimensions.", review.variants);
+  assert(review.outputPlan?.length === 3, "Expected pre-export review to return an output plan.", review.outputPlan);
+  assert(review.outputPlan?.some((item) => item.label === "Files" && /planned/.test(item.value)), "Expected output plan to summarize planned files.", review.outputPlan);
+  assert(review.outputPlan?.some((item) => item.label === "Long Pages"), "Expected output plan to describe long-page behavior.", review.outputPlan);
   assert(
     review.variants?.every((variant) =>
       variant.preview?.regions?.some((region) => region.role === "auto") &&
@@ -97,7 +100,7 @@ try {
     "Expected review preview maps to include auto-redaction and cutaway overlays.",
     review.variants
   );
-  assert(review.warnings?.some((warning) => /reviewed before external sharing/i.test(warning)), "Expected redaction safety warning in pre-export review.", review.warnings);
+  assert(review.warnings?.some((warning) => /check the saved image before sharing/i.test(warning)), "Expected redaction safety warning in pre-export review.", review.warnings);
 
   const response = await popup.evaluate((captureOptions) =>
     chrome.runtime.sendMessage({

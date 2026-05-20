@@ -10,13 +10,13 @@ This file tracks what Lumen needs before a serious Chrome Web Store submission.
 4. Local-first history and region storage.
 5. Clear blocked-page handling for Chrome, Web Store, extension, and internal browser pages.
 6. Manifest description shortened to 131 characters.
-7. Landing page keeps present features separate from future direction.
+7. Landing page keeps present features separate from broader product planning.
 8. Store package script builds a narrow upload ZIP and validates manifest fields, icons, permissions, and blocked development files.
 9. Production manifest no longer requests the broad `tabs` permission.
 10. Public privacy policy exists at `https://captainfredric.github.io/lumen-extension/privacy.html`.
 11. Manifest declares the public homepage URL.
-12. Store screenshot generator creates 1280 by 800 PNGs from actual popup states and current proof assets.
-13. Backend watch and agent routes require explicit opt-in before creating future automation records.
+12. Store screenshot generator creates 1280 by 800 PNGs from actual popup states and current sample capture assets.
+13. Timed capture and agent routes require explicit opt-in before creating automation records.
 
 ## Public URLs
 
@@ -29,10 +29,11 @@ This file tracks what Lumen needs before a serious Chrome Web Store submission.
 Current permissions:
 
 1. `activeTab`: temporary access after user action.
-2. `downloads`: save capture artifacts and manifests.
-3. `offscreen`: compose stitched images in an offscreen document.
-4. `scripting`: inject the capture and cleanup content script.
-5. `storage`: keep settings, local history, manual redactions, and cutaway regions.
+2. `alarms`: run saved timed captures on the cadence the user chooses.
+3. `downloads`: save capture images, tiles, and context files.
+4. `offscreen`: compose stitched images in an offscreen document.
+5. `scripting`: inject the capture and cleanup content script.
+6. `storage`: keep settings, local history, manual redactions, focused regions, timed capture plans, and callout regions.
 
 Optional host permissions:
 
@@ -44,7 +45,7 @@ These are only needed for tablet, mobile, and responsive captures that open temp
 ## Submission Risks To Resolve
 
 1. Keep the Chrome Web Store privacy fields consistent with `PRIVACY.md` and the public privacy URL.
-2. Keep continuous capture disabled until region watch has explicit schedule selection, visible pause controls, retention limits, and delete controls.
+2. Keep timed capture limited to explicit saved regions with visible schedule, pause, run-now, and delete controls.
 3. Keep agent handoff disabled until the user can review exactly what will be sent and choose the destination.
 4. Review generated Chrome Web Store screenshots from `store-assets/screenshots/` against final listing copy.
 5. Fill the single-purpose field from `CHROME_STORE_LISTING.md` without widening the product story.
@@ -65,7 +66,7 @@ The script creates `dist/lumen-extension-0.2.0.zip` and checks:
 4. Declared icon files and PNG dimensions.
 5. Permissions against the current approved list.
 6. Optional host permissions remain limited to `http://*/*` and `https://*/*`.
-7. Development paths such as docs, backend, scripts, node_modules, dist, and proof assets are not included.
+7. Development paths such as docs, backend, scripts, node_modules, dist, and sample capture assets are not included.
 
 ## Screenshot Generation
 

@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "generator": "Lumen proof asset script",
-  "capturedAt": "2026-05-01T04:44:12.850Z",
+  "generator": "Lumen sample asset script",
+  "capturedAt": "2026-05-15T19:30:12.534Z",
   "page": {
     "title": "Orbit Release Manager",
-    "url": "http://proof.lumen.test/",
-    "host": "proof.lumen.test"
+    "url": "http://capture.lumen.test/",
+    "host": "capture.lumen.test"
   },
   "capture": {
     "devicePreset": "responsive",
@@ -22,9 +22,9 @@
     }
   },
   "files": [
-    "proof-run-desktop.png",
-    "proof-run-tablet.png",
-    "proof-run-mobile.png"
+    "capture-run-desktop.png",
+    "capture-run-tablet.png",
+    "capture-run-mobile.png"
   ],
   "pageSignals": {
     "siteType": "Brochure site",

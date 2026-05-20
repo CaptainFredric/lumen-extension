@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-05-01T04:44:05.709Z",
+  "generatedAt": "2026-05-15T19:30:06.074Z",
   "page": {
     "title": "Orbit Release Manager",
-    "url": "http://proof.lumen.test/",
-    "host": "proof.lumen.test",
+    "url": "http://capture.lumen.test/",
+    "host": "capture.lumen.test",
     "description": "Ship product updates with cleaner planning, calmer launches, and clearer status reviews.",
     "scrollMode": "document",
     "scrollContainer": "document"

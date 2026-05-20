@@ -17,15 +17,15 @@
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://captainfredric.github.io/lumen-extension/privacy.html" />
-    <meta property="og:image" content="https://captainfredric.github.io/lumen-extension/assets/proof-social-card.png" />
-    <meta property="og:image:alt" content="Lumen proof card showing a real cleaned capture, redaction example, and extracted signals." />
+    <meta property="og:image" content="https://captainfredric.github.io/lumen-extension/assets/lumen-social-card.png" />
+    <meta property="og:image:alt" content="Lumen browser capture workflow interface." />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Lumen Privacy Policy" />
     <meta
       name="twitter:description"
       content="How Lumen handles screenshots, page metadata, redaction metadata, page signals, and local capture history."
     />
-    <meta name="twitter:image" content="https://captainfredric.github.io/lumen-extension/assets/proof-social-card.png" />
+    <meta name="twitter:image" content="https://captainfredric.github.io/lumen-extension/assets/lumen-social-card.png" />
     <link rel="icon" href="brandmark.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/brandmark-512.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -50,10 +50,9 @@
       </a>
 
       <nav class="site-nav" aria-label="Primary">
-        <a href="./#product">Product</a>
-        <a href="./#proof">Proof</a>
-        <a href="./#mechanics">Implementation</a>
-        <a href="./#scope">Roadmap</a>
+        <a href="./#features">Features</a>
+        <a href="./#cleanup-demo">Demo</a>
+        <a href="./#workflow">Workflow</a>
         <a href="privacy.html" aria-current="page">Privacy</a>
       </nav>
 
@@ -75,8 +74,8 @@
         <p class="kicker">Privacy policy</p>
         <h1>Local-first capture, clear limits.</h1>
         <p class="privacy-lede">
-          Lumen captures webpage evidence for review work. This policy describes what the current
-          prototype handles, where it is stored, and what is not sent off-device by default.
+          Lumen captures webpages for review work. This policy describes what the extension stores
+          locally, how downloads are saved, and how connected features handle data.
         </p>
         <p class="privacy-date">Effective date: May 12, 2026</p>
       </section>
@@ -85,7 +84,7 @@
         <article class="privacy-card">
           <h2>Default behavior</h2>
           <p>
-            The current extension stores capture settings, redaction boxes, cutaway regions,
+            The extension stores capture settings, redaction boxes, focused crop regions,
             extracted page signals, and capture history in the browser. Screenshot files and
             manifest files are saved through Chrome Downloads.
           </p>
@@ -94,17 +93,16 @@
         <article class="privacy-card">
           <h2>No advertising use</h2>
           <p>
-            Lumen does not sell capture data, does not use capture data for personalized
-            advertising, and does not transfer capture data for advertising.
+            Lumen keeps capture data out of personalized advertising, advertising transfers, and
+            data sales.
           </p>
         </article>
 
         <article class="privacy-card">
-          <h2>Future sync is separate</h2>
+          <h2>Connected destinations stay separate</h2>
           <p>
-            Cloud sync, agent handoff, watch automation, billing, and team destinations are future
-            product layers. They should require explicit user action and updated disclosure before
-            data leaves the browser.
+            Cloud sync, agent handoff, scheduled capture, billing, and team destinations require
+            explicit user action and clear disclosure before data leaves the browser.
           </p>
         </article>
       </section>
@@ -112,12 +110,12 @@
       <section class="privacy-policy-body">
         <article>
           <h2>Information Lumen handles</h2>
-          <p>The current build can handle the following data when you use capture, review, or analysis features:</p>
+          <p>Lumen can handle the following data when you use capture, checklist, or analysis features:</p>
           <ul>
             <li>Screenshot images of the page you choose to capture.</li>
             <li>Page URL, title, host, viewport, dimensions, capture time, and export settings.</li>
             <li>Redaction metadata, including detected sensitive regions and manual redaction boxes.</li>
-            <li>Cutaway region metadata, including selected coordinates, dimensions, and projection status.</li>
+            <li>Focused crop metadata, including selected coordinates, dimensions, and projection status.</li>
             <li>Extracted page signals such as colors, fonts, navigation labels, headline text, CTA text, and layout counts.</li>
             <li>Local capture history, file names, Chrome download IDs, and bundle manifest metadata.</li>
             <li>Optional capture notes that you choose to add to an export.</li>
@@ -129,10 +127,10 @@
           <p>Lumen uses this information to provide its user-facing capture workflow:</p>
           <ul>
             <li>Clean sticky headers, cookie banners, chat widgets, and other page chrome before capture.</li>
-            <li>Generate full-page, responsive, redacted, annotated, and cutaway capture artifacts.</li>
+            <li>Generate full-page, responsive, redacted, annotated, and focused crop capture artifacts.</li>
             <li>Build a JSON manifest that keeps capture context attached to the image outputs.</li>
-            <li>Show recent capture history and file actions in the extension popup.</li>
-            <li>Help you review redactions and cutaway resolution before export.</li>
+            <li>Show capture history and file actions in the extension popup.</li>
+            <li>Help you check redactions and focused crop resolution before export.</li>
           </ul>
         </article>
 
@@ -142,25 +140,25 @@
             Lumen stores extension settings and local history using Chrome extension storage.
             Screenshot images and JSON manifests are saved through Chrome Downloads into folders
             named by capture date. You control those files through your browser and operating
-            system. The current build does not provide its own remote retention service.
+            system.
           </p>
           <p>
-            Chrome extension storage and downloaded files are not encrypted by Lumen. Do not capture
-            or retain sensitive pages unless you are comfortable storing those files locally.
+            Chrome extension storage and downloaded files use the protection provided by your
+            browser and operating system. Lumen adds no separate encryption layer. Capture sensitive
+            pages only when you are comfortable storing those files locally.
           </p>
         </article>
 
         <article>
           <h2>Sharing and transfer</h2>
           <p>
-            The current public prototype does not send screenshot content, page text, capture
-            history, redaction metadata, or page signals to a Lumen-owned production service by
-            default. The repository includes a local demo backend for development testing, but it is
-            not a production sync service.
+            By default, screenshot content, page text, capture history, redaction metadata, and
+            page signals stay in the browser and downloaded files. The repository includes a local
+            demo backend for development testing.
           </p>
           <p>
-            If future versions add cloud sync, agent handoff, team destinations, or scheduled watch,
-            those features should be opt-in, visibly controlled, and described before data is sent.
+            Any cloud sync, agent handoff, team destination, or scheduled capture feature should be
+            opt-in, visibly controlled, and described before data is sent.
           </p>
         </article>
 
@@ -168,8 +166,8 @@
           <h2>Limited use disclosure</h2>
           <p>
             Lumen uses information received from Chrome extension APIs only to provide or improve
-            the browser capture workflow described in the product UI and listing. Lumen does not
-            use or transfer that information for personalized advertising, retargeting, or
+            the browser capture workflow described in the product UI and listing. Lumen avoids use
+            or transfer of that information for personalized advertising, retargeting, or
             interest-based advertising.
           </p>
           <p>
@@ -177,8 +175,8 @@
             User Data Policy, including the Limited Use requirements.
           </p>
           <p>
-            Lumen does not allow human review of user capture data unless the user explicitly sends
-            that data for support, review, or another chosen destination.
+            Human review of user capture data happens only when the user explicitly sends that data
+            for support, review, or another chosen destination.
           </p>
         </article>
 

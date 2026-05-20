@@ -30,9 +30,20 @@ const ui = {
   redactionPreviewSummary: document.querySelector("#redactionPreviewSummary"),
   cutawayRegionStatus: document.querySelector("#cutawayRegionStatus"),
   startCutawayPickerButton: document.querySelector("#startCutawayPickerButton"),
+  startLassoPickerButton: document.querySelector("#startLassoPickerButton"),
   clearCutawayButton: document.querySelector("#clearCutawayButton"),
   explainCutawayPlanButton: document.querySelector("#explainCutawayPlanButton"),
   cutawaySummary: document.querySelector("#cutawaySummary"),
+  watchIntervalSelect: document.querySelector("#watchIntervalSelect"),
+  saveWatchPlanButton: document.querySelector("#saveWatchPlanButton"),
+  runWatchPlanNowButton: document.querySelector("#runWatchPlanNowButton"),
+  watchPlanCard: document.querySelector("#watchPlanCard"),
+  watchPlanStatus: document.querySelector("#watchPlanStatus"),
+  watchPlanTitle: document.querySelector("#watchPlanTitle"),
+  watchPlanMeta: document.querySelector("#watchPlanMeta"),
+  toggleWatchPlanButton: document.querySelector("#toggleWatchPlanButton"),
+  deleteWatchPlanButton: document.querySelector("#deleteWatchPlanButton"),
+  watchPlanSummary: document.querySelector("#watchPlanSummary"),
   exportManifest: document.querySelector("#exportManifest"),
   annotationEnabled: document.querySelector("#annotationEnabled"),
   annotationBlock: document.querySelector("#annotationBlock"),
@@ -45,6 +56,7 @@ const ui = {
   annotationPositionButtons: [...document.querySelectorAll("[data-annotation-position]")],
   deviceButtons: [...document.querySelectorAll("[data-device]")],
   exportButtons: [...document.querySelectorAll("[data-export]")],
+  longPageButtons: [...document.querySelectorAll("[data-long-page]")],
   statusPanel: document.querySelector("#statusPanel"),
   statusEyebrow: document.querySelector("#statusEyebrow"),
   statusTitle: document.querySelector("#statusTitle"),
@@ -62,6 +74,7 @@ const ui = {
   reviewAutoCount: document.querySelector("#reviewAutoCount"),
   reviewManualCount: document.querySelector("#reviewManualCount"),
   reviewCutawayCount: document.querySelector("#reviewCutawayCount"),
+  exportReviewOutputPlan: document.querySelector("#exportReviewOutputPlan"),
   exportReviewVariants: document.querySelector("#exportReviewVariants"),
   exportReviewWarnings: document.querySelector("#exportReviewWarnings"),
   exportReviewCancelButton: document.querySelector("#exportReviewCancelButton"),
@@ -78,6 +91,12 @@ const ui = {
   accountDescription: document.querySelector("#accountDescription"),
   accountPlan: document.querySelector("#accountPlan"),
   accountSource: document.querySelector("#accountSource"),
+  productReadinessList: document.querySelector("#productReadinessList"),
+  destinationSummary: document.querySelector("#destinationSummary"),
+  queueLatestDeliveryButton: document.querySelector("#queueLatestDeliveryButton"),
+  captureShelfCount: document.querySelector("#captureShelfCount"),
+  captureShelfEmpty: document.querySelector("#captureShelfEmpty"),
+  captureShelfGrid: document.querySelector("#captureShelfGrid"),
   dataControlsSummary: document.querySelector("#dataControlsSummary"),
   retentionSelect: document.querySelector("#retentionSelect"),
   cloudSyncEnabled: document.querySelector("#cloudSyncEnabled"),
@@ -136,6 +155,8 @@ let suppressNextCaptureClick = false;
 let launchActionsBlocked = false;
 let launchTargetTab = null;
 let latestHistoryItems = [];
+let latestWatchPlans = [];
+let latestWatchRuns = [];
 let expandedHistoryId = "";
 let exportReviewDecision = null;
 
@@ -188,6 +209,14 @@ chrome.runtime.onMessage.addListener((message) => {
     renderHistory(message.payload || []);
   }
 
+  if (message?.type === "LUMEN_WATCH_PLANS_UPDATED") {
+    renderWatchPlans(message.payload || []);
+  }
+
+  if (message?.type === "LUMEN_WATCH_RUNS_UPDATED") {
+    renderWatchRuns(message.payload || []);
+  }
+
   if (message?.type === "LUMEN_MANUAL_REDACTIONS_UPDATED") {
     renderManualRedactions(message.payload);
   }
@@ -204,9 +233,10 @@ chrome.runtime.onMessage.addListener((message) => {
 async function bootstrap() {
   await restoreSettings();
   bindEvents();
+  const launchStatusPromise = refreshLaunchStatus();
   await restoreAppState();
   applyPlanGates();
-  await refreshLaunchStatus();
+  await launchStatusPromise;
 }
 
 function bindEvents() {
@@ -229,8 +259,13 @@ function bindEvents() {
   ui.startRedactionPickerButton.addEventListener("click", handleStartRedactionPicker);
   ui.clearManualRedactionsButton.addEventListener("click", handleClearManualRedactions);
   ui.startCutawayPickerButton.addEventListener("click", handleStartCutawayPicker);
+  ui.startLassoPickerButton.addEventListener("click", handleStartLassoPicker);
   ui.clearCutawayButton.addEventListener("click", handleClearCutawayRegion);
   ui.explainCutawayPlanButton.addEventListener("click", handleExplainCutawayPlan);
+  ui.saveWatchPlanButton.addEventListener("click", handleSaveWatchPlan);
+  ui.runWatchPlanNowButton.addEventListener("click", handleRunWatchPlanNow);
+  ui.toggleWatchPlanButton.addEventListener("click", handleToggleWatchPlan);
+  ui.deleteWatchPlanButton.addEventListener("click", handleDeleteWatchPlan);
   ui.startAnnotationPickerButton.addEventListener("click", handleStartAnnotationPicker);
   ui.clearAnnotationButton.addEventListener("click", handleClearAnnotationRegion);
 
@@ -248,12 +283,20 @@ function bindEvents() {
 
   for (const button of ui.exportButtons) {
     button.addEventListener("click", () => {
-      if (button.dataset.export !== "raw" && !enforceFeatureAccess("beautify", "Poster export")) {
+      if (button.dataset.export !== "raw" && !enforceFeatureAccess("beautify", "Framed output")) {
         return;
       }
 
       currentSettings.exportPreset = button.dataset.export;
       updateExportButtons();
+      persistCurrentSettings();
+    });
+  }
+
+  for (const button of ui.longPageButtons) {
+    button.addEventListener("click", () => {
+      currentSettings.longPageMode = button.dataset.longPage || "auto";
+      updateLongPageButtons();
       persistCurrentSettings();
     });
   }
@@ -284,7 +327,9 @@ function bindEvents() {
   ui.retentionSelect.addEventListener("change", handleRetentionChange);
   ui.cloudSyncEnabled.addEventListener("change", handleCloudSyncToggle);
   ui.deleteBackendDataButton.addEventListener("click", handleDeleteBackendData);
+  ui.queueLatestDeliveryButton.addEventListener("click", handleQueueLatestDelivery);
   ui.historyList.addEventListener("click", handleHistoryAction);
+  ui.captureShelfGrid.addEventListener("click", handleHistoryAction);
 }
 
 async function restoreSettings() {
@@ -307,6 +352,7 @@ async function restoreSettings() {
   updateAnnotationCounter();
   updateDeviceButtons();
   updateExportButtons();
+  updateLongPageButtons();
   updateAnnotationControls();
   renderRunSummary(currentSettings);
   renderTimeline("idle");
@@ -321,6 +367,8 @@ async function restoreAppState() {
   if (!response?.ok) {
     renderBlueprint(null);
     renderHistory([]);
+    renderWatchPlans([]);
+    renderWatchRuns([]);
     renderSession(currentSession);
     await refreshManualRedactions();
     await refreshCutawayRegion();
@@ -330,11 +378,15 @@ async function restoreAppState() {
 
   renderBlueprint(response.latestBlueprint);
   renderHistory(response.captureHistory || []);
+  renderWatchPlans(response.watchPlans || []);
+  renderWatchRuns(response.watchRuns || []);
   renderSession(response.session || currentSession);
   await refreshManualRedactions();
   await refreshCutawayRegion();
   await refreshAnnotationRegion();
   await refreshDataControls();
+  await refreshProductReadiness();
+  await refreshDestinations();
 }
 
 async function resolveActionTargetTab() {
@@ -370,13 +422,13 @@ async function ensureActionTargetReady(actionLabel = "run this action") {
     renderLaunchStatus({
       state: "blocked",
       title: "Open a normal web page first",
-      detail: "Lumen cannot run capture actions on Chrome, extension, or internal browser pages.",
+      detail: "Lumen runs capture actions on normal webpages. Chrome, extension, and internal browser pages are blocked by the browser.",
       actionsBlocked: true
     });
     showStatus({
       tone: "error",
       eyebrow: "Blocked",
-      title: "No capturable page",
+      title: "Page unavailable",
       detail: `Open an http or https page before asking Lumen to ${actionLabel}.`,
       badge: "Blocked",
       progress: 0.08
@@ -395,7 +447,7 @@ async function ensureActionTargetReady(actionLabel = "run this action") {
   renderLaunchStatus({
     state: "ready",
     title: `${formatTabHost(tab.url)} ready`,
-    detail: "Target tab selected for the next Lumen action.",
+    detail: "Target tab selected for the Lumen action.",
     actionsBlocked: false
   });
 
@@ -412,7 +464,8 @@ async function persistCurrentSettings() {
     annotationText: ui.annotationText.value,
     annotationPosition: currentSettings.annotationPosition,
     devicePreset: currentSettings.devicePreset,
-    exportPreset: currentSettings.exportPreset
+    exportPreset: currentSettings.exportPreset,
+    longPageMode: currentSettings.longPageMode || "auto"
   };
 
   const captureNote = normalizeCaptureNoteOptions(currentSettings);
@@ -421,6 +474,7 @@ async function persistCurrentSettings() {
   currentSettings.annotationPosition = captureNote.position;
   ui.annotationEnabled.checked = captureNote.enabled;
   updateAnnotationCounter();
+  updateLongPageButtons();
   updateAnnotationControls();
   renderRunSummary(currentSettings);
 
@@ -447,6 +501,14 @@ function updateDeviceButtons() {
 function updateExportButtons() {
   for (const button of ui.exportButtons) {
     button.classList.toggle("is-active", button.dataset.export === currentSettings.exportPreset);
+  }
+}
+
+function updateLongPageButtons() {
+  const mode = currentSettings.longPageMode || "auto";
+
+  for (const button of ui.longPageButtons) {
+    button.classList.toggle("is-active", button.dataset.longPage === mode);
   }
 }
 
@@ -499,7 +561,7 @@ function applyPlanGates() {
     const requiresResponsive = button.dataset.device !== "desktop";
     button.disabled = requiresResponsive && !canResponsive;
     button.title = button.disabled
-      ? "Responsive capture is available in Demo Pro and paid plans."
+      ? "Responsive capture is available in advanced mode."
       : "";
 
     if (button.disabled && button.dataset.device === currentSettings.devicePreset) {
@@ -511,7 +573,7 @@ function applyPlanGates() {
     const requiresBeautify = button.dataset.export !== "raw";
     button.disabled = requiresBeautify && !canBeautify;
     button.title = button.disabled
-      ? "Poster export frames are available in Demo Pro and paid plans."
+      ? "Browser and phone frames are available in advanced mode."
       : "";
 
     if (button.disabled && button.dataset.export === currentSettings.exportPreset) {
@@ -667,6 +729,11 @@ async function runQuickAction(action) {
     return;
   }
 
+  if (action === "lasso") {
+    await handleStartLassoPicker();
+    return;
+  }
+
   if (action === "annotate") {
     await handleStartAnnotationPicker();
     return;
@@ -690,7 +757,7 @@ function openHoldMenu(source = "hold") {
   renderLaunchStatus({
     state: "ready",
     title: source === "keyboard" ? "Quick actions open" : "Hold menu ready",
-    detail: "Choose a capture action without digging through settings."
+    detail: "Choose a capture action from the main control."
   });
 }
 
@@ -733,9 +800,9 @@ async function handleCaptureClick() {
       showStatus({
         tone: "neutral",
         stage: "inspect",
-        eyebrow: "Review",
-        title: "Export paused",
-        detail: "Adjust settings, redaction boxes, or cutaway region before starting the export again.",
+        eyebrow: "Check",
+        title: "Save paused",
+        detail: "Adjust settings, redaction boxes, or focused crop region before saving.",
         badge: "Paused",
         progress: 0.18
       });
@@ -770,7 +837,7 @@ async function runApprovedCapture() {
     stage: "prepare",
     eyebrow: "Capture",
     title: "Queueing capture",
-    detail: "Passing the reviewed capture settings into the export pipeline.",
+    detail: "Passing the checked capture settings into the save flow.",
     badge: "Queued",
     progress: 0.05
   });
@@ -822,8 +889,8 @@ async function requestExportReviewBeforeCapture() {
     tone: "neutral",
     stage: "inspect",
     eyebrow: "Review",
-    title: "Preparing export review",
-    detail: "Checking requested viewports for auto-redaction, manual box projection, and cutaway resolution before saving.",
+    title: "Preparing save review",
+    detail: "Checking requested viewports, sensitive regions, manual boxes, and focused crop resolution before saving.",
     badge: "Review",
     progress: 0.16
   });
@@ -837,7 +904,7 @@ async function requestExportReviewBeforeCapture() {
     });
 
     if (!response?.ok) {
-      throw new Error(response?.error?.description || "Export review could not be prepared.");
+      throw new Error(response?.error?.description || "Save check failed to prepare.");
     }
 
     renderExportReview(response);
@@ -846,7 +913,7 @@ async function requestExportReviewBeforeCapture() {
       tone: "neutral",
       stage: "inspect",
       eyebrow: "Review",
-      title: "Review before export",
+      title: "Save check ready",
       detail: buildExportReviewStatusText(response),
       badge: "Confirm",
       progress: 0.24
@@ -857,7 +924,7 @@ async function requestExportReviewBeforeCapture() {
       tone: "error",
       stage: "error",
       eyebrow: "Review",
-      title: "Review failed",
+      title: "Save check failed",
       detail: error.message,
       badge: "Failed",
       progress: 0.12
@@ -949,7 +1016,7 @@ async function handlePreviewRedactions() {
     });
 
     if (!response?.ok) {
-      throw new Error(response?.error?.description || "Redaction scan could not run.");
+      throw new Error(response?.error?.description || "Redaction scan failed.");
     }
 
     renderRedactionPreview(response);
@@ -991,7 +1058,7 @@ async function handleStartRedactionPicker() {
     tone: "neutral",
     eyebrow: "Redact",
     title: "Opening page picker",
-    detail: "Draw boxes over areas to sanitize. Press Done in the page overlay when finished.",
+    detail: "Mark the areas to hide, then save them from the page overlay.",
     badge: "Picker",
     progress: 0.08
   });
@@ -1002,7 +1069,7 @@ async function handleStartRedactionPicker() {
     });
 
     if (!response?.ok) {
-      throw new Error(response?.error?.description || "Manual redaction picker could not start.");
+      throw new Error(response?.error?.description || "Manual redaction picker failed to start.");
     }
 
     renderManualRedactions(response.record);
@@ -1011,7 +1078,7 @@ async function handleStartRedactionPicker() {
       tone: "success",
       eyebrow: "Redact",
       title: "Picker ready on page",
-      detail: "Manual boxes are stored locally for this URL and applied to the next desktop capture.",
+      detail: "Manual boxes are stored for this URL and applied to captures.",
       badge: "Ready",
       progress: 1
     });
@@ -1046,7 +1113,7 @@ async function handleClearManualRedactions() {
     });
 
     if (!response?.ok) {
-      throw new Error(response?.error?.description || "Manual redactions could not be cleared.");
+      throw new Error(response?.error?.description || "Manual redactions failed to clear.");
     }
 
     renderManualRedactions(response.record);
@@ -1055,7 +1122,7 @@ async function handleClearManualRedactions() {
       tone: "neutral",
       eyebrow: "Redact",
       title: "Manual boxes cleared",
-      detail: "The next capture will only use auto-redaction unless you mark new boxes.",
+      detail: "Manual boxes cleared. Mark new boxes to add custom redaction again.",
       badge: "Cleared",
       progress: 0.2
     });
@@ -1088,18 +1155,21 @@ async function handleStartCutawayPicker() {
     tone: "neutral",
     eyebrow: "Cutaway",
     title: "Opening region picker",
-    detail: "Draw one box around the page area you want to reuse. Press Done in the page overlay when finished.",
+    detail: "Choose the page area you want to reuse, then save it from the page overlay.",
     badge: "Picker",
     progress: 0.08
   });
 
   try {
     const response = await chrome.runtime.sendMessage({
-      type: "LUMEN_START_CUTAWAY_PICKER"
+      type: "LUMEN_START_CUTAWAY_PICKER",
+      payload: {
+        selectionMode: "rect"
+      }
     });
 
     if (!response?.ok) {
-      throw new Error(response?.error?.description || "Cutaway picker could not start.");
+      throw new Error(response?.error?.description || "Cutaway picker failed to start.");
     }
 
     renderCutawayRegion(response.record);
@@ -1108,7 +1178,7 @@ async function handleStartCutawayPicker() {
       tone: "success",
       eyebrow: "Cutaway",
       title: "Cutaway picker ready",
-      detail: "The selected region is stored locally for this URL. Continuous watch still needs explicit opt-in and review UI.",
+      detail: "The selected region is stored for this URL and can be used for timed captures.",
       badge: "Ready",
       progress: 1
     });
@@ -1124,6 +1194,373 @@ async function handleStartCutawayPicker() {
   } finally {
     setActionBusy(false);
   }
+}
+
+async function handleStartLassoPicker() {
+  if (actionBusy) {
+    return;
+  }
+
+  if (!(await ensureActionTargetReady("lasso a capture region"))) {
+    return;
+  }
+
+  setActionBusy(true);
+
+  showStatus({
+    tone: "neutral",
+    eyebrow: "Lasso",
+    title: "Opening lasso picker",
+    detail: "Draw around the page area you want to reuse. Lumen saves the lasso and a clean crop around it.",
+    badge: "Picker",
+    progress: 0.08
+  });
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "LUMEN_START_CUTAWAY_PICKER",
+      payload: {
+        selectionMode: "lasso"
+      }
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error?.description || "Lasso picker failed to start.");
+    }
+
+    renderCutawayRegion(response.record);
+
+    showStatus({
+      tone: "success",
+      eyebrow: "Lasso",
+      title: "Lasso region stored",
+      detail: "The lasso is saved for this URL. Captures use the surrounding crop and keep the lasso shape.",
+      badge: "Ready",
+      progress: 1
+    });
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Lasso",
+      title: "Picker failed",
+      detail: error.message,
+      badge: "Failed",
+      progress: 0.12
+    });
+  } finally {
+    setActionBusy(false);
+  }
+}
+
+async function handleSaveWatchPlan() {
+  if (actionBusy) {
+    return;
+  }
+
+  if (!enforceFeatureAccess("regionWatch", "Timed capture")) {
+    return;
+  }
+
+  if (!cutawayRegionRecord.region) {
+    showStatus({
+      tone: "neutral",
+      eyebrow: "Watch",
+      title: "Mark a region first",
+      detail: "Use Mark cutaway or Lasso area, then save that region as a timed capture.",
+      badge: "Choose region",
+      progress: 0.12
+    });
+    return;
+  }
+
+  const tab = await ensureActionTargetReady("save a timed capture");
+
+  if (!tab) {
+    return;
+  }
+
+  const hasWatchAccess = await ensureOriginPermissionForTab(tab, "Timed capture needs site access so Chrome can run the saved region later.");
+
+  if (!hasWatchAccess) {
+    return;
+  }
+
+  setActionBusy(true);
+
+  try {
+    const intervalMinutes = Number(ui.watchIntervalSelect.value) || 60;
+    const response = await chrome.runtime.sendMessage({
+      type: "LUMEN_SAVE_WATCH_PLAN",
+      payload: {
+        title: tab.title || new URL(tab.url).hostname,
+        url: tab.url,
+        status: "active",
+        selectionMode: cutawayRegionRecord.region.shape === "lasso" ? "lasso" : "rect",
+        region: cutawayRegionRecord.region,
+        schedule: {
+          intervalMinutes,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "local"
+        },
+        destination: "local"
+      }
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error?.description || "Timed capture failed to save.");
+    }
+
+    renderWatchPlans([
+      response.watchPlan,
+      ...latestWatchPlans.filter((plan) => plan.id !== response.watchPlan?.id)
+    ].filter(Boolean));
+    renderWatchPlanSummary(response.watchPlan);
+    renderWatchRuns(response.watchRuns || latestWatchRuns);
+    await refreshProductReadiness();
+
+    showStatus({
+      tone: "success",
+      eyebrow: "Watch",
+      title: "Timed capture saved",
+      detail: `${response.watchPlan.title || tab.title || "This page"} will be checked ${formatWatchInterval(intervalMinutes)}.`,
+      badge: "Saved",
+      progress: 1
+    });
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Watch",
+      title: "Timed capture blocked",
+      detail: error.message,
+      badge: "Blocked",
+      progress: 0.12
+    });
+  } finally {
+    setActionBusy(false);
+  }
+}
+
+async function handleRunWatchPlanNow() {
+  if (actionBusy) {
+    return;
+  }
+
+  if (!enforceFeatureAccess("regionWatch", "Timed capture")) {
+    return;
+  }
+
+  const watchPlan = selectActiveWatchPlan();
+
+  if (!watchPlan?.id) {
+    showStatus({
+      tone: "neutral",
+      eyebrow: "Watch",
+      title: "Save a timed capture first",
+      detail: "Mark a focused region, save the timed capture, then run it whenever you need a fresh check.",
+      badge: "Setup",
+      progress: 0.12
+    });
+    return;
+  }
+
+  setActionBusy(true);
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "LUMEN_RUN_WATCH_PLAN_NOW",
+      payload: {
+        watchPlanId: watchPlan.id
+      }
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error?.description || "Timed capture could not run.");
+    }
+
+    renderWatchPlans(response.watchPlans || latestWatchPlans);
+    renderWatchRuns(response.watchRuns || latestWatchRuns);
+
+    const latestRun = (response.watchRuns || []).find((run) => run.watchPlanId === watchPlan.id) || null;
+    const status = latestRun?.status || "captured";
+
+    showStatus({
+      tone: status === "captured" ? "success" : status === "running" ? "neutral" : "error",
+      eyebrow: "Watch",
+      title: status === "captured" ? "Timed capture saved" : "Timed capture updated",
+      detail: formatWatchRunStatus(latestRun, watchPlan),
+      badge: titleCase(status),
+      progress: status === "captured" ? 1 : 0.64
+    });
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Watch",
+      title: "Timed capture blocked",
+      detail: error.message,
+      badge: "Blocked",
+      progress: 0.12
+    });
+  } finally {
+    setActionBusy(false);
+  }
+}
+
+async function handleToggleWatchPlan() {
+  if (actionBusy) {
+    return;
+  }
+
+  if (!enforceFeatureAccess("regionWatch", "Timed capture")) {
+    return;
+  }
+
+  const watchPlan = selectCurrentWatchPlan();
+
+  if (!watchPlan?.id) {
+    showStatus({
+      tone: "neutral",
+      eyebrow: "Watch",
+      title: "Timed capture setup",
+      detail: "Save a focused region before pausing or resuming a timed capture.",
+      badge: "Setup",
+      progress: 0.12
+    });
+    return;
+  }
+
+  const nextStatus = watchPlan.status === "active" ? "paused" : "active";
+  setActionBusy(true);
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "LUMEN_UPDATE_WATCH_PLAN",
+      payload: {
+        watchPlanId: watchPlan.id,
+        patch: {
+          status: nextStatus,
+          explicitOptIn: true
+        }
+      }
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error?.description || "Timed capture could not be updated.");
+    }
+
+    renderWatchPlans(response.watchPlans || latestWatchPlans);
+
+    showStatus({
+      tone: "success",
+      eyebrow: "Watch",
+      title: nextStatus === "active" ? "Timed capture resumed" : "Timed capture paused",
+      detail: nextStatus === "active"
+        ? `${watchPlan.title || "Timed capture"} will run ${formatWatchInterval(watchPlan.schedule?.intervalMinutes || 60)}.`
+        : `${watchPlan.title || "Timed capture"} will stay in the shelf and stop scheduled runs.`,
+      badge: titleCase(nextStatus),
+      progress: 1
+    });
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Watch",
+      title: "Timed capture blocked",
+      detail: error.message,
+      badge: "Blocked",
+      progress: 0.12
+    });
+  } finally {
+    setActionBusy(false);
+  }
+}
+
+async function handleDeleteWatchPlan() {
+  if (actionBusy) {
+    return;
+  }
+
+  const watchPlan = selectCurrentWatchPlan();
+
+  if (!watchPlan?.id) {
+    return;
+  }
+
+  setActionBusy(true);
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "LUMEN_DELETE_WATCH_PLAN",
+      payload: {
+        watchPlanId: watchPlan.id
+      }
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error?.description || "Timed capture could not be cleared.");
+    }
+
+    renderWatchPlans(response.watchPlans || []);
+    renderWatchRuns(response.watchRuns || latestWatchRuns);
+
+    showStatus({
+      tone: "success",
+      eyebrow: "Watch",
+      title: "Timed capture cleared",
+      detail: "Scheduled runs are off. Existing capture shelf items stay available.",
+      badge: "Cleared",
+      progress: 1
+    });
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Watch",
+      title: "Timed capture blocked",
+      detail: error.message,
+      badge: "Blocked",
+      progress: 0.12
+    });
+  } finally {
+    setActionBusy(false);
+  }
+}
+
+async function ensureOriginPermissionForTab(tab, detail) {
+  if (!tab?.url || !isOriginPermissionSupported(tab.url)) {
+    return false;
+  }
+
+  const origin = buildOriginPattern(tab.url);
+  const contains = await chrome.permissions.contains({
+    origins: [origin]
+  });
+
+  if (contains) {
+    return true;
+  }
+
+  showStatus({
+    tone: "neutral",
+    eyebrow: "Permission",
+    title: "Site access needed",
+    detail,
+    badge: "Prompt",
+    progress: 0.08
+  });
+
+  const granted = await chrome.permissions.request({
+    origins: [origin]
+  });
+
+  if (!granted) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Permission",
+      title: "Site access denied",
+      detail: "Chrome needs site access before a timed capture can run in the background.",
+      badge: "Blocked",
+      progress: 0.08
+    });
+  }
+
+  return granted;
 }
 
 async function handleClearCutawayRegion() {
@@ -1143,7 +1580,7 @@ async function handleClearCutawayRegion() {
     });
 
     if (!response?.ok) {
-      throw new Error(response?.error?.description || "Cutaway region could not be cleared.");
+      throw new Error(response?.error?.description || "Cutaway region failed to clear.");
     }
 
     renderCutawayRegion(response.record);
@@ -1152,7 +1589,7 @@ async function handleClearCutawayRegion() {
       tone: "neutral",
       eyebrow: "Cutaway",
       title: "Cutaway cleared",
-      detail: "No reusable region is stored for this URL.",
+      detail: "Save a reusable region for this URL when you need a focused crop.",
       badge: "Cleared",
       progress: 0.2
     });
@@ -1191,7 +1628,7 @@ async function handleStartAnnotationPicker() {
     tone: "neutral",
     eyebrow: "Annotate",
     title: "Opening callout picker",
-    detail: "Draw one box around the page area that should be highlighted in the exported image.",
+    detail: "Draw one box around the page area that should be highlighted in the saved image.",
     badge: "Picker",
     progress: 0.08
   });
@@ -1202,7 +1639,7 @@ async function handleStartAnnotationPicker() {
     });
 
     if (!response?.ok) {
-      throw new Error(response?.error?.description || "Annotation picker could not start.");
+      throw new Error(response?.error?.description || "Annotation picker failed to start.");
     }
 
     renderAnnotationRegion(response.record);
@@ -1211,7 +1648,7 @@ async function handleStartAnnotationPicker() {
       tone: "success",
       eyebrow: "Annotate",
       title: "Callout picker ready",
-      detail: "The selected region is stored locally for this URL and rendered into the next export with the capture note.",
+      detail: "The selected region is stored locally for this URL and rendered into the saved image with the capture note.",
       badge: "Ready",
       progress: 1
     });
@@ -1246,7 +1683,7 @@ async function handleClearAnnotationRegion() {
     });
 
     if (!response?.ok) {
-      throw new Error(response?.error?.description || "Annotation callout could not be cleared.");
+      throw new Error(response?.error?.description || "Annotation callout failed to clear.");
     }
 
     renderAnnotationRegion(response.record);
@@ -1255,7 +1692,7 @@ async function handleClearAnnotationRegion() {
       tone: "neutral",
       eyebrow: "Annotate",
       title: "Callout cleared",
-      detail: "The next export will keep the note text but will not draw a highlighted page region.",
+      detail: "Exports keep the note text and skip the highlighted page region.",
       badge: "Cleared",
       progress: 0.2
     });
@@ -1279,11 +1716,11 @@ function handleExplainCutawayPlan() {
   showStatus({
     tone: "neutral",
     eyebrow: "Cutaway",
-    title: hasRegion ? "Region watch plan" : "Mark a region first",
+    title: hasRegion ? "Focused crop details" : "Mark a region first",
     detail: hasRegion
-      ? "Implemented now: focused cutaway crops during capture. Next layer: opt-in schedules, pause controls, retention limits, and explicit agent handoff destinations."
-      : "Use Mark cutaway to save one page area before capture, watch, or agent handoff planning.",
-    badge: hasRegion ? "Planned" : "No region",
+      ? "The selected region is stored locally for this URL and saved beside matching captures."
+      : "Use Mark cutaway to save one page area for focused crops.",
+    badge: hasRegion ? "Stored" : "Choose region",
     progress: hasRegion ? 0.42 : 0.12
   });
 }
@@ -1299,7 +1736,7 @@ async function ensurePermissionsForCurrentCapture() {
     showStatus({
       tone: "error",
       eyebrow: "Blocked",
-      title: "No capturable page",
+      title: "Page unavailable",
       detail: "Open an http or https page before running tablet, mobile, or responsive capture.",
       badge: "Blocked",
       progress: 0.08
@@ -1334,7 +1771,7 @@ async function ensurePermissionsForCurrentCapture() {
       tone: "error",
       eyebrow: "Permission",
       title: "Site access denied",
-      detail: "Tablet, mobile, and responsive set capture need temporary permission for this site. Desktop capture still works without it.",
+      detail: "Tablet, mobile, and responsive set capture need temporary permission for this site. Desktop capture still works with the active tab permission.",
       badge: "Blocked",
       progress: 0.08
     });
@@ -1353,7 +1790,7 @@ async function handleSignIn() {
       tone: "error",
       eyebrow: "Auth",
       title: "Session bootstrap failed",
-      detail: response?.error?.description || "The demo session could not be started.",
+      detail: response?.error?.description || "Demo session failed to start.",
       badge: "Failed",
       progress: 0.12
     });
@@ -1362,15 +1799,19 @@ async function handleSignIn() {
 
   renderSession(response.session);
   renderHistory(response.captureHistory || []);
+  renderWatchPlans(response.watchPlans || latestWatchPlans);
+  renderWatchRuns(response.watchRuns || []);
   await refreshDataControls();
+  await refreshProductReadiness();
+  await refreshDestinations();
 
   showStatus({
     tone: "success",
     eyebrow: "Auth",
-    title: "Demo session started",
+    title: "Advanced tools enabled",
     detail: response.session.source === "remote"
-      ? "Connected to the backend slice and ready to sync captures."
-      : "Backend was not reachable, so Lumen started a local demo session and kept working.",
+      ? "Advanced access loaded and ready to sync captures."
+      : "The local service is unavailable, so Lumen kept working in this browser.",
     badge: "Ready",
     progress: 1
   });
@@ -1386,6 +1827,8 @@ async function handleSignOut() {
   }
 
   renderSession(response.session);
+  await refreshProductReadiness();
+  await refreshDestinations();
   showStatus({
     tone: "neutral",
     eyebrow: "Auth",
@@ -1401,11 +1844,79 @@ function handleBillingClick() {
 
   showStatus({
     tone: "neutral",
-    eyebrow: "Plan",
-    title: `${entitlements.label} entitlement active`,
-    detail: "This build has plan gates, but billing and account recovery are still production work.",
-    badge: "Plan",
+    eyebrow: "Access",
+    title: `${entitlements.label} access active`,
+    detail: "Current access controls responsive capture, framed output, sync, and history tools.",
+    badge: "Access",
     progress: 0.12
+  });
+}
+
+async function refreshProductReadiness() {
+  const response = await chrome.runtime.sendMessage({
+    type: "LUMEN_GET_PRODUCT_READINESS"
+  });
+
+  renderProductReadiness(response?.readiness);
+}
+
+async function refreshDestinations() {
+  const response = await chrome.runtime.sendMessage({
+    type: "LUMEN_GET_DESTINATIONS"
+  });
+
+  renderDestinationSummary(response?.destinations || []);
+}
+
+async function handleQueueLatestDelivery() {
+  const latest = latestHistoryItems[0];
+
+  if (!latest) {
+    showStatus({
+      tone: "neutral",
+      eyebrow: "Routing",
+      title: "Capture something first",
+      detail: "Run a capture, then queue it for local delivery or a connected destination.",
+      badge: "Empty",
+      progress: 0.1
+    });
+    return;
+  }
+
+  const response = await chrome.runtime.sendMessage({
+    type: "LUMEN_QUEUE_DELIVERY",
+    payload: {
+      captureId: latest.id,
+      files: latest.files || [],
+      payloadSummary: {
+        title: latest.title || latest.host || "Untitled capture",
+        host: latest.host || "",
+        fileCount: latest.files?.length || 0,
+        redactionCount: latest.redactionCount || 0,
+        manifestFile: latest.manifestFile || ""
+      }
+    }
+  });
+
+  if (!response?.ok) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Routing",
+      title: response?.error?.title || "Delivery unavailable",
+      detail: response?.error?.description || "Enable advanced tools before queueing deliveries.",
+      badge: "Blocked",
+      progress: 0.12
+    });
+    return;
+  }
+
+  showStatus({
+    tone: "success",
+    eyebrow: "Routing",
+    title: "Delivery queued",
+    detail: `${latest.title || latest.host || "Capture"} is queued for ${response.delivery.destinationLabel || "local history"}.`,
+    badge: "Queued",
+    progress: 1
   });
 }
 
@@ -1447,7 +1958,7 @@ async function updateDataControls(patch) {
       tone: "error",
       eyebrow: "Data",
       title: response?.error?.title || "Data controls unavailable",
-      detail: response?.error?.description || "Start a demo session with the backend running before changing backend data controls.",
+      detail: response?.error?.description || "Start an advanced session before changing data controls.",
       badge: "Blocked",
       progress: 0.12
     });
@@ -1466,7 +1977,7 @@ async function updateDataControls(patch) {
 }
 
 async function handleDeleteBackendData() {
-  const confirmed = window.confirm("Delete backend capture history, watch records, and agent jobs for this Lumen session?");
+  const confirmed = window.confirm("Delete capture history, timed runs, and delivery jobs for this Lumen session?");
 
   if (!confirmed) {
     return;
@@ -1481,7 +1992,7 @@ async function handleDeleteBackendData() {
       tone: "error",
       eyebrow: "Data",
       title: response?.error?.title || "Delete unavailable",
-      detail: response?.error?.description || "Backend data could not be deleted from this session.",
+      detail: response?.error?.description || "Session data deletion failed.",
       badge: "Blocked",
       progress: 0.12
     });
@@ -1490,10 +2001,11 @@ async function handleDeleteBackendData() {
 
   renderDataControls(response.dataControls || currentDataControls);
   renderHistory(response.captureHistory || []);
+  renderWatchRuns(response.watchRuns || []);
   showStatus({
     tone: "success",
     eyebrow: "Data",
-    title: "Backend data deleted",
+    title: "Session data deleted",
     detail: formatDeletedDataSummary(response.deleted),
     badge: "Deleted",
     progress: 1
@@ -1515,6 +2027,7 @@ async function handleHistoryAction(event) {
   }
 
   const captureId = button.dataset.captureId || "";
+  const watchRunId = button.dataset.watchRunId || "";
   const action = button.dataset.historyAction;
 
   if (action === "details") {
@@ -1524,6 +2037,11 @@ async function handleHistoryAction(event) {
   }
 
   if (action === "copy") {
+    if (watchRunId) {
+      await handleCopyWatchRunSummary(watchRunId, button);
+      return;
+    }
+
     await handleCopyHistorySummary(captureId, button);
     return;
   }
@@ -1548,7 +2066,7 @@ async function handleHistoryAction(event) {
         tone: "error",
         eyebrow: "Archive",
         title: response?.error?.title || "History action failed",
-        detail: response?.error?.description || "Lumen could not access that downloaded artifact.",
+        detail: response?.error?.description || "Lumen failed to access that downloaded file.",
         badge: "Blocked",
         progress: 0.12
       });
@@ -1558,10 +2076,10 @@ async function handleHistoryAction(event) {
     showStatus({
       tone: "success",
       eyebrow: "Archive",
-      title: action === "open" ? "Opened capture artifact" : "Revealed capture artifact",
+      title: action === "open" ? "Opened capture file" : "Revealed capture file",
       detail: response.archiveFolder
         ? `Saved in ${response.archiveFolder}.`
-        : response.filename || "Chrome opened the local artifact.",
+        : response.filename || "Chrome opened the local file.",
       badge: "Ready",
       progress: 1
     });
@@ -1594,7 +2112,40 @@ async function handleCopyHistorySummary(captureId, button) {
       tone: "error",
       eyebrow: "Archive",
       title: "Copy failed",
-      detail: error.message || "The browser did not allow clipboard access.",
+      detail: error.message || "The browser blocked clipboard access.",
+      badge: "Failed",
+      progress: 0.12
+    });
+  } finally {
+    button.disabled = actionBusy;
+  }
+}
+
+async function handleCopyWatchRunSummary(watchRunId, button) {
+  const run = latestWatchRuns.find((record) => record.id === watchRunId);
+
+  if (!run) {
+    return;
+  }
+
+  button.disabled = true;
+
+  try {
+    await copyTextToClipboard(buildWatchRunSummaryText(run));
+    showStatus({
+      tone: "success",
+      eyebrow: "Shelf",
+      title: "Timed run summary copied",
+      detail: "The timed capture summary is ready to paste into a review note or issue.",
+      badge: "Copied",
+      progress: 1
+    });
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Shelf",
+      title: "Copy failed",
+      detail: error.message || "The browser blocked clipboard access.",
       badge: "Failed",
       progress: 0.12
     });
@@ -1620,17 +2171,72 @@ function renderSession(session) {
     : "Free local session";
   ui.accountDescription.textContent = signedIn
     ? backendReachable
-      ? `${entitlements.label} entitlement loaded. New captures can sync into local backend history.`
-      : `${entitlements.label} entitlement loaded locally. Captures stay in this browser until the backend is reachable.`
-    : `Free keeps local capture available. Start Demo Pro to unlock ${lockedAdvancedCount} current advanced tool${lockedAdvancedCount === 1 ? "" : "s"} for testing.`;
+      ? `${entitlements.label} access loaded. New captures can sync into session history.`
+      : `${entitlements.label} access loaded locally. Captures stay in this browser until the local service is reachable.`
+    : `Free keeps local capture available. Enable advanced tools to unlock ${lockedAdvancedCount} current tool${lockedAdvancedCount === 1 ? "" : "s"} for testing.`;
   ui.accountPlan.textContent = entitlements.label;
   ui.accountSource.textContent = source;
-  ui.backendBadge.textContent = backendReachable ? "Backend reachable" : "Local-first";
+  ui.backendBadge.textContent = backendReachable ? "Connected" : "Local";
   ui.signInButton.classList.toggle("is-hidden", signedIn);
   ui.signOutButton.classList.toggle("is-hidden", !signedIn);
   ui.billingButton.disabled = !signedIn || plan === "free";
   applyPlanGates();
   renderDataControls(currentDataControls);
+  updateDeliveryActionState();
+}
+
+function renderProductReadiness(payload = {}) {
+  const meters = Array.isArray(payload?.readiness) && payload.readiness.length
+    ? payload.readiness
+    : [
+        { label: "Capture core", score: 66, status: "local" },
+        { label: "Save flow", score: 58, status: "ready" },
+        { label: "Automation", score: 34, status: "queued" }
+      ];
+
+  ui.productReadinessList.replaceChildren();
+
+  for (const meter of meters.slice(0, 3)) {
+    const item = document.createElement("div");
+    const label = document.createElement("span");
+    const status = document.createElement("strong");
+    const track = document.createElement("i");
+    const bar = document.createElement("b");
+
+    item.className = "readiness-item";
+    label.textContent = meter.label || "Readiness";
+    status.textContent = `${Math.max(0, Math.min(100, Math.round(meter.score || 0)))}% ${meter.status || ""}`.trim();
+    bar.style.width = `${Math.max(4, Math.min(100, Math.round(meter.score || 0)))}%`;
+
+    track.append(bar);
+    item.append(label, status, track);
+    ui.productReadinessList.append(item);
+  }
+}
+
+function renderDestinationSummary(destinations = []) {
+  const signedIn = Boolean(currentSession?.signedIn);
+  const activeCount = destinations.filter((destination) => destination.status === "active").length;
+
+  ui.destinationSummary.textContent = signedIn
+    ? activeCount
+      ? `${activeCount} destination${activeCount === 1 ? "" : "s"} ready. Latest captures can be queued after the save check.`
+      : "Local delivery queue ready. Add connected destinations when the team workflow needs them."
+    : "Local history is ready. Connected destinations appear after advanced tools are enabled.";
+
+  updateDeliveryActionState();
+}
+
+function updateDeliveryActionState() {
+  if (!ui.queueLatestDeliveryButton) {
+    return;
+  }
+
+  const canQueue = Boolean(currentSession?.signedIn && latestHistoryItems.length);
+  ui.queueLatestDeliveryButton.disabled = !canQueue;
+  ui.queueLatestDeliveryButton.title = canQueue
+    ? "Queue the latest capture in the delivery log."
+    : "Enable advanced tools and run a capture before queueing delivery.";
 }
 
 function renderDataControls(dataControls = currentDataControls) {
@@ -1650,10 +2256,10 @@ function renderDataControls(dataControls = currentDataControls) {
   ui.cloudSyncEnabled.disabled = !controlsAvailable || !canCloudSync;
   ui.deleteBackendDataButton.disabled = !controlsAvailable;
   ui.dataControlsSummary.textContent = controlsAvailable
-    ? `Backend retention is ${formatRetentionDays(currentDataControls.retentionDays)}. Cloud sync is ${currentDataControls.cloudSyncEnabled ? "allowed" : "off"}.`
+    ? `Retention is ${formatRetentionDays(currentDataControls.retentionDays)}. Cloud sync is ${currentDataControls.cloudSyncEnabled ? "allowed" : "off"}.`
     : signedIn
-      ? "Backend is unavailable. Captures remain local in this browser until it reconnects."
-      : "Start Demo Pro to test backend retention and delete controls.";
+      ? "The local service is unavailable. Captures remain local in this browser."
+      : "Enable advanced tools to test retention and delete controls.";
 }
 
 function formatRetentionDays(days) {
@@ -1661,19 +2267,253 @@ function formatRetentionDays(days) {
   return normalized === 0 ? "manual delete only" : `${normalized} days`;
 }
 
+function formatWatchInterval(minutes) {
+  const normalized = Number(minutes) || 60;
+
+  if (normalized < 60) {
+    return `every ${normalized} minutes`;
+  }
+
+  if (normalized === 60) {
+    return "hourly";
+  }
+
+  if (normalized % 1440 === 0) {
+    const days = normalized / 1440;
+    return days === 1 ? "daily" : `every ${days} days`;
+  }
+
+  if (normalized % 60 === 0) {
+    const hours = normalized / 60;
+    return `every ${hours} hours`;
+  }
+
+  return `every ${normalized} minutes`;
+}
+
+function formatWatchRunStatus(run = null, plan = {}) {
+  if (!run) {
+    return `${plan.title || "Timed capture"} started. The result will appear in the capture shelf.`;
+  }
+
+  if (run.status === "captured") {
+    const fileText = run.fileCount
+      ? `${run.fileCount} file${run.fileCount === 1 ? "" : "s"}`
+      : "Files";
+    return `${run.title || plan.title || "Timed capture"} finished with ${fileText} in the capture shelf.`;
+  }
+
+  if (run.status === "skipped") {
+    return run.error || "Another Lumen run was active, so this timed capture was skipped.";
+  }
+
+  if (run.status === "failed") {
+    return run.error || "The saved page could not be captured.";
+  }
+
+  return `${run.title || plan.title || "Timed capture"} is running now.`;
+}
+
 function formatDeletedDataSummary(deleted = {}) {
   const parts = [
     `${deleted.captures || 0} capture${deleted.captures === 1 ? "" : "s"}`,
-    `${deleted.watchPlans || 0} watch record${deleted.watchPlans === 1 ? "" : "s"}`,
-    `${deleted.agentJobs || 0} agent job${deleted.agentJobs === 1 ? "" : "s"}`
+    `${deleted.watchPlans || 0} timed capture plan${deleted.watchPlans === 1 ? "" : "s"}`,
+    `${deleted.agentJobs || 0} agent job${deleted.agentJobs === 1 ? "" : "s"}`,
+    `${deleted.destinations || 0} destination${deleted.destinations === 1 ? "" : "s"}`,
+    deleted.deliveries === 1 ? "1 delivery" : `${deleted.deliveries || 0} deliveries`
   ];
 
-  return `Deleted ${parts.join(", ")} from the backend session.`;
+  return `Deleted ${parts.join(", ")} from this session.`;
+}
+
+function renderWatchRuns(watchRuns = []) {
+  latestWatchRuns = Array.isArray(watchRuns) ? watchRuns : [];
+  renderWatchPlanCard(selectCurrentWatchPlan());
+  renderCaptureShelf(latestHistoryItems, latestWatchRuns);
+}
+
+function renderWatchPlans(watchPlans = []) {
+  latestWatchPlans = Array.isArray(watchPlans) ? watchPlans : [];
+
+  const currentPlan = selectCurrentWatchPlan();
+
+  renderWatchPlanCard(currentPlan);
+
+  if (currentPlan) {
+    renderWatchPlanSummary(currentPlan);
+  }
+
+  updateActionDisabledState();
+}
+
+function selectActiveWatchPlan() {
+  return latestWatchPlans.find((plan) => plan?.status === "active") || null;
+}
+
+function selectCurrentWatchPlan() {
+  return selectActiveWatchPlan() ||
+    latestWatchPlans.find((plan) => plan?.id) ||
+    null;
+}
+
+function renderWatchPlanCard(watchPlan = null) {
+  if (!watchPlan) {
+    ui.watchPlanCard.classList.add("is-hidden");
+    ui.watchPlanCard.removeAttribute("data-status");
+    ui.watchPlanStatus.textContent = "Timed capture";
+    ui.watchPlanTitle.textContent = "Ready for setup";
+    ui.watchPlanMeta.textContent = "Save a focused region to start timed captures.";
+    ui.toggleWatchPlanButton.textContent = "Pause";
+    return;
+  }
+
+  const status = watchPlan.status === "paused" ? "paused" : "active";
+  const shapeLabel = watchPlan.selectionMode === "lasso" ? "Lasso" : "Region";
+  const lastRun = latestWatchRuns.find((run) => run.watchPlanId === watchPlan.id);
+  const runText = watchPlan.lastRunAt || lastRun?.completedAt || lastRun?.startedAt || lastRun?.scheduledAt
+    ? `Last run ${formatTimestamp(watchPlan.lastRunAt || lastRun.completedAt || lastRun.startedAt || lastRun.scheduledAt)}`
+    : "Awaiting first run";
+
+  ui.watchPlanCard.classList.remove("is-hidden");
+  ui.watchPlanCard.dataset.status = status;
+  ui.watchPlanStatus.textContent = status === "active" ? "Active timed capture" : "Paused timed capture";
+  ui.watchPlanTitle.textContent = watchPlan.title || watchPlan.host || "Timed capture";
+  ui.watchPlanMeta.textContent = [
+    formatWatchInterval(watchPlan.schedule?.intervalMinutes || 60),
+    shapeLabel,
+    runText
+  ].join(" · ");
+  ui.toggleWatchPlanButton.textContent = status === "active" ? "Pause" : "Resume";
+}
+
+function renderCaptureShelf(history = latestHistoryItems, watchRuns = latestWatchRuns) {
+  const captures = Array.isArray(history) ? history : [];
+  const runs = Array.isArray(watchRuns) ? watchRuns : [];
+  const watchCards = runs.slice(0, 4).map((run) => ({
+    type: "watch",
+    id: run.id,
+    watchRunId: run.id || "",
+    title: run.title || run.host || "Timed capture",
+    meta: [
+      "Timed",
+      titleCase(run.status || "queued"),
+      formatTimestamp(run.completedAt || run.startedAt || run.scheduledAt),
+      run.fileCount ? `${run.fileCount} file${run.fileCount === 1 ? "" : "s"}` : "",
+      run.error ? shortenText(run.error, 44) : ""
+    ].filter(Boolean).join(" · "),
+    captureId: run.captureId || "",
+    status: run.status || "queued",
+    badge: run.status === "captured" ? "Timed saved" : `Timed ${titleCase(run.status || "queued")}`
+  }));
+  const captureCards = captures.slice(0, 6).map((item) => ({
+    type: "capture",
+    id: item.id,
+    watchRunId: "",
+    title: item.title || item.host || "Capture",
+    meta: [
+      item.host || "",
+      formatTimestamp(item.capturedAt),
+      item.variants?.length ? `${item.variants.length} view${item.variants.length === 1 ? "" : "s"}` : "",
+      `${item.files?.length || 0} file${item.files?.length === 1 ? "" : "s"}`
+    ].filter(Boolean).join(" · "),
+    captureId: item.id || "",
+    status: "captured",
+    badge: "Capture"
+  }));
+  const cards = [...watchCards, ...captureCards].slice(0, 8);
+
+  ui.captureShelfCount.textContent = [
+    `${captures.length} capture${captures.length === 1 ? "" : "s"}`,
+    `${runs.length} timed run${runs.length === 1 ? "" : "s"}`
+  ].join(" · ");
+  ui.captureShelfGrid.replaceChildren();
+
+  if (!cards.length) {
+    ui.captureShelfEmpty.classList.remove("is-hidden");
+    ui.captureShelfGrid.classList.add("is-hidden");
+    return;
+  }
+
+  ui.captureShelfEmpty.classList.add("is-hidden");
+  ui.captureShelfGrid.classList.remove("is-hidden");
+
+  for (const card of cards) {
+    const item = document.createElement("article");
+    const thumb = document.createElement("div");
+    const copy = document.createElement("div");
+    const titleRow = document.createElement("div");
+    const badge = document.createElement("span");
+    const title = document.createElement("strong");
+    const meta = document.createElement("p");
+    const actions = document.createElement("div");
+    const copyButton = document.createElement("button");
+    const openButton = document.createElement("button");
+    const showButton = document.createElement("button");
+    const hasCapture = Boolean(card.captureId);
+    const captureRecord = captures.find((record) => record.id === card.captureId);
+    const hasDownloadHandles = Array.isArray(captureRecord?.downloads) &&
+      captureRecord.downloads.some((download) => Number.isInteger(download.downloadId));
+    const canCopy = hasCapture || Boolean(card.watchRunId);
+
+    item.className = "capture-shelf-card";
+    item.dataset.kind = card.type;
+    item.dataset.state = card.status;
+    thumb.className = "capture-shelf-thumb";
+    thumb.dataset.kind = card.type;
+    thumb.innerHTML = "<span></span><span></span><span></span><span></span>";
+    copy.className = "capture-shelf-copy";
+    titleRow.className = "capture-shelf-title-row";
+    badge.className = "capture-shelf-badge";
+    badge.textContent = card.badge;
+    title.textContent = card.title;
+    meta.textContent = card.meta;
+    actions.className = "capture-shelf-actions";
+    titleRow.append(title, badge);
+
+    copyButton.className = "history-action";
+    copyButton.type = "button";
+    copyButton.dataset.historyAction = "copy";
+    copyButton.dataset.captureId = card.captureId;
+    copyButton.dataset.watchRunId = card.watchRunId;
+    copyButton.disabled = !canCopy;
+    copyButton.textContent = "Copy";
+
+    openButton.className = "history-action";
+    openButton.type = "button";
+    openButton.dataset.historyAction = "open";
+    openButton.dataset.captureId = card.captureId;
+    openButton.dataset.watchRunId = card.watchRunId;
+    openButton.dataset.downloadReady = hasDownloadHandles ? "true" : "false";
+    openButton.disabled = !hasDownloadHandles;
+    openButton.textContent = "Open";
+
+    showButton.className = "history-action";
+    showButton.type = "button";
+    showButton.dataset.historyAction = "show";
+    showButton.dataset.captureId = card.captureId;
+    showButton.dataset.watchRunId = card.watchRunId;
+    showButton.dataset.downloadReady = hasDownloadHandles ? "true" : "false";
+    showButton.disabled = !hasDownloadHandles;
+    showButton.textContent = "Show";
+
+    if (!hasDownloadHandles) {
+      openButton.title = card.type === "watch"
+        ? "Open becomes available after a timed run saves local files."
+        : "Run a fresh capture to enable local file actions.";
+      showButton.title = openButton.title;
+    }
+
+    actions.append(copyButton, openButton, showButton);
+    copy.append(titleRow, meta, actions);
+    item.append(thumb, copy);
+    ui.captureShelfGrid.append(item);
+  }
 }
 
 function renderHistory(history) {
   const items = Array.isArray(history) ? history : [];
   latestHistoryItems = items;
+  renderCaptureShelf(latestHistoryItems, latestWatchRuns);
   ui.historyCount.textContent = `${items.length} item${items.length === 1 ? "" : "s"}`;
   ui.historyList.replaceChildren();
 
@@ -1681,6 +2521,7 @@ function renderHistory(history) {
     expandedHistoryId = "";
     ui.historyEmpty.classList.remove("is-hidden");
     ui.historyList.classList.add("is-hidden");
+    updateDeliveryActionState();
     return;
   }
 
@@ -1720,7 +2561,7 @@ function renderHistory(history) {
       formatTimestamp(item.capturedAt),
       item.variants?.length ? `${item.variants.length} view${item.variants.length === 1 ? "" : "s"}` : "",
       `${item.files?.length || 0} file${item.files?.length === 1 ? "" : "s"}`,
-      item.manifestFile ? "manifest saved" : "",
+      item.manifestFile ? "context saved" : "",
       item.annotation?.text ? "note added" : "",
       item.manualRedactionCount ? `${item.manualRedactionCount} manual box${item.manualRedactionCount === 1 ? "" : "es"}` : "",
       item.cutawayCount ? `${item.cutawayCount} cutaway crop${item.cutawayCount === 1 ? "" : "s"}` : "",
@@ -1802,6 +2643,8 @@ function renderHistory(history) {
 
     ui.historyList.appendChild(row);
   }
+
+  updateDeliveryActionState();
 }
 
 function renderManualRedactions(record) {
@@ -1824,21 +2667,45 @@ function renderCutawayRegion(record) {
   };
 
   if (!region) {
-    ui.cutawayRegionStatus.textContent = "No region";
-    ui.cutawaySummary.textContent = "A marked region is stored locally for this URL. The next capture can save cutaway PNGs beside the full-page artifact.";
+    ui.cutawayRegionStatus.textContent = "Choose region";
+    ui.cutawaySummary.textContent = "The selected area is saved beside full-page captures when it is found.";
+    if (selectActiveWatchPlan()) {
+      renderWatchPlanSummary(selectActiveWatchPlan());
+    } else {
+      ui.watchPlanSummary.textContent = "Mark a region, then save it as a timed capture.";
+    }
     updateActionDisabledState();
     renderRunSummary(currentSettings);
     return;
   }
 
-  ui.cutawayRegionStatus.textContent = `${Math.round(region.width)}x${Math.round(region.height)}`;
+  const shapeLabel = region.shape === "lasso" ? "Lasso" : "Region";
+  ui.cutawayRegionStatus.textContent = `${shapeLabel} ${Math.round(region.width)}x${Math.round(region.height)}`;
   ui.cutawaySummary.textContent = [
     `Stored for ${record?.host || "this URL"}.`,
     `Top ${Math.round(region.top)}px, left ${Math.round(region.left)}px.`,
-    "Captures can export focused cutaway PNGs when this region resolves."
+    region.shape === "lasso"
+      ? "Captures save a focused crop and keep the lasso shape."
+      : "Captures save focused crop PNGs when this region resolves."
   ].join(" ");
+  ui.watchPlanSummary.textContent = `${shapeLabel} ready for timed capture. Choose a cadence and save it after checking the region.`;
   updateActionDisabledState();
   renderRunSummary(currentSettings);
+}
+
+function renderWatchPlanSummary(watchPlan = null) {
+  if (!watchPlan) {
+    return;
+  }
+
+  ui.watchPlanSummary.textContent = [
+    `${watchPlan.title || "Timed capture"} saved.`,
+    watchPlan.status === "paused"
+      ? `Paused at ${formatWatchInterval(watchPlan.schedule?.intervalMinutes || 60)}.`
+      : `Runs ${formatWatchInterval(watchPlan.schedule?.intervalMinutes || 60)}.`,
+    watchPlan.selectionMode === "lasso" ? "Lasso region retained." : "Focused region retained.",
+    watchPlan.status === "paused" ? "Resume when you want scheduled runs again." : "Use Run now for a fresh capture."
+  ].join(" ");
 }
 
 function renderAnnotationRegion(record) {
@@ -1850,8 +2717,8 @@ function renderAnnotationRegion(record) {
   };
 
   if (!region) {
-    ui.annotationRegionStatus.textContent = "No callout";
-    ui.annotationRegionSummary.textContent = "Optional. Use this when a review note needs to point at a specific page area.";
+    ui.annotationRegionStatus.textContent = "Choose target";
+    ui.annotationRegionSummary.textContent = "Optional. Use this when a capture note needs to point at a specific page area.";
     updateActionDisabledState();
     renderRunSummary(currentSettings);
     return;
@@ -1861,7 +2728,7 @@ function renderAnnotationRegion(record) {
   ui.annotationRegionSummary.textContent = [
     `Stored for ${record?.host || "this URL"}.`,
     `Top ${Math.round(region.top)}px, left ${Math.round(region.left)}px.`,
-    "The next export draws this as a callout when the region resolves."
+    "Saved images draw this as a callout when the region resolves."
   ].join(" ");
   updateActionDisabledState();
   renderRunSummary(currentSettings);
@@ -1885,7 +2752,7 @@ function buildHistoryDetails(item) {
     buildHistoryMetric("Files", String(fileCount)),
     buildHistoryMetric("Redactions", String(redactionCount)),
     buildHistoryMetric("Cutaways", String(cutawayCount)),
-    buildHistoryMetric("Manifest", manifestState)
+    buildHistoryMetric("Context", manifestState)
   );
   detail.append(metrics);
 
@@ -1970,7 +2837,7 @@ function buildHistoryArtifactList(item) {
     return null;
   }
 
-  const panel = buildHistoryPanelShell("Artifacts");
+  const panel = buildHistoryPanelShell("Files");
   const list = document.createElement("div");
   const cutawayPreview = buildHistoryCutawayPreview(item, records);
 
@@ -2018,8 +2885,8 @@ function getHistoryArtifactRecords(item) {
 
   return files.map((filename) => ({
     filename,
-    kind: filename.endsWith(".json") ? "manifest" : "image",
-    role: filename.includes("-cutaway") ? "cutaway" : "full-page"
+    kind: inferHistoryFileKind(filename),
+    role: inferHistoryFileRole(filename)
   }));
 }
 
@@ -2030,7 +2897,8 @@ function buildHistoryArtifactFilters(records) {
     ["all", "All", records.length],
     ["image", "Full page", counts.image],
     ["cutaway", "Cutaway", counts.cutaway],
-    ["manifest", "Manifest", counts.manifest]
+    ["print-sheet", "Print sheet", counts["print-sheet"]],
+    ["manifest", "Context", counts.manifest]
   ].filter(([, , count]) => count > 0);
 
   filterRow.className = "history-artifact-filters";
@@ -2056,7 +2924,8 @@ function countHistoryArtifacts(records) {
   }, {
     image: 0,
     cutaway: 0,
-    manifest: 0
+    manifest: 0,
+    "print-sheet": 0
   });
 }
 
@@ -2130,11 +2999,43 @@ function getHistoryArtifactType(record) {
     return "cutaway";
   }
 
+  if (
+    record.role === "print-sheet" ||
+    record.kind === "html" ||
+    /-print-sheet\.html$/i.test(record.filename || "")
+  ) {
+    return "print-sheet";
+  }
+
   if (record.kind === "manifest" || /\.json$/i.test(record.filename || "")) {
     return "manifest";
   }
 
   return "image";
+}
+
+function inferHistoryFileKind(filename = "") {
+  if (/\.json$/i.test(filename)) {
+    return "manifest";
+  }
+
+  if (/\.html?$/i.test(filename)) {
+    return "html";
+  }
+
+  return "image";
+}
+
+function inferHistoryFileRole(filename = "") {
+  if (/-cutaway(?:\.|$)/i.test(filename)) {
+    return "cutaway";
+  }
+
+  if (/-print-sheet\.html?$/i.test(filename)) {
+    return "print-sheet";
+  }
+
+  return "full-page";
 }
 
 function formatArtifactLabel(record) {
@@ -2145,7 +3046,11 @@ function formatArtifactLabel(record) {
   }
 
   if (artifactType === "manifest") {
-    return "Manifest JSON";
+    return "Page context JSON";
+  }
+
+  if (artifactType === "print-sheet") {
+    return "Print sheet HTML";
   }
 
   return record.partTotal > 1
@@ -2198,14 +3103,16 @@ function renderExportReview(review) {
   ui.exportReviewPanel.classList.remove("is-hidden");
   ui.exportReviewBadge.textContent = review.warnings?.length ? "Review" : "Ready";
   ui.exportReviewSummary.textContent = [
-    `${review.variantCount || 1} view${review.variantCount === 1 ? "" : "s"} checked for ${review.page?.host || "this page"}.`,
-    `${review.redactionCount || 0} redaction check${review.redactionCount === 1 ? "" : "s"} ready before export.`
+    `${review.variantCount || 1} view${review.variantCount === 1 ? "" : "s"} ready for ${review.page?.host || "this page"}.`,
+    `${review.redactionCount || 0} detected sensitive region${review.redactionCount === 1 ? "" : "s"}.`,
+    `${titleCase(currentSettings.longPageMode || "auto")} long-page mode.`
   ].join(" ");
   ui.reviewViewCount.textContent = String(review.variantCount || 1);
   ui.reviewAutoCount.textContent = String(review.autoRedactionCount || 0);
   ui.reviewManualCount.textContent = formatReviewManualMetric(review);
   ui.reviewCutawayCount.textContent = formatReviewCutawayMetric(review);
 
+  renderExportReviewOutputPlan(review);
   renderExportReviewVariants(review.variants || []);
   renderExportReviewWarnings(review.warnings || []);
 
@@ -2214,13 +3121,115 @@ function renderExportReview(review) {
   });
 }
 
+function renderExportReviewOutputPlan(review) {
+  ui.exportReviewOutputPlan.replaceChildren();
+
+  const planItems = Array.isArray(review.outputPlan) && review.outputPlan.length
+    ? review.outputPlan
+    : buildExportReviewOutputPlan(review);
+
+  for (const item of planItems) {
+    const card = document.createElement("div");
+    const label = document.createElement("span");
+    const value = document.createElement("strong");
+    const copy = document.createElement("p");
+
+    card.className = "review-output-card";
+    label.textContent = item.label;
+    value.textContent = item.value;
+    copy.textContent = item.detail;
+    card.append(label, value, copy);
+    ui.exportReviewOutputPlan.append(card);
+  }
+}
+
+function buildExportReviewOutputPlan(review) {
+  const variants = Array.isArray(review.variants) ? review.variants : [];
+  const viewCount = review.variantCount || variants.length || 1;
+  const longPageMode = currentSettings.longPageMode || "auto";
+  const tileCount = estimateReviewTileCount(variants, longPageMode);
+  const baseImageCount = longPageMode === "auto"
+    ? Math.max(viewCount, tileCount)
+    : tileCount;
+  const printSheetCount = longPageMode === "print" ? viewCount : 0;
+  const contextCount = currentSettings.exportManifest === false ? 0 : 1;
+  const cutawayCount = review.cutawayAppliedCount || 0;
+  const totalFiles = baseImageCount + printSheetCount + contextCount + cutawayCount;
+
+  return [
+    {
+      label: "Files",
+      value: `${totalFiles} planned`,
+      detail: [
+        `${baseImageCount} image${baseImageCount === 1 ? "" : "s"}`,
+        cutawayCount ? `${cutawayCount} crop${cutawayCount === 1 ? "" : "s"}` : "",
+        printSheetCount ? `${printSheetCount} print sheet${printSheetCount === 1 ? "" : "s"}` : "",
+        contextCount ? "page context" : ""
+      ].filter(Boolean).join(", ")
+    },
+    {
+      label: "Long Pages",
+      value: formatLongPagePlanLabel(longPageMode, tileCount, viewCount),
+      detail: buildLongPagePlanDetail(longPageMode, tileCount, viewCount)
+    },
+    {
+      label: "Review",
+      value: review.warnings?.length ? `${review.warnings.length} note${review.warnings.length === 1 ? "" : "s"}` : "Ready",
+      detail: review.warnings?.length
+        ? "Check the notes below before saving."
+        : "Marked areas and output choices are ready."
+    }
+  ];
+}
+
+function estimateReviewTileCount(variants, longPageMode) {
+  const viewCount = variants.length || 1;
+
+  if (longPageMode === "auto") {
+    return viewCount;
+  }
+
+  const maxTileHeight = Math.max(1, Number(LUMEN_CONFIG.capture.tileMaxOutputHeight) || 12000);
+
+  return variants.reduce((sum, variant) => {
+    const pageHeight = Math.max(1, Number(variant.dimensions?.pageHeight) || 1);
+    return sum + Math.max(1, Math.ceil(pageHeight / maxTileHeight));
+  }, 0) || viewCount;
+}
+
+function formatLongPagePlanLabel(mode, tileCount, viewCount) {
+  if (mode === "print") {
+    return "Print sheets";
+  }
+
+  if (mode === "tiles") {
+    return `${tileCount} tile${tileCount === 1 ? "" : "s"}`;
+  }
+
+  return tileCount > viewCount ? "Tiles if needed" : "Single images";
+}
+
+function buildLongPagePlanDetail(mode, tileCount, viewCount) {
+  if (mode === "print") {
+    return "Saves readable image tiles and browser-printable sheets for PDF export.";
+  }
+
+  if (mode === "tiles") {
+    return `Splits tall pages into ${tileCount} readable image tile${tileCount === 1 ? "" : "s"}.`;
+  }
+
+  return tileCount > viewCount
+    ? "Keeps normal pages as one image and splits very tall pages."
+    : "Keeps each view as one image when browser limits allow.";
+}
+
 function renderExportReviewVariants(variants) {
   ui.exportReviewVariants.replaceChildren();
 
   if (!variants.length) {
     const empty = document.createElement("p");
     empty.className = "review-summary";
-    empty.textContent = "No view checks were returned.";
+    empty.textContent = "View checks were unavailable.";
     ui.exportReviewVariants.append(empty);
     return;
   }
@@ -2281,9 +3290,9 @@ function buildReviewPreviewMap(variant) {
   }
 
   legend.append(
-    buildReviewLegendItem("Auto", "auto"),
+    buildReviewLegendItem("Sensitive", "auto"),
     buildReviewLegendItem("Manual", "manual"),
-    buildReviewLegendItem("Cutaway", "cutaway")
+    buildReviewLegendItem("Crop", "cutaway")
   );
   map.append(surface, legend);
 
@@ -2319,10 +3328,10 @@ function renderExportReviewWarnings(warnings) {
     item.className = "review-warning-item";
 
     const label = document.createElement("strong");
-    label.textContent = "No blocking issues found";
+    label.textContent = "Ready to save";
 
     const copy = document.createElement("p");
-    copy.textContent = "Review the final artifact before external sharing, then continue when ready.";
+    copy.textContent = "View setup, marked areas, and long-page output are ready.";
 
     item.append(label, copy);
     ui.exportReviewWarnings.append(item);
@@ -2334,7 +3343,7 @@ function renderExportReviewWarnings(warnings) {
     item.className = "review-warning-item";
 
     const label = document.createElement("strong");
-    label.textContent = "Check before export";
+    label.textContent = "Needs review";
 
     const copy = document.createElement("p");
     copy.textContent = warning;
@@ -2372,7 +3381,7 @@ function settleExportReview(approved) {
 
 function renderBlueprint(blueprint) {
   if (!blueprint) {
-    ui.blueprintTimestamp.textContent = "No analysis yet";
+    ui.blueprintTimestamp.textContent = "Awaiting analysis";
     ui.blueprintEmpty.classList.remove("is-hidden");
     ui.blueprintContent.classList.add("is-hidden");
     return;
@@ -2388,10 +3397,10 @@ function renderBlueprint(blueprint) {
     `${blueprint.identity.siteType} with ${blueprint.layout.sections} sections, ${blueprint.layout.visuals} visuals, and ${blueprint.layout.words} words.`;
   ui.blueprintSiteType.textContent = blueprint.identity.siteType || "Unknown";
   ui.blueprintHeadline.textContent =
-    blueprint.identity.heroHeadline || "No hero headline detected.";
-  ui.blueprintCta.textContent = blueprint.identity.primaryCta || "No primary CTA detected.";
+    blueprint.identity.heroHeadline || "Awaiting headline.";
+  ui.blueprintCta.textContent = blueprint.identity.primaryCta || "Awaiting CTA.";
   ui.blueprintNav.textContent =
-    blueprint.identity.navLabels?.join(" · ") || "No visible navigation labels detected.";
+    blueprint.identity.navLabels?.join(" · ") || "Awaiting navigation.";
   ui.metricSections.textContent = formatCompactNumber(blueprint.layout.sections);
   ui.metricHeadings.textContent = formatCompactNumber(blueprint.layout.headings);
   ui.metricButtons.textContent = formatCompactNumber(blueprint.layout.buttons);
@@ -2407,7 +3416,7 @@ function renderColorStrip(colors) {
   ui.colorStrip.replaceChildren();
 
   if (!colors.length) {
-    ui.colorStrip.textContent = "No strong palette extracted.";
+    ui.colorStrip.textContent = "Palette pending.";
     return;
   }
 
@@ -2432,7 +3441,7 @@ function renderFontStrip(fonts) {
   ui.fontStrip.replaceChildren();
 
   if (!fonts.length) {
-    ui.fontStrip.textContent = "No type families extracted.";
+    ui.fontStrip.textContent = "Type pending.";
     return;
   }
 
@@ -2453,7 +3462,7 @@ async function refreshLaunchStatus() {
     if (!tab?.url) {
       renderLaunchStatus({
         state: "blocked",
-        title: "No active tab found",
+        title: "Active tab unavailable",
         detail: "Open a web page, then launch Lumen again.",
         actionsBlocked: true
       });
@@ -2463,7 +3472,7 @@ async function refreshLaunchStatus() {
     if (!isOriginPermissionSupported(tab.url)) {
       renderLaunchStatus({
         state: "blocked",
-        title: "This page cannot be captured",
+        title: "This page is blocked by Chrome",
         detail: "Chrome blocks capture scripts on browser and extension pages.",
         actionsBlocked: true
       });
@@ -2480,7 +3489,7 @@ async function refreshLaunchStatus() {
     renderLaunchStatus({
       state: "blocked",
       title: "Tab check failed",
-      detail: error.message || "Lumen could not read the active tab.",
+      detail: error.message || "Lumen failed to read the active tab.",
       actionsBlocked: true
     });
   }
@@ -2491,7 +3500,7 @@ function renderLaunchStatusFromRun({ tone, title, detail, progress }) {
     renderLaunchStatus({
       state: "blocked",
       title: "Action needs attention",
-      detail: title || detail || "The last action could not finish.",
+      detail: title || detail || "The last action needs attention.",
       actionsBlocked: launchActionsBlocked
     });
     return;
@@ -2500,7 +3509,7 @@ function renderLaunchStatusFromRun({ tone, title, detail, progress }) {
   if (tone === "success" || progress >= 1) {
     renderLaunchStatus({
       state: "ready",
-      title: "Ready for the next action",
+      title: "Ready for another action",
       detail: title || "The last Lumen action completed.",
       actionsBlocked: false
     });
@@ -2519,7 +3528,7 @@ function renderLaunchStatus({ state, title, detail, actionsBlocked = false }) {
   launchActionsBlocked = Boolean(actionsBlocked);
   ui.launchStatus.dataset.state = state || "ready";
   ui.launchStatusTitle.textContent = title || "Ready";
-  ui.launchStatusDetail.textContent = detail || "Choose the next Lumen action.";
+  ui.launchStatusDetail.textContent = detail || "Choose a Lumen action.";
   ui.launchPanel.classList.toggle("is-blocked", launchActionsBlocked);
   updateActionDisabledState();
 }
@@ -2567,7 +3576,11 @@ function renderRunSummary(settings = currentSettings) {
   ui.runViewSummary.textContent = viewLabel;
   ui.runExportSummary.textContent = exportLabel;
   ui.runSafetySummary.textContent = safetyParts.length ? safetyParts.join(", ") : "Basic";
-  ui.runManifestSummary.textContent = settings.exportManifest === false ? "Off" : "Manifest";
+  ui.runManifestSummary.textContent = [
+    settings.exportManifest === false ? "Context off" : "Context file",
+    settings.longPageMode === "tiles" ? "Tiles" : "",
+    settings.longPageMode === "print" ? "Print sheet" : ""
+  ].filter(Boolean).join(" + ");
 }
 
 function renderTimeline(stage = "idle", tone = "neutral", progress = 0) {
@@ -2613,7 +3626,7 @@ function renderStatusLog() {
 
   if (!statusEvents.length) {
     const empty = document.createElement("p");
-    empty.textContent = "No active run yet.";
+    empty.textContent = "Run status appears here.";
     ui.statusLog.appendChild(empty);
     return;
   }
@@ -2663,8 +3676,13 @@ function updateActionDisabledState() {
   ui.startRedactionPickerButton.disabled = disabled;
   ui.clearManualRedactionsButton.disabled = disabled || !(manualRedactionRecord.regions?.length);
   ui.startCutawayPickerButton.disabled = disabled;
+  ui.startLassoPickerButton.disabled = disabled;
   ui.clearCutawayButton.disabled = disabled || !cutawayRegionRecord.region;
   ui.explainCutawayPlanButton.disabled = disabled;
+  ui.saveWatchPlanButton.disabled = disabled || !cutawayRegionRecord.region || !currentSession?.signedIn || !getFeatureAccess("regionWatch", currentSession?.plan || "free");
+  ui.runWatchPlanNowButton.disabled = disabled || !selectActiveWatchPlan() || !currentSession?.signedIn || !getFeatureAccess("regionWatch", currentSession?.plan || "free");
+  ui.toggleWatchPlanButton.disabled = disabled || !selectCurrentWatchPlan() || !currentSession?.signedIn || !getFeatureAccess("regionWatch", currentSession?.plan || "free");
+  ui.deleteWatchPlanButton.disabled = disabled || !selectCurrentWatchPlan() || !currentSession?.signedIn;
   ui.startAnnotationPickerButton.disabled = disabled;
   ui.clearAnnotationButton.disabled = disabled || !annotationRegionRecord.region;
   ui.exportReviewCancelButton.disabled = actionBusy;
@@ -2677,6 +3695,15 @@ function updateActionDisabledState() {
   for (const button of ui.historyList.querySelectorAll("[data-history-action]")) {
     const requiresDownload = button.dataset.historyAction === "open" || button.dataset.historyAction === "show";
     button.disabled = actionBusy || (requiresDownload && button.dataset.downloadReady !== "true");
+  }
+
+  for (const button of ui.captureShelfGrid.querySelectorAll("[data-history-action]")) {
+    const requiresDownload = button.dataset.historyAction === "open" || button.dataset.historyAction === "show";
+    const hasSummaryTarget = Boolean(button.dataset.captureId || button.dataset.watchRunId);
+    const hasFileTarget = Boolean(button.dataset.captureId);
+    button.disabled = actionBusy ||
+      (requiresDownload ? !hasFileTarget : !hasSummaryTarget) ||
+      (requiresDownload && button.dataset.downloadReady !== "true");
   }
 }
 
@@ -2715,7 +3742,7 @@ function stageToBadge(stage) {
 
 function formatTimestamp(rawValue) {
   if (!rawValue) {
-    return "No analysis yet";
+    return "Awaiting analysis";
   }
 
   const date = new Date(rawValue);
@@ -2736,12 +3763,12 @@ function buildExportReviewStatusText(review) {
   const warnings = review.warnings?.length || 0;
   const cutawayText = review.cutawayStored
     ? `${review.cutawayAppliedCount || 0} cutaway view${review.cutawayAppliedCount === 1 ? "" : "s"} ready`
-    : "no cutaway selected";
+    : "cutaway unselected";
   const manualText = review.manualStoredCount
     ? `${review.manualAppliedCount || 0} manual check${review.manualAppliedCount === 1 ? "" : "s"} ready`
-    : "no manual boxes selected";
+    : "manual boxes unselected";
 
-  return `${manualText}, ${cutawayText}. ${warnings ? `${warnings} review note${warnings === 1 ? "" : "s"} to check.` : "No blocking review notes."}`;
+  return `${manualText}, ${cutawayText}. ${warnings ? `${warnings} review note${warnings === 1 ? "" : "s"} to check.` : "Ready to save."}`;
 }
 
 function formatReviewManualMetric(review) {
@@ -2766,7 +3793,7 @@ function formatReviewVariantManual(variant) {
   const storedCount = variant.manualStoredCount || 0;
 
   if (!storedCount) {
-    return "manual none";
+    return "manual 0";
   }
 
   return `${variant.manualAppliedCount || 0}/${storedCount} manual`;
@@ -2774,7 +3801,7 @@ function formatReviewVariantManual(variant) {
 
 function formatReviewVariantCutaway(variant) {
   if (!variant.cutawayStored) {
-    return "cutaway none";
+    return "cutaway 0";
   }
 
   if (!variant.cutawayApplied) {
@@ -2792,7 +3819,7 @@ function buildReviewVariantDetail(variant) {
     ? ` Cutaway crop ${variant.cutawayRegion.width}x${variant.cutawayRegion.height}.`
     : "";
 
-  return `${manualText || "No manual boxes for this view."} ${cutawayText || "No cutaway region for this view."}${cutawaySize}`;
+  return `${manualText || "Manual boxes: 0 for this view."} ${cutawayText || "Cutaway: unselected for this view."}${cutawaySize}`;
 }
 
 function formatProjectionStats(label, stats = {}) {
@@ -2822,9 +3849,9 @@ function formatProjectionStats(label, stats = {}) {
 }
 
 function buildCaptureSuccessMessage(response, settings) {
-  const fileText = `${response.files.length} file${response.files.length === 1 ? "" : "s"} saved using ${response.exportPreset} export mode`;
+  const fileText = `${response.files.length} file${response.files.length === 1 ? "" : "s"} saved using ${response.exportPreset} output mode`;
   const variantCount = response.variantCount || getCaptureVariants(settings.devicePreset).length;
-  const manifestText = response.manifestFile ? " Bundle manifest saved." : "";
+  const manifestText = response.manifestFile ? " Page context saved." : "";
   const folderText = response.archiveFolder ? ` Saved in ${response.archiveFolder}.` : "";
   const captureNote = normalizeCaptureNoteOptions(settings);
   const noteText = response.annotation?.enabled || captureNote.enabled ? " Capture note added." : "";
@@ -2832,7 +3859,7 @@ function buildCaptureSuccessMessage(response, settings) {
     ? ` ${response.manualRedactionCount} manual box${response.manualRedactionCount === 1 ? "" : "es"} applied.`
     : "";
   const cutawayText = response.cutawayCount
-    ? ` ${response.cutawayCount} cutaway crop${response.cutawayCount === 1 ? "" : "s"} exported.`
+    ? ` ${response.cutawayCount} cutaway crop${response.cutawayCount === 1 ? "" : "s"} saved.`
     : "";
   const projectionText = formatManualProjectionStats(response.manualProjectionStats);
   const projectionSentence = projectionText ? ` ${projectionText}.` : "";
@@ -2855,7 +3882,7 @@ function buildRedactionPreviewText(preview) {
   const kinds = formatRedactionKinds(preview?.redactionBreakdown?.byKind);
 
   if (!total) {
-    return "No sensitive regions detected in the current DOM. Review the page before external sharing.";
+    return "Sensitive region scan found 0 areas. Check the page before sharing.";
   }
 
   return `${total} region${total === 1 ? "" : "s"} found: ${autoCount} auto, ${manualCount} manual${kinds ? ` (${kinds})` : ""}.`;
@@ -2872,12 +3899,32 @@ function buildHistorySummaryText(item) {
     `Redactions: ${item.redactionCount || 0}`,
     item.manualRedactionCount ? `Manual boxes: ${item.manualRedactionCount}` : "",
     item.cutawayCount ? `Cutaway crops: ${item.cutawayCount}` : "",
-    item.manifestFile ? `Manifest: ${item.manifestFile}` : "Manifest: not saved",
+    item.manifestFile ? `Page context: ${item.manifestFile}` : "Page context: off",
     item.archiveFolder ? `Folder: ${item.archiveFolder}` : "",
     item.blueprintSummary?.siteType ? `Page type: ${item.blueprintSummary.siteType}` : "",
     item.blueprintSummary?.heroHeadline ? `Hero: ${item.blueprintSummary.heroHeadline}` : "",
     item.blueprintSummary?.primaryCta ? `Primary CTA: ${item.blueprintSummary.primaryCta}` : "",
     item.annotation?.text ? `Note: ${item.annotation.text}` : ""
+  ];
+
+  return lines.filter(Boolean).join("\n");
+}
+
+function buildWatchRunSummaryText(run) {
+  const linkedCapture = latestHistoryItems.find((item) => item.id === run.captureId);
+  const lines = [
+    "Lumen timed capture summary",
+    `Title: ${run.title || run.host || "Timed capture"}`,
+    `URL: ${run.url || "Unknown"}`,
+    `Status: ${titleCase(run.status || "queued")}`,
+    `Scheduled: ${formatTimestamp(run.scheduledAt)}`,
+    run.startedAt ? `Started: ${formatTimestamp(run.startedAt)}` : "",
+    run.completedAt ? `Finished: ${formatTimestamp(run.completedAt)}` : "",
+    `Files: ${run.fileCount || run.files?.length || 0}`,
+    run.files?.length ? `File list: ${run.files.map(shortenPath).join(", ")}` : "",
+    run.error ? `Issue: ${run.error}` : "",
+    run.captureId ? `Capture: ${run.captureId}` : "",
+    linkedCapture?.archiveFolder ? `Folder: ${linkedCapture.archiveFolder}` : ""
   ];
 
   return lines.filter(Boolean).join("\n");
@@ -2988,6 +4035,16 @@ function shortenPath(value = "") {
   }
 
   return `${parts.at(-2)}/${parts.at(-1)}`;
+}
+
+function shortenText(value = "", limit = 80) {
+  const normalized = String(value || "").replace(/\s+/g, " ").trim();
+
+  if (normalized.length <= limit) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, Math.max(0, limit - 3)).trim()}...`;
 }
 
 function clampPercent(value, min = 0, max = 100) {

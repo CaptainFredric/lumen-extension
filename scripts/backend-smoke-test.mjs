@@ -87,6 +87,18 @@ try {
   });
   assert(rejectedPaidAgentJob.status === 402, "Free plan should reject paid agent records.", rejectedPaidAgentJob);
 
+  const rejectedFreeDestination = await requestJson("/v1/destinations", {
+    method: "POST",
+    sessionId: freeSessionId,
+    body: {
+      explicitOptIn: true,
+      type: "webhook",
+      label: "Free webhook",
+      endpointUrl: "https://hooks.example.com/lumen"
+    }
+  });
+  assert(rejectedFreeDestination.status === 402, "Free plan should reject connected destinations.", rejectedFreeDestination);
+
   const demo = await requestJson("/v1/session/demo", {
     method: "POST",
     body: {
@@ -103,6 +115,13 @@ try {
   );
 
   const sessionId = demo.body.session.id;
+  const readiness = await requestJson("/v1/product-readiness", { sessionId });
+  assert(
+    readiness.status === 200 && readiness.body.readiness?.some((item) => item.id === "team-automation"),
+    "Product readiness endpoint did not describe automation coverage.",
+    readiness
+  );
+
   const defaultDataControls = await requestJson("/v1/data-controls", { sessionId });
   assert(
     defaultDataControls.status === 200 && defaultDataControls.body.dataControls?.retentionDays === 90,
@@ -176,6 +195,38 @@ try {
   const captureDetail = await requestJson("/v1/captures/capture-smoke-001", { sessionId });
   assert(captureDetail.status === 200 && captureDetail.body.capture.title === "Backend Smoke Capture", "Capture detail failed.", captureDetail);
 
+  const destination = await requestJson("/v1/destinations", {
+    method: "POST",
+    sessionId,
+    body: {
+      explicitOptIn: true,
+      type: "webhook",
+      label: "Review channel",
+      endpointUrl: "https://hooks.example.com/lumen-review",
+      deliveryMode: "manual",
+      includeImages: true,
+      includeManifest: true
+    }
+  });
+  assert(destination.status === 201 && destination.body.destination?.id, "Destination was not created.", destination);
+
+  const delivery = await requestJson("/v1/deliveries", {
+    method: "POST",
+    sessionId,
+    body: {
+      explicitOptIn: true,
+      payloadReviewed: true,
+      destinationId: destination.body.destination.id,
+      captureId: "capture-smoke-001",
+      files: capturePayload.files,
+      payloadSummary: {
+        fileCount: capturePayload.files.length,
+        redactionCount: capturePayload.redactionCount
+      }
+    }
+  });
+  assert(delivery.status === 201 && delivery.body.delivery?.status === "queued", "Delivery was not queued.", delivery);
+
   const rejectedWatchPlan = await requestJson("/v1/watch-plans", {
     method: "POST",
     sessionId,
@@ -201,12 +252,20 @@ try {
       title: "Pricing card watch",
       url: "https://example.com/pricing",
       status: "active",
+      selectionMode: "lasso",
       region: {
         id: "region-001",
+        shape: "lasso",
         left: 100,
         top: 220,
         width: 640,
-        height: 320
+        height: 320,
+        points: [
+          { x: 120, y: 240 },
+          { x: 720, y: 260 },
+          { x: 700, y: 520 },
+          { x: 110, y: 500 }
+        ]
       },
       schedule: {
         intervalMinutes: 60
@@ -214,6 +273,13 @@ try {
     }
   });
   assert(watchPlan.status === 201 && watchPlan.body.watchPlan?.id, "Watch plan was not created.", watchPlan);
+  assert(
+    watchPlan.body.watchPlan.selectionMode === "lasso" &&
+      watchPlan.body.watchPlan.region?.shape === "lasso" &&
+      watchPlan.body.watchPlan.region?.points?.length === 4,
+    "Watch plan did not preserve lasso selection metadata.",
+    watchPlan
+  );
 
   const updatedWatchPlan = await requestJson(`/v1/watch-plans/${watchPlan.body.watchPlan.id}`, {
     method: "PATCH",
@@ -224,6 +290,22 @@ try {
     }
   });
   assert(updatedWatchPlan.body.watchPlan.status === "paused", "Watch plan was not patched.", updatedWatchPlan);
+
+  const watchRun = await requestJson("/v1/watch-runs", {
+    method: "POST",
+    sessionId,
+    body: {
+      id: "watch-run-smoke-001",
+      watchPlanId: watchPlan.body.watchPlan.id,
+      captureId: "capture-smoke-001",
+      title: "Pricing card watch",
+      url: "https://example.com/pricing",
+      status: "captured",
+      fileCount: 2,
+      files: ["pricing-desktop.png", "pricing-print-sheet.html"]
+    }
+  });
+  assert(watchRun.status === 201 && watchRun.body.watchRun.status === "captured", "Watch run was not stored.", watchRun);
 
   const agentJob = await requestJson("/v1/agent-jobs", {
     method: "POST",
@@ -257,11 +339,14 @@ try {
   const stats = await requestJson("/v1/stats", { sessionId });
   assert(stats.body.stats.captureCount === 1, "Stats did not count captures.", stats);
   assert(stats.body.stats.watchPlanCount === 1, "Stats did not count watch plans.", stats);
+  assert(stats.body.stats.watchRunCount === 1, "Stats did not count watch runs.", stats);
   assert(stats.body.stats.agentJobCount === 1, "Stats did not count agent jobs.", stats);
+  assert(stats.body.stats.destinationCount === 1, "Stats did not count destinations.", stats);
+  assert(stats.body.stats.deliveryCount === 1, "Stats did not count deliveries.", stats);
   assert(stats.body.stats.bytesReceived === 124000, "Stats did not sum download bytes.", stats);
 
   const integrations = await requestJson("/v1/integrations");
-  assert(integrations.body.integrations?.some((item) => item.id === "agent"), "Integrations did not include agent handoff.", integrations);
+  assert(integrations.body.integrations?.some((item) => item.id === "agent-chat"), "Integrations did not include agent handoff.", integrations);
 
   const invalidSession = await requestJson("/v1/captures", {
     sessionId: "missing-session"
@@ -289,7 +374,10 @@ try {
     deletedAccountData.status === 200 &&
       deletedAccountData.body.deleted.captures === 1 &&
       deletedAccountData.body.deleted.watchPlans === 1 &&
-      deletedAccountData.body.deleted.agentJobs === 1,
+      deletedAccountData.body.deleted.watchRuns === 1 &&
+      deletedAccountData.body.deleted.agentJobs === 1 &&
+      deletedAccountData.body.deleted.destinations === 1 &&
+      deletedAccountData.body.deleted.deliveries === 1,
     "Account data delete did not remove session records.",
     deletedAccountData
   );
@@ -297,7 +385,10 @@ try {
   const postDeleteStats = await requestJson("/v1/stats", { sessionId });
   assert(postDeleteStats.body.stats.captureCount === 0, "Post-delete stats still count captures.", postDeleteStats);
   assert(postDeleteStats.body.stats.watchPlanCount === 0, "Post-delete stats still count watch plans.", postDeleteStats);
+  assert(postDeleteStats.body.stats.watchRunCount === 0, "Post-delete stats still count watch runs.", postDeleteStats);
   assert(postDeleteStats.body.stats.agentJobCount === 0, "Post-delete stats still count agent jobs.", postDeleteStats);
+  assert(postDeleteStats.body.stats.destinationCount === 0, "Post-delete stats still count destinations.", postDeleteStats);
+  assert(postDeleteStats.body.stats.deliveryCount === 0, "Post-delete stats still count deliveries.", postDeleteStats);
 
   console.log(JSON.stringify({
     ok: true,
@@ -305,7 +396,10 @@ try {
     checks: {
       session: sessionId,
       capture: createdCapture.body.capture.id,
+      destination: destination.body.destination.id,
+      delivery: delivery.body.delivery.id,
       watchPlan: watchPlan.body.watchPlan.id,
+      watchRun: watchRun.body.watchRun.id,
       agentJob: agentJob.body.agentJob.id,
       stats: stats.body.stats,
       deleted: deletedAccountData.body.deleted

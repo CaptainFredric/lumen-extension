@@ -4,7 +4,7 @@ export const LUMEN_CONFIG = {
   isProUser: false,
   plans: {
     defaultPlan: "free",
-    demoPlan: "demo-pro"
+    demoPlan: "team"
   },
   capture: {
     maxSegments: 30,
@@ -49,7 +49,12 @@ export const LUMEN_CONFIG = {
       dataControls: "/v1/data-controls",
       accountData: "/v1/account-data",
       billing: "/v1/billing/portal",
-      syncDestinations: "/v1/integrations"
+      productReadiness: "/v1/product-readiness",
+      syncDestinations: "/v1/integrations",
+      watchPlans: "/v1/watch-plans",
+      watchRuns: "/v1/watch-runs",
+      destinations: "/v1/destinations",
+      deliveries: "/v1/deliveries"
     }
   },
   defaults: {
@@ -61,7 +66,8 @@ export const LUMEN_CONFIG = {
     annotationText: "",
     annotationPosition: "top-right",
     devicePreset: "desktop",
-    exportPreset: "raw"
+    exportPreset: "raw",
+    longPageMode: "auto"
   }
 };
 
@@ -77,6 +83,8 @@ export const STORAGE_KEYS = {
   latestBlueprint: "lumen.inspector.latestBlueprint",
   session: "lumen.account.session",
   captureHistory: "lumen.capture.history",
+  watchPlans: "lumen.watch.plans",
+  watchRuns: "lumen.watch.runs",
   manualRedactions: "lumen.capture.manualRedactions",
   cutawayRegions: "lumen.capture.cutawayRegions",
   annotationRegions: "lumen.capture.annotationRegions"

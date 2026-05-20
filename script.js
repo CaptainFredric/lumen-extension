@@ -13,6 +13,9 @@ const demoHoldButton = document.querySelector("[data-demo-hold-button]");
 const demoHoldMenu = document.querySelector(".demo-hold-menu");
 const demoStatusTitle = document.querySelector("[data-demo-status-title]");
 const demoStatusDetail = document.querySelector("[data-demo-status-detail]");
+const cleanupDemo = document.querySelector("[data-cleanup-demo]");
+const cleanupReplay = document.querySelector("[data-cleanup-replay]");
+const cleanupModeButtons = [...document.querySelectorAll("[data-cleanup-mode]")];
 
 if (canReveal) {
   const revealObserver = new IntersectionObserver(
@@ -71,18 +74,48 @@ if (
   window.matchMedia("(prefers-reduced-motion: no-preference)").matches &&
   window.matchMedia("(pointer: fine)").matches
 ) {
+  let tiltFrame = 0;
+  let targetRotateX = 0;
+  let targetRotateY = 0;
+  let currentRotateX = 0;
+  let currentRotateY = 0;
+
+  const renderTilt = () => {
+    currentRotateX += (targetRotateX - currentRotateX) * 0.16;
+    currentRotateY += (targetRotateY - currentRotateY) * 0.16;
+
+    tiltNode.style.setProperty("--tilt-x", `${currentRotateX.toFixed(3)}deg`);
+    tiltNode.style.setProperty("--tilt-y", `${currentRotateY.toFixed(3)}deg`);
+
+    if (Math.abs(targetRotateX - currentRotateX) > 0.01 || Math.abs(targetRotateY - currentRotateY) > 0.01) {
+      tiltFrame = window.requestAnimationFrame(renderTilt);
+    } else {
+      tiltFrame = 0;
+    }
+  };
+
+  const requestTiltFrame = () => {
+    if (!tiltFrame) {
+      tiltFrame = window.requestAnimationFrame(renderTilt);
+    }
+  };
+
   tiltNode.addEventListener("pointermove", (event) => {
     const bounds = tiltNode.getBoundingClientRect();
     const offsetX = (event.clientX - bounds.left) / bounds.width - 0.5;
     const offsetY = (event.clientY - bounds.top) / bounds.height - 0.5;
-    const rotateX = offsetY * -3.6;
-    const rotateY = offsetX * 5.2;
 
-    tiltNode.style.transform = `perspective(1500px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+    targetRotateX = Math.max(-3.2, Math.min(3.2, offsetY * -5.2));
+    targetRotateY = Math.max(-4.8, Math.min(4.8, offsetX * 7.2));
+    tiltNode.style.setProperty("--tilt-glare-x", `${Math.round((offsetX + 0.5) * 100)}%`);
+    tiltNode.style.setProperty("--tilt-glare-y", `${Math.round((offsetY + 0.5) * 100)}%`);
+    requestTiltFrame();
   });
 
   tiltNode.addEventListener("pointerleave", () => {
-    tiltNode.style.transform = "perspective(1500px) rotateX(0deg) rotateY(0deg)";
+    targetRotateX = 0;
+    targetRotateY = 0;
+    requestTiltFrame();
   });
 }
 
@@ -104,7 +137,7 @@ if (demoLaunch && demoHoldButton && demoHoldMenu) {
     demoLaunch.classList.add("is-menu-open");
     demoHoldMenu.setAttribute("aria-hidden", "false");
     demoHoldButton.setAttribute("aria-expanded", "true");
-    setDemoStatus("Hold menu ready", "Choose responsive, redaction, boxes, or cutaway.");
+    setDemoStatus("Capture actions ready", "Choose a responsive set, redaction scan, lasso, callout, or signals.");
     suppressClick = true;
     window.setTimeout(() => {
       suppressClick = false;
@@ -115,13 +148,13 @@ if (demoLaunch && demoHoldButton && demoHoldMenu) {
     demoLaunch.classList.remove("is-menu-open");
     demoHoldMenu.setAttribute("aria-hidden", "true");
     demoHoldButton.setAttribute("aria-expanded", "false");
-    setDemoStatus("captainfredric.github.io ready", "Hold capture to choose a focused action.");
+    setDemoStatus("example.com ready", "Choose the capture you need.");
   };
 
   const startDemoHold = () => {
     window.clearTimeout(holdTimer);
     demoLaunch.classList.add("is-holding");
-    setDemoStatus("Hold to open actions", "Release after the menu appears.");
+    setDemoStatus("Opening capture actions", "Release when the action menu appears.");
     holdTimer = window.setTimeout(openDemoMenu, 520);
   };
 
@@ -130,7 +163,7 @@ if (demoLaunch && demoHoldButton && demoHoldMenu) {
     demoLaunch.classList.remove("is-holding");
 
     if (!demoLaunch.classList.contains("is-menu-open")) {
-      setDemoStatus("captainfredric.github.io ready", "Hold capture to choose a focused action.");
+      setDemoStatus("example.com ready", "Choose the capture you need.");
     }
   };
 
@@ -167,4 +200,35 @@ if (demoLaunch && demoHoldButton && demoHoldMenu) {
 
     closeDemoMenu();
   });
+}
+
+if (cleanupDemo && cleanupReplay) {
+  cleanupReplay.addEventListener("click", () => {
+    cleanupDemo.removeAttribute("data-cleanup-state");
+    for (const button of cleanupModeButtons) {
+      button.classList.remove("is-active");
+    }
+
+    cleanupDemo.classList.remove("is-running");
+    cleanupDemo.classList.add("is-replaying");
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        cleanupDemo.classList.add("is-running");
+      });
+    });
+  });
+}
+
+if (cleanupDemo && cleanupModeButtons.length) {
+  for (const button of cleanupModeButtons) {
+    button.addEventListener("click", () => {
+      cleanupDemo.classList.remove("is-replaying", "is-running");
+      cleanupDemo.dataset.cleanupState = button.dataset.cleanupMode || "cluttered";
+
+      for (const modeButton of cleanupModeButtons) {
+        modeButton.classList.toggle("is-active", modeButton === button);
+      }
+    });
+  }
 }

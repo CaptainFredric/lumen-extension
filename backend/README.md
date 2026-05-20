@@ -49,14 +49,18 @@ LUMEN_API_PORT=8788 LUMEN_API_DATA_DIR=/tmp/lumen-api npm run api
 17. `GET /v1/watch-plans/:id`
 18. `PATCH /v1/watch-plans/:id`
 19. `DELETE /v1/watch-plans/:id`
-20. `GET /v1/agent-jobs`
-21. `POST /v1/agent-jobs`
-22. `GET /v1/agent-jobs/:id`
-23. `PATCH /v1/agent-jobs/:id`
+20. `GET /v1/watch-runs`
+21. `POST /v1/watch-runs`
+22. `GET /v1/watch-runs/:id`
+23. `DELETE /v1/watch-runs/:id`
+24. `GET /v1/agent-jobs`
+25. `POST /v1/agent-jobs`
+26. `GET /v1/agent-jobs/:id`
+27. `PATCH /v1/agent-jobs/:id`
 
-Demo sessions accept `plan: "free"`, `"demo-pro"`, `"team"`, or `"enterprise"`. This is an entitlement test harness, not production billing. Watch plan creation requires a plan with `regionWatch` access plus `explicitOptIn: true` or `optIn: true`. Agent job creation requires `agentHandoff` access plus explicit opt-in and `payloadReviewed: true` or `reviewedPayload: true`.
+Demo sessions accept `plan: "free"`, `"demo-pro"`, `"team"`, or `"enterprise"`. This is an entitlement test harness, not production billing. Watch plan creation requires a plan with `regionWatch` access plus `explicitOptIn: true` or `optIn: true`. Watch runs store scheduled capture results for the shelf. Agent job creation requires `agentHandoff` access plus explicit opt-in and `payloadReviewed: true` or `reviewedPayload: true`.
 
-Data controls allow retention values of `7`, `30`, `90`, `180`, `365`, or `0` for manual delete only. `cloudSyncEnabled: true` requires a plan with `cloudSync` access. `DELETE /v1/account-data` requires `confirmation: "DELETE LUMEN DATA"` and removes captures, watch plans, agent jobs, and saved data controls for the active session.
+Data controls allow retention values of `7`, `30`, `90`, `180`, `365`, or `0` for manual delete only. `cloudSyncEnabled: true` requires a plan with `cloudSync` access. `DELETE /v1/account-data` requires `confirmation: "DELETE LUMEN DATA"` and removes captures, watch plans, watch runs, agent jobs, and saved data controls for the active session.
 
 ## Smoke Test
 
@@ -64,4 +68,4 @@ Data controls allow retention values of `7`, `30`, `90`, `180`, `365`, or `0` fo
 npm run smoke:backend
 ```
 
-The smoke test starts the API with a temporary data directory, checks that a free plan cannot create paid watch, agent, or cloud-sync records, creates a team session, verifies retention controls, writes a capture, checks that watch plans reject missing opt-in, writes an opted-in watch plan, queues and completes a reviewed agent job, verifies stats, checks invalid-session rejection, deletes all session backend data, and removes the temporary store.
+The smoke test starts the API with a temporary data directory, checks that a free plan cannot create paid watch, agent, or cloud-sync records, creates a team session, verifies retention controls, writes a capture, checks that watch plans reject missing opt-in, writes an opted-in watch plan and captured watch run, queues and completes a reviewed agent job, verifies stats, checks invalid-session rejection, deletes all session backend data, and removes the temporary store.

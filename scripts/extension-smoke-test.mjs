@@ -55,6 +55,7 @@ try {
         files: [
           "Lumen/2026-05-02/smoke-capture/smoke-desktop-raw.png",
           "Lumen/2026-05-02/smoke-capture/smoke-desktop-raw-cutaway.png",
+          "Lumen/2026-05-02/smoke-capture/smoke-desktop-raw-print-sheet.html",
           "Lumen/2026-05-02/smoke-capture/smoke-bundle-desktop-raw.json"
         ],
         downloads: [
@@ -84,6 +85,16 @@ try {
               height: 320,
               projection: "direct"
             }
+          },
+          {
+            downloadId: 12348,
+            filename: "Lumen/2026-05-02/smoke-capture/smoke-desktop-raw-print-sheet.html",
+            bytesReceived: 9400,
+            kind: "html",
+            role: "print-sheet",
+            variantId: "desktop",
+            width: 1280,
+            height: 2400
           },
           {
             downloadId: 12346,
@@ -118,6 +129,40 @@ try {
             }
           }
         ]
+      }
+    ],
+    "lumen.watch.runs": [
+      {
+        id: "watch-run-smoke-captured",
+        watchPlanId: "watch-plan-smoke",
+        captureId,
+        title: "Pricing area watch",
+        url: "https://example.test/pricing",
+        host: "example.test",
+        status: "captured",
+        scheduledAt: "2026-05-02T14:00:00.000Z",
+        startedAt: "2026-05-02T14:00:10.000Z",
+        completedAt: "2026-05-02T14:00:22.000Z",
+        fileCount: 3,
+        files: [
+          "Lumen/2026-05-02/smoke-capture/smoke-desktop-raw.png",
+          "Lumen/2026-05-02/smoke-capture/smoke-desktop-raw-cutaway.png",
+          "Lumen/2026-05-02/smoke-capture/smoke-desktop-raw-print-sheet.html",
+          "Lumen/2026-05-02/smoke-capture/smoke-bundle-desktop-raw.json"
+        ]
+      },
+      {
+        id: "watch-run-smoke-failed",
+        watchPlanId: "watch-plan-smoke",
+        title: "Hero area watch",
+        url: "https://example.test/hero",
+        host: "example.test",
+        status: "failed",
+        scheduledAt: "2026-05-02T15:00:00.000Z",
+        completedAt: "2026-05-02T15:00:04.000Z",
+        fileCount: 0,
+        files: [],
+        error: "Site access expired."
       }
     ]
   }), seededCaptureId);
@@ -154,7 +199,7 @@ try {
     captureButton: document.querySelector("#captureButton strong")?.textContent?.trim() || "",
     captureHint: document.querySelector("#captureButton small")?.textContent?.trim() || "",
     captureDisabled: document.querySelector("#captureButton")?.disabled || false,
-    analyzeButton: document.querySelector("#analyzeButton span")?.textContent?.trim() || "",
+    analyzeButton: document.querySelector("#analyzeButton .action-label")?.textContent?.trim() || "",
     analyzeDisabled: document.querySelector("#analyzeButton")?.disabled || false,
     holdMenuHidden: document.querySelector("#holdMenu")?.getAttribute("aria-hidden") || "",
     holdActionCount: document.querySelectorAll("[data-quick-action]").length,
@@ -163,6 +208,10 @@ try {
     autoRedactDisabled: document.querySelector("#autoRedact")?.disabled || false,
     cutawayStatus: document.querySelector("#cutawayRegionStatus")?.textContent?.trim() || "",
     cutawayClearDisabled: document.querySelector("#clearCutawayButton")?.disabled || false,
+    watchCardHidden: document.querySelector("#watchPlanCard")?.classList.contains("is-hidden") ?? false,
+    runWatchNowDisabled: document.querySelector("#runWatchPlanNowButton")?.disabled || false,
+    toggleWatchDisabled: document.querySelector("#toggleWatchPlanButton")?.disabled || false,
+    deleteWatchDisabled: document.querySelector("#deleteWatchPlanButton")?.disabled || false,
     annotationStatus: document.querySelector("#annotationRegionStatus")?.textContent?.trim() || "",
     annotationClearDisabled: document.querySelector("#clearAnnotationButton")?.disabled || false,
     runViewSummary: document.querySelector("#runViewSummary")?.textContent?.trim() || "",
@@ -189,7 +238,18 @@ try {
     historyArtifactFilters: [...document.querySelectorAll("[data-history-artifact-filter]")].map((button) => button.textContent?.trim()),
     historyArtifactRows: [...document.querySelectorAll("[data-artifact-type]")].map((row) => row.dataset.artifactType),
     historyCutawayPreview: Boolean(document.querySelector(".history-cutaway-preview")),
-    historyActions: [...document.querySelectorAll("[data-history-action]")].map((button) => ({
+    shelfCount: document.querySelector("#captureShelfCount")?.textContent?.trim() || "",
+    shelfCards: document.querySelectorAll(".capture-shelf-card").length,
+    shelfKinds: [...document.querySelectorAll(".capture-shelf-card")].map((card) => card.dataset.kind),
+    shelfBadges: [...document.querySelectorAll(".capture-shelf-badge")].map((badge) => badge.textContent?.trim()),
+    shelfActions: [...document.querySelectorAll("#captureShelfGrid [data-history-action]")].map((button) => ({
+      action: button.dataset.historyAction,
+      captureId: button.dataset.captureId,
+      watchRunId: button.dataset.watchRunId,
+      disabled: button.disabled,
+      text: button.textContent?.trim()
+    })),
+    historyActions: [...document.querySelectorAll("#historyList [data-history-action]")].map((button) => ({
       action: button.dataset.historyAction,
       captureId: button.dataset.captureId,
       disabled: button.disabled
@@ -202,28 +262,32 @@ try {
   assert(popupState.launchStatusTitle === "lumen-smoke.test ready", "Launch status title did not render the target host.", popupState);
   assert(!popupState.launchBlocked, "Launch panel should not block a capturable target tab.", popupState);
   assert(popupState.captureButton === "Capture page", "Capture action did not render.", popupState);
-  assert(popupState.captureHint === "Full page capture. Hold for actions.", "Capture hold hint did not render.", popupState);
+  assert(popupState.captureHint === "Capture now. Hold for tools.", "Capture hold hint did not render.", popupState);
   assert(!popupState.captureDisabled, "Capture action should be enabled for a capturable target tab.", popupState);
-  assert(popupState.analyzeButton === "Analyze Page", "Analyze action did not render.", popupState);
+  assert(popupState.analyzeButton === "Analyze page", "Analyze action did not render.", popupState);
   assert(!popupState.analyzeDisabled, "Analyze action should be enabled for a capturable target tab.", popupState);
   assert(popupState.holdMenuHidden === "true", "Hold menu should start closed.", popupState);
-  assert(popupState.holdActionCount === 6, "Hold menu actions did not render.", popupState);
+  assert(popupState.holdActionCount === 7, "Hold menu actions did not render.", popupState);
   assert(popupState.statusHidden, "Popup status panel should start hidden.", popupState);
   assert(popupState.manualCount === "0 boxes", "Manual redaction counter did not initialize.", popupState);
   assert(popupState.autoRedactDisabled, "Free local session should lock auto-redaction.", popupState);
-  assert(popupState.cutawayStatus === "No region", "Cutaway region status did not initialize.", popupState);
+  assert(popupState.cutawayStatus === "Choose region", "Cutaway region status did not initialize.", popupState);
   assert(popupState.cutawayClearDisabled, "Cutaway clear action should start disabled without a region.", popupState);
-  assert(popupState.annotationStatus === "No callout", "Annotation callout status did not initialize.", popupState);
+  assert(popupState.watchCardHidden, "Timed capture card should start hidden without a saved watch.", popupState);
+  assert(popupState.runWatchNowDisabled, "Run now should start disabled without a saved active watch.", popupState);
+  assert(popupState.toggleWatchDisabled, "Pause/resume should start disabled without a saved watch.", popupState);
+  assert(popupState.deleteWatchDisabled, "Clear watch should start disabled without a saved watch.", popupState);
+  assert(popupState.annotationStatus === "Choose target", "Annotation callout status did not initialize.", popupState);
   assert(popupState.annotationClearDisabled, "Annotation clear action should start disabled without a callout.", popupState);
   assert(popupState.runViewSummary === "Desktop", "Run view summary did not initialize.", popupState);
   assert(popupState.runExportSummary === "Raw", "Run export summary did not initialize.", popupState);
   assert(popupState.runSafetySummary.includes("Cleanup"), "Run safety summary did not initialize.", popupState);
   assert(popupState.accountPlan === "Free", "Free account plan did not render.", popupState);
-  assert(popupState.dataControlsSummary.includes("Start Demo Pro"), "Data controls summary did not explain the locked state.", popupState);
+  assert(popupState.dataControlsSummary.includes("Enable advanced tools"), "Data controls summary did not explain the locked state.", popupState);
   assert(popupState.retentionDisabled, "Retention control should start disabled without a backend session.", popupState);
   assert(popupState.retentionValue === "90", "Retention control should default to 90 days.", popupState);
   assert(popupState.cloudSyncDisabled, "Cloud sync control should start disabled for the free plan.", popupState);
-  assert(popupState.deleteBackendDataDisabled, "Backend delete action should start disabled without a backend session.", popupState);
+  assert(popupState.deleteBackendDataDisabled, "Session delete action should start disabled without an advanced session.", popupState);
   assert(popupState.lockedFeatureCount >= 2, "Advanced feature chips should start locked for the free plan.", popupState);
   assert(
     popupState.disabledResponsiveModes.includes("tablet") &&
@@ -238,20 +302,61 @@ try {
     popupState
   );
   assert(popupState.exportReviewHidden, "Export review screen should start hidden.", popupState);
-  assert(popupState.exportReviewConfirm === "Run export", "Export review confirmation action did not render.", popupState);
+  assert(popupState.exportReviewConfirm === "Save capture", "Export review confirmation action did not render.", popupState);
   assert(popupState.timelineStepCount === 6, "Capture timeline did not render.", popupState);
-  assert(popupState.statusLogText === "No active run yet.", "Status log did not initialize.", popupState);
+  assert(popupState.statusLogText === "Run status appears here.", "Status log did not initialize.", popupState);
   assert(popupState.historyCount === "1 item", "Seeded history count did not render.", popupState);
   assert(popupState.historyPath === "Lumen/2026-05-02/smoke-capture", "Archive folder did not render.", popupState);
   assert(popupState.historyDetailOpen, "Latest history detail panel did not open.", popupState);
   assert(popupState.historyDetailMetrics.includes("Saved"), "History detail manifest state did not render.", popupState);
   assert(popupState.historyDetailPanels.includes("Capture views"), "History detail capture views did not render.", popupState);
-  assert(popupState.historyDetailPanels.includes("Artifacts"), "History detail artifacts did not render.", popupState);
+  assert(popupState.historyDetailPanels.includes("Files"), "History detail files did not render.", popupState);
   assert(popupState.historyDetailPanels.includes("Page signals"), "History detail page signals did not render.", popupState);
-  assert(popupState.historyArtifactFilters.includes("All 3"), "Artifact all filter did not render.", popupState);
-  assert(popupState.historyArtifactFilters.includes("Cutaway 1"), "Cutaway artifact filter did not render.", popupState);
-  assert(popupState.historyArtifactRows.includes("cutaway"), "Cutaway artifact row did not render.", popupState);
+  assert(popupState.historyArtifactFilters.includes("All 4"), "Files all filter did not render.", popupState);
+  assert(popupState.historyArtifactFilters.includes("Cutaway 1"), "Cutaway file filter did not render.", popupState);
+  assert(popupState.historyArtifactFilters.includes("Print sheet 1"), "Print sheet file filter did not render.", popupState);
+  assert(popupState.historyArtifactRows.includes("cutaway"), "Cutaway file row did not render.", popupState);
+  assert(popupState.historyArtifactRows.includes("print-sheet"), "Print sheet file row did not render.", popupState);
   assert(popupState.historyCutawayPreview, "Cutaway preview did not render in history detail.", popupState);
+  assert(popupState.shelfCount.includes("1 capture"), "Capture shelf did not count seeded history.", popupState);
+  assert(popupState.shelfCount.includes("2 timed runs"), "Capture shelf did not count seeded timed runs.", popupState);
+  assert(popupState.shelfCards === 3, "Capture shelf did not render seeded captures and timed runs.", popupState);
+  assert(
+    popupState.shelfKinds.filter((kind) => kind === "watch").length === 2 &&
+      popupState.shelfKinds.includes("capture"),
+    "Capture shelf did not label timed run cards and capture cards.",
+    popupState
+  );
+  assert(
+    popupState.shelfBadges.includes("Timed saved") &&
+      popupState.shelfBadges.includes("Timed Failed") &&
+      popupState.shelfBadges.includes("Capture"),
+    "Capture shelf status badges did not render.",
+    popupState
+  );
+  assert(
+    popupState.shelfActions.some((button) =>
+      button.action === "copy" &&
+        button.watchRunId === "watch-run-smoke-captured" &&
+        !button.disabled
+    ) &&
+      popupState.shelfActions.some((button) =>
+        button.action === "copy" &&
+          button.watchRunId === "watch-run-smoke-failed" &&
+          !button.disabled
+      ),
+    "Timed run shelf summaries should be copyable.",
+    popupState
+  );
+  assert(
+    popupState.shelfActions.some((button) =>
+      button.action === "open" &&
+        button.watchRunId === "watch-run-smoke-failed" &&
+        button.disabled
+    ),
+    "Failed timed runs should keep file actions disabled.",
+    popupState
+  );
   assert(
     popupState.historyActions.length === 4 &&
       popupState.historyActions.every((button) => button.captureId === seededCaptureId && !button.disabled),

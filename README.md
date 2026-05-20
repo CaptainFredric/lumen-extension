@@ -1,20 +1,20 @@
 # Lumen
 
-Lumen is a Manifest V3 Chrome extension for clean, responsive, safer evidence capture.
+Lumen is a Manifest V3 Chrome extension for clean, responsive webpage capture.
 
-The current wedge is narrow on purpose:
+Lumen focuses on:
 
 1. clean the page before capture
 2. capture desktop, tablet, and mobile views together
 3. redact sensitive visible data during export
 4. attach useful page signals beside the image
-5. save a bundle manifest so the capture can travel with its context
+5. save a page context file so the capture can travel with its source details
 
-The repo is aimed at design review, QA, and product work with a deliberately narrow first wedge.
+The repo is aimed at design review, QA, and product work.
 
 ## What Works Now
 
-The current build includes:
+The extension includes:
 
 1. sticky, fixed, and high-z cleanup before capture
 2. lazy-load preflight scrolling
@@ -29,15 +29,15 @@ The current build includes:
 11. a pre-export review screen that checks auto-redactions, manual projection, and cutaway resolution across the requested view set before saving
 12. an anchored callout picker that marks one page area and renders it into the exported image with the capture note
 13. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
-14. bundle-manifest JSON exports with view, redaction, manual projection, cutaway, callout, signal, output health, and note metadata
-15. dated per-run download folders so capture sets, tiles, and manifests stay together
+14. page context JSON exports with view, redaction, manual projection, cutaway, callout, signal, output health, and note metadata
+15. dated per-run download folders so capture sets, tiles, and context files stay together
 16. local capture history with file, folder, summary, and Chrome download-handle metadata
-17. popup history actions to open the latest artifact or reveal it in the Downloads folder
-18. capture-time popup UI with run settings, cutaway state, a live stage timeline, and recent status log
+17. popup history and shelf actions to copy summaries, open saved files, or reveal them in the Downloads folder
+18. capture-time popup UI with run settings, cutaway state, timed-run shelf cards, a live stage timeline, and recent status log
 19. an on-page usage HUD that appears during preparation and review setup, then hides before screenshots so exports stay clean
-20. a shared entitlement model used by the popup and backend so paid-path features have one access contract
-21. backend retention and delete controls for session-owned captures, watch records, and agent jobs
-22. a local backend slice for demo session state, entitlement checks, and history sync when an API is reachable
+20. a shared entitlement model used by the popup and local service so paid-path features have one access contract
+21. session retention and delete controls for captures, timed runs, and delivery jobs
+22. a local service slice for demo session state, entitlement checks, and history sync when an API is reachable
 23. a GitHub Pages landing site in `docs/`
 
 ## Current Limits
@@ -46,12 +46,12 @@ These limits are important:
 
 1. redaction currently covers text and filled inputs present in the current DOM during export and should be reviewed before external sharing
 2. manual redaction boxes can project into responsive captures through DOM anchors, but the result still needs review before external sharing
-3. cutaway export works when the stored region can resolve in the captured view, but scheduled watch automation is not active yet
+3. timed region capture uses Chrome alarms, saved site access, and a local watch-run shelf; Chrome may defer runs while the browser is closed
 4. the current annotation pass is one anchored callout plus one capture note, not a full drawing suite
-5. cloud sync, billing, scheduled monitoring, and visual diffs remain future work
+5. cloud sync, billing, destination delivery workers, and visual diffs remain outside the local extension package
 6. highly dynamic sites with virtualization or unusual scroll behavior can still need site-specific fallback work
-7. retention and delete controls cover the local backend slice, but cloud deletion and account recovery are still production work
-8. the local backend slice now checks entitlements, but it remains a demo path rather than a production account or billing system
+7. retention and delete controls cover the local service, while cloud deletion and account recovery remain production work
+8. the local service checks entitlements, retention, timed records, and delivery queues, while production account and billing systems remain separate work
 
 ## Architecture
 
@@ -67,15 +67,15 @@ The current capture flow is:
 6. content script resolves manual redactions, any stored cutaway region, and the optional callout region against the current layout
 7. offscreen stitches the final output using device-pixel-ratio aware composition, renders one capture note and callout marker, and can export a cutaway crop from the stitched result
 8. if the page is too large for one safe canvas, the export falls back to tiled raw output and skips cutaway cropping for that view
-9. background downloads the files, writes the bundle manifest, writes local history, and restores the page
+9. background downloads the files, writes page context, writes local history, and restores the page
 
 ### Entitlements
 
-`entitlements.js` is the shared plan contract for the extension and backend. Free keeps the local capture wedge available. Demo Pro unlocks current advanced local tools for testing. Team and Enterprise are required before the backend accepts future watch or agent records, and those records still require explicit opt-in and review flags.
+`entitlements.js` is the shared plan contract for the extension and local service. Free keeps the local capture wedge available. Demo Pro unlocks current advanced local tools for testing. Team and Enterprise are required before the service accepts timed capture or agent records, and those records still require explicit opt-in and review flags.
 
 ### Data Controls
 
-The backend exposes retention and account-data deletion routes for the active session. These controls are intentionally in place before real cloud destinations so synced capture workflows have a deletion and retention contract before they become customer-facing.
+The local service exposes retention and session-data deletion routes. These controls are intentionally in place before real cloud destinations so synced capture workflows have a deletion and retention contract before they become customer-facing.
 
 ### Page Signals
 
@@ -88,7 +88,7 @@ The current signal extraction reads:
 5. most-used type families
 6. layout counts such as sections, headings, buttons, forms, visuals, and words
 
-The proof generator uses the same content-script extraction path. If the proof assets miss a signal, the product copy should avoid claiming that signal as reliable.
+The sample capture generator uses the same content-script extraction path. If the sample assets miss a signal, the product copy should avoid claiming that signal as reliable.
 
 ## Local Development
 
@@ -99,7 +99,7 @@ The proof generator uses the same content-script extraction path. If the proof a
 3. Click `Load unpacked`
 4. Select this `lumen-extension` directory
 
-### Run The Backend Slice
+### Run The Local Service
 
 ```bash
 npm install
@@ -108,7 +108,7 @@ npm run api
 
 The local API listens on `http://127.0.0.1:8787`.
 
-To verify the backend contract for sessions, captures, watch plans, agent jobs, stats, and integrations:
+To verify the local service contract for sessions, captures, timed capture plans, agent jobs, stats, and integrations:
 
 ```bash
 npm run smoke:backend
@@ -129,39 +129,39 @@ The public landing page will be available at `http://127.0.0.1:3000/`.
 2. Open the Lumen popup
 3. Check the launch indicator to confirm the current tab is capture-ready
 4. Click `Capture page` for the default full-page run
-5. Hold `Capture page` to open quick actions for responsive capture, redaction scan, manual boxes, or signal extraction
+5. Hold `Capture page` to open quick actions for responsive capture, redaction scan, manual boxes, cutaway, lasso, callout, or signal extraction
 6. Change capture device, export mode, cleanup, lazy-load forcing, auto-redaction, notes, or manifest settings when needed
 7. Use `Scan` to preview detected redaction regions before export
 8. Use `Mark boxes` if you need manual redactions before capture
-9. Use `Mark cutaway` to store one reusable page region; the next capture exports cutaway PNGs for views where the region resolves
-10. Use `Open` or `Show in folder` from recent captures to get back to the saved artifact
-11. When the pre-export review appears, check auto-redaction counts, manual projection status, cutaway status, and warnings, then click `Run export`
-12. Expand recent capture details to review views, artifacts, redactions, manifest status, notes, and page signals
-13. Copy a capture summary when you need to paste evidence into a review note or bug report
+9. Use `Mark cutaway` or `Lasso area` to store one reusable page region; the next capture exports focused PNGs for views where the region resolves
+10. Use `Open` or `Show` from the shelf or recent captures to get back to saved files
+11. When the save check appears, check auto-redaction counts, manual projection status, cutaway status, and warnings, then click `Save capture`
+12. Expand recent capture details to review views, files, redactions, context status, notes, and page signals
+13. Copy a capture or timed-run summary when you need to paste evidence into a review note or bug report
 
 If the launch indicator says the page is blocked, switch to a normal `http://` or `https://` page. Chrome does not allow extension capture scripts on internal browser pages, Web Store pages, or other extension pages.
 
-## Proof Assets
+## Sample Capture Assets
 
-The landing page includes proof assets generated from the current prototype:
+The landing page and store screenshot pack use generated sample capture assets:
 
-1. `docs/assets/proof-run-desktop.png`
-2. `docs/assets/proof-run-tablet.png`
-3. `docs/assets/proof-run-mobile.png`
-4. `docs/assets/proof-run-redacted.png`
-5. `docs/assets/proof-run-signals.png`
-6. `docs/assets/proof-run-history.png`
-7. `docs/assets/proof-run-bundle.json`
-8. `docs/assets/proof-run-signals.json`
-9. `docs/assets/proof-run-summary.json`
-10. `docs/assets/proof-social-card.png`
-11. `docs/assets/proof-run-bundle.zip`
+1. `docs/assets/capture-run-desktop.png`
+2. `docs/assets/capture-run-tablet.png`
+3. `docs/assets/capture-run-mobile.png`
+4. `docs/assets/capture-run-redacted.png`
+5. `docs/assets/capture-run-signals.png`
+6. `docs/assets/capture-run-history.png`
+7. `docs/assets/capture-run-bundle.json`
+8. `docs/assets/capture-run-signals.json`
+9. `docs/assets/capture-run-summary.json`
+10. `docs/assets/lumen-social-card.png`
+11. `docs/assets/capture-run-bundle.zip`
 
 To regenerate them:
 
 ```bash
 npm install
-npm run proof:assets
+npm run capture:assets
 ```
 
 ### Run Capture Smoke Tests
@@ -180,13 +180,13 @@ npm run smoke:extension
 
 This opens a temporary Chromium profile, loads the extension unpacked, checks the background service worker, opens `popup.html`, then closes and removes the profile.
 
-To verify the loaded extension can capture a real local page and produce finished artifacts:
+To verify the loaded extension can capture a real local page and produce finished files:
 
 ```bash
 npm run smoke:e2e
 ```
 
-This starts a local fixture page, loads a temporary copy of the extension with explicit test only capture access, seeds one anchored cutaway region, runs a responsive desktop, tablet, and mobile capture through the MV3 background worker, waits for Chrome downloads to finish, validates the full-page PNGs, cutaway PNGs, and manifest artifacts, checks that local history stores the run, then removes the temporary profile and download folder. The checked in manifest is not widened by this test.
+This starts a local fixture page, loads a temporary copy of the extension with explicit test only capture access, seeds one anchored cutaway region, runs a responsive desktop, tablet, and mobile capture through the MV3 background worker, waits for Chrome downloads to finish, validates the full-page PNGs, cutaway PNGs, and context files, checks that local history stores the run, then removes the temporary profile and download folder. The checked in manifest is not widened by this test.
 
 If a browser run is interrupted, remove leftover Lumen test screenshots, temporary profiles, and capture downloads with:
 
@@ -205,12 +205,12 @@ The default list captures the public Lumen docs page and the GitHub repository. 
 To install Chromium for Playwright, run:
 
 ```bash
-npm run proof:install-browser
+npm run capture:install-browser
 ```
 
-The proof script depends on Playwright and a local Chromium install. It is reproducible and requires those local browser dependencies.
+The sample asset script depends on Playwright and a local Chromium install. It is reproducible and requires those local browser dependencies.
 
-The script also tries to create `docs/assets/proof-run-bundle.zip` with the system `zip` command. If `zip` is missing, the proof images and JSON files still generate, but the archive step is skipped.
+The script also tries to create `docs/assets/capture-run-bundle.zip` with the system `zip` command. If `zip` is missing, the sample images and JSON files still generate, but the archive step is skipped.
 
 ### Generate Store Screenshots
 
@@ -218,7 +218,7 @@ The script also tries to create `docs/assets/proof-run-bundle.zip` with the syst
 npm run store:screenshots
 ```
 
-This creates Chrome Web Store sized screenshots in `store-assets/screenshots/` from the live extension popup plus the current proof output assets. The generated screenshots are 1280 by 800 PNGs.
+This creates Chrome Web Store sized screenshots in `store-assets/screenshots/` from the live extension popup plus the current sample capture assets. The generated screenshots are 1280 by 800 PNGs.
 
 ### Build The Store Package
 
@@ -226,7 +226,7 @@ This creates Chrome Web Store sized screenshots in `store-assets/screenshots/` f
 npm run package:extension
 ```
 
-This validates the Manifest V3 upload package, checks required runtime files, verifies declared PNG icon dimensions, rejects development folders, and writes `dist/lumen-extension-0.2.0.zip`. The ZIP contains only the runtime extension files, not docs, tests, backend code, node_modules, or proof assets.
+This validates the Manifest V3 upload package, checks required runtime files, verifies declared PNG icon dimensions, rejects development folders, and writes `dist/lumen-extension-0.2.0.zip`. The ZIP contains only the runtime extension files, not docs, tests, backend code, node_modules, or sample capture assets.
 
 ## Publish The Landing Site
 
@@ -243,9 +243,9 @@ To verify the deployed route shape locally:
 npm run smoke:site
 ```
 
-## Future Direction
+## Product Backlog
 
-These are future layers:
+Potential product layers:
 
 1. freeform annotation tools
 2. opt-in region watch with visible pause and retention controls
@@ -258,7 +258,7 @@ See `PRODUCT_ROADMAP.md` for the longer product direction and Chrome Web Store g
 See `STORE_READINESS.md` for the current submission checklist, permission rationale, and policy references.
 See `READINESS_CRITERIA.md` for how the personal use, Web Store beta, and paid product percentages are estimated.
 See `PRIVACY.md` for the local-first privacy disclosure that mirrors the public privacy page.
-See `CHROME_STORE_LISTING.md` for the current single-purpose listing draft, permission rationale, and screenshot checklist.
+See `CHROME_STORE_LISTING.md` for the single-purpose listing copy, permission rationale, and screenshot checklist.
 
 ## Next Work
 

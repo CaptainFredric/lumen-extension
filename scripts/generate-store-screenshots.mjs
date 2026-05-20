@@ -16,14 +16,19 @@ const shotSize = {
   height: 800
 };
 
-const proofAssets = {
-  desktop: await imageDataUrl("docs/assets/proof-run-desktop.png"),
-  tablet: await imageDataUrl("docs/assets/proof-run-tablet.png"),
-  mobile: await imageDataUrl("docs/assets/proof-run-mobile.png"),
-  redacted: await imageDataUrl("docs/assets/proof-run-redacted.png"),
-  signals: await imageDataUrl("docs/assets/proof-run-signals.png"),
-  history: await imageDataUrl("docs/assets/proof-run-history.png")
+const captureAssets = {
+  desktop: await imageDataUrl("docs/assets/capture-run-desktop.png"),
+  tablet: await imageDataUrl("docs/assets/capture-run-tablet.png"),
+  mobile: await imageDataUrl("docs/assets/capture-run-mobile.png"),
+  redacted: await imageDataUrl("docs/assets/capture-run-redacted.png"),
+  signals: await imageDataUrl("docs/assets/capture-run-signals.png"),
+  history: await imageDataUrl("docs/assets/capture-run-history.png")
 };
+const publicStoreAssetCopies = [
+  ["01-extension-control-surface.png", "store-control-surface.png"],
+  ["02-hold-actions-and-review.png", "store-review-actions.png"],
+  ["03-responsive-capture-set.png", "store-responsive-set.png"]
+];
 
 const screenshots = [];
 let extensionContext;
@@ -51,6 +56,8 @@ try {
   for (const filePath of screenshots) {
     await assertPngDimensions(filePath, shotSize.width, shotSize.height);
   }
+
+  await copyPublicStoreAssets();
 
   console.log(JSON.stringify({
     ok: true,
@@ -135,10 +142,10 @@ function buildControlSurfaceShot(popupImage) {
   return `
     <section class="hero-grid">
       <div class="copy">
-        <p class="eyebrow">Lumen browser capture workflow</p>
-        <h1>Clean, responsive, safer evidence from any webpage.</h1>
-        <p class="lede">Capture the page, clean hostile overlays, review sensitive regions, and save a useful bundle instead of a dead screenshot.</p>
-        <div class="cta-row"><span>Full-page capture</span><span>Responsive set</span><span>Review before export</span></div>
+        <p class="eyebrow">Lumen capture workflow</p>
+        <h1>Clean, responsive captures from any webpage.</h1>
+        <p class="lede">Capture the page, clear overlays, check sensitive regions, and keep page context with the saved files.</p>
+        <div class="cta-row"><span>Full-page capture</span><span>Responsive set</span><span>Save check</span></div>
       </div>
       <div class="phone-frame">
         <img src="${popupImage}" alt="Lumen extension popup" />
@@ -154,13 +161,13 @@ function buildHoldActionShot(popupImage) {
         <img src="${popupImage}" alt="Lumen hold action menu" />
       </div>
       <div class="panel-stack">
-        <p class="eyebrow">Quick actions during review</p>
+        <p class="eyebrow">Quick actions</p>
         <h2>Hold the capture button to move faster.</h2>
-        <p>Run the exact review step you need: scan redactions, prepare export review, mark a cutaway, or add a callout region.</p>
+        <p>Run the step you need: scan redactions, mark a cutaway, lasso a region, or add a callout.</p>
         <div class="metric-grid">
-          <article><strong>6</strong><span>quick actions</span></article>
+          <article><strong>7</strong><span>quick actions</span></article>
           <article><strong>1</strong><span>callout region</span></article>
-          <article><strong>0</strong><span>silent handoffs</span></article>
+          <article><strong>1</strong><span>lasso region</span></article>
         </div>
       </div>
     </section>
@@ -171,13 +178,13 @@ function buildResponsiveSetShot() {
   return `
     <section class="output-shot">
       <div class="shot-head">
-        <p class="eyebrow">Current output</p>
-        <h2>One run can export desktop, tablet, and mobile evidence.</h2>
+        <p class="eyebrow">Responsive output</p>
+        <h2>One run can save desktop, tablet, and mobile views.</h2>
       </div>
       <div class="device-grid">
-        <figure class="browser-card wide"><img src="${proofAssets.desktop}" alt="Desktop capture output" /><figcaption>Desktop full page</figcaption></figure>
-        <figure class="browser-card"><img src="${proofAssets.tablet}" alt="Tablet capture output" /><figcaption>Tablet</figcaption></figure>
-        <figure class="browser-card phone"><img src="${proofAssets.mobile}" alt="Mobile capture output" /><figcaption>Mobile</figcaption></figure>
+        <figure class="browser-card wide"><img src="${captureAssets.desktop}" alt="Desktop capture output" /><figcaption>Desktop full page</figcaption></figure>
+        <figure class="browser-card"><img src="${captureAssets.tablet}" alt="Tablet capture output" /><figcaption>Tablet</figcaption></figure>
+        <figure class="browser-card phone"><img src="${captureAssets.mobile}" alt="Mobile capture output" /><figcaption>Mobile</figcaption></figure>
       </div>
     </section>
   `;
@@ -185,22 +192,22 @@ function buildResponsiveSetShot() {
 
 function buildRedactionShot() {
   return `
-    <section class="proof-grid-shot">
+    <section class="review-grid-shot">
       <div class="shot-head">
-        <p class="eyebrow">Redaction and annotation review</p>
+        <p class="eyebrow">Redaction and callouts</p>
         <h2>Clean the page first, then mark what needs attention.</h2>
-        <p>Current redaction covers visible text and filled inputs during export and should be reviewed before external sharing.</p>
+        <p>Redaction covers visible text and filled inputs during saving. Marked regions stay visible for a final check before sharing.</p>
       </div>
-      <div class="proof-pair">
-        <figure class="browser-card redaction"><img src="${proofAssets.redacted}" alt="Redacted capture output" /><figcaption>Redacted export</figcaption></figure>
+      <div class="review-pair">
+        <figure class="browser-card redaction"><img src="${captureAssets.redacted}" alt="Redacted capture output" /><figcaption>Redacted image</figcaption></figure>
         <div class="artifact-card">
-          <span class="status-pill">Implemented now</span>
-          <h3>Review artifact</h3>
+          <span class="status-pill">Save controls</span>
+          <h3>Check before sharing</h3>
           <ul>
             <li>Auto-redactions applied</li>
-            <li>Manual boxes can be drawn before export</li>
+            <li>Manual boxes can be drawn before saving</li>
             <li>Cutaway and callout regions resolve by page anchor</li>
-            <li>Agent or watch features require explicit opt-in</li>
+            <li>Timed capture and routing records require explicit opt-in</li>
           </ul>
         </div>
       </div>
@@ -210,15 +217,15 @@ function buildRedactionShot() {
 
 function buildSignalsShot() {
   return `
-    <section class="proof-grid-shot">
+    <section class="review-grid-shot">
       <div class="shot-head">
         <p class="eyebrow">Signals and local history</p>
         <h2>The screenshot ships with context.</h2>
-        <p>Each run can include files, dimensions, redaction counts, page signals, and a local history entry for later review.</p>
+        <p>Each run can include files, dimensions, redaction counts, page signals, and a local history entry for later reference.</p>
       </div>
-      <div class="proof-pair">
-        <figure class="browser-card"><img src="${proofAssets.signals}" alt="Extracted page signals" /><figcaption>Signals JSON</figcaption></figure>
-        <figure class="browser-card"><img src="${proofAssets.history}" alt="Local capture history" /><figcaption>Local history item</figcaption></figure>
+      <div class="review-pair">
+        <figure class="browser-card"><img src="${captureAssets.signals}" alt="Extracted page signals" /><figcaption>Signals JSON</figcaption></figure>
+        <figure class="browser-card"><img src="${captureAssets.history}" alt="Local capture history" /><figcaption>Local history item</figcaption></figure>
       </div>
     </section>
   `;
@@ -272,7 +279,7 @@ function buildStoreShell(bodyHtml) {
           .hero-grid,
           .split-grid,
           .output-shot,
-          .proof-grid-shot {
+          .review-grid-shot {
             position: relative;
             display: grid;
             height: 100%;
@@ -282,7 +289,7 @@ function buildStoreShell(bodyHtml) {
           .hero-grid { grid-template-columns: 1fr 430px; }
           .split-grid { grid-template-columns: 430px 1fr; }
           .output-shot,
-          .proof-grid-shot { align-content: center; }
+          .review-grid-shot { align-content: center; }
           .copy,
           .panel-stack,
           .artifact-card {
@@ -413,7 +420,7 @@ function buildStoreShell(bodyHtml) {
             gap: 18px;
             align-items: stretch;
           }
-          .proof-pair {
+          .review-pair {
             display: grid;
             grid-template-columns: 1.15fr 0.85fr;
             gap: 22px;
@@ -528,6 +535,25 @@ function buildTargetFixture() {
     </html>`;
 }
 
+async function copyPublicStoreAssets() {
+  const targets = [
+    path.join(repoRoot, "assets"),
+    path.join(repoRoot, "docs", "assets")
+  ];
+
+  for (const targetDir of targets) {
+    await mkdir(targetDir, { recursive: true });
+  }
+
+  for (const [sourceName, targetName] of publicStoreAssetCopies) {
+    const source = path.join(outputDir, sourceName);
+
+    for (const targetDir of targets) {
+      await cp(source, path.join(targetDir, targetName));
+    }
+  }
+}
+
 async function seedExtensionState(worker) {
   await worker.evaluate(() => chrome.storage.sync.set({
     "lumen.capture.settings": {
@@ -547,7 +573,7 @@ async function seedExtensionState(worker) {
     "lumen.capture.history": [
       {
         id: "store-shot-capture",
-        title: "Launch review capture",
+        title: "Launch capture",
         host: "lumen-store.test",
         url: "https://lumen-store.test/",
         devicePreset: "responsive",
@@ -558,24 +584,24 @@ async function seedExtensionState(worker) {
           "Lumen/2026-05-12/store-shot/desktop-browser.png",
           "Lumen/2026-05-12/store-shot/tablet-browser.png",
           "Lumen/2026-05-12/store-shot/mobile-browser.png",
-          "Lumen/2026-05-12/store-shot/bundle.json"
+          "Lumen/2026-05-12/store-shot/context.json"
         ],
         downloads: [
           { downloadId: 210, filename: "Lumen/2026-05-12/store-shot/desktop-browser.png", bytesReceived: 180000, kind: "image", role: "full-page", variantId: "desktop", width: 1440, height: 2600 },
           { downloadId: 211, filename: "Lumen/2026-05-12/store-shot/tablet-browser.png", bytesReceived: 132000, kind: "image", role: "full-page", variantId: "tablet", width: 1024, height: 2400 },
           { downloadId: 212, filename: "Lumen/2026-05-12/store-shot/mobile-browser.png", bytesReceived: 88000, kind: "image", role: "full-page", variantId: "mobile", width: 430, height: 2100 },
-          { downloadId: 213, filename: "Lumen/2026-05-12/store-shot/bundle.json", bytesReceived: 5200, kind: "manifest" }
+          { downloadId: 213, filename: "Lumen/2026-05-12/store-shot/context.json", bytesReceived: 5200, kind: "manifest" }
         ],
         redactionCount: 4,
         manualRedactionCount: 1,
         cutawayCount: 1,
-        manifestFile: "Lumen/2026-05-12/store-shot/bundle.json",
+        manifestFile: "Lumen/2026-05-12/store-shot/context.json",
         annotation: { text: "Check pricing module before sharing" },
         annotationRegion: { left: 220, top: 460, width: 520, height: 240 },
         blueprintSummary: {
           siteType: "Landing page",
           heroHeadline: "Evidence page with overlays",
-          primaryCta: "Start review"
+          primaryCta: "Start capture"
         },
         variants: [
           { id: "desktop", label: "Desktop", files: ["desktop-browser.png"], redactionCount: 4, cutawayCount: 1, dimensions: { width: 1440, height: 2600 } },

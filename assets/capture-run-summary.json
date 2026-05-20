@@ -1,13 +1,13 @@
 {
   "generatedAt": "2026-05-01T04:44:14.644Z",
-  "source": "Prototype proof page rendered with Lumen content-script cleanup, scan, and extraction logic.",
+  "source": "Sample capture page rendered with Lumen content-script cleanup, scan, and extraction logic.",
   "files": [
-    "proof-run-desktop.png",
-    "proof-run-tablet.png",
-    "proof-run-mobile.png",
-    "proof-run-bundle.json",
-    "proof-run-bundle.zip",
-    "proof-run-signals.json"
+    "capture-run-desktop.png",
+    "capture-run-tablet.png",
+    "capture-run-mobile.png",
+    "capture-run-bundle.json",
+    "capture-run-bundle.zip",
+    "capture-run-signals.json"
   ],
   "hiddenCount": 0,
   "redactionCount": 4,
@@ -24,8 +24,8 @@
     "generatedAt": "2026-05-01T04:44:05.709Z",
     "page": {
       "title": "Orbit Release Manager",
-      "url": "http://proof.lumen.test/",
-      "host": "proof.lumen.test",
+      "url": "http://capture.lumen.test/",
+      "host": "capture.lumen.test",
       "description": "Ship product updates with cleaner planning, calmer launches, and clearer status reviews.",
       "scrollMode": "document",
       "scrollContainer": "document"
@@ -110,6 +110,6 @@
   "historyItem": {
     "title": "Orbit Release Manager",
     "exportPreset": "raw",
-    "metaLine": "proof.lumen.test · Apr 30, 11:44 PM · 3 views · 4 files · 4 redactions · Brochure site"
+    "metaLine": "capture.lumen.test · Apr 30, 11:44 PM · 3 views · 4 files · 4 redactions · Brochure site"
   }
 }
