@@ -235,13 +235,15 @@ This validates the Manifest V3 upload package, checks required runtime files, ve
 3. Wait for the `Deploy Pages` workflow to complete
 4. Use `https://captainfredric.github.io/lumen-extension/`
 
-The Pages workflow deploys `docs/` as the public root. The project also keeps a compatibility route at `/docs/` so older shared links redirect back to the root product page.
+The Pages workflow deploys `docs/` as the public root. The root public files mirror the `docs/` copies so local repository-root previews match the deployed page. The project also keeps a compatibility route at `/docs/` so older shared links redirect back to the root product page.
 
 To verify the deployed route shape locally:
 
 ```bash
 npm run smoke:site
 ```
+
+This checks the mirrored public files, the root landing page, privacy page, legacy `/docs/` route, 404 fallback, and required social and store screenshot assets.
 
 ## Product Backlog
 

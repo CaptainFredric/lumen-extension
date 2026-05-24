@@ -5,6 +5,13 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
+const publicMirrors = [
+  "404.html",
+  "index.html",
+  "privacy.html",
+  "script.js",
+  "styles.css"
+];
 const siteRoots = [
   {
     name: "docs artifact root",
@@ -24,12 +31,15 @@ const siteRoots = [
 const results = [];
 
 try {
+  const mirrors = await verifyPublicMirrors();
+
   for (const target of siteRoots) {
     results.push(await runRouteChecks(target));
   }
 
   console.log(JSON.stringify({
     ok: true,
+    mirrors,
     results
   }, null, 2));
 } catch (error) {
@@ -39,6 +49,32 @@ try {
     details: error.details || null
   }, null, 2));
   process.exitCode = 1;
+}
+
+async function verifyPublicMirrors() {
+  const mirrors = [];
+
+  for (const relativePath of publicMirrors) {
+    const rootFile = path.join(repoRoot, relativePath);
+    const docsFile = path.join(repoRoot, "docs", relativePath);
+    const [rootBuffer, docsBuffer] = await Promise.all([
+      readFile(rootFile),
+      readFile(docsFile)
+    ]);
+
+    assert(rootBuffer.equals(docsBuffer), `Expected ${relativePath} to match docs/${relativePath}.`, {
+      rootBytes: rootBuffer.byteLength,
+      docsBytes: docsBuffer.byteLength,
+      firstDifference: findFirstDifference(rootBuffer, docsBuffer)
+    });
+
+    mirrors.push({
+      path: relativePath,
+      bytes: rootBuffer.byteLength
+    });
+  }
+
+  return mirrors;
 }
 
 async function runRouteChecks(target) {
@@ -204,6 +240,18 @@ function getContentType(filePath) {
   }
 
   return "application/octet-stream";
+}
+
+function findFirstDifference(left, right) {
+  const limit = Math.min(left.byteLength, right.byteLength);
+
+  for (let index = 0; index < limit; index += 1) {
+    if (left[index] !== right[index]) {
+      return index;
+    }
+  }
+
+  return left.byteLength === right.byteLength ? -1 : limit;
 }
 
 function assert(condition, message, details = null) {
