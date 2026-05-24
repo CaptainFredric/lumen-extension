@@ -1463,7 +1463,7 @@ function buildProductReadinessPayload(store, session) {
         signals: [
           "Manual boxes",
           "Callout notes",
-          "Page context",
+          "Bundle manifest",
           "Backend history sync"
         ]
       },
