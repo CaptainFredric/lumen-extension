@@ -488,6 +488,11 @@ function updateAnnotationCounter() {
     return;
   }
 
+  if (!ui.annotationEnabled?.checked) {
+    ui.annotationCounter.textContent = "Disabled";
+    return;
+  }
+
   const noteLength = ui.annotationText?.value?.trim()?.length || 0;
   ui.annotationCounter.textContent = `${noteLength} / 180`;
 }
@@ -520,6 +525,7 @@ function updateAnnotationControls() {
   currentSettings.annotationPosition = captureNote.position;
   ui.annotationBlock.classList.toggle("is-disabled", !enabled);
   ui.annotationText.disabled = !enabled;
+  updateAnnotationCounter();
 
   for (const button of ui.annotationPositionButtons) {
     const isActive = button.dataset.annotationPosition === captureNote.position;
@@ -2317,7 +2323,7 @@ function formatWatchRunStatus(run = null, plan = {}) {
 function formatDeletedDataSummary(deleted = {}) {
   const parts = [
     `${deleted.captures || 0} capture${deleted.captures === 1 ? "" : "s"}`,
-    `${deleted.watchPlans || 0} timed capture plan${deleted.watchPlans === 1 ? "" : "s"}`,
+    `${deleted.watchPlans || 0} watch record${deleted.watchPlans === 1 ? "" : "s"}`,
     `${deleted.agentJobs || 0} agent job${deleted.agentJobs === 1 ? "" : "s"}`,
     `${deleted.destinations || 0} destination${deleted.destinations === 1 ? "" : "s"}`,
     deleted.deliveries === 1 ? "1 delivery" : `${deleted.deliveries || 0} deliveries`
@@ -2561,7 +2567,7 @@ function renderHistory(history) {
       formatTimestamp(item.capturedAt),
       item.variants?.length ? `${item.variants.length} view${item.variants.length === 1 ? "" : "s"}` : "",
       `${item.files?.length || 0} file${item.files?.length === 1 ? "" : "s"}`,
-      item.manifestFile ? "context saved" : "",
+      item.manifestFile ? "manifest saved" : "",
       item.annotation?.text ? "note added" : "",
       item.manualRedactionCount ? `${item.manualRedactionCount} manual box${item.manualRedactionCount === 1 ? "" : "es"}` : "",
       item.cutawayCount ? `${item.cutawayCount} cutaway crop${item.cutawayCount === 1 ? "" : "s"}` : "",
@@ -2752,7 +2758,7 @@ function buildHistoryDetails(item) {
     buildHistoryMetric("Files", String(fileCount)),
     buildHistoryMetric("Redactions", String(redactionCount)),
     buildHistoryMetric("Cutaways", String(cutawayCount)),
-    buildHistoryMetric("Context", manifestState)
+    buildHistoryMetric("Manifest", manifestState)
   );
   detail.append(metrics);
 
@@ -2898,7 +2904,7 @@ function buildHistoryArtifactFilters(records) {
     ["image", "Full page", counts.image],
     ["cutaway", "Cutaway", counts.cutaway],
     ["print-sheet", "Print sheet", counts["print-sheet"]],
-    ["manifest", "Context", counts.manifest]
+    ["manifest", "Manifest", counts.manifest]
   ].filter(([, , count]) => count > 0);
 
   filterRow.className = "history-artifact-filters";
@@ -3046,7 +3052,7 @@ function formatArtifactLabel(record) {
   }
 
   if (artifactType === "manifest") {
-    return "Page context JSON";
+    return "Bundle manifest JSON";
   }
 
   if (artifactType === "print-sheet") {
@@ -3152,19 +3158,19 @@ function buildExportReviewOutputPlan(review) {
     ? Math.max(viewCount, tileCount)
     : tileCount;
   const printSheetCount = longPageMode === "print" ? viewCount : 0;
-  const contextCount = currentSettings.exportManifest === false ? 0 : 1;
+  const manifestCount = currentSettings.exportManifest === false ? 0 : 1;
   const cutawayCount = review.cutawayAppliedCount || 0;
-  const totalFiles = baseImageCount + printSheetCount + contextCount + cutawayCount;
+  const totalFiles = baseImageCount + printSheetCount + manifestCount + cutawayCount;
 
   return [
     {
-      label: "Files",
+      label: "Artifacts",
       value: `${totalFiles} planned`,
       detail: [
         `${baseImageCount} image${baseImageCount === 1 ? "" : "s"}`,
         cutawayCount ? `${cutawayCount} crop${cutawayCount === 1 ? "" : "s"}` : "",
         printSheetCount ? `${printSheetCount} print sheet${printSheetCount === 1 ? "" : "s"}` : "",
-        contextCount ? "page context" : ""
+        manifestCount ? "bundle manifest" : ""
       ].filter(Boolean).join(", ")
     },
     {
@@ -3577,7 +3583,7 @@ function renderRunSummary(settings = currentSettings) {
   ui.runExportSummary.textContent = exportLabel;
   ui.runSafetySummary.textContent = safetyParts.length ? safetyParts.join(", ") : "Basic";
   ui.runManifestSummary.textContent = [
-    settings.exportManifest === false ? "Context off" : "Context file",
+    settings.exportManifest === false ? "Manifest off" : "Manifest",
     settings.longPageMode === "tiles" ? "Tiles" : "",
     settings.longPageMode === "print" ? "Print sheet" : ""
   ].filter(Boolean).join(" + ");
@@ -3851,7 +3857,7 @@ function formatProjectionStats(label, stats = {}) {
 function buildCaptureSuccessMessage(response, settings) {
   const fileText = `${response.files.length} file${response.files.length === 1 ? "" : "s"} saved using ${response.exportPreset} output mode`;
   const variantCount = response.variantCount || getCaptureVariants(settings.devicePreset).length;
-  const manifestText = response.manifestFile ? " Page context saved." : "";
+  const manifestText = response.manifestFile ? " Bundle manifest saved." : "";
   const folderText = response.archiveFolder ? ` Saved in ${response.archiveFolder}.` : "";
   const captureNote = normalizeCaptureNoteOptions(settings);
   const noteText = response.annotation?.enabled || captureNote.enabled ? " Capture note added." : "";
@@ -3899,7 +3905,7 @@ function buildHistorySummaryText(item) {
     `Redactions: ${item.redactionCount || 0}`,
     item.manualRedactionCount ? `Manual boxes: ${item.manualRedactionCount}` : "",
     item.cutawayCount ? `Cutaway crops: ${item.cutawayCount}` : "",
-    item.manifestFile ? `Page context: ${item.manifestFile}` : "Page context: off",
+    item.manifestFile ? `Bundle manifest: ${item.manifestFile}` : "Bundle manifest: off",
     item.archiveFolder ? `Folder: ${item.archiveFolder}` : "",
     item.blueprintSummary?.siteType ? `Page type: ${item.blueprintSummary.siteType}` : "",
     item.blueprintSummary?.heroHeadline ? `Hero: ${item.blueprintSummary.heroHeadline}` : "",

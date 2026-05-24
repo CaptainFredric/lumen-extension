@@ -47,7 +47,7 @@ async function runRouteChecks(target) {
   try {
     const root = await fetchText(`${fixture.origin}/`);
     assert(root.status === 200, `Expected ${target.name} root route to load.`, root);
-    assert(root.body.includes("Clean captures from busy webpages."), `Expected ${target.name} root route to serve the Lumen landing page.`, {
+    assert(root.body.includes("<h1>Lumen</h1>"), `Expected ${target.name} root route to serve the Lumen landing page.`, {
       sample: root.body.slice(0, 240)
     });
 
@@ -71,7 +71,7 @@ async function runRouteChecks(target) {
         sample: legacyDocs.body.slice(0, 240)
       });
     } else {
-      assert(legacyDocs.body.includes("Clean captures from busy webpages."), "Expected repository-root docs route to serve the landing page.", {
+      assert(legacyDocs.body.includes("<h1>Lumen</h1>"), "Expected repository-root docs route to serve the landing page.", {
         sample: legacyDocs.body.slice(0, 240)
       });
     }

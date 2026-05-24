@@ -6,7 +6,7 @@
     <title>Lumen | Clean Webpage Capture</title>
     <meta
       name="description"
-      content="Lumen helps teams capture cleaner webpages for design review, QA, and product work. Remove page clutter, save responsive views, check sensitive details, and keep useful page context attached."
+      content="Lumen is a Chrome extension for clean webpage capture. Clear page clutter, save responsive views, mark sensitive details, and keep useful context with every capture."
     />
     <link rel="canonical" href="https://captainfredric.github.io/lumen-extension/" />
     <meta property="og:site_name" content="Lumen" />
@@ -21,7 +21,7 @@
       property="og:image"
       content="https://captainfredric.github.io/lumen-extension/assets/lumen-social-card.png"
     />
-    <meta property="og:image:alt" content="Lumen browser capture workflow interface." />
+    <meta property="og:image:alt" content="Lumen extension capture interface." />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
@@ -34,64 +34,64 @@
       name="twitter:image"
       content="https://captainfredric.github.io/lumen-extension/assets/lumen-social-card.png"
     />
-    <meta name="twitter:image:alt" content="Lumen browser capture workflow interface." />
+    <meta name="twitter:image:alt" content="Lumen extension capture interface." />
     <link rel="icon" href="brandmark.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/brandmark-512.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260516-public" />
+    <link rel="stylesheet" href="styles.css?v=20260520-redesign" />
   </head>
   <body>
-    <a class="skip-link" href="#features">Skip to content</a>
-    <div class="noise"></div>
+    <a class="skip-link" href="#product">Skip to content</a>
 
     <header class="site-header">
       <a class="brand" href="#top" aria-label="Lumen home">
         <span class="brand-mark">L</span>
-        <span class="brand-copy">
-          <strong>Lumen</strong>
-          <span>Capture workflow</span>
-        </span>
+        <span>Lumen</span>
       </a>
 
       <nav class="site-nav" aria-label="Primary">
-        <a href="#features">Features</a>
-        <a href="#cleanup-demo">Demo</a>
+        <a href="#product">Product</a>
+        <a href="#demo">Demo</a>
         <a href="#workflow">Workflow</a>
-        <a href="#product-system">Plans</a>
-        <a href="#chrome-store">Store</a>
+        <a href="#store">Store</a>
         <a href="#privacy">Privacy</a>
       </nav>
 
-      <div class="header-actions">
-        <a
-          class="nav-link nav-link-accent"
-          href="https://github.com/CaptainFredric/lumen-extension#load-the-extension-locally"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Install locally
-        </a>
-      </div>
+      <a
+        class="header-link"
+        href="https://github.com/CaptainFredric/lumen-extension#load-the-extension-locally"
+        target="_blank"
+        rel="noreferrer"
+      >
+        Install
+      </a>
     </header>
 
     <main>
-      <section class="hero" id="top">
-        <div class="hero-copy" data-reveal>
-          <p class="hero-kicker">Clean browser capture for design review, QA, and product work</p>
-          <h1>Clean captures from busy webpages.</h1>
-          <p class="hero-body">
-            Lumen clears floating UI, captures responsive views, checks sensitive details, and keeps
-            useful page context with every saved file.
+      <section class="site-hero" id="top" aria-label="Lumen">
+        <img
+          class="hero-image"
+          src="assets/store-control-surface.png"
+          alt="Lumen extension control surface"
+          width="1280"
+          height="800"
+        />
+        <div class="hero-scrim"></div>
+        <div class="hero-content" data-reveal>
+          <p class="eyebrow">Chrome extension for review work</p>
+          <h1>Lumen</h1>
+          <p>
+            Capture busy webpages as cleaner, safer review material. Clear floating UI, save the
+            layouts that matter, mark sensitive details, and keep manifest context close to the image.
           </p>
-
           <div class="hero-actions">
             <a
-              class="primary-link"
+              class="button button-primary"
               href="https://github.com/CaptainFredric/lumen-extension#load-the-extension-locally"
               target="_blank"
               rel="noreferrer"
@@ -99,604 +99,225 @@
               Install locally
             </a>
             <a
-              class="secondary-link"
+              class="button button-secondary"
               href="https://github.com/CaptainFredric/lumen-extension"
               target="_blank"
               rel="noreferrer"
             >
-              View source
+              GitHub
             </a>
           </div>
-
-          <p class="hero-inline-note">
-            Runs in Chrome. Captures, settings, and local history stay under your control.
-          </p>
-        </div>
-
-        <div class="hero-stage" data-tilt>
-          <div class="product-demo-shell">
-            <div class="product-demo-head">
-              <div>
-                <p class="support-label">Lumen</p>
-                <strong>Capture control</strong>
-              </div>
-              <span>Ready</span>
-            </div>
-
-            <div class="product-demo-grid">
-              <div class="demo-popup">
-                <div class="demo-panel demo-intro">
-                  <div class="demo-brand-row">
-                    <span class="demo-brand-mark">L</span>
-                    <div>
-                      <p class="support-label">Current page</p>
-                      <h3>Clean capture from a busy page.</h3>
-                    </div>
-                    <span class="demo-pill">MV3</span>
-                  </div>
-
-                  <p>
-                    Capture the page after sticky headers, overlays, and sensitive details have
-                    been checked.
-                  </p>
-
-                  <div class="demo-chip-row" aria-label="Capture capabilities">
-                    <span>Clean</span>
-                    <span>Responsive</span>
-                    <span>Redact</span>
-                    <span>Annotate</span>
-                    <span>History</span>
-                  </div>
-                </div>
-
-                <div class="demo-panel demo-launch-panel" data-demo-launch>
-                  <div class="demo-launch-status" data-demo-status>
-                    <span class="demo-ready-orb" aria-hidden="true"></span>
-                    <div>
-                      <strong data-demo-status-title>example.com ready</strong>
-                      <small data-demo-status-detail>Choose the capture you need.</small>
-                    </div>
-                  </div>
-
-                  <div class="demo-launch-grid">
-                    <button
-                      class="demo-capture-button"
-                      type="button"
-                      aria-haspopup="menu"
-                      aria-expanded="false"
-                      data-demo-hold-button
-                    >
-                      <span>
-                        <strong>Capture page</strong>
-                        <small>Full page or responsive set</small>
-                      </span>
-                      <span class="demo-hold-progress" aria-hidden="true"></span>
-                    </button>
-
-                    <button class="demo-secondary-action" type="button">
-                      <span>Analyze page</span>
-                      <small>Colors, type, layout</small>
-                    </button>
-                  </div>
-
-                  <div class="demo-hold-menu" role="menu" aria-label="Capture actions" aria-hidden="true">
-                    <button type="button" role="menuitem">
-                      <i class="demo-action-icon demo-action-responsive" aria-hidden="true"></i>
-                      <span>Responsive set</span>
-                      <small>Desktop, tablet, mobile</small>
-                    </button>
-                    <button type="button" role="menuitem">
-                      <i class="demo-action-icon demo-action-redact" aria-hidden="true"></i>
-                      <span>Scan redactions</span>
-                      <small>Check sensitive regions</small>
-                    </button>
-                    <button type="button" role="menuitem">
-                      <i class="demo-action-icon demo-action-box" aria-hidden="true"></i>
-                      <span>Mark boxes</span>
-                      <small>Hide custom areas</small>
-                    </button>
-                    <button type="button" role="menuitem">
-                      <i class="demo-action-icon demo-action-cutaway" aria-hidden="true"></i>
-                      <span>Mark cutaway</span>
-                      <small>Save a focused crop</small>
-                    </button>
-                    <button type="button" role="menuitem">
-                      <i class="demo-action-icon demo-action-lasso" aria-hidden="true"></i>
-                      <span>Lasso area</span>
-                      <small>Trace a flexible region</small>
-                    </button>
-                    <button type="button" role="menuitem">
-                      <i class="demo-action-icon demo-action-callout" aria-hidden="true"></i>
-                      <span>Mark callout</span>
-                      <small>Add capture context</small>
-                    </button>
-                    <button type="button" role="menuitem">
-                      <i class="demo-action-icon demo-action-signals" aria-hidden="true"></i>
-                      <span>Extract signals</span>
-                      <small>Colors, type, layout</small>
-                    </button>
-                  </div>
-                </div>
-
-                <div class="demo-panel demo-review-panel">
-                  <div class="demo-panel-head">
-                    <div>
-                      <p class="support-label">Save check</p>
-                      <h3>Ready to save.</h3>
-                    </div>
-                    <span class="demo-pill">Ready</span>
-                  </div>
-
-                  <div class="demo-review-metrics">
-                    <div><span>Views</span><strong>3</strong></div>
-                    <div><span>Sensitive</span><strong>9</strong></div>
-                    <div><span>Manual</span><strong>2</strong></div>
-                    <div><span>Crop</span><strong>1</strong></div>
-                  </div>
-
-                  <div class="demo-save-list" aria-label="Saved output preview">
-                    <span><strong>Desktop, tablet, mobile</strong><small>Responsive views</small></span>
-                    <span><strong>Sensitive regions marked</strong><small>Detected and manual areas</small></span>
-                    <span><strong>Focused crop included</strong><small>Ready for quick paste</small></span>
-                  </div>
-
-                  <p>
-                    The saved set includes the views, marked areas, focused crop, and page context
-                    needed for handoff.
-                  </p>
-                </div>
-              </div>
-
-              <aside class="demo-artifact-rail" aria-label="Saved capture example">
-                <div class="demo-artifact-card demo-saved-card">
-                  <p class="support-label">Saved example</p>
-                  <div class="saved-output-card">
-                    <div>
-                      <strong>landing-page-capture</strong>
-                      <span>Cleaned webpage capture</span>
-                    </div>
-                    <em>PNG</em>
-                  </div>
-                  <div class="saved-output-card saved-output-card-soft">
-                    <div>
-                      <strong>page-context</strong>
-                      <span>Title, URL, colors, type, and notes</span>
-                    </div>
-                    <em>JSON</em>
-                  </div>
-                </div>
-
-                <div class="demo-artifact-list">
-                  <div>
-                    <span>Views</span>
-                    <strong>Desktop, tablet, mobile</strong>
-                  </div>
-                  <div>
-                    <span>Sensitive details</span>
-                    <strong>Checked before saving</strong>
-                  </div>
-                  <div>
-                    <span>Context</span>
-                    <strong>Notes and page signals</strong>
-                  </div>
-                </div>
-              </aside>
-            </div>
-          </div>
         </div>
       </section>
 
-      <section class="cleanup-demo-section" id="cleanup-demo">
-        <div class="section-head" data-reveal>
-          <p class="kicker">Demo</p>
-          <h2>Watch a busy article become a clean capture.</h2>
-          <p class="section-body">
-            A crowded page comes in. Lumen clears floating UI, loads deferred media, flags sensitive
-            details, and saves a calmer reference to share.
-          </p>
+      <section class="product-strip" id="product" aria-label="Product summary">
+        <div class="strip-copy" data-reveal>
+          <p class="eyebrow">Product</p>
+          <h2>Capture first. Cleanup included.</h2>
         </div>
-
-        <div class="cleanup-demo" data-cleanup-demo data-reveal>
-          <div class="cleanup-demo-copy">
-            <p class="support-label">Animated example</p>
-            <h3>From cluttered page to clean capture.</h3>
-            <p>
-              The article keeps its headline, layout, and useful page context. Cookie banners, ads,
-              chat launchers, and sticky bars get cleared from the final capture.
-            </p>
-            <button class="cleanup-replay-button" type="button" data-cleanup-replay>
-              Replay cleanup
-            </button>
-            <div class="cleanup-mode-controls" aria-label="Demo stage">
-              <button type="button" data-cleanup-mode="cluttered">Cluttered</button>
-              <button type="button" data-cleanup-mode="cleaning">Cleaning</button>
-              <button type="button" data-cleanup-mode="review">Ready</button>
-            </div>
-          </div>
-
-          <div class="cleanup-browser" aria-label="Animated cluttered article cleanup">
-            <div class="cleanup-browser-head">
-              <span></span>
-              <span></span>
-              <span></span>
-              <strong>daily-desk.example</strong>
-            </div>
-
-            <div class="clutter-page">
-              <div class="clutter-sticky clutter-floating">Live updates</div>
-              <article class="news-article">
-                <p class="news-section">City Desk</p>
-                <h3>Transit plan clears final vote after a long budget session</h3>
-                <div class="article-meta">
-                  <span>By Maya Chen</span>
-                  <span>May 16, 2026</span>
-                </div>
-                <div class="article-lines">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-                <div class="article-photo">
-                  <span></span>
-                </div>
-                <div class="article-lines article-lines-short">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-              </article>
-
-              <aside class="clutter-ad clutter-floating">
-                <span>Ad</span>
-                <strong>Subscribe today</strong>
-              </aside>
-
-              <div class="clutter-cookie clutter-floating">
-                <span>Cookie preferences</span>
-                <button type="button">Accept</button>
-              </div>
-
-              <div class="clutter-chat clutter-floating" aria-hidden="true">?</div>
-
-              <span class="cleanup-redaction cleanup-redaction-name">Private name</span>
-              <span class="cleanup-redaction cleanup-redaction-email">Contact detail</span>
-              <span class="cleanup-sweep"></span>
-              <span class="cleanup-capture-frame"></span>
-              <span class="cleanup-complete-badge">Clean capture ready</span>
-            </div>
-          </div>
+        <div class="strip-points" data-reveal>
+          <span>Clean page</span>
+          <span>Responsive views</span>
+          <span>Redaction review</span>
+          <span>Local shelf</span>
         </div>
       </section>
 
-      <section class="support-section" id="features">
-        <div class="section-head" data-reveal>
-          <p class="kicker">Features</p>
-          <h2>A better capture starts before the screenshot.</h2>
-          <p class="section-body">
-            Lumen is built for the moment when a screenshot has to explain what happened and keep
-            the page context close by.
+      <section class="feature-section" aria-label="Lumen features">
+        <div class="section-intro" data-reveal>
+          <p class="eyebrow">What it does</p>
+          <h2>Built for screenshots that turn into work.</h2>
+          <p>
+            Lumen focuses on the handoff moment: the image should be readable, the page should be
+            documented, and recent captures should be easy to reuse.
           </p>
         </div>
 
-        <div class="function-grid">
-          <article class="function-card" data-reveal>
-            <div class="function-demo demo-clean-page" aria-hidden="true">
-              <span class="demo-window-bar"></span>
-              <span class="demo-noise-chip demo-noise-one">Cookie banner</span>
-              <span class="demo-noise-chip demo-noise-two">Chat</span>
-              <span class="demo-clean-line demo-clean-title"></span>
-              <span class="demo-clean-line"></span>
-              <span class="demo-clean-line short"></span>
-              <span class="demo-clean-sweep"></span>
-            </div>
-            <span>Clean page</span>
-            <h3>Clear the page before saving.</h3>
-            <p>Hide sticky bars, cookie banners, ads, and chat widgets so the capture shows the page itself.</p>
+        <div class="feature-grid">
+          <article class="feature-tile tile-clean" data-reveal>
+            <span class="tile-icon" aria-hidden="true"></span>
+            <h3>Clear page clutter</h3>
+            <p>Sticky bars, cookie prompts, launchers, and late overlays are handled before saving.</p>
           </article>
 
-          <article class="function-card" data-reveal>
-            <div class="function-demo demo-responsive-set" aria-hidden="true">
-              <span class="demo-device demo-device-desktop"></span>
-              <span class="demo-device demo-device-tablet"></span>
-              <span class="demo-device demo-device-phone"></span>
-            </div>
-            <span>Responsive set</span>
-            <h3>Save the layouts people compare.</h3>
-            <p>Capture desktop, tablet, and mobile views together when the layout shift matters.</p>
+          <article class="feature-tile tile-responsive" data-reveal>
+            <span class="tile-icon" aria-hidden="true"></span>
+            <h3>Save view sets</h3>
+            <p>Capture desktop, tablet, and mobile layouts together for comparison work.</p>
           </article>
 
-          <article class="function-card" data-reveal>
-            <div class="function-demo demo-redaction-scan" aria-hidden="true">
-              <span class="demo-redact-line wide"></span>
-              <span class="demo-redact-line"></span>
-              <span class="demo-redact-line short"></span>
-              <span class="demo-redact-mask mask-one">Email</span>
-              <span class="demo-redact-mask mask-two">Token</span>
-            </div>
-            <span>Redaction</span>
-            <h3>Mark sensitive details before saving.</h3>
-            <p>Find visible emails, phone numbers, tokens, and filled fields before the image leaves Chrome.</p>
+          <article class="feature-tile tile-redact" data-reveal>
+            <span class="tile-icon" aria-hidden="true"></span>
+            <h3>Review sensitive details</h3>
+            <p>Scan visible private data, add manual boxes, and check the marked regions before saving.</p>
           </article>
 
-          <article class="function-card" data-reveal>
-            <div class="function-demo demo-lasso-select" aria-hidden="true">
-              <span class="demo-lasso-card"></span>
-              <span class="demo-lasso-path"></span>
-              <span class="demo-lasso-crop">Crop</span>
-            </div>
-            <span>Lasso crop</span>
-            <h3>Trace the useful part.</h3>
-            <p>Draw around a chart, card, image, or irregular region and save that focused crop beside the page.</p>
+          <article class="feature-tile tile-shelf" data-reveal>
+            <span class="tile-icon" aria-hidden="true"></span>
+            <h3>Reuse recent captures</h3>
+            <p>Find saved runs and timed captures in a compact shelf with copy, open, and show actions.</p>
           </article>
+        </div>
+      </section>
 
-          <article class="function-card" data-reveal>
-            <div class="function-demo demo-timed-capture" aria-hidden="true">
-              <span class="demo-clock"><i></i></span>
-              <span class="demo-timed-shot shot-one"></span>
-              <span class="demo-timed-shot shot-two"></span>
-              <span class="demo-timed-shot shot-three"></span>
-            </div>
-            <span>Timed capture</span>
-            <h3>Watch a saved area.</h3>
-            <p>Run the same region on a cadence, pause it anytime, and collect each result in the capture shelf.</p>
-          </article>
+      <section class="demo-section" id="demo">
+        <div class="section-intro demo-intro" data-reveal>
+          <p class="eyebrow">Demo</p>
+          <h2>A cluttered article becomes a usable capture.</h2>
+          <p>
+            The animated sample shows the capture pass removing page chrome, keeping the article,
+            and marking sensitive details before the final save.
+          </p>
+        </div>
 
-          <article class="function-card" data-reveal>
-            <div class="function-demo demo-long-page" aria-hidden="true">
-              <span class="demo-tall-page"></span>
-              <span class="demo-page-tile tile-one"></span>
-              <span class="demo-page-tile tile-two"></span>
-              <span class="demo-page-tile tile-three"></span>
-            </div>
-            <span>Long pages</span>
-            <h3>Keep tall pages readable.</h3>
-            <p>Save one image when it fits, split into tiles when it helps, or add a print sheet for PDF.</p>
-          </article>
-
-          <article class="function-card" data-reveal>
-            <div class="function-demo demo-capture-shelf" aria-hidden="true">
-              <span></span>
+        <div class="site-demo" data-demo data-reveal>
+          <div class="demo-toolbar">
+            <div class="traffic" aria-hidden="true">
               <span></span>
               <span></span>
               <span></span>
             </div>
-            <span>Capture shelf</span>
-            <h3>Pick up the latest files fast.</h3>
-            <p>Browse recent captures and timed runs in a compact grid, then copy, open, or show the files.</p>
-          </article>
-
-          <article class="function-card" data-reveal>
-            <div class="function-demo demo-destination-route" aria-hidden="true">
-              <span class="demo-route-file"></span>
-              <span class="demo-route-line"></span>
-              <span class="demo-route-target target-chat">Chat</span>
-              <span class="demo-route-target target-agent">Agent</span>
+            <strong>citydesk.example</strong>
+            <div class="demo-controls" aria-label="Demo state">
+              <button type="button" data-mode="messy" aria-pressed="true">Messy</button>
+              <button type="button" data-mode="clean" aria-pressed="false">Clean</button>
+              <button type="button" data-mode="ready" aria-pressed="false">Ready</button>
             </div>
-            <span>Destinations</span>
-            <h3>Send captures where work happens.</h3>
-            <p>Queue captures for a team space, document, webhook, or agent chat after the final check.</p>
-          </article>
+          </div>
+
+          <div class="demo-canvas">
+            <div class="article-page">
+              <p class="article-kicker">City Desk</p>
+              <h3>Transit plan clears final vote after a long budget session</h3>
+              <p class="article-meta">By Maya Chen · May 16, 2026</p>
+              <div class="article-lines">
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+              <div class="article-photo"></div>
+              <div class="article-lines short-lines">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+
+            <aside class="page-noise noise-nav">Live updates</aside>
+            <aside class="page-noise noise-ad">Subscribe today</aside>
+            <aside class="page-noise noise-cookie">Cookie settings</aside>
+            <aside class="page-noise noise-chat">Chat</aside>
+
+            <span class="sensitive-mark mark-name">Name</span>
+            <span class="sensitive-mark mark-email">Email</span>
+            <span class="capture-sweep"></span>
+            <span class="capture-frame"></span>
+            <span class="ready-badge">Clean capture ready</span>
+          </div>
         </div>
       </section>
 
       <section class="workflow-section" id="workflow">
-        <div class="workflow-sticky" data-reveal>
-          <div class="workflow-visual" data-active-step="clean">
-            <div class="workflow-monitor">
-              <div class="monitor-head">
-                <span></span>
-                <span></span>
-                <span></span>
-              </div>
-
-              <div class="workflow-layer layer-clean">
-                <p class="workflow-caption">Before capture</p>
-                <ul class="workflow-points">
-                  <li>Sticky header hidden</li>
-                  <li>Cookie banner removed</li>
-                  <li>Chat widget hidden</li>
-                  <li>Lazy media loaded</li>
-                  <li>Late overlays checked again</li>
-                </ul>
-              </div>
-
-              <div class="workflow-layer layer-responsive">
-                <p class="workflow-caption">Responsive set</p>
-                <div class="workflow-view-grid">
-                  <span>Desktop</span>
-                  <span>Tablet</span>
-                  <span>Mobile</span>
-                </div>
-              </div>
-
-              <div class="workflow-layer layer-redact">
-                <p class="workflow-caption">Redaction check</p>
-                <div class="workflow-chip-row">
-                  <span>Email</span>
-                  <span>Phone</span>
-                  <span>Token</span>
-                  <span>Field</span>
-                </div>
-              </div>
-
-              <div class="workflow-layer layer-inspect">
-                <p class="workflow-caption">Page context</p>
-                <div class="workflow-signal-grid">
-                  <span>Palette</span>
-                  <span>Fonts</span>
-                  <span>Headline</span>
-                  <span>CTA</span>
-                  <span>Navigation</span>
-                  <span>Layout</span>
-                </div>
-              </div>
-            </div>
-          </div>
+        <div class="section-intro" data-reveal>
+          <p class="eyebrow">Workflow</p>
+          <h2>One pass from page to saved review set.</h2>
         </div>
 
-        <div class="workflow-rail">
-          <div class="section-head" data-reveal>
-            <p class="kicker">Workflow</p>
-            <h2>Capture the page and the reason it matters.</h2>
-            <p class="section-body">
-              A useful capture should be clean enough to share and detailed enough to understand
-              later.
-            </p>
-          </div>
-
-          <article class="workflow-step is-active" data-step="clean" data-reveal>
-            <span>Clean</span>
-            <h3>Remove the noise that gets in the way.</h3>
-            <p>
-              Lumen prepares the page by hiding common blockers and loading deferred content before
-              the screenshot pass begins.
-            </p>
+        <div class="workflow-grid">
+          <article data-reveal>
+            <span>01</span>
+            <h3>Prepare</h3>
+            <p>Clean the page, load deferred media, and read page signals.</p>
           </article>
-
-          <article class="workflow-step" data-step="responsive" data-reveal>
-            <span>Capture</span>
-            <h3>Save the layouts people compare.</h3>
-            <p>
-              Capture the active page, a specific device size, or a responsive set when a project
-              needs more than one viewport.
-            </p>
+          <article data-reveal>
+            <span>02</span>
+            <h3>Check</h3>
+            <p>Review sensitive regions, manual boxes, focused crops, and long-page output.</p>
           </article>
-
-          <article class="workflow-step" data-step="redact" data-reveal>
-            <span>Check</span>
-            <h3>Check sensitive details before sharing.</h3>
-            <p>
-              Redaction is part of the save flow, with detected regions and manual boxes ready
-              before saving.
-            </p>
-          </article>
-
-          <article class="workflow-step" data-step="inspect" data-reveal>
-            <span>Context</span>
-            <h3>Keep the page signals close to the image.</h3>
-            <p>
-              The saved capture can include the page title, URL, colors, fonts, headline, CTA, and
-              navigation labels.
-            </p>
+          <article data-reveal>
+            <span>03</span>
+            <h3>Save</h3>
+            <p>Write images, focused crops, print sheets, and the bundle manifest into local history.</p>
           </article>
         </div>
       </section>
 
-      <section class="product-system-section" id="product-system">
-        <div class="section-head" data-reveal>
-          <p class="kicker">Plans</p>
-          <h2>Use Lumen where capture work actually happens.</h2>
-          <p class="section-body">
-            Start with local clean captures. Add responsive sets, timed areas, and shared
-            destinations when the workflow needs more structure.
+      <section class="showcase-section" id="store">
+        <div class="section-intro" data-reveal>
+          <p class="eyebrow">Chrome Store</p>
+          <h2>The listing shows the real interface.</h2>
+          <p>
+            Store assets use the current popup and capture examples, so the product page matches
+            what people install.
           </p>
         </div>
 
-        <div class="plan-grid">
-          <article class="plan-card" data-reveal>
-            <p class="support-label">Local Free</p>
-            <h3>Capture a page cleanly.</h3>
-            <p>Page cleanup, manual boxes, focused crops, notes, page context, and local history.</p>
-          </article>
-
-          <article class="plan-card plan-card-featured" data-reveal>
-            <p class="support-label">Pro</p>
-            <h3>Handle multi-view review.</h3>
-            <p>Responsive sets, auto-redaction, framed outputs, long-page tiles, and saved print sheets.</p>
-          </article>
-
-          <article class="plan-card" data-reveal>
-            <p class="support-label">Team</p>
-            <h3>Keep repeated captures moving.</h3>
-            <p>Timed captures, shared destinations, review handoff, and longer retention controls.</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="store-section" id="chrome-store">
-        <div class="section-head" data-reveal>
-          <p class="kicker">Chrome Store</p>
-          <h2>A Chrome Store page that shows the real product.</h2>
-          <p class="section-body">
-            The listing leads with the control surface, plain permission language, and screenshots
-            that match the extension people install.
-          </p>
-        </div>
-
-        <div class="store-showcase" data-reveal>
-          <figure class="store-shot store-shot-large">
-            <img src="assets/store-control-surface.png" alt="Lumen extension control surface screenshot" />
+        <div class="showcase-grid">
+          <figure class="showcase-frame large" data-tilt data-reveal>
+            <img src="assets/store-control-surface.png" alt="Lumen extension control surface" />
             <figcaption>Control surface</figcaption>
           </figure>
-          <div class="store-shot-stack">
-            <figure class="store-shot">
-              <img src="assets/store-review-actions.png" alt="Lumen quick capture actions screenshot" />
-              <figcaption>Quick actions</figcaption>
-            </figure>
-            <figure class="store-shot">
-              <img src="assets/store-responsive-set.png" alt="Responsive capture set screenshot" />
-              <figcaption>Responsive set</figcaption>
-            </figure>
-          </div>
+          <figure class="showcase-frame" data-reveal>
+            <img src="assets/store-review-actions.png" alt="Lumen quick actions and save check" />
+            <figcaption>Quick actions</figcaption>
+          </figure>
+          <figure class="showcase-frame" data-reveal>
+            <img src="assets/store-responsive-set.png" alt="Responsive capture set example" />
+            <figcaption>Responsive set</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="plans-section" aria-label="Plans">
+        <div class="section-intro" data-reveal>
+          <p class="eyebrow">Use cases</p>
+          <h2>Small capture jobs and repeated review loops.</h2>
         </div>
 
-        <div class="store-readiness-grid">
-          <article class="store-readiness-card" data-reveal>
-            <span>Single purpose</span>
-            <h3>Capture cleaner webpage references.</h3>
-            <p>Page cleanup, responsive screenshots, redaction checks, notes, signals, and local history stay in one workflow.</p>
+        <div class="plans-grid">
+          <article data-reveal>
+            <p class="eyebrow">Local</p>
+            <h3>Capture a page cleanly</h3>
+            <p>Use cleanup, notes, focused crops, bundle manifests, and local history.</p>
           </article>
-
-          <article class="store-readiness-card" data-reveal>
-            <span>Clear permissions</span>
-            <h3>Capture starts from the toolbar.</h3>
-            <p>Active tab access is used for the current page. Site access for responsive views is requested only when that workflow needs it.</p>
+          <article data-reveal>
+            <p class="eyebrow">Pro</p>
+            <h3>Compare more layouts</h3>
+            <p>Add responsive sets, auto-redaction, framed outputs, long-page tiles, and print sheets.</p>
           </article>
-
-          <article class="store-readiness-card" data-reveal>
-            <span>Store page</span>
-            <h3>Screenshots match the product.</h3>
-            <p>The screenshots show the popup, quick actions, responsive views, and saved outputs.</p>
+          <article data-reveal>
+            <p class="eyebrow">Team</p>
+            <h3>Repeat the same checks</h3>
+            <p>Use timed captures, shared destinations, review handoff, and retention controls.</p>
           </article>
         </div>
       </section>
 
       <section class="privacy-section" id="privacy">
-        <div class="scope-grid">
-          <article class="scope-panel privacy-panel" data-reveal>
-            <p class="support-label">Local by default</p>
-            <h2>Your captures stay with you.</h2>
-            <p class="card-note">
-              Lumen stores settings and history in Chrome extension storage. Image files are saved
-              through Chrome Downloads so you control where they are stored.
-            </p>
-            <a class="text-link" href="privacy.html">Read the privacy policy</a>
-          </article>
-
-          <article class="scope-panel privacy-panel" data-reveal>
-            <p class="support-label">Share with care</p>
-            <h2>Care stays part of the flow.</h2>
-            <p class="card-note">
-              Redaction highlights visible sensitive details during the save check. Check each capture
-              before sending it outside your workspace.
-            </p>
-          </article>
+        <div data-reveal>
+          <p class="eyebrow">Privacy</p>
+          <h2>Local by default.</h2>
+          <p>
+            Lumen stores settings and history in Chrome extension storage. Saved images go through
+            Chrome Downloads, so you choose where the files live.
+          </p>
         </div>
+        <a class="button button-secondary" href="privacy.html">Privacy policy</a>
       </section>
-
     </main>
 
     <footer class="site-footer">
-      <p>Lumen</p>
-      <span>
-        Clean webpage capture for design review, QA, and product work.
+      <a class="brand" href="#top" aria-label="Lumen home">
+        <span class="brand-mark">L</span>
+        <span>Lumen</span>
+      </a>
+      <div>
         <a href="privacy.html">Privacy</a>
         <a href="https://github.com/CaptainFredric/lumen-extension" target="_blank" rel="noreferrer">GitHub</a>
-      </span>
+      </div>
     </footer>
 
-    <script src="script.js?v=20260516-public"></script>
+    <script src="script.js?v=20260520-redesign"></script>
   </body>
 </html>

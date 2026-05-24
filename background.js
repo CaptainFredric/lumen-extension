@@ -904,18 +904,18 @@ function buildExportReviewOutputPlan({ variants = [], variantCount = 1, cutawayA
     ? Math.max(viewCount, tileCount)
     : tileCount;
   const printSheetCount = longPageMode === "print" ? viewCount : 0;
-  const contextCount = options.exportManifest === false ? 0 : 1;
-  const totalFiles = baseImageCount + printSheetCount + contextCount + cutawayAppliedCount;
+  const manifestCount = options.exportManifest === false ? 0 : 1;
+  const totalFiles = baseImageCount + printSheetCount + manifestCount + cutawayAppliedCount;
 
   return [
     {
-      label: "Files",
+      label: "Artifacts",
       value: `${totalFiles} planned`,
       detail: [
         `${baseImageCount} image${baseImageCount === 1 ? "" : "s"}`,
         cutawayAppliedCount ? `${cutawayAppliedCount} crop${cutawayAppliedCount === 1 ? "" : "s"}` : "",
         printSheetCount ? `${printSheetCount} print sheet${printSheetCount === 1 ? "" : "s"}` : "",
-        contextCount ? "page context" : ""
+        manifestCount ? "bundle manifest" : ""
       ].filter(Boolean).join(", ")
     },
     {
@@ -1069,11 +1069,11 @@ function buildExportReviewWarnings({
   const manualCount = manualRedactions.regions?.length || 0;
 
   if (!options.autoRedact && !manualCount) {
-    warnings.push("Redaction is off for this save.");
+    warnings.push("No redaction layer is enabled for this export.");
   }
 
   if (options.autoRedact) {
-    warnings.push("Auto-redaction covers visible text and filled inputs. Check the saved image before sharing.");
+    warnings.push("Current redaction covers visible text and filled inputs during export and should be reviewed before external sharing.");
   }
 
   if (manualProjectionStats.skippedCount) {
@@ -1085,7 +1085,7 @@ function buildExportReviewWarnings({
   }
 
   if ((manualCount || cutawayRegion.region) && variants.length > 1) {
-    warnings.push("Responsive projection is checked per viewport. The page context file records the saved result for each view.");
+    warnings.push("Responsive projection is checked per viewport before export. The final manifest records the capture-time result for each view.");
   }
 
   return warnings;
@@ -1139,7 +1139,7 @@ async function runHistoryDownloadAction(payload = {}, action = "show") {
   } catch (error) {
     throw createFriendlyError(
       action === "open" ? "File Could Not Open" : "File Could Not Be Revealed",
-      error.message || "Chrome could not access this saved file. It may have been moved or deleted."
+      error.message || "Chrome could not access this downloaded artifact. It may have been moved or deleted."
     );
   }
 
@@ -2045,7 +2045,7 @@ async function captureVariant({
     await showPageUsageHud(target.tab.id, {
       stage: "save",
       title: `Compositing ${variant.label.toLowerCase()} output`,
-      detail: "The page capture is complete. Lumen is stitching and saving files in the background.",
+      detail: "The page capture is complete. Lumen is stitching and saving artifacts in the background.",
       progress: 0.84
     });
 
@@ -2825,7 +2825,7 @@ function buildCaptureCompletionDetail({
   }
 
   if (cutawayCount) {
-    fragments.push(`${cutawayCount} cutaway crop${cutawayCount === 1 ? "" : "s"} saved`);
+    fragments.push(`${cutawayCount} cutaway crop${cutawayCount === 1 ? "" : "s"} exported`);
   }
 
   if (projectionText) {
@@ -2837,7 +2837,7 @@ function buildCaptureCompletionDetail({
   }
 
   if (manifestSaved) {
-    fragments.push("context file saved");
+    fragments.push("bundle manifest saved");
   }
 
   if (annotationAdded) {
@@ -3302,7 +3302,7 @@ function buildPrintSheetHtml(outputs = [], page = {}) {
       <h1>${title}</h1>
       <p>${source}</p>
     </header>
-    <main>${outputMarkup || "<p>Image parts were unavailable.</p>"}</main>
+    <main>${outputMarkup || "<p>No image parts were exported.</p>"}</main>
   </body>
 </html>`;
 }

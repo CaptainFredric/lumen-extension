@@ -8,7 +8,7 @@ Lumen focuses on:
 2. capture desktop, tablet, and mobile views together
 3. redact sensitive visible data during export
 4. attach useful page signals beside the image
-5. save a page context file so the capture can travel with its source details
+5. save a bundle manifest so the capture can travel with its context
 
 The repo is aimed at design review, QA, and product work.
 
@@ -29,15 +29,15 @@ The extension includes:
 11. a pre-export review screen that checks auto-redactions, manual projection, and cutaway resolution across the requested view set before saving
 12. an anchored callout picker that marks one page area and renders it into the exported image with the capture note
 13. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
-14. page context JSON exports with view, redaction, manual projection, cutaway, callout, signal, output health, and note metadata
-15. dated per-run download folders so capture sets, tiles, and context files stay together
+14. bundle-manifest JSON exports with view, redaction, manual projection, cutaway, callout, signal, output health, and note metadata
+15. dated per-run download folders so capture sets, tiles, and manifests stay together
 16. local capture history with file, folder, summary, and Chrome download-handle metadata
-17. popup history and shelf actions to copy summaries, open saved files, or reveal them in the Downloads folder
-18. capture-time popup UI with run settings, cutaway state, timed-run shelf cards, a live stage timeline, and recent status log
+17. popup history actions to open the latest artifact or reveal it in the Downloads folder
+18. capture-time popup UI with run settings, cutaway state, a live stage timeline, and recent status log
 19. an on-page usage HUD that appears during preparation and review setup, then hides before screenshots so exports stay clean
-20. a shared entitlement model used by the popup and local service so paid-path features have one access contract
-21. session retention and delete controls for captures, timed runs, and delivery jobs
-22. a local service slice for demo session state, entitlement checks, and history sync when an API is reachable
+20. a shared entitlement model used by the popup and backend so paid-path features have one access contract
+21. backend retention and delete controls for session-owned captures, watch records, and agent jobs
+22. a local backend slice for demo session state, entitlement checks, and history sync when an API is reachable
 23. a GitHub Pages landing site in `docs/`
 
 ## Current Limits
@@ -50,8 +50,8 @@ These limits are important:
 4. the current annotation pass is one anchored callout plus one capture note, not a full drawing suite
 5. cloud sync, billing, destination delivery workers, and visual diffs remain outside the local extension package
 6. highly dynamic sites with virtualization or unusual scroll behavior can still need site-specific fallback work
-7. retention and delete controls cover the local service, while cloud deletion and account recovery remain production work
-8. the local service checks entitlements, retention, timed records, and delivery queues, while production account and billing systems remain separate work
+7. retention and delete controls cover the local backend slice, but cloud deletion and account recovery are still production work
+8. the local backend slice checks entitlements, retention, watch records, and delivery queues, while production account and billing systems remain separate work
 
 ## Architecture
 
@@ -67,15 +67,15 @@ The current capture flow is:
 6. content script resolves manual redactions, any stored cutaway region, and the optional callout region against the current layout
 7. offscreen stitches the final output using device-pixel-ratio aware composition, renders one capture note and callout marker, and can export a cutaway crop from the stitched result
 8. if the page is too large for one safe canvas, the export falls back to tiled raw output and skips cutaway cropping for that view
-9. background downloads the files, writes page context, writes local history, and restores the page
+9. background downloads the files, writes the bundle manifest, writes local history, and restores the page
 
 ### Entitlements
 
-`entitlements.js` is the shared plan contract for the extension and local service. Free keeps the local capture wedge available. Demo Pro unlocks current advanced local tools for testing. Team and Enterprise are required before the service accepts timed capture or agent records, and those records still require explicit opt-in and review flags.
+`entitlements.js` is the shared plan contract for the extension and backend. Free keeps the local capture wedge available. Demo Pro unlocks current advanced local tools for testing. Team and Enterprise are required before the backend accepts watch or agent records, and those records still require explicit opt-in and review flags.
 
 ### Data Controls
 
-The local service exposes retention and session-data deletion routes. These controls are intentionally in place before real cloud destinations so synced capture workflows have a deletion and retention contract before they become customer-facing.
+The backend exposes retention and account-data deletion routes for the active session. These controls are intentionally in place before real cloud destinations so synced capture workflows have a deletion and retention contract before they become customer-facing.
 
 ### Page Signals
 
@@ -99,7 +99,7 @@ The sample capture generator uses the same content-script extraction path. If th
 3. Click `Load unpacked`
 4. Select this `lumen-extension` directory
 
-### Run The Local Service
+### Run The Backend Slice
 
 ```bash
 npm install
@@ -108,7 +108,7 @@ npm run api
 
 The local API listens on `http://127.0.0.1:8787`.
 
-To verify the local service contract for sessions, captures, timed capture plans, agent jobs, stats, and integrations:
+To verify the backend contract for sessions, captures, watch plans, agent jobs, stats, and integrations:
 
 ```bash
 npm run smoke:backend
@@ -134,10 +134,10 @@ The public landing page will be available at `http://127.0.0.1:3000/`.
 7. Use `Scan` to preview detected redaction regions before export
 8. Use `Mark boxes` if you need manual redactions before capture
 9. Use `Mark cutaway` or `Lasso area` to store one reusable page region; the next capture exports focused PNGs for views where the region resolves
-10. Use `Open` or `Show` from the shelf or recent captures to get back to saved files
-11. When the save check appears, check auto-redaction counts, manual projection status, cutaway status, and warnings, then click `Save capture`
-12. Expand recent capture details to review views, files, redactions, context status, notes, and page signals
-13. Copy a capture or timed-run summary when you need to paste evidence into a review note or bug report
+10. Use `Open` or `Show in folder` from recent captures to get back to the saved artifact
+11. When the pre-export review appears, check auto-redaction counts, manual projection status, cutaway status, and warnings, then click `Run export`
+12. Expand recent capture details to review views, artifacts, redactions, manifest status, notes, and page signals
+13. Copy a capture summary when you need to paste evidence into a review note or bug report
 
 If the launch indicator says the page is blocked, switch to a normal `http://` or `https://` page. Chrome does not allow extension capture scripts on internal browser pages, Web Store pages, or other extension pages.
 
@@ -180,13 +180,13 @@ npm run smoke:extension
 
 This opens a temporary Chromium profile, loads the extension unpacked, checks the background service worker, opens `popup.html`, then closes and removes the profile.
 
-To verify the loaded extension can capture a real local page and produce finished files:
+To verify the loaded extension can capture a real local page and produce finished artifacts:
 
 ```bash
 npm run smoke:e2e
 ```
 
-This starts a local fixture page, loads a temporary copy of the extension with explicit test only capture access, seeds one anchored cutaway region, runs a responsive desktop, tablet, and mobile capture through the MV3 background worker, waits for Chrome downloads to finish, validates the full-page PNGs, cutaway PNGs, and context files, checks that local history stores the run, then removes the temporary profile and download folder. The checked in manifest is not widened by this test.
+This starts a local fixture page, loads a temporary copy of the extension with explicit test only capture access, seeds one anchored cutaway region, runs a responsive desktop, tablet, and mobile capture through the MV3 background worker, waits for Chrome downloads to finish, validates the full-page PNGs, cutaway PNGs, and manifest artifacts, checks that local history stores the run, then removes the temporary profile and download folder. The checked in manifest is not widened by this test.
 
 If a browser run is interrupted, remove leftover Lumen test screenshots, temporary profiles, and capture downloads with:
 

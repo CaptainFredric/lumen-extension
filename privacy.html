@@ -31,42 +31,35 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260512-privacy" />
+    <link rel="stylesheet" href="styles.css?v=20260520-redesign" />
   </head>
   <body>
     <a class="skip-link" href="#privacy">Skip to privacy policy</a>
-    <div class="noise"></div>
 
     <header class="site-header">
       <a class="brand" href="./" aria-label="Lumen home">
         <span class="brand-mark">L</span>
-        <span class="brand-copy">
-          <strong>Lumen</strong>
-          <span>Browser capture workflow</span>
-        </span>
+        <span>Lumen</span>
       </a>
 
       <nav class="site-nav" aria-label="Primary">
-        <a href="./#features">Features</a>
-        <a href="./#cleanup-demo">Demo</a>
+        <a href="./#product">Product</a>
+        <a href="./#demo">Demo</a>
         <a href="./#workflow">Workflow</a>
         <a href="privacy.html" aria-current="page">Privacy</a>
       </nav>
 
-      <div class="header-actions">
-        <a
-          class="nav-link nav-link-split"
-          href="https://github.com/CaptainFredric/lumen-extension"
-          target="_blank"
-          rel="noreferrer"
-        >
-          <span>GitHub</span>
-          <span class="nav-link-chip">Repository</span>
-        </a>
-      </div>
+      <a
+        class="header-link"
+        href="https://github.com/CaptainFredric/lumen-extension#load-the-extension-locally"
+        target="_blank"
+        rel="noreferrer"
+      >
+        Install
+      </a>
     </header>
 
     <main class="privacy-main" id="privacy">
@@ -202,12 +195,15 @@
     </main>
 
     <footer class="site-footer">
-      <p>Lumen</p>
-      <span>
-        Browser capture workflow for design review, QA, and product work.
+      <a class="brand" href="./" aria-label="Lumen home">
+        <span class="brand-mark">L</span>
+        <span>Lumen</span>
+      </a>
+      <div>
         <a href="./">Home</a>
         <a href="privacy.html">Privacy</a>
-      </span>
+        <a href="https://github.com/CaptainFredric/lumen-extension" target="_blank" rel="noreferrer">GitHub</a>
+      </div>
     </footer>
   </body>
 </html>
