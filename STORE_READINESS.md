@@ -29,10 +29,11 @@ This file tracks what Lumen needs before a serious Chrome Web Store submission.
 Current permissions:
 
 1. `activeTab`: temporary access after user action.
-2. `downloads`: save capture artifacts and manifests.
-3. `offscreen`: compose stitched images in an offscreen document.
-4. `scripting`: inject the capture and cleanup content script.
-5. `storage`: keep settings, local history, manual redactions, and cutaway regions.
+2. `alarms`: run explicitly saved timed captures on the cadence the user chooses.
+3. `downloads`: save capture artifacts and manifests.
+4. `offscreen`: compose stitched images in an offscreen document.
+5. `scripting`: inject the capture and cleanup content script.
+6. `storage`: keep settings, local history, manual redactions, cutaway regions, timed capture plans, and callout regions.
 
 Optional host permissions:
 

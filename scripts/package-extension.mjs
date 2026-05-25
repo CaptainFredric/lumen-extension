@@ -119,6 +119,7 @@ async function validatePackage({ manifest, zipPath }) {
   validateManifest(manifest, errors, warnings);
   await validateRequiredFiles(errors);
   await validateIcons(manifest, errors, warnings);
+  await validatePermissionDocumentation(manifest, errors);
   validateBlockedFiles(files, errors);
 
   return {
@@ -245,6 +246,39 @@ function validateBlockedFiles(files, errors) {
 
     if (/\.(zip|crx|log|map)$/i.test(file)) {
       errors.push(`Blocked generated file type included in package: ${file}.`);
+    }
+  }
+}
+
+async function validatePermissionDocumentation(manifest, errors) {
+  const documents = [
+    {
+      label: "STORE_READINESS.md",
+      body: await readFile(path.join(repoRoot, "STORE_READINESS.md"), "utf8")
+    },
+    {
+      label: "CHROME_STORE_LISTING.md",
+      body: await readFile(path.join(repoRoot, "CHROME_STORE_LISTING.md"), "utf8")
+    }
+  ];
+
+  for (const permission of manifest.permissions || []) {
+    const needle = `\`${permission}\``;
+
+    for (const document of documents) {
+      if (!document.body.includes(needle)) {
+        errors.push(`${document.label} is missing permission rationale for ${needle}.`);
+      }
+    }
+  }
+
+  for (const permission of manifest.optional_host_permissions || []) {
+    const escapedPermission = `\`${permission}\``;
+
+    for (const document of documents) {
+      if (!document.body.includes(escapedPermission)) {
+        errors.push(`${document.label} is missing optional host permission rationale for ${escapedPermission}.`);
+      }
     }
   }
 }
