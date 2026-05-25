@@ -118,6 +118,9 @@ async function runRouteChecks(target) {
       sample: notFound.body.slice(0, 240)
     });
 
+    const traversal = await fetchText(`${fixture.origin}/..%2fpackage.json`);
+    assert(traversal.status === 403, `Expected ${target.name} encoded path traversal to be blocked.`, traversal);
+
     const socialCard = await fetchBytes(`${fixture.origin}${target.assetPath}`);
     assert(socialCard.status === 200, `Expected ${target.name} social image asset to load.`, socialCard);
     assert(socialCard.bytes > 1024, `Expected ${target.name} social image asset to contain data.`, socialCard);
@@ -134,6 +137,7 @@ async function runRouteChecks(target) {
         "/privacy.html",
         "/docs/",
         "/missing-route",
+        "/..%2fpackage.json",
         target.assetPath,
         target.storeAssetPath
       ]
@@ -191,7 +195,7 @@ function resolveFilePath(requestUrl, siteRoot) {
   const withIndex = normalized.endsWith("/") ? `${normalized}index.html` : normalized;
   const filePath = path.resolve(siteRoot, `.${withIndex}`);
 
-  return filePath.startsWith(siteRoot) ? filePath : null;
+  return isInsideRoot(siteRoot, filePath) ? filePath : null;
 }
 
 async function fetchText(url) {
@@ -240,6 +244,11 @@ function getContentType(filePath) {
   }
 
   return "application/octet-stream";
+}
+
+function isInsideRoot(root, targetPath) {
+  const relative = path.relative(root, targetPath);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 function findFirstDifference(left, right) {

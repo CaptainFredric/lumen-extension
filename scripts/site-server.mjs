@@ -26,11 +26,16 @@ const resolveFilePath = (requestUrl) => {
   const withIndex = normalizedPath.endsWith("/") ? `${normalizedPath}index.html` : normalizedPath;
   const absolutePath = path.resolve(repoRoot, `.${withIndex}`);
 
-  if (!absolutePath.startsWith(repoRoot)) {
+  if (!isInsideRoot(repoRoot, absolutePath)) {
     return null;
   }
 
   return absolutePath;
+};
+
+const isInsideRoot = (root, targetPath) => {
+  const relative = path.relative(root, targetPath);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 };
 
 const send = (response, statusCode, body, contentType) => {
