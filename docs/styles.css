@@ -25,6 +25,10 @@ html {
   background: var(--paper);
 }
 
+section[id] {
+  scroll-margin-top: 128px;
+}
+
 body {
   min-width: 320px;
   margin: 0;
@@ -272,6 +276,7 @@ main {
 .product-strip,
 .feature-section,
 .demo-section,
+.modes-section,
 .workflow-section,
 .showcase-section,
 .plans-section,
@@ -753,6 +758,187 @@ main {
   opacity: 1;
 }
 
+.mode-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 30px;
+}
+
+.mode-card {
+  display: grid;
+  gap: 18px;
+  min-height: 320px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 16px 42px rgba(9, 32, 48, 0.07);
+}
+
+.mode-visual {
+  position: relative;
+  min-height: 160px;
+  overflow: hidden;
+  border-radius: 8px;
+  background:
+    linear-gradient(rgba(7, 19, 27, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(7, 19, 27, 0.06) 1px, transparent 1px),
+    #eef6fb;
+  background-size: 28px 28px;
+}
+
+.mode-card h3 {
+  font-size: 1.25rem;
+  line-height: 1.15;
+}
+
+.mode-card p {
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.mode-page,
+.mode-lasso,
+.mode-cursor,
+.mode-clock,
+.mode-shot,
+.mode-page-stack,
+.mode-stitch {
+  position: absolute;
+  display: block;
+  border-radius: 8px;
+}
+
+.mode-page {
+  left: 26px;
+  right: 26px;
+  top: 28px;
+  bottom: 26px;
+  background:
+    linear-gradient(var(--ink) 0 12px, transparent 12px),
+    repeating-linear-gradient(180deg, rgba(7, 19, 27, 0.22) 0 7px, transparent 7px 17px),
+    white;
+  background-position: 16px 18px, 16px 48px, 0 0;
+  background-size: 52%, calc(100% - 32px), auto;
+  background-repeat: no-repeat;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+.mode-lasso {
+  left: 46px;
+  top: 74px;
+  width: 126px;
+  height: 54px;
+  border: 2px solid var(--blue);
+  background: rgba(79, 148, 255, 0.12);
+  animation: lasso-pulse 3.6s infinite ease-in-out;
+}
+
+.mode-cursor {
+  left: 158px;
+  top: 128px;
+  width: 16px;
+  height: 16px;
+  border: 3px solid var(--ink);
+  background: var(--mint);
+  animation: cursor-drag 3.6s infinite ease-in-out;
+}
+
+.mode-clock {
+  left: 20px;
+  top: 20px;
+  width: 56px;
+  height: 56px;
+  border: 3px solid var(--ink);
+  background: white;
+}
+
+.mode-clock::before,
+.mode-clock::after {
+  content: "";
+  position: absolute;
+  left: 25px;
+  top: 10px;
+  width: 3px;
+  height: 19px;
+  border-radius: 999px;
+  background: var(--blue);
+  transform-origin: 50% 18px;
+  animation: clock-hand 4.2s infinite linear;
+}
+
+.mode-clock::after {
+  top: 24px;
+  height: 14px;
+  background: var(--mint);
+  animation-duration: 12.6s;
+}
+
+.mode-shot {
+  width: 92px;
+  height: 70px;
+  border: 1px solid var(--line-strong);
+  background:
+    linear-gradient(90deg, var(--mint), var(--blue)) 14px 44px / 46px 8px no-repeat,
+    repeating-linear-gradient(180deg, rgba(7, 19, 27, 0.16) 0 6px, transparent 6px 16px),
+    white;
+  box-shadow: 0 10px 24px rgba(9, 32, 48, 0.12);
+  opacity: 0.45;
+}
+
+.shot-one {
+  left: 92px;
+  top: 22px;
+  animation: shot-pop 4.2s infinite ease-in-out;
+}
+
+.shot-two {
+  left: 132px;
+  top: 52px;
+  animation: shot-pop 4.2s 0.75s infinite ease-in-out;
+}
+
+.shot-three {
+  left: 172px;
+  top: 82px;
+  animation: shot-pop 4.2s 1.5s infinite ease-in-out;
+}
+
+.mode-page-stack {
+  width: 84px;
+  height: 118px;
+  top: 24px;
+  border: 1px solid var(--line-strong);
+  background:
+    linear-gradient(var(--ink) 0 10px, transparent 10px) 14px 18px / 52px 10px no-repeat,
+    repeating-linear-gradient(180deg, rgba(7, 19, 27, 0.18) 0 7px, transparent 7px 18px),
+    white;
+  box-shadow: 0 12px 26px rgba(9, 32, 48, 0.12);
+}
+
+.stack-one {
+  left: 28px;
+}
+
+.stack-two {
+  left: calc(50% - 42px);
+  animation: stack-lift 3.8s infinite ease-in-out;
+}
+
+.stack-three {
+  right: 28px;
+}
+
+.mode-stitch {
+  left: 48px;
+  right: 48px;
+  bottom: 30px;
+  height: 4px;
+  background: linear-gradient(90deg, var(--mint), var(--blue));
+  animation: stitch-line 3.8s infinite ease-in-out;
+}
+
 .workflow-grid,
 .plans-grid {
   display: grid;
@@ -980,6 +1166,65 @@ main {
   }
 }
 
+@keyframes lasso-pulse {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(0.82);
+  }
+  50% {
+    transform: translate(18px, -8px) scale(1.14);
+  }
+}
+
+@keyframes cursor-drag {
+  0%,
+  100% {
+    transform: translate(-76px, -42px);
+  }
+  50% {
+    transform: translate(18px, -10px);
+  }
+}
+
+@keyframes clock-hand {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shot-pop {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: translateY(0);
+  }
+  35%,
+  65% {
+    opacity: 1;
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes stack-lift {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes stitch-line {
+  0%,
+  100% {
+    transform: scaleX(0.25);
+  }
+  50% {
+    transform: scaleX(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1014,6 +1259,7 @@ main {
 
   .strip-points,
   .feature-grid,
+  .mode-grid,
   .workflow-grid,
   .plans-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1038,6 +1284,7 @@ main {
   .feature-section,
   .demo-section,
   .workflow-section,
+  .modes-section,
   .showcase-section,
   .plans-section,
   .privacy-section,
@@ -1064,6 +1311,7 @@ main {
 
   .strip-points,
   .feature-grid,
+  .mode-grid,
   .workflow-grid,
   .plans-grid {
     grid-template-columns: 1fr;

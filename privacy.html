@@ -13,7 +13,7 @@
     <meta property="og:title" content="Lumen Privacy Policy" />
     <meta
       property="og:description"
-      content="How Lumen handles screenshots, page metadata, redaction metadata, page signals, and local capture history."
+      content="How Lumen handles screenshots, page details, redaction details, page signals, and local capture history."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://captainfredric.github.io/lumen-extension/privacy.html" />
@@ -23,7 +23,7 @@
     <meta name="twitter:title" content="Lumen Privacy Policy" />
     <meta
       name="twitter:description"
-      content="How Lumen handles screenshots, page metadata, redaction metadata, page signals, and local capture history."
+      content="How Lumen handles screenshots, page details, redaction details, page signals, and local capture history."
     />
     <meta name="twitter:image" content="https://captainfredric.github.io/lumen-extension/assets/lumen-social-card.png" />
     <link rel="icon" href="brandmark.svg" type="image/svg+xml" />
@@ -48,7 +48,9 @@
       <nav class="site-nav" aria-label="Primary">
         <a href="./#product">Product</a>
         <a href="./#demo">Demo</a>
+        <a href="./#modes">Modes</a>
         <a href="./#workflow">Workflow</a>
+        <a href="./#store">Store</a>
         <a href="privacy.html" aria-current="page">Privacy</a>
       </nav>
 
@@ -64,7 +66,7 @@
 
     <main class="privacy-main" id="privacy">
       <section class="privacy-hero">
-        <p class="kicker">Privacy policy</p>
+        <p class="eyebrow">Privacy policy</p>
         <h1>Local-first capture, clear limits.</h1>
         <p class="privacy-lede">
           Lumen captures webpages for review work. This policy describes what the extension stores
@@ -79,7 +81,7 @@
           <p>
             The extension stores capture settings, redaction boxes, focused crop regions,
             extracted page signals, and capture history in the browser. Screenshot files and
-            manifest files are saved through Chrome Downloads.
+            supporting metadata files are saved through Chrome Downloads.
           </p>
         </article>
 
@@ -107,10 +109,10 @@
           <ul>
             <li>Screenshot images of the page you choose to capture.</li>
             <li>Page URL, title, host, viewport, dimensions, capture time, and export settings.</li>
-            <li>Redaction metadata, including detected sensitive regions and manual redaction boxes.</li>
-            <li>Focused crop metadata, including selected coordinates, dimensions, and projection status.</li>
+            <li>Redaction details, including detected sensitive regions and manual redaction boxes.</li>
+            <li>Focused crop details, including selected coordinates, dimensions, and projection status.</li>
             <li>Extracted page signals such as colors, fonts, navigation labels, headline text, CTA text, and layout counts.</li>
-            <li>Local capture history, file names, Chrome download IDs, and bundle manifest metadata.</li>
+            <li>Local capture history, file names, Chrome download IDs, and supporting capture metadata.</li>
             <li>Optional capture notes that you choose to add to an export.</li>
           </ul>
         </article>
@@ -121,7 +123,7 @@
           <ul>
             <li>Clean sticky headers, cookie banners, chat widgets, and other page chrome before capture.</li>
             <li>Generate full-page, responsive, redacted, annotated, and focused crop capture artifacts.</li>
-            <li>Build a JSON manifest that keeps capture context attached to the image outputs.</li>
+            <li>Build a JSON metadata file that keeps capture context attached to the image outputs.</li>
             <li>Show capture history and file actions in the extension popup.</li>
             <li>Help you check redactions and focused crop resolution before export.</li>
           </ul>
@@ -131,7 +133,7 @@
           <h2>Storage and retention</h2>
           <p>
             Lumen stores extension settings and local history using Chrome extension storage.
-            Screenshot images and JSON manifests are saved through Chrome Downloads into folders
+            Screenshot images and JSON metadata files are saved through Chrome Downloads into folders
             named by capture date. You control those files through your browser and operating
             system.
           </p>
@@ -145,7 +147,7 @@
         <article>
           <h2>Sharing and transfer</h2>
           <p>
-            By default, screenshot content, page text, capture history, redaction metadata, and
+            By default, screenshot content, page text, capture history, redaction details, and
             page signals stay in the browser and downloaded files. The repository includes a local
             demo backend for development testing.
           </p>
@@ -177,8 +179,8 @@
           <h2>Your controls</h2>
           <ul>
             <li>You choose when to capture a page.</li>
-            <li>You can disable cleanup, lazy-load forcing, redaction, notes, and manifest export in the popup settings.</li>
-            <li>You can delete downloaded images and manifests from your Downloads folder.</li>
+            <li>You can disable cleanup, lazy-load forcing, redaction, notes, and metadata export in the popup settings.</li>
+            <li>You can delete downloaded images and metadata files from your Downloads folder.</li>
             <li>You can clear extension storage through Chrome extension site data controls or by removing the extension.</li>
           </ul>
         </article>
