@@ -144,7 +144,7 @@ function buildControlSurfaceShot(popupImage) {
       <div class="copy">
         <p class="eyebrow">Lumen capture workflow</p>
         <h1>Clean, responsive captures from any webpage.</h1>
-        <p class="lede">Capture the page, clear overlays, check sensitive regions, and keep bundle context with the saved files.</p>
+        <p class="lede">Capture the page, clear overlays, check sensitive regions, and keep page context with the saved files.</p>
         <div class="cta-row"><span>Full-page capture</span><span>Responsive set</span><span>Save check</span></div>
       </div>
       <div class="phone-frame">

@@ -12,7 +12,7 @@ Clean webpage captures with responsive views, redaction checks, notes, page sign
 
 Lumen turns a busy webpage into a cleaner capture.
 
-Use it when a normal screenshot carries too much noise: sticky headers, cookie banners, chat launchers, floating ads, unfinished lazy media, or missing layout context. Start from the Chrome toolbar, clean the page, capture the view you need, check sensitive regions, and save the result with a useful bundle manifest attached.
+Use it when a normal screenshot carries too much noise: sticky headers, cookie banners, chat launchers, floating ads, unfinished lazy media, or missing layout context. Start from the Chrome toolbar, clean the page, capture the view you need, check sensitive regions, and save the result with useful capture details attached.
 
 Lumen supports:
 
@@ -24,7 +24,7 @@ Lumen supports:
 6. Page signals such as title, URL, colors, typography, headline, CTA text, and navigation labels.
 7. Timed captures for saved regions, with pause, resume, and run-now controls.
 8. Local capture history with saved file details.
-9. Bundle manifest JSON that keeps capture details beside the images.
+9. Capture details JSON that keeps page context beside the images.
 
 Redaction checks are a safety aid. Check each capture before sharing it outside your workspace.
 
@@ -44,7 +44,7 @@ https://captainfredric.github.io/lumen-extension/
 
 1. `activeTab`: lets Lumen read and capture the current page after the user starts an action.
 2. `alarms`: runs saved timed captures on the cadence the user chooses.
-3. `downloads`: saves capture images, focused crops, and bundle manifest JSON to the user's Downloads folder.
+3. `downloads`: saves capture images, focused crops, and capture details JSON to the user's Downloads folder.
 4. `offscreen`: composes stitched screenshots in an offscreen canvas document.
 5. `scripting`: injects the content script that prepares and reads the current page for capture.
 6. `storage`: stores settings, local capture history, manual redaction boxes, focused crop regions, timed capture plans, and callout regions.

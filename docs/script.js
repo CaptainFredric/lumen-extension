@@ -2,6 +2,12 @@ const revealTargets = [...document.querySelectorAll("[data-reveal]")];
 const demo = document.querySelector("[data-demo]");
 const demoButtons = [...document.querySelectorAll("[data-mode]")];
 const tiltTargets = [...document.querySelectorAll("[data-tilt]")];
+const demoModes = ["messy", "clean", "ready"];
+const shouldRotateDemo =
+  demo &&
+  window.matchMedia("(prefers-reduced-motion: no-preference)").matches;
+let demoModeIndex = 0;
+let demoRotationTimer;
 
 if ("IntersectionObserver" in window) {
   const observer = new IntersectionObserver(
@@ -36,23 +42,35 @@ function setDemoMode(mode) {
   for (const button of demoButtons) {
     button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
   }
+
+  const nextIndex = demoModes.indexOf(mode);
+
+  if (nextIndex !== -1) {
+    demoModeIndex = nextIndex;
+  }
+}
+
+function queueDemoRotation(delay = 3600) {
+  if (!shouldRotateDemo) {
+    return;
+  }
+
+  window.clearTimeout(demoRotationTimer);
+  demoRotationTimer = window.setTimeout(() => {
+    demoModeIndex = (demoModeIndex + 1) % demoModes.length;
+    setDemoMode(demoModes[demoModeIndex]);
+    queueDemoRotation();
+  }, delay);
 }
 
 for (const button of demoButtons) {
   button.addEventListener("click", () => {
-    setDemoMode(button.dataset.mode || "messy");
+    setDemoMode(button.dataset.mode || demoModes[0]);
+    queueDemoRotation(7200);
   });
 }
 
-if (demo && window.matchMedia("(prefers-reduced-motion: no-preference)").matches) {
-  const modes = ["messy", "clean", "ready"];
-  let modeIndex = 0;
-
-  window.setInterval(() => {
-    modeIndex = (modeIndex + 1) % modes.length;
-    setDemoMode(modes[modeIndex]);
-  }, 3600);
-}
+queueDemoRotation();
 
 if (
   tiltTargets.length &&

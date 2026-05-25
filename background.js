@@ -915,7 +915,7 @@ function buildExportReviewOutputPlan({ variants = [], variantCount = 1, cutawayA
         `${baseImageCount} image${baseImageCount === 1 ? "" : "s"}`,
         cutawayAppliedCount ? `${cutawayAppliedCount} crop${cutawayAppliedCount === 1 ? "" : "s"}` : "",
         printSheetCount ? `${printSheetCount} print sheet${printSheetCount === 1 ? "" : "s"}` : "",
-        manifestCount ? "bundle manifest" : ""
+        manifestCount ? "details JSON" : ""
       ].filter(Boolean).join(", ")
     },
     {
@@ -1085,7 +1085,7 @@ function buildExportReviewWarnings({
   }
 
   if ((manualCount || cutawayRegion.region) && variants.length > 1) {
-    warnings.push("Responsive projection is checked per viewport before export. The final manifest records the capture-time result for each view.");
+    warnings.push("Responsive projection is checked per viewport before export. The capture details file records the capture-time result for each view.");
   }
 
   return warnings;
@@ -2837,7 +2837,7 @@ function buildCaptureCompletionDetail({
   }
 
   if (manifestSaved) {
-    fragments.push("bundle manifest saved");
+    fragments.push("capture details saved");
   }
 
   if (annotationAdded) {

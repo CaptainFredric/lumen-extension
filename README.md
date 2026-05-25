@@ -8,7 +8,7 @@ Lumen focuses on:
 2. capture desktop, tablet, and mobile views together
 3. redact sensitive visible data during export
 4. attach useful page signals beside the image
-5. save a bundle manifest so the capture can travel with its context
+5. save capture details so the image keeps useful page context
 
 The repo is aimed at design review, QA, and product work.
 
@@ -29,8 +29,8 @@ The extension includes:
 11. a pre-export review screen that checks auto-redactions, manual projection, and cutaway resolution across the requested view set before saving
 12. an anchored callout picker that marks one page area and renders it into the exported image with the capture note
 13. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
-14. bundle-manifest JSON exports with view, redaction, manual projection, cutaway, callout, signal, output health, and note metadata
-15. dated per-run download folders so capture sets, tiles, and manifests stay together
+14. capture details JSON exports with view, redaction, manual projection, focused crop, callout, signal, output health, and note metadata
+15. dated per-run download folders so capture sets, tiles, and detail files stay together
 16. local capture history with file, folder, summary, and Chrome download-handle metadata
 17. popup history actions to open the latest artifact or reveal it in the Downloads folder
 18. capture-time popup UI with run settings, cutaway state, a live stage timeline, and recent status log
@@ -67,7 +67,7 @@ The current capture flow is:
 6. content script resolves manual redactions, any stored cutaway region, and the optional callout region against the current layout
 7. offscreen stitches the final output using device-pixel-ratio aware composition, renders one capture note and callout marker, and can export a cutaway crop from the stitched result
 8. if the page is too large for one safe canvas, the export falls back to tiled raw output and skips cutaway cropping for that view
-9. background downloads the files, writes the bundle manifest, writes local history, and restores the page
+9. background downloads the files, writes capture details, writes local history, and restores the page
 
 ### Entitlements
 
@@ -130,13 +130,13 @@ The public landing page will be available at `http://127.0.0.1:3000/`.
 3. Check the launch indicator to confirm the current tab is capture-ready
 4. Click `Capture page` for the default full-page run
 5. Hold `Capture page` to open quick actions for responsive capture, redaction scan, manual boxes, cutaway, lasso, callout, or signal extraction
-6. Change capture device, export mode, cleanup, lazy-load forcing, auto-redaction, notes, or manifest settings when needed
+6. Change capture device, export mode, cleanup, lazy-load forcing, auto-redaction, notes, or capture-detail settings when needed
 7. Use `Scan` to preview detected redaction regions before export
 8. Use `Mark boxes` if you need manual redactions before capture
 9. Use `Mark cutaway` or `Lasso area` to store one reusable page region; the next capture exports focused PNGs for views where the region resolves
 10. Use `Open` or `Show in folder` from recent captures to get back to the saved artifact
 11. When the pre-export review appears, check auto-redaction counts, manual projection status, cutaway status, and warnings, then click `Run export`
-12. Expand recent capture details to review views, artifacts, redactions, manifest status, notes, and page signals
+12. Expand recent capture details to review views, artifacts, redactions, detail-file status, notes, and page signals
 13. Copy a capture summary when you need to paste evidence into a review note or bug report
 
 If the launch indicator says the page is blocked, switch to a normal `http://` or `https://` page. Chrome does not allow extension capture scripts on internal browser pages, Web Store pages, or other extension pages.
@@ -186,7 +186,7 @@ To verify the loaded extension can capture a real local page and produce finishe
 npm run smoke:e2e
 ```
 
-This starts a local fixture page, loads a temporary copy of the extension with explicit test only capture access, seeds one anchored cutaway region, runs a responsive desktop, tablet, and mobile capture through the MV3 background worker, waits for Chrome downloads to finish, validates the full-page PNGs, cutaway PNGs, and manifest artifacts, checks that local history stores the run, then removes the temporary profile and download folder. The checked in manifest is not widened by this test.
+This starts a local fixture page, loads a temporary copy of the extension with explicit test-only capture access, seeds one anchored focused-crop region, runs a responsive desktop, tablet, and mobile capture through the MV3 background worker, waits for Chrome downloads to finish, validates the full-page PNGs, focused-crop PNGs, and capture detail files, checks that local history stores the run, then removes the temporary profile and download folder. The checked-in extension manifest is not widened by this test.
 
 If a browser run is interrupted, remove leftover Lumen test screenshots, temporary profiles, and capture downloads with:
 

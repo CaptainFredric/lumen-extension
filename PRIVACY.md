@@ -2,7 +2,7 @@
 
 Effective date: May 12, 2026
 
-Lumen is a local-first browser capture workflow for design review, QA, and product work. The current extension stores capture settings, redaction boxes, cutaway regions, extracted page signals, and capture history in the browser. Screenshot files and manifest files are saved through Chrome Downloads.
+Lumen is a local-first browser capture workflow for design review, QA, and product work. The current extension stores capture settings, redaction boxes, cutaway regions, extracted page signals, and capture history in the browser. Screenshot files and capture detail files are saved through Chrome Downloads.
 
 ## Information Lumen Handles
 
@@ -11,16 +11,16 @@ Lumen is a local-first browser capture workflow for design review, QA, and produ
 3. Redaction metadata, including detected sensitive regions and manual redaction boxes.
 4. Cutaway region metadata, including selected coordinates, dimensions, and projection status.
 5. Extracted page signals such as colors, fonts, navigation labels, headline text, CTA text, and layout counts.
-6. Local capture history, file names, Chrome download IDs, and bundle manifest metadata.
+6. Local capture history, file names, Chrome download IDs, and capture detail metadata.
 7. Optional capture notes that you choose to add to an export.
 
 ## Use
 
-Lumen uses this information to provide its user-facing capture workflow: page cleanup, responsive capture, redaction review, cutaway export, bundle manifests, local history, and file actions.
+Lumen uses this information to provide its user-facing capture workflow: page cleanup, responsive capture, redaction review, cutaway export, capture details, local history, and file actions.
 
 ## Storage And Retention
 
-Lumen stores extension settings and local history using Chrome extension storage. Screenshot images and JSON manifests are saved through Chrome Downloads into folders named by capture date. You control those files through your browser and operating system.
+Lumen stores extension settings and local history using Chrome extension storage. Screenshot images and capture details JSON are saved through Chrome Downloads into folders named by capture date. You control those files through your browser and operating system.
 
 Chrome extension storage and downloaded files are not encrypted by Lumen. Do not capture or retain sensitive pages unless you are comfortable storing those files locally.
 

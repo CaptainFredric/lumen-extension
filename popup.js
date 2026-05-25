@@ -2323,7 +2323,7 @@ function formatWatchRunStatus(run = null, plan = {}) {
 function formatDeletedDataSummary(deleted = {}) {
   const parts = [
     `${deleted.captures || 0} capture${deleted.captures === 1 ? "" : "s"}`,
-    `${deleted.watchPlans || 0} watch record${deleted.watchPlans === 1 ? "" : "s"}`,
+    `${deleted.watchPlans || 0} timed capture${deleted.watchPlans === 1 ? "" : "s"}`,
     `${deleted.agentJobs || 0} agent job${deleted.agentJobs === 1 ? "" : "s"}`,
     `${deleted.destinations || 0} destination${deleted.destinations === 1 ? "" : "s"}`,
     deleted.deliveries === 1 ? "1 delivery" : `${deleted.deliveries || 0} deliveries`
@@ -2567,7 +2567,7 @@ function renderHistory(history) {
       formatTimestamp(item.capturedAt),
       item.variants?.length ? `${item.variants.length} view${item.variants.length === 1 ? "" : "s"}` : "",
       `${item.files?.length || 0} file${item.files?.length === 1 ? "" : "s"}`,
-      item.manifestFile ? "manifest saved" : "",
+      item.manifestFile ? "details saved" : "",
       item.annotation?.text ? "note added" : "",
       item.manualRedactionCount ? `${item.manualRedactionCount} manual box${item.manualRedactionCount === 1 ? "" : "es"}` : "",
       item.cutawayCount ? `${item.cutawayCount} cutaway crop${item.cutawayCount === 1 ? "" : "s"}` : "",
@@ -2758,7 +2758,7 @@ function buildHistoryDetails(item) {
     buildHistoryMetric("Files", String(fileCount)),
     buildHistoryMetric("Redactions", String(redactionCount)),
     buildHistoryMetric("Cutaways", String(cutawayCount)),
-    buildHistoryMetric("Manifest", manifestState)
+    buildHistoryMetric("Details", manifestState)
   );
   detail.append(metrics);
 
@@ -2904,7 +2904,7 @@ function buildHistoryArtifactFilters(records) {
     ["image", "Full page", counts.image],
     ["cutaway", "Cutaway", counts.cutaway],
     ["print-sheet", "Print sheet", counts["print-sheet"]],
-    ["manifest", "Manifest", counts.manifest]
+    ["manifest", "Details", counts.manifest]
   ].filter(([, , count]) => count > 0);
 
   filterRow.className = "history-artifact-filters";
@@ -3052,7 +3052,7 @@ function formatArtifactLabel(record) {
   }
 
   if (artifactType === "manifest") {
-    return "Bundle manifest JSON";
+    return "Capture details JSON";
   }
 
   if (artifactType === "print-sheet") {
@@ -3170,7 +3170,7 @@ function buildExportReviewOutputPlan(review) {
         `${baseImageCount} image${baseImageCount === 1 ? "" : "s"}`,
         cutawayCount ? `${cutawayCount} crop${cutawayCount === 1 ? "" : "s"}` : "",
         printSheetCount ? `${printSheetCount} print sheet${printSheetCount === 1 ? "" : "s"}` : "",
-        manifestCount ? "bundle manifest" : ""
+        manifestCount ? "details JSON" : ""
       ].filter(Boolean).join(", ")
     },
     {
@@ -3583,7 +3583,7 @@ function renderRunSummary(settings = currentSettings) {
   ui.runExportSummary.textContent = exportLabel;
   ui.runSafetySummary.textContent = safetyParts.length ? safetyParts.join(", ") : "Basic";
   ui.runManifestSummary.textContent = [
-    settings.exportManifest === false ? "Manifest off" : "Manifest",
+    settings.exportManifest === false ? "Details off" : "Details file",
     settings.longPageMode === "tiles" ? "Tiles" : "",
     settings.longPageMode === "print" ? "Print sheet" : ""
   ].filter(Boolean).join(" + ");
@@ -3857,7 +3857,7 @@ function formatProjectionStats(label, stats = {}) {
 function buildCaptureSuccessMessage(response, settings) {
   const fileText = `${response.files.length} file${response.files.length === 1 ? "" : "s"} saved using ${response.exportPreset} output mode`;
   const variantCount = response.variantCount || getCaptureVariants(settings.devicePreset).length;
-  const manifestText = response.manifestFile ? " Bundle manifest saved." : "";
+  const manifestText = response.manifestFile ? " Capture details saved." : "";
   const folderText = response.archiveFolder ? ` Saved in ${response.archiveFolder}.` : "";
   const captureNote = normalizeCaptureNoteOptions(settings);
   const noteText = response.annotation?.enabled || captureNote.enabled ? " Capture note added." : "";
@@ -3905,7 +3905,7 @@ function buildHistorySummaryText(item) {
     `Redactions: ${item.redactionCount || 0}`,
     item.manualRedactionCount ? `Manual boxes: ${item.manualRedactionCount}` : "",
     item.cutawayCount ? `Cutaway crops: ${item.cutawayCount}` : "",
-    item.manifestFile ? `Bundle manifest: ${item.manifestFile}` : "Bundle manifest: off",
+    item.manifestFile ? `Capture details: ${item.manifestFile}` : "Capture details: off",
     item.archiveFolder ? `Folder: ${item.archiveFolder}` : "",
     item.blueprintSummary?.siteType ? `Page type: ${item.blueprintSummary.siteType}` : "",
     item.blueprintSummary?.heroHeadline ? `Hero: ${item.blueprintSummary.heroHeadline}` : "",

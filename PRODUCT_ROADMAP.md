@@ -10,7 +10,7 @@ The product can become ambitious without changing the first wedge. The screensho
 2. Capture desktop, tablet, and mobile views together.
 3. Redact visible sensitive data during export.
 4. Attach useful page signals beside the image.
-5. Keep local history and a portable bundle manifest.
+5. Keep local history and portable capture details.
 
 ## Implemented Now
 

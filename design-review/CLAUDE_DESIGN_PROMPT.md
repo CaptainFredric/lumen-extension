@@ -15,7 +15,7 @@ What it does today:
 5. Allows anchored manual redaction boxes.
 6. Stores one reusable cutaway region per URL.
 7. Extracts page signals such as palette, fonts, CTA, navigation, and layout counts.
-8. Saves local capture history and bundle manifests.
+8. Saves local capture history and capture details.
 
 What is future direction:
 
