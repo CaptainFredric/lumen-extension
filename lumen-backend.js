@@ -38,18 +38,36 @@ export async function bootstrapAppState() {
           backendReachable: false
         }
       : localState.session;
-  const captureHistory =
-    remoteCaptures?.ok && Array.isArray(remoteCaptures.data.captures)
+  const captureHistory = reconcileRecords(
+    localState.captureHistory,
+    remoteCaptures?.ok && Array.isArray(remoteCaptures.data?.captures)
       ? remoteCaptures.data.captures
-      : localState.captureHistory;
-  const watchPlans =
-    remoteWatchPlans?.ok && Array.isArray(remoteWatchPlans.data.watchPlans)
+      : [],
+    {
+      freshnessFields: ["updatedAt", "capturedAt", "createdAt"],
+      sortFields: ["capturedAt", "updatedAt", "createdAt"]
+    }
+  );
+  const watchPlans = reconcileRecords(
+    localState.watchPlans,
+    remoteWatchPlans?.ok && Array.isArray(remoteWatchPlans.data?.watchPlans)
       ? remoteWatchPlans.data.watchPlans
-      : localState.watchPlans;
-  const watchRuns =
-    remoteWatchRuns?.ok && Array.isArray(remoteWatchRuns.data.watchRuns)
+      : [],
+    {
+      freshnessFields: ["updatedAt", "lastRunAt", "createdAt"],
+      sortFields: ["updatedAt", "lastRunAt", "createdAt"]
+    }
+  );
+  const watchRuns = reconcileRecords(
+    localState.watchRuns,
+    remoteWatchRuns?.ok && Array.isArray(remoteWatchRuns.data?.watchRuns)
       ? remoteWatchRuns.data.watchRuns
-      : localState.watchRuns;
+      : [],
+    {
+      freshnessFields: ["updatedAt", "completedAt", "startedAt", "scheduledAt", "createdAt"],
+      sortFields: ["completedAt", "startedAt", "scheduledAt", "updatedAt", "createdAt"]
+    }
+  );
 
   const merged = {
     ...localState,
@@ -67,6 +85,69 @@ export async function bootstrapAppState() {
   });
 
   return merged;
+}
+
+function reconcileRecords(localRecords, remoteRecords, { freshnessFields = [], sortFields = [] } = {}) {
+  const localById = indexRecordsById(localRecords);
+  const remoteById = indexRecordsById(remoteRecords);
+  const recordIds = new Set([...localById.keys(), ...remoteById.keys()]);
+  const reconciled = [...recordIds].map((id) => {
+    const localRecord = localById.get(id);
+    const remoteRecord = remoteById.get(id);
+
+    if (!localRecord) {
+      return remoteRecord;
+    }
+
+    if (!remoteRecord) {
+      return localRecord;
+    }
+
+    const localTimestamp = readRecordTimestamp(localRecord, freshnessFields);
+    const remoteTimestamp = readRecordTimestamp(remoteRecord, freshnessFields);
+
+    // Local wins an equal-version conflict because it may contain a write that
+    // has not reached the backend yet. Fields unique to either copy survive.
+    return localTimestamp >= remoteTimestamp
+      ? { ...remoteRecord, ...localRecord }
+      : { ...localRecord, ...remoteRecord };
+  });
+
+  return reconciled.sort((left, right) => {
+    const timeDifference = readRecordTimestamp(right, sortFields) - readRecordTimestamp(left, sortFields);
+
+    if (timeDifference) {
+      return timeDifference;
+    }
+
+    return String(left?.id || "").localeCompare(String(right?.id || ""));
+  });
+}
+
+function indexRecordsById(records) {
+  const indexed = new Map();
+
+  for (const record of Array.isArray(records) ? records : []) {
+    const id = typeof record?.id === "string" ? record.id.trim() : "";
+
+    if (id) {
+      indexed.set(id, record);
+    }
+  }
+
+  return indexed;
+}
+
+function readRecordTimestamp(record, fields) {
+  for (const field of fields) {
+    const timestamp = Date.parse(record?.[field] || "");
+
+    if (Number.isFinite(timestamp)) {
+      return timestamp;
+    }
+  }
+
+  return 0;
 }
 
 export async function startDemoSession() {
@@ -259,10 +340,11 @@ export async function readRemoteDestinations() {
 export async function saveRemoteWatchPlan(payload = {}) {
   const localState = await readLocalState();
 
-  if (!localState.session.signedIn || !localState.session.id) {
+  if (!(await hasExplicitCloudSync(localState))) {
     return {
-      ok: false,
-      error: "Enable advanced tools before saving a timed capture."
+      ok: true,
+      backendReachable: Boolean(localState.session.backendReachable),
+      watchPlan: await persistLocalWatchPlan(buildLocalWatchPlan(payload, localState.session.id))
     };
   }
 
@@ -308,7 +390,7 @@ export async function updateRemoteWatchPlan(watchPlanId = "", patch = {}) {
     updatedAt: new Date().toISOString()
   }, localState.session.id);
 
-  if (localState.session.signedIn && localState.session.id) {
+  if (localState.session.signedIn && localState.session.id && await hasExplicitCloudSync(localState)) {
     const remote = await fetchJson(`${LUMEN_CONFIG.api.endpoints.watchPlans}/${encodeURIComponent(watchPlanId)}`, {
       method: "PATCH",
       sessionId: localState.session.id,
@@ -370,6 +452,9 @@ export async function readLocalWatchRuns() {
 export async function persistWatchRunRecord(record = {}) {
   const localState = await readLocalState();
   const normalized = normalizeWatchRunRecord(record, localState.session.id);
+  const previousRun = localState.watchRuns.find((entry) => entry.id === normalized.id);
+  const terminalStatuses = new Set(["captured", "unchanged", "failed"]);
+  const completedNewAttempt = terminalStatuses.has(normalized.status) && !terminalStatuses.has(previousRun?.status);
   const updatedRuns = [
     normalized,
     ...localState.watchRuns.filter((entry) => entry.id !== normalized.id)
@@ -381,6 +466,11 @@ export async function persistWatchRunRecord(record = {}) {
           ? {
               ...plan,
               lastRunAt: runAt,
+              runCount: Math.max(0, Number(plan.runCount) || 0) + (completedNewAttempt ? 1 : 0),
+              lastVisualHash: normalized.visualHash || plan.lastVisualHash || "",
+              lastChangePercent: Number.isFinite(normalized.changePercent)
+                ? normalized.changePercent
+                : plan.lastChangePercent,
               updatedAt: new Date().toISOString()
             }
           : plan
@@ -392,7 +482,7 @@ export async function persistWatchRunRecord(record = {}) {
     [STORAGE_KEYS.watchPlans]: updatedPlans
   });
 
-  if (localState.session.signedIn) {
+  if (localState.session.signedIn && await hasExplicitCloudSync(localState)) {
     await fetchJson(LUMEN_CONFIG.api.endpoints.watchRuns, {
       method: "POST",
       sessionId: localState.session.id,
@@ -445,7 +535,7 @@ export async function persistCaptureRecord(record) {
     [STORAGE_KEYS.captureHistory]: updatedHistory
   });
 
-  if (localState.session.signedIn) {
+  if (localState.session.signedIn && await hasExplicitCloudSync(localState)) {
     await fetchJson(LUMEN_CONFIG.api.endpoints.captures, {
       method: "POST",
       sessionId: localState.session.id,
@@ -454,6 +544,18 @@ export async function persistCaptureRecord(record) {
   }
 
   return updatedHistory;
+}
+
+async function hasExplicitCloudSync(localState) {
+  if (!localState?.session?.signedIn || !localState.session.id) {
+    return false;
+  }
+
+  const remote = await fetchJson(LUMEN_CONFIG.api.endpoints.dataControls, {
+    sessionId: localState.session.id
+  });
+
+  return Boolean(remote?.ok && normalizeDataControls(remote.data?.dataControls).cloudSyncEnabled);
 }
 
 export async function readLocalState() {
@@ -499,7 +601,7 @@ function buildLocalWatchPlan(payload = {}, sessionId = "") {
     title: normalizeText(payload.title, rawUrl?.hostname || "Timed capture", 160),
     url: rawUrl?.href || "",
     host: rawUrl?.host || "",
-    status: payload.status === "paused" ? "paused" : "active",
+    status: normalizeWatchStatus(payload.status),
     selectionMode: payload.selectionMode === "lasso" ? "lasso" : "rect",
     region: normalizeRegion(payload.region),
     schedule: normalizeSchedule(payload.schedule),
@@ -507,6 +609,9 @@ function buildLocalWatchPlan(payload = {}, sessionId = "") {
     explicitOptIn: true,
     consentAcceptedAt: payload.consentAcceptedAt || now,
     lastRunAt: payload.lastRunAt || "",
+    runCount: Math.max(0, Math.round(Number(payload.runCount) || 0)),
+    lastVisualHash: normalizeText(payload.lastVisualHash, "", 64),
+    lastChangePercent: Math.max(0, Math.min(100, Number(payload.lastChangePercent) || 0)),
     createdAt: payload.createdAt || now,
     updatedAt: now
   };
@@ -522,7 +627,7 @@ function normalizeWatchPlanRecord(plan = {}, fallbackSessionId = "") {
     title: normalizeText(plan.title, rawUrl?.hostname || "Timed capture", 160),
     url: rawUrl?.href || "",
     host: rawUrl?.host || "",
-    status: plan.status === "paused" ? "paused" : "active",
+    status: normalizeWatchStatus(plan.status),
     selectionMode: plan.selectionMode === "lasso" ? "lasso" : "rect",
     region: normalizeRegion(plan.region),
     schedule: normalizeSchedule(plan.schedule),
@@ -530,6 +635,9 @@ function normalizeWatchPlanRecord(plan = {}, fallbackSessionId = "") {
     explicitOptIn: plan.explicitOptIn !== false,
     consentAcceptedAt: plan.consentAcceptedAt || now,
     lastRunAt: plan.lastRunAt || "",
+    runCount: Math.max(0, Math.round(Number(plan.runCount) || 0)),
+    lastVisualHash: normalizeText(plan.lastVisualHash, "", 64),
+    lastChangePercent: Math.max(0, Math.min(100, Number(plan.lastChangePercent) || 0)),
     createdAt: plan.createdAt || now,
     updatedAt: plan.updatedAt || now
   };
@@ -547,13 +655,15 @@ function normalizeWatchRunRecord(record = {}, fallbackSessionId = "") {
     title: normalizeText(record.title, rawUrl?.hostname || "Timed capture", 160),
     url: rawUrl?.href || "",
     host: rawUrl?.host || "",
-    status: ["queued", "running", "captured", "skipped", "failed"].includes(record.status)
+    status: ["queued", "running", "captured", "unchanged", "skipped", "failed"].includes(record.status)
       ? record.status
       : "queued",
     scheduledAt: record.scheduledAt || now,
     startedAt: record.startedAt || "",
     completedAt: record.completedAt || "",
     fileCount: Math.max(0, Math.round(Number(record.fileCount) || 0)),
+    visualHash: normalizeText(record.visualHash, "", 64),
+    changePercent: Math.max(0, Math.min(100, Number(record.changePercent) || 0)),
     files: Array.isArray(record.files) ? record.files.map((file) => normalizeText(file, "", 240)).filter(Boolean).slice(0, 20) : [],
     error: normalizeText(record.error, "", 240),
     createdAt: record.createdAt || now,
@@ -562,12 +672,39 @@ function normalizeWatchRunRecord(record = {}, fallbackSessionId = "") {
 }
 
 function normalizeSchedule(schedule = {}) {
-  const intervalMinutes = Math.max(1, Math.round(Number(schedule.intervalMinutes) || 60));
+  const mode = ["once", "repeat", "continuous"].includes(schedule.mode)
+    ? schedule.mode
+    : "repeat";
+  const minimumInterval = mode === "continuous" ? 1 : 15;
+  const intervalMinutes = Math.max(minimumInterval, Math.round(Number(schedule.intervalMinutes) || (mode === "continuous" ? 1 : 60)));
+  const delaySeconds = Math.max(5, Math.min(86400, Math.round(Number(schedule.delaySeconds) || 10)));
+  const requestedMaxRuns = Math.max(0, Math.round(Number(schedule.maxRuns) || 0));
+  const maxRuns = mode === "once"
+    ? 1
+    : mode === "continuous"
+      ? Math.max(2, Math.min(100, requestedMaxRuns || 10))
+      : Math.min(1000, requestedMaxRuns);
+  const expiresAt = typeof schedule.expiresAt === "string" && Number.isFinite(Date.parse(schedule.expiresAt))
+    ? schedule.expiresAt
+    : "";
+  const runAt = typeof schedule.runAt === "string" && Number.isFinite(Date.parse(schedule.runAt))
+    ? schedule.runAt
+    : "";
 
   return {
+    mode,
     intervalMinutes,
+    delaySeconds,
+    maxRuns,
+    saveOnlyWhenChanged: Boolean(schedule.saveOnlyWhenChanged),
+    runAt,
+    expiresAt,
     timezone: normalizeText(schedule.timezone, "local", 80)
   };
+}
+
+function normalizeWatchStatus(status = "active") {
+  return ["active", "paused", "completed"].includes(status) ? status : "active";
 }
 
 function normalizeRegion(region = null) {
@@ -620,7 +757,9 @@ function normalizeStoredSession(session) {
     return buildGuestSession();
   }
 
-  const plan = normalizePlan(session.plan || "free");
+  const plan = !session.signedIn && (!session.plan || session.plan === "free")
+    ? LUMEN_CONFIG.plans.defaultPlan
+    : normalizePlan(session.plan || LUMEN_CONFIG.plans.defaultPlan);
 
   return {
     ...session,
@@ -628,12 +767,12 @@ function normalizeStoredSession(session) {
     plan,
     source: session.source || "local",
     backendReachable: Boolean(session.backendReachable),
-    entitlements: session.entitlements || getPlanEntitlements(plan)
+    entitlements: getPlanEntitlements(plan)
   };
 }
 
 function buildGuestSession() {
-  const plan = "free";
+  const plan = LUMEN_CONFIG.plans.defaultPlan;
 
   return {
     id: "",

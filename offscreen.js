@@ -59,7 +59,7 @@ function appendSegment({ sessionId, segment }) {
   return {};
 }
 
-function updateSession({ sessionId, page }) {
+function updateSession({ sessionId, page, redactions }) {
   const session = stitchSessions.get(sessionId);
 
   if (!session) {
@@ -71,6 +71,10 @@ function updateSession({ sessionId, page }) {
       ...session.page,
       ...page
     };
+  }
+
+  if (Array.isArray(redactions)) {
+    session.redactions = redactions;
   }
 
   return {};
@@ -91,6 +95,7 @@ async function finalizeSession(sessionId) {
 
 async function renderSession(session) {
   const renderModel = await buildRenderModel(session);
+  const captureHealth = buildCaptureHealth(renderModel);
   const requestedPreset = session.options?.exportPreset || "raw";
   const canRenderSingle = canFitCanvas(renderModel.canvasWidth, renderModel.canvasHeight);
   const forceTiled = ["tiles", "print"].includes(session.options?.longPageMode);
@@ -137,36 +142,37 @@ async function renderSession(session) {
       total: tiledCanvases.length
     }));
 
-    if (canRenderSingle) {
-      const cutawayCanvas = renderCutawayCanvas(
-        renderSliceCanvas(renderModel, 0, renderModel.canvasHeight),
-        renderModel.cutawayRegion
-      );
+    const cutawayCanvas = renderCutawayFromModel(renderModel, renderModel.cutawayRegion);
 
-      if (cutawayCanvas) {
-        outputItems.push({
-          canvas: cutawayCanvas,
-          role: "cutaway",
-          index: 0,
-          total: 1,
-          cutawayRegion: renderModel.cutawayRegion
-        });
-      }
+    if (cutawayCanvas) {
+      outputItems.push({
+        canvas: cutawayCanvas,
+        role: "cutaway",
+        index: 0,
+        total: 1,
+        cutawayRegion: renderModel.cutawayRegion
+      });
     }
   }
 
   return {
-    outputs: outputItems.map((output) => ({
-      dataUrl: output.canvas.toDataURL("image/png"),
-      width: output.canvas.width,
-      height: output.canvas.height,
-      index: output.index,
-      total: output.total,
-      role: output.role,
-      partIndex: output.index + 1,
-      partTotal: output.total,
-      cutawayRegion: output.cutawayRegion || null
-    })),
+    outputs: outputItems.map((output) => {
+      const previewDataUrl = renderPreviewDataUrl(output.canvas);
+
+      return {
+        dataUrl: output.canvas.toDataURL("image/png"),
+        previewDataUrl,
+        visualHash: buildVisualHash(output.canvas),
+        width: output.canvas.width,
+        height: output.canvas.height,
+        index: output.index,
+        total: output.total,
+        role: output.role,
+        partIndex: output.index + 1,
+        partTotal: output.total,
+        cutawayRegion: output.cutawayRegion || null
+      };
+    }),
     width: renderModel.canvasWidth,
     height: renderModel.canvasHeight,
     pixelRatio: renderModel.effectiveScale,
@@ -174,6 +180,7 @@ async function renderSession(session) {
     tileCount,
     cutawayCount: outputItems.filter((output) => output.role === "cutaway").length,
     redactionCount: renderModel.redactions.length,
+    captureHealth,
     annotation: renderModel.annotation
       ? {
           enabled: true,
@@ -186,6 +193,66 @@ async function renderSession(session) {
           text: ""
         },
     annotationRegion: renderModel.annotationRegion
+  };
+}
+
+function buildCaptureHealth(renderModel) {
+  const expectedHeight = Math.max(1, renderModel.canvasHeight);
+  const spans = renderModel.segments
+    .map((segment) => ({
+      start: Math.max(0, Math.min(expectedHeight, Math.round(segment.drawTop))),
+      end: Math.max(0, Math.min(expectedHeight, Math.round(segment.drawBottom)))
+    }))
+    .filter((span) => span.end > span.start)
+    .sort((left, right) => left.start - right.start);
+  const merged = [];
+  let totalDrawnPixels = 0;
+  let seamGapCount = 0;
+
+  for (const span of spans) {
+    totalDrawnPixels += span.end - span.start;
+    const previous = merged[merged.length - 1];
+
+    if (!previous || span.start > previous.end) {
+      if (previous && span.start > previous.end) {
+        seamGapCount += 1;
+      }
+      merged.push({ ...span });
+      continue;
+    }
+
+    previous.end = Math.max(previous.end, span.end);
+  }
+
+  const coveredPixels = merged.reduce((sum, span) => sum + span.end - span.start, 0);
+  const uncoveredPixels = Math.max(0, expectedHeight - coveredPixels);
+  const overlapPixels = Math.max(0, totalDrawnPixels - coveredPixels);
+  const capturedBottom = merged.reduce((maximum, span) => Math.max(maximum, span.end), 0);
+  const coveragePercent = Number((coveredPixels / expectedHeight * 100).toFixed(2));
+  const reachedTail = capturedBottom >= expectedHeight - 1;
+  const widthMismatchCount = renderModel.segments.filter((segment) =>
+    Math.abs(segment.sourceWidth - renderModel.canvasWidth) > 1
+  ).length;
+  const status = coveragePercent >= 99.5 && reachedTail && seamGapCount === 0 && widthMismatchCount === 0
+    ? "complete"
+    : coveragePercent >= 90
+      ? "partial"
+      : "incomplete";
+
+  return {
+    status,
+    coveragePercent,
+    reachedTail,
+    seamGapCount,
+    widthMismatchCount,
+    segmentCount: spans.length,
+    expectedWidth: renderModel.canvasWidth,
+    expectedHeight,
+    coveredPixels,
+    uncoveredPixels,
+    overlapPixels,
+    capturedBottom,
+    uncoveredCssPixels: Math.max(0, Math.round(uncoveredPixels / Math.max(1, renderModel.effectiveScale)))
   };
 }
 
@@ -207,8 +274,12 @@ async function buildRenderModel(session) {
   }
 
   const firstImage = hydratedSegments[0].image;
+  const browserViewportWidth = Math.max(
+    1,
+    Number(session.page.browserViewportWidth) || Number(session.page.viewportWidth) || firstImage.naturalWidth
+  );
   const effectiveScale =
-    firstImage.naturalWidth / session.page.viewportWidth || session.page.devicePixelRatio || 1;
+    firstImage.naturalWidth / browserViewportWidth || session.page.devicePixelRatio || 1;
   const canvasWidth = Math.max(1, Math.round(session.page.viewportWidth * effectiveScale));
   const canvasHeight = Math.max(1, Math.round(session.page.pageHeight * effectiveScale));
   const annotation = buildCaptureAnnotation({
@@ -233,19 +304,43 @@ async function buildRenderModel(session) {
       height: Math.max(1, Math.round(region.height * effectiveScale))
     })),
     segments: hydratedSegments.map((segment) => {
+      const captureRect = normalizeCaptureRect(
+        segment.captureRect || session.page.captureRect,
+        session.page,
+        segment.image,
+        effectiveScale
+      );
       const cropTopPixels = Math.round(segment.cropTopCss * effectiveScale);
       const cropBottomPixels = Math.round(segment.cropBottomCss * effectiveScale);
-      const sourceHeight = segment.image.naturalHeight - cropTopPixels - cropBottomPixels;
+      const sourceHeight = captureRect.height - cropTopPixels - cropBottomPixels;
       const drawTopPixels = Math.round((segment.topCss + segment.cropTopCss) * effectiveScale);
 
       return {
         image: segment.image,
+        sourceX: captureRect.left,
+        sourceWidth: captureRect.width,
         sourceHeight,
-        sourceY: cropTopPixels,
+        sourceY: captureRect.top + cropTopPixels,
         drawTop: drawTopPixels,
         drawBottom: drawTopPixels + sourceHeight
       };
     })
+  };
+}
+
+function normalizeCaptureRect(rawRect, page, image, effectiveScale) {
+  const fallbackWidth = Math.max(1, Math.round((Number(page.viewportWidth) || 1) * effectiveScale));
+  const fallbackHeight = Math.max(1, Math.round((Number(page.viewportHeight) || 1) * effectiveScale));
+  const left = Math.max(0, Math.round((Number(rawRect?.left) || 0) * effectiveScale));
+  const top = Math.max(0, Math.round((Number(rawRect?.top) || 0) * effectiveScale));
+  const requestedWidth = Math.max(1, Math.round((Number(rawRect?.width) || Number(page.viewportWidth) || 1) * effectiveScale));
+  const requestedHeight = Math.max(1, Math.round((Number(rawRect?.height) || Number(page.viewportHeight) || 1) * effectiveScale));
+
+  return {
+    left: Math.min(left, Math.max(0, image.naturalWidth - 1)),
+    top: Math.min(top, Math.max(0, image.naturalHeight - 1)),
+    width: Math.max(1, Math.min(requestedWidth || fallbackWidth, image.naturalWidth - left)),
+    height: Math.max(1, Math.min(requestedHeight || fallbackHeight, image.naturalHeight - top))
   };
 }
 
@@ -274,6 +369,16 @@ function scaleCutawayRegion(region, effectiveScale, canvasWidth, canvasHeight) {
     return null;
   }
 
+  const points = region.shape === "lasso"
+    ? (Array.isArray(region.points) ? region.points : [])
+        .filter((point) => Number.isFinite(point?.x) && Number.isFinite(point?.y))
+        .map((point) => ({
+          x: Math.max(left, Math.min(right, Math.round(point.x * effectiveScale))),
+          y: Math.max(top, Math.min(bottom, Math.round(point.y * effectiveScale)))
+        }))
+        .slice(0, 120)
+    : [];
+
   return {
     id: region.id || "",
     kind: "cutaway",
@@ -281,6 +386,8 @@ function scaleCutawayRegion(region, effectiveScale, canvasWidth, canvasHeight) {
     top,
     width,
     height,
+    shape: points.length >= 3 ? "lasso" : "rect",
+    points: points.length >= 3 ? points : [],
     ...(region.projected ? { projected: true } : {}),
     ...(typeof region.projection === "string" ? { projection: region.projection } : {})
   };
@@ -376,9 +483,9 @@ function renderSliceCanvas(renderModel, sliceStart, sliceEnd) {
 
     context.drawImage(
       segment.image,
-      0,
+      segment.sourceX,
       segment.sourceY + sourceOffset,
-      segment.image.naturalWidth,
+      segment.sourceWidth,
       drawHeight,
       0,
       localDrawY,
@@ -412,19 +519,152 @@ function renderCutawayCanvas(sourceCanvas, region) {
   canvas.width = width;
   canvas.height = height;
 
+  const lassoPoints = region.shape === "lasso"
+    ? (Array.isArray(region.points) ? region.points : [])
+        .filter((point) => Number.isFinite(point?.x) && Number.isFinite(point?.y))
+        .map((point) => ({
+          x: Math.max(0, Math.min(width, point.x - left)),
+          y: Math.max(0, Math.min(height, point.y - top))
+        }))
+        .slice(0, 120)
+    : [];
+  const isLasso = lassoPoints.length >= 3;
+
   const context = canvas.getContext("2d", {
-    alpha: false
+    alpha: isLasso
   });
 
   if (!context) {
     return null;
   }
 
-  context.fillStyle = "#ffffff";
-  context.fillRect(0, 0, width, height);
+  if (isLasso) {
+    context.clearRect(0, 0, width, height);
+    context.save();
+    context.beginPath();
+    context.moveTo(lassoPoints[0].x, lassoPoints[0].y);
+
+    for (const point of lassoPoints.slice(1)) {
+      context.lineTo(point.x, point.y);
+    }
+
+    context.closePath();
+    context.clip();
+  } else {
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, width, height);
+  }
+
   context.drawImage(sourceCanvas, left, top, width, height, 0, 0, width, height);
 
+  if (isLasso) {
+    context.restore();
+  }
+
   return canvas;
+}
+
+function renderCutawayFromModel(renderModel, region) {
+  if (!region) {
+    return null;
+  }
+
+  const sliceStart = Math.max(0, Math.floor(region.top));
+  const sliceEnd = Math.min(renderModel.canvasHeight, Math.ceil(region.top + region.height));
+
+  if (sliceEnd - sliceStart < 2 || !canFitCanvas(renderModel.canvasWidth, sliceEnd - sliceStart)) {
+    return null;
+  }
+
+  const sourceCanvas = renderSliceCanvas(renderModel, sliceStart, sliceEnd);
+  const localRegion = {
+    ...region,
+    top: region.top - sliceStart,
+    points: Array.isArray(region.points)
+      ? region.points.map((point) => ({
+          x: point.x,
+          y: point.y - sliceStart
+        }))
+      : []
+  };
+
+  return renderCutawayCanvas(sourceCanvas, localRegion);
+}
+
+function renderPreviewDataUrl(sourceCanvas) {
+  const width = 360;
+  const height = 240;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { alpha: true });
+
+  if (!context) {
+    return "";
+  }
+
+  const sourceAspect = sourceCanvas.width / Math.max(1, sourceCanvas.height);
+  const targetAspect = width / height;
+  let sourceX = 0;
+  let sourceY = 0;
+  let sourceWidth = sourceCanvas.width;
+  let sourceHeight = sourceCanvas.height;
+
+  if (sourceAspect > targetAspect) {
+    sourceWidth = Math.max(1, Math.round(sourceCanvas.height * targetAspect));
+    sourceX = Math.max(0, Math.round((sourceCanvas.width - sourceWidth) / 2));
+  } else if (sourceAspect < targetAspect) {
+    sourceHeight = Math.max(1, Math.round(sourceCanvas.width / targetAspect));
+  }
+
+  context.clearRect(0, 0, width, height);
+  context.drawImage(
+    sourceCanvas,
+    sourceX,
+    sourceY,
+    sourceWidth,
+    sourceHeight,
+    0,
+    0,
+    width,
+    height
+  );
+
+  return canvas.toDataURL("image/webp", 0.78);
+}
+
+function buildVisualHash(sourceCanvas) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 9;
+  canvas.height = 8;
+  const context = canvas.getContext("2d", {
+    alpha: false,
+    willReadFrequently: true
+  });
+
+  if (!context) {
+    return "";
+  }
+
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(sourceCanvas, 0, 0, canvas.width, canvas.height);
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+  let bits = "";
+
+  for (let y = 0; y < canvas.height; y += 1) {
+    for (let x = 0; x < canvas.width - 1; x += 1) {
+      const leftIndex = (y * canvas.width + x) * 4;
+      const rightIndex = leftIndex + 4;
+      const leftLuma = pixels[leftIndex] * 0.299 + pixels[leftIndex + 1] * 0.587 + pixels[leftIndex + 2] * 0.114;
+      const rightLuma = pixels[rightIndex] * 0.299 + pixels[rightIndex + 1] * 0.587 + pixels[rightIndex + 2] * 0.114;
+      bits += leftLuma > rightLuma ? "1" : "0";
+    }
+  }
+
+  return bits.match(/.{1,4}/g)
+    .map((nibble) => Number.parseInt(nibble, 2).toString(16))
+    .join("");
 }
 
 function renderPresentationCanvas(sourceCanvas, { preset, devicePreset }) {
@@ -717,7 +957,10 @@ function drawRedactionShell(context, x, y, width, height, kind) {
 
   context.save();
   roundPath(context, x, y, width, height, radius);
-  context.fillStyle = "rgba(4, 10, 18, 0.66)";
+  // Redaction must destroy the underlying pixels, not merely blur them. The
+  // opaque fill keeps exported secrets unrecoverable while the stripe and
+  // label treatment preserves Lumen's visual review language.
+  context.fillStyle = "rgb(4, 10, 18)";
   context.fill();
   context.strokeStyle = "rgba(255, 255, 255, 0.14)";
   context.lineWidth = 1;

@@ -23,21 +23,51 @@
 
         <h1>Clean captures from busy pages.</h1>
         <p class="hero-copy">
-          Page cleanup, redaction, responsive views, timed captures, and a working shelf
-          for design, QA, and product review.
+          Page cleanup, redaction, responsive views, area monitoring, and a local photo
+          library for design, QA, and product review.
         </p>
 
         <div class="hero-ribbon">
           <span>Sticky cleanup</span>
-          <span>Timed capture</span>
+          <span>Area monitor</span>
           <span>Tail remeasure</span>
           <span>Retina stitch</span>
           <span>Responsive set</span>
           <span>Capture details</span>
           <span>Page signals</span>
-          <span>Local history</span>
+          <span>Photo library</span>
         </div>
       </header>
+
+      <section id="onboardingPanel" class="panel onboarding-panel is-hidden" aria-labelledby="onboardingTitle">
+        <div class="onboarding-head">
+          <div>
+            <p class="section-label">First capture</p>
+            <h2 id="onboardingTitle">Evidence you can trust in three steps.</h2>
+          </div>
+          <button id="onboardingDismissButton" class="onboarding-dismiss" type="button" aria-label="Dismiss first-capture guide">Not now</button>
+        </div>
+
+        <ol class="onboarding-steps">
+          <li data-onboarding-step="page">
+            <span>1</span>
+            <div><strong>Choose the page</strong><small id="onboardingPageStatus">Checking the current tab.</small></div>
+          </li>
+          <li data-onboarding-step="review">
+            <span>2</span>
+            <div><strong>Review before saving</strong><small>Lumen shows redactions, crops, and the exact output plan.</small></div>
+          </li>
+          <li data-onboarding-step="save">
+            <span>3</span>
+            <div><strong>Save verified evidence</strong><small>Capture health and local download records prove the run completed.</small></div>
+          </li>
+        </ol>
+
+        <div class="onboarding-actions">
+          <button id="onboardingStartButton" class="mini-action" type="button">Review first capture</button>
+          <button id="onboardingSettingsButton" class="mini-action ghost-mini-action" type="button">Check settings</button>
+        </div>
+      </section>
 
       <section id="launchPanel" class="panel launch-panel" aria-label="Launch capture">
         <div id="launchStatus" class="launch-status" data-state="checking">
@@ -86,7 +116,7 @@
           <span><i class="pipeline-icon pipeline-icon-route" aria-hidden="true"></i>Route</span>
         </div>
 
-        <div id="holdMenu" class="hold-menu" role="menu" aria-label="Quick capture actions" aria-hidden="true">
+        <div id="holdMenu" class="hold-menu" role="menu" aria-label="Quick capture actions" aria-hidden="true" inert>
           <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="responsive">
             <i class="action-icon action-icon-responsive" aria-hidden="true"></i>
             <span><strong>Responsive set</strong><small>Desktop, tablet, and mobile</small></span>
@@ -183,36 +213,93 @@
           <p id="cutawaySummary" class="cutaway-summary">The selected area is saved beside full-page captures when it is found.</p>
         </div>
 
-        <div class="watch-panel">
-          <div class="watch-copy">
-            <strong>Timed capture</strong>
-            <small>Repeat a focused region on a schedule. Each run lands in the capture shelf.</small>
+        <div class="watch-panel area-monitor-panel">
+          <div class="watch-heading">
+            <div class="watch-copy">
+              <span class="watch-kicker"><i aria-hidden="true"></i>Selected area</span>
+              <strong>Area monitor</strong>
+              <small>Capture the selected rectangle or transparent lasso once, on a schedule, or continuously.</small>
+            </div>
+            <span class="watch-local-badge">Local</span>
           </div>
-          <div class="watch-actions">
-            <label class="watch-field" for="watchIntervalSelect">
-              <span>Cadence</span>
-              <select id="watchIntervalSelect">
-                <option value="15">Every 15 min</option>
-                <option value="60" selected>Hourly</option>
-                <option value="360">Every 6 hours</option>
-                <option value="1440">Daily</option>
+
+          <div class="watch-schedule-grid">
+            <label class="watch-field" for="watchModeSelect">
+              <span>Mode</span>
+              <select id="watchModeSelect" aria-describedby="watchModeHint">
+                <option value="once" selected>Once</option>
+                <option value="repeat">Repeat</option>
+                <option value="continuous">Continuous</option>
               </select>
             </label>
-            <button id="saveWatchPlanButton" class="mini-action" type="button">Save timed capture</button>
+
+            <label id="watchDelayField" class="watch-field" for="watchDelaySelect" data-watch-mode-field="once">
+              <span>Start after</span>
+              <select id="watchDelaySelect">
+                <option value="5" selected>5 seconds</option>
+                <option value="10">10 seconds</option>
+                <option value="30">30 seconds</option>
+              </select>
+            </label>
+
+            <label id="watchIntervalField" class="watch-field is-hidden" for="watchIntervalSelect" data-watch-mode-field="repeat">
+              <span>Repeat every</span>
+              <select id="watchIntervalSelect">
+                <option value="15">15 minutes</option>
+                <option value="60" selected>1 hour</option>
+                <option value="360">6 hours</option>
+                <option value="1440">24 hours</option>
+              </select>
+            </label>
+
+            <label id="watchContinuousIntervalField" class="watch-field is-hidden" for="watchContinuousIntervalSelect" data-watch-mode-field="continuous">
+              <span>Check every</span>
+              <select id="watchContinuousIntervalSelect">
+                <option value="1" selected>1 minute</option>
+                <option value="5">5 minutes</option>
+                <option value="15">15 minutes</option>
+              </select>
+            </label>
+
+            <label id="watchMaxRunsField" class="watch-field" for="watchMaxRunsSelect">
+              <span>Stop after</span>
+              <select id="watchMaxRunsSelect">
+                <option value="10">10 runs</option>
+                <option value="25" selected>25 runs</option>
+                <option value="50">50 runs</option>
+              </select>
+            </label>
+          </div>
+
+          <p id="watchModeHint" class="watch-mode-hint">
+            One reviewed area will be captured after a short delay.
+          </p>
+
+          <label class="watch-change-row" for="watchSaveOnlyOnChange">
+            <input id="watchSaveOnlyOnChange" type="checkbox" checked />
+            <span class="watch-checkbox" aria-hidden="true"></span>
+            <span>
+              <strong>Save only when the area changes</strong>
+              <small>Avoid duplicate photos during repeat and continuous monitoring.</small>
+            </span>
+          </label>
+
+          <div class="watch-actions">
+            <button id="saveWatchPlanButton" class="mini-action monitor-save-action" type="button">Save area monitor</button>
             <button id="runWatchPlanNowButton" class="mini-action ghost-mini-action" type="button">Run now</button>
           </div>
           <div id="watchPlanCard" class="watch-plan-card is-hidden" aria-live="polite">
             <div class="watch-plan-card-copy">
-              <span id="watchPlanStatus" class="tiny-note">Timed capture</span>
+              <span id="watchPlanStatus" class="tiny-note">Area monitor</span>
               <strong id="watchPlanTitle">Ready for setup</strong>
-              <small id="watchPlanMeta">Save a focused region to start timed captures.</small>
+              <small id="watchPlanMeta">Save a selected area to start monitoring.</small>
             </div>
             <div class="watch-plan-controls">
               <button id="toggleWatchPlanButton" class="mini-action ghost-mini-action" type="button">Pause</button>
               <button id="deleteWatchPlanButton" class="mini-action ghost-mini-action" type="button">Clear</button>
             </div>
           </div>
-          <p id="watchPlanSummary" class="cutaway-summary">Mark a region, then save it as a timed capture.</p>
+          <p id="watchPlanSummary" class="cutaway-summary">Mark a focused crop or lasso, then choose when Lumen should capture it.</p>
         </div>
 
         <label class="toggle-row">
@@ -259,7 +346,7 @@
 
             <div class="annotation-toolbar">
               <span class="field-label">Position</span>
-              <div class="segmented-control segmented-control-note" id="annotationPosition">
+              <div class="segmented-control segmented-control-note" id="annotationPosition" role="group" aria-label="Capture note position">
                 <button type="button" class="segment is-active" data-annotation-position="top-right">Top right</button>
                 <button type="button" class="segment" data-annotation-position="top-left">Top left</button>
                 <button type="button" class="segment" data-annotation-position="bottom-right">Bottom right</button>
@@ -274,7 +361,7 @@
             <strong>Capture device</strong>
             <small>Desktop uses this tab. Tablet and Mobile open temporary viewports. Set captures all three.</small>
           </div>
-          <div class="segmented-control segmented-control-device" id="devicePreset">
+          <div class="segmented-control segmented-control-device" id="devicePreset" role="group" aria-label="Capture device">
             <button type="button" class="segment is-active" data-device="desktop">Desktop</button>
             <button type="button" class="segment" data-device="tablet">Tablet</button>
             <button type="button" class="segment" data-device="mobile">Mobile</button>
@@ -287,7 +374,7 @@
             <strong>Presentation</strong>
             <small>Raw keeps the page as captured. Browser and Phone add a simple frame for sharing.</small>
           </div>
-          <div class="segmented-control segmented-control-wide" id="exportPreset">
+          <div class="segmented-control segmented-control-wide" id="exportPreset" role="group" aria-label="Presentation style">
             <button type="button" class="segment is-active" data-export="raw">Raw</button>
             <button type="button" class="segment" data-export="browser">Browser</button>
             <button type="button" class="segment" data-export="phone">Phone</button>
@@ -299,7 +386,7 @@
             <strong>Long page output</strong>
             <small>Auto keeps one image when it stays readable. Tiles split tall pages. Print sheet adds a browser-printable file.</small>
           </div>
-          <div class="segmented-control segmented-control-wide" id="longPageMode">
+          <div class="segmented-control segmented-control-wide" id="longPageMode" role="group" aria-label="Long page output">
             <button type="button" class="segment is-active" data-long-page="auto">Auto</button>
             <button type="button" class="segment" data-long-page="tiles">Tiles</button>
             <button type="button" class="segment" data-long-page="print">Print sheet</button>
@@ -507,14 +594,14 @@
         </div>
       </section>
 
-      <section class="panel studio-panel">
-        <div class="panel-head">
+      <details class="panel studio-panel advanced-workspace">
+        <summary class="panel-head advanced-workspace-summary">
           <div>
-            <p class="section-label">Workspace</p>
-            <h2>Session and routing</h2>
+            <p class="section-label">Advanced</p>
+            <h2>Automation and local data</h2>
           </div>
           <span id="backendBadge" class="tiny-note">Local</span>
-        </div>
+        </summary>
 
         <div class="feature-row">
           <button class="feature-chip" data-pro-feature="beautify" type="button">
@@ -533,7 +620,7 @@
             <p class="section-label">Account</p>
             <h3 id="accountTitle">Local session</h3>
             <p id="accountDescription">
-              Enable advanced tools, routing, and history controls when the local service is available.
+              The local beta includes responsive capture, redaction, framed exports, and local history.
             </p>
           </div>
 
@@ -550,7 +637,7 @@
 
           <div class="auth-actions">
             <button id="signInButton" class="secondary-button" type="button">
-              Enable advanced tools
+              Connect team preview
             </button>
             <button id="billingButton" class="ghost-button" type="button">
               Access details
@@ -622,9 +709,33 @@
           </label>
 
           <button id="deleteBackendDataButton" class="danger-button" type="button">
-            Delete session data
+            Clear local workspace
           </button>
         </div>
+      </details>
+
+      <section class="panel photo-library-panel" aria-labelledby="photoLibraryTitle">
+        <div class="panel-head photo-library-head">
+          <div>
+            <p class="section-label">Local photos</p>
+            <h2 id="photoLibraryTitle">Photo library</h2>
+          </div>
+          <div class="photo-library-head-actions">
+            <span id="photoLibraryCount" class="tiny-note">0 photos</span>
+            <button id="openPhotoLibraryButton" class="mini-action ghost-mini-action" type="button">Open all</button>
+          </div>
+        </div>
+
+        <div id="photoLibraryEmpty" class="empty-state photo-library-empty">
+          Saved captures will appear here as real previews. Originals stay in your Lumen downloads folder.
+        </div>
+
+        <div id="photoLibraryGrid" class="photo-library-grid is-hidden" role="list" aria-label="Recent saved photos" aria-live="polite"></div>
+
+        <p class="photo-library-note">
+          <span aria-hidden="true"></span>
+          Preview storage stays on this device.
+        </p>
       </section>
 
       <section class="panel capture-shelf-panel">

@@ -3,13 +3,13 @@ import { getEntitlementsForPlan, hasFeatureAccess, normalizePlan } from "./entit
 export const LUMEN_CONFIG = {
   isProUser: false,
   plans: {
-    defaultPlan: "free",
+    defaultPlan: "demo-pro",
     demoPlan: "team"
   },
   capture: {
     maxSegments: 30,
     captureThrottleMs: 550,
-    historyLimit: 12,
+    historyLimit: 100,
     manualRedactionLimit: 24,
     cutawayRegionLimit: 1,
     annotationRegionLimit: 1,
@@ -78,6 +78,34 @@ const CAPTURE_NOTE_POSITIONS = new Set([
   "bottom-right"
 ]);
 
+const SENSITIVE_URL_KEY_TOKENS = new Set([
+  "token",
+  "auth",
+  "authorization",
+  "code",
+  "session",
+  "secret",
+  "password",
+  "passwd",
+  "key",
+  "signature",
+  "sig",
+  "jwt",
+  "credential"
+]);
+
+const SENSITIVE_URL_COMPACT_KEYS = new Set([
+  "accesstoken",
+  "refreshtoken",
+  "authtoken",
+  "authorizationcode",
+  "sessionid",
+  "sessionkey",
+  "apikey",
+  "clientsecret",
+  "signedsignature"
+]);
+
 export const STORAGE_KEYS = {
   settings: "lumen.capture.settings",
   latestBlueprint: "lumen.inspector.latestBlueprint",
@@ -87,7 +115,9 @@ export const STORAGE_KEYS = {
   watchRuns: "lumen.watch.runs",
   manualRedactions: "lumen.capture.manualRedactions",
   cutawayRegions: "lumen.capture.cutawayRegions",
-  annotationRegions: "lumen.capture.annotationRegions"
+  annotationRegions: "lumen.capture.annotationRegions",
+  privateSettings: "lumen.capture.privateSettings",
+  onboarding: "lumen.onboarding"
 };
 
 export function isRestrictedCaptureUrl(url = "") {
@@ -117,6 +147,16 @@ export function getDefaultSettings() {
   return structuredClone(LUMEN_CONFIG.defaults);
 }
 
+export function getSyncSafeSettings(settings = {}) {
+  const normalized = {
+    ...getDefaultSettings(),
+    ...settings
+  };
+  const { annotationText: _privateAnnotationText, ...syncSafeSettings } = normalized;
+
+  return syncSafeSettings;
+}
+
 export function normalizeCaptureNoteOptions(settings = {}) {
   const text = typeof settings.annotationText === "string"
     ? settings.annotationText.trim().replace(/\s+/g, " ").slice(0, 180)
@@ -134,6 +174,34 @@ export function normalizeCaptureNoteOptions(settings = {}) {
 
 export function isOriginPermissionSupported(rawUrl = "") {
   return /^https?:/i.test(rawUrl);
+}
+
+export function sanitizeCaptureUrl(rawUrl = "") {
+  try {
+    const url = new URL(rawUrl);
+
+    if (!/^https?:$/.test(url.protocol)) {
+      return "";
+    }
+
+    url.hash = "";
+
+    for (const key of [...url.searchParams.keys()]) {
+      const spacedKey = key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase();
+      const tokens = spacedKey.split(/[^a-z0-9]+/).filter(Boolean);
+      const compactKey = tokens.join("");
+      const isSensitive = tokens.some((token) => SENSITIVE_URL_KEY_TOKENS.has(token)) ||
+        SENSITIVE_URL_COMPACT_KEYS.has(compactKey);
+
+      if (isSensitive) {
+        url.searchParams.delete(key);
+      }
+    }
+
+    return url.href;
+  } catch {
+    return "";
+  }
 }
 
 export function getApiBaseUrls() {

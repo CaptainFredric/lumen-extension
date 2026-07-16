@@ -30,11 +30,7 @@ try {
     acceptDownloads: true,
     downloadsPath: downloadDir,
     headless: false,
-    viewport: {
-      width: 1280,
-      height: 900
-    },
-    deviceScaleFactor: 1,
+    viewport: null,
     args: [
       `--disable-extensions-except=${extensionDir}`,
       `--load-extension=${extensionDir}`
@@ -89,6 +85,15 @@ try {
   assert(review.autoRedactionCount >= expectedVariantCount * 3, "Expected pre-export review to scan sensitive regions.", review);
   assert(review.variants?.every((variant) => variant.cutawayApplied), "Expected every reviewed variant to have a cutaway crop ready.", review.variants);
   assert(review.variants?.every((variant) => variant.preview?.pageWidth > 0 && variant.preview?.pageHeight > 0), "Expected every review variant to include preview dimensions.", review.variants);
+  assert(
+    review.variants?.filter((variant) => variant.id !== "desktop").every((variant) => {
+      const expected = variant.id === "tablet" ? { width: 1024, height: 1366 } : { width: 430, height: 932 };
+      return Math.abs(variant.dimensions?.browserViewportWidth - expected.width) <= 1 &&
+        variant.dimensions?.browserViewportHeight > 0;
+    }),
+    "Expected responsive review windows to use exact CSS viewport sizes.",
+    review.variants
+  );
   assert(review.outputPlan?.length === 3, "Expected pre-export review to return an output plan.", review.outputPlan);
   assert(review.outputPlan?.some((item) => item.label === "Artifacts" && /planned/.test(item.value)), "Expected output plan to summarize planned files.", review.outputPlan);
   assert(review.outputPlan?.some((item) => item.label === "Long Pages"), "Expected output plan to describe long-page behavior.", review.outputPlan);
@@ -118,8 +123,35 @@ try {
   assert(response.archiveFolder?.startsWith("Lumen/"), "Expected organized Lumen archive folder.", response);
   assert(response.redactionCount >= expectedVariantCount * 3, "Expected automatic redactions across responsive views.", response);
   assert(response.segmentCount >= expectedVariantCount * 2, "Expected full-page capture to stitch multiple responsive views.", response);
+  assert(response.captureHealth?.status === "complete", "Expected capture response to verify full-page integrity.", response.captureHealth);
+  assert(response.captureHealth?.verifiedVariantCount === expectedVariantCount, "Expected every responsive view to pass capture health.", response.captureHealth);
   assert(response.downloads.every((item) => Number.isInteger(item.downloadId)), "Expected Chrome download handles.", response.downloads);
   assert(response.downloads.every((item) => item.bytesReceived > 0), "Expected completed downloads with bytes.", response.downloads);
+  assert(response.librarySaved, "Expected the completed capture to create a local photo-library record.", response);
+
+  const libraryState = await popup.evaluate(async (captureId) => {
+    const store = await import(chrome.runtime.getURL("library-store.js"));
+    const capture = await store.getLibraryCapture(captureId, { includePreview: true });
+    const localStorage = await chrome.storage.local.get(null);
+
+    return {
+      count: await store.countLibraryCaptures(),
+      id: capture?.id || "",
+      sourceType: capture?.sourceType || "",
+      previewCount: capture?.previewAssetIds?.length || 0,
+      previewType: capture?.preview?.blob?.type || "",
+      previewBytes: capture?.preview?.blob?.size || 0,
+      downloadCount: capture?.downloads?.length || 0,
+      storageContainsPreviewDataUrl: JSON.stringify(localStorage).includes("data:image/")
+    };
+  }, response.captureId);
+
+  assert(libraryState.count === 1 && libraryState.id === response.captureId, "Expected one linked capture in the local photo library.", libraryState);
+  assert(libraryState.sourceType === "manual", "Expected the library to distinguish manual captures.", libraryState);
+  assert(libraryState.previewCount === expectedVariantCount + expectedCutawayCount, "Expected a preview for every downloaded PNG view.", libraryState);
+  assert(libraryState.previewType === "image/webp" && libraryState.previewBytes > 0, "Expected a real WebP preview blob in IndexedDB.", libraryState);
+  assert(libraryState.downloadCount === response.downloads.length, "Expected library file actions to retain all download handles.", libraryState);
+  assert(!libraryState.storageContainsPreviewDataUrl, "Preview image data leaked into chrome.storage.local.", libraryState);
 
   const localState = await worker.evaluate(() =>
     chrome.storage.local.get([
@@ -135,6 +167,7 @@ try {
   assert(latest?.variants?.length === expectedVariantCount, "Expected history to store responsive variants.", latest);
   assert(latest.redactionCount >= expectedVariantCount * 3, "Expected history redaction count.", latest);
   assert(latest.cutawayCount === expectedCutawayCount, "Expected history cutaway count.", latest);
+  assert(latest.captureHealth?.status === "complete", "Expected history to retain capture integrity evidence.", latest);
   assert(localState["lumen.inspector.latestBlueprint"]?.identity?.heroHeadline, "Expected latest blueprint to be stored.", localState);
 
   const downloadItems = await worker.evaluate((downloadIds) =>
@@ -183,11 +216,17 @@ try {
   const imageInfos = [];
 
   for (const imageItem of imageItems) {
-    imageInfos.push({
+    const imageInfo = {
       variantId: imageItem.lumenRecord.variantId,
       role: imageItem.lumenRecord.role || "full-page",
       ...(await assertPng(imageItem.filename))
-    });
+    };
+
+    if (imageInfo.role === "cutaway") {
+      imageInfo.alpha = await samplePngAlpha(popup, imageItem.filename);
+    }
+
+    imageInfos.push(imageInfo);
   }
 
   const cutawayInfo = imageInfos.find((info) => info.role === "cutaway");
@@ -196,7 +235,13 @@ try {
 
   assert(manifest.capture.archiveFolder === response.archiveFolder, "Expected manifest archive folder to match response.", manifest.capture);
   assert(manifest.capture.variantCount === expectedVariantCount, "Expected manifest responsive variant metadata.", manifest.capture);
+  assert(manifest.capture.health?.status === "complete", "Expected manifest to record verified capture health.", manifest.capture.health);
   assert(manifest.variants?.length === expectedVariantCount, "Expected manifest variant records.", manifest.variants);
+  assert(
+    manifest.variants.filter((variant) => variant.id !== "desktop").every((variant) => variant.viewport?.widthExact === true),
+    "Expected responsive manifest records to prove exact CSS-width calibration.",
+    manifest.variants
+  );
   assert(manifest.capture.artifactStats?.complete, "Expected manifest to mark output artifacts complete.", manifest.capture);
   assert(manifest.capture.artifactStats?.imageCount === expectedVariantCount + expectedCutawayCount, "Expected manifest image artifact count.", manifest.capture);
   assert(manifest.capture.artifactStats?.cutawayCount === expectedCutawayCount, "Expected manifest cutaway artifact count.", manifest.capture);
@@ -210,6 +255,7 @@ try {
         variant.artifactStats?.complete &&
         variant.outputs?.length >= 1 &&
         variant.outputs.every((output) => output.complete && output.bytesReceived > 0) &&
+        variant.health?.status === "complete" &&
         variant.dimensions?.width > 0 &&
         variant.dimensions?.height > 0
     ),
@@ -242,6 +288,13 @@ try {
     { cutawayInfo, variants: manifest.variants }
   );
   assert(
+    imageInfos.filter((info) => info.role === "cutaway").every((info) =>
+      info.alpha?.corner === 0 && info.alpha?.center === 255
+    ),
+    "Expected every lasso cutaway PNG to keep transparent exterior pixels and opaque selected pixels.",
+    imageInfos.filter((info) => info.role === "cutaway")
+  );
+  assert(
     manifest.variants.some((variant) =>
       variant.outputs?.some((output) =>
         output.role === "cutaway" &&
@@ -253,6 +306,77 @@ try {
     manifest.variants
   );
   assert(manifest.pageSignals?.heroHeadline, "Expected page signals in capture details JSON.", manifest.pageSignals);
+
+  const savedCutaway = await worker.evaluate(async (rawUrl) => {
+    const url = new URL(rawUrl);
+    const key = `${url.origin}${url.pathname}${url.search}`;
+    const stored = await chrome.storage.local.get("lumen.capture.cutawayRegions");
+    return stored["lumen.capture.cutawayRegions"]?.[key]?.region || null;
+  }, fixture.url);
+  const watchSave = await popup.evaluate(({ rawUrl, region }) => chrome.runtime.sendMessage({
+    type: "LUMEN_SAVE_WATCH_PLAN",
+    payload: {
+      title: "E2E selected area monitor",
+      url: rawUrl,
+      status: "active",
+      selectionMode: "lasso",
+      region,
+      schedule: {
+        mode: "continuous",
+        intervalMinutes: 1,
+        maxRuns: 2,
+        saveOnlyWhenChanged: true,
+        timezone: "UTC"
+      },
+      destination: "local"
+    }
+  }), { rawUrl: fixture.url, region: savedCutaway });
+
+  assert(watchSave?.ok && watchSave.watchPlan?.id, "Expected Local beta to save a selected-area monitor without sign-in.", watchSave);
+  const watchAlarm = await worker.evaluate((watchPlanId) => chrome.alarms.get(`lumen.watch.${watchPlanId}`), watchSave.watchPlan.id);
+  assert(watchAlarm?.periodInMinutes === 1, "Expected continuous monitoring to create a one-minute recurring alarm.", watchAlarm);
+
+  const firstWatchRun = await popup.evaluate((watchPlanId) => chrome.runtime.sendMessage({
+    type: "LUMEN_RUN_WATCH_PLAN_NOW",
+    payload: { watchPlanId }
+  }), watchSave.watchPlan.id);
+  const firstWatchRecord = firstWatchRun.watchRuns?.find((run) => run.watchPlanId === watchSave.watchPlan.id);
+  assert(firstWatchRun?.ok && firstWatchRecord?.status === "captured", "Expected the first monitor run to save a selected-area photo.", firstWatchRun);
+  assert(firstWatchRecord.fileCount === 1 && firstWatchRecord.captureId, "Expected the first monitor run to save only one selected-area PNG.", firstWatchRecord);
+
+  const secondWatchRun = await popup.evaluate((watchPlanId) => chrome.runtime.sendMessage({
+    type: "LUMEN_RUN_WATCH_PLAN_NOW",
+    payload: { watchPlanId }
+  }), watchSave.watchPlan.id);
+  const secondWatchRecord = secondWatchRun.watchRuns?.find((run) => run.watchPlanId === watchSave.watchPlan.id);
+  const completedWatchPlan = secondWatchRun.watchPlans?.find((plan) => plan.id === watchSave.watchPlan.id);
+  assert(secondWatchRun?.ok && secondWatchRecord?.status === "unchanged", "Expected an identical continuous run to skip its duplicate photo.", secondWatchRun);
+  assert(secondWatchRecord.fileCount === 0 && secondWatchRecord.changePercent <= 1.5, "Expected unchanged monitoring to create no downloaded file.", secondWatchRecord);
+  assert(completedWatchPlan?.status === "completed" && completedWatchPlan.runCount === 2, "Expected the capped continuous monitor to stop after two checks.", completedWatchPlan);
+
+  const monitorState = await popup.evaluate(async ({ watchPlanId, firstCaptureId }) => {
+    const store = await import(chrome.runtime.getURL("library-store.js"));
+    const captures = await store.listLibraryCaptures({ limit: 20 });
+    const storage = await chrome.storage.local.get(["lumen.capture.history", "lumen.watch.runs"]);
+    const alarm = await chrome.alarms.get(`lumen.watch.${watchPlanId}`);
+    const timedHistory = (storage["lumen.capture.history"] || []).find((capture) => capture.id === firstCaptureId);
+
+    return {
+      libraryCount: captures.length,
+      timedLibraryCount: captures.filter((capture) => capture.sourceType === "timed").length,
+      historyCount: storage["lumen.capture.history"]?.length || 0,
+      watchRunCount: (storage["lumen.watch.runs"] || []).filter((run) => run.watchPlanId === watchPlanId).length,
+      timedFiles: timedHistory?.files?.length || 0,
+      timedManifest: timedHistory?.manifestFile || "",
+      timedSourceType: timedHistory?.sourceType || "",
+      alarmExists: Boolean(alarm)
+    };
+  }, { watchPlanId: watchSave.watchPlan.id, firstCaptureId: firstWatchRecord.captureId });
+
+  assert(monitorState.libraryCount === 2 && monitorState.timedLibraryCount === 1, "Expected duplicate suppression to keep only one timed photo in the library.", monitorState);
+  assert(monitorState.historyCount === 2 && monitorState.watchRunCount === 2, "Expected manual and changed timed captures plus two monitor-run records.", monitorState);
+  assert(monitorState.timedFiles === 1 && !monitorState.timedManifest && monitorState.timedSourceType === "timed", "Expected timed history to contain only its selected-area PNG and no manifest download.", monitorState);
+  assert(!monitorState.alarmExists, "Expected the completed continuous monitor alarm to be cleared.", monitorState);
 
   assert(!popupConsoleErrors.length, "Popup emitted console errors.", popupConsoleErrors);
 
@@ -374,10 +498,17 @@ async function seedCutawayRegion(worker, fixtureUrl) {
           region: {
             id: "e2e-cutaway-region",
             kind: "cutaway",
+            shape: "lasso",
             left: 652,
             top: 424,
             width: 300,
             height: 220,
+            points: [
+              { x: 802, y: 424 },
+              { x: 952, y: 534 },
+              { x: 802, y: 644 },
+              { x: 652, y: 534 }
+            ],
             sourceViewport,
             anchor: {
               selector: ".proof .card:nth-child(2)",
@@ -579,6 +710,26 @@ async function assertPng(filename) {
     height: file.readUInt32BE(20),
     size: stats.size
   };
+}
+
+async function samplePngAlpha(page, filename) {
+  const base64 = (await readFile(filename)).toString("base64");
+
+  return page.evaluate(async (encoded) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${encoded}`;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d");
+    context.drawImage(image, 0, 0);
+
+    return {
+      corner: context.getImageData(0, 0, 1, 1).data[3],
+      center: context.getImageData(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1).data[3]
+    };
+  }, base64);
 }
 
 function isInside(parent, child) {

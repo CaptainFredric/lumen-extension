@@ -42,7 +42,17 @@ const defaultStore = {
   integrations: buildDefaultIntegrations()
 };
 
-const server = http.createServer(handleRequest);
+let mutationQueue = Promise.resolve();
+
+const server = http.createServer((request, response) => {
+  if (!isMutatingRequest(request.method)) {
+    void handleRequest(request, response);
+    return;
+  }
+
+  const runMutation = () => handleRequest(request, response);
+  mutationQueue = mutationQueue.then(runMutation, runMutation);
+});
 
 server.listen(PORT, HOST, () => {
   const address = server.address();
@@ -197,6 +207,10 @@ async function handleRequest(request, response) {
       ...(error.details ? { details: error.details } : {})
     });
   }
+}
+
+function isMutatingRequest(method) {
+  return method === "POST" || method === "PATCH" || method === "PUT" || method === "DELETE";
 }
 
 async function handleCapturesRoute({ request, response, url, segments }) {
@@ -423,6 +437,9 @@ async function handleWatchRunsRoute({ request, response, url, segments }) {
         ? {
             ...plan,
             lastRunAt: watchRun.completedAt || watchRun.startedAt || watchRun.scheduledAt,
+            runCount: Math.max(0, Number(plan.runCount) || 0) + (["captured", "unchanged", "failed"].includes(watchRun.status) ? 1 : 0),
+            lastVisualHash: watchRun.visualHash || plan.lastVisualHash || "",
+            lastChangePercent: Number.isFinite(watchRun.changePercent) ? watchRun.changePercent : plan.lastChangePercent,
             updatedAt: new Date().toISOString()
           }
         : plan
@@ -783,7 +800,7 @@ async function writeStore(store) {
   });
 
   const normalized = normalizeStore(store);
-  const tempFile = `${DATA_FILE}.${process.pid}.${Date.now()}.tmp`;
+  const tempFile = `${DATA_FILE}.${process.pid}.${Date.now()}.${randomUUID()}.tmp`;
   await writeFile(tempFile, `${JSON.stringify(normalized, null, 2)}\n`);
   await rename(tempFile, DATA_FILE);
 }
@@ -1025,7 +1042,7 @@ function normalizeWatchPlan(body, sessionId) {
     title: normalizeText(body.title, url.hostname, 160),
     url: url.href,
     host: url.host,
-    status: normalizeStatus(body.status, ["active", "paused"], "paused"),
+    status: normalizeStatus(body.status, ["active", "paused", "completed"], "paused"),
     selectionMode: normalizeStatus(body.selectionMode || region.shape, ["rect", "lasso", "viewport"], "rect"),
     region,
     schedule: normalizeSchedule(body.schedule),
@@ -1033,6 +1050,9 @@ function normalizeWatchPlan(body, sessionId) {
     explicitOptIn: true,
     consentAcceptedAt: normalizeIsoDate(body.consentAcceptedAt || now),
     lastRunAt: body.lastRunAt ? normalizeIsoDate(body.lastRunAt) : "",
+    runCount: normalizeInteger(body.runCount),
+    lastVisualHash: normalizeText(body.lastVisualHash, "", 64),
+    lastChangePercent: Math.max(0, Math.min(100, Number(body.lastChangePercent) || 0)),
     createdAt: normalizeIsoDate(body.createdAt || now),
     updatedAt: normalizeIsoDate(body.updatedAt || now)
   };
@@ -1057,7 +1077,7 @@ function normalizeWatchPlanUpdate(existing, body) {
   return {
     ...existing,
     ...(typeof body.title === "string" ? { title: normalizeText(body.title, existing.title, 160) } : {}),
-    ...(typeof body.status === "string" ? { status: normalizeStatus(body.status, ["active", "paused"], existing.status) } : {}),
+    ...(typeof body.status === "string" ? { status: normalizeStatus(body.status, ["active", "paused", "completed"], existing.status) } : {}),
     ...(typeof body.selectionMode === "string" ? { selectionMode: normalizeStatus(body.selectionMode, ["rect", "lasso", "viewport"], existing.selectionMode || "rect") } : {}),
     ...(body.region ? { region: normalizeRegion(body.region) || existing.region } : {}),
     ...(body.schedule ? { schedule: normalizeSchedule(body.schedule) } : {}),
@@ -1069,6 +1089,9 @@ function normalizeWatchPlanUpdate(existing, body) {
         }
       : {}),
     ...(typeof body.lastRunAt === "string" ? { lastRunAt: normalizeIsoDate(body.lastRunAt) } : {}),
+    ...(Number.isFinite(Number(body.runCount)) ? { runCount: normalizeInteger(body.runCount) } : {}),
+    ...(typeof body.lastVisualHash === "string" ? { lastVisualHash: normalizeText(body.lastVisualHash, "", 64) } : {}),
+    ...(Number.isFinite(Number(body.lastChangePercent)) ? { lastChangePercent: Math.max(0, Math.min(100, Number(body.lastChangePercent))) } : {}),
     updatedAt: new Date().toISOString()
   };
 }
@@ -1094,11 +1117,13 @@ function normalizeWatchRun(body, sessionId) {
     title: normalizeText(body.title, url?.hostname || "Timed capture", 160),
     url: url?.href || "",
     host: url?.host || "",
-    status: normalizeStatus(body.status, ["queued", "running", "captured", "skipped", "failed"], "queued"),
+    status: normalizeStatus(body.status, ["queued", "running", "captured", "unchanged", "skipped", "failed"], "queued"),
     scheduledAt: normalizeIsoDate(body.scheduledAt || now),
     startedAt: body.startedAt ? normalizeIsoDate(body.startedAt) : "",
     completedAt: body.completedAt ? normalizeIsoDate(body.completedAt) : "",
     fileCount: normalizeInteger(body.fileCount),
+    visualHash: normalizeText(body.visualHash, "", 64),
+    changePercent: Math.max(0, Math.min(100, Number(body.changePercent) || 0)),
     files: normalizeStringArray(body.files, 20, 240),
     error: normalizeText(body.error, "", 240),
     createdAt: normalizeIsoDate(body.createdAt || now),
@@ -1560,11 +1585,24 @@ function normalizeRegionPoints(points) {
 }
 
 function normalizeSchedule(schedule = {}) {
-  const intervalMinutes = Math.max(5, Math.min(10080, normalizeInteger(schedule.intervalMinutes || 60)));
+  const mode = normalizeStatus(schedule.mode, ["once", "repeat", "continuous"], "repeat");
+  const intervalMinutes = Math.max(
+    mode === "continuous" ? 1 : 15,
+    Math.min(10080, normalizeInteger(schedule.intervalMinutes || (mode === "continuous" ? 1 : 60)))
+  );
+  const delaySeconds = Math.max(5, Math.min(86400, normalizeInteger(schedule.delaySeconds || 10)));
+  const requestedMaxRuns = Math.max(0, normalizeInteger(schedule.maxRuns || 0));
+  const maxRuns = mode === "once" ? 1 : mode === "continuous" ? Math.max(2, Math.min(100, requestedMaxRuns || 10)) : Math.min(1000, requestedMaxRuns);
 
   return {
-    type: "interval",
+    type: mode === "once" ? "once" : "interval",
+    mode,
     intervalMinutes,
+    delaySeconds,
+    maxRuns,
+    saveOnlyWhenChanged: Boolean(schedule.saveOnlyWhenChanged),
+    runAt: schedule.runAt ? normalizeIsoDate(schedule.runAt) : "",
+    expiresAt: schedule.expiresAt ? normalizeIsoDate(schedule.expiresAt) : "",
     timezone: normalizeText(schedule.timezone, "local", 64)
   };
 }

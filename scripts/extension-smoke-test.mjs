@@ -167,6 +167,40 @@ try {
     ]
   }), seededCaptureId);
 
+  const librarySeedPage = await context.newPage();
+  await librarySeedPage.goto(`chrome-extension://${extensionId}/library.html`, { waitUntil: "load" });
+  await librarySeedPage.evaluate(async (captureId) => {
+    const store = await import(chrome.runtime.getURL("library-store.js"));
+    await store.putLibraryCapture({
+      id: captureId,
+      title: "Smoke capture",
+      host: "example.test",
+      url: "https://example.test/",
+      capturedAt: new Date().toISOString(),
+      sourceType: "manual",
+      devicePreset: "desktop",
+      exportPreset: "raw",
+      archiveFolder: "Lumen/2026-05-02/smoke-capture",
+      downloads: [{
+        downloadId: 12345,
+        filename: "Lumen/2026-05-02/smoke-capture/smoke-desktop-raw.png",
+        kind: "image",
+        role: "full-page",
+        variantId: "desktop",
+        width: 1280,
+        height: 2400
+      }],
+      previews: [{
+        dataUrl: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='240'%3E%3Crect width='360' height='240' fill='%2364f2df'/%3E%3C/svg%3E",
+        width: 360,
+        height: 240,
+        role: "full-page",
+        variantId: "desktop"
+      }]
+    });
+  }, seededCaptureId);
+  await librarySeedPage.close();
+
   await context.route("https://lumen-smoke.test/", (route) => route.fulfill({
     status: 200,
     contentType: "text/html",
@@ -189,6 +223,7 @@ try {
   await popup.goto(`chrome-extension://${extensionId}/popup.html`, { waitUntil: "load" });
   await popup.waitForSelector("#captureButton", { timeout: 10000 });
   await popup.waitForSelector("[data-history-action='open']", { timeout: 10000 });
+  await popup.waitForSelector("#photoLibraryGrid img:not(.is-hidden)", { timeout: 10000 });
 
   const popupState = await popup.evaluate(() => ({
     title: document.title,
@@ -212,6 +247,9 @@ try {
     runWatchNowDisabled: document.querySelector("#runWatchPlanNowButton")?.disabled || false,
     toggleWatchDisabled: document.querySelector("#toggleWatchPlanButton")?.disabled || false,
     deleteWatchDisabled: document.querySelector("#deleteWatchPlanButton")?.disabled || false,
+    watchMode: document.querySelector("#watchModeSelect")?.value || "",
+    watchDelayVisible: !document.querySelector("#watchDelayField")?.classList.contains("is-hidden"),
+    watchContinuousHidden: document.querySelector("#watchContinuousIntervalField")?.classList.contains("is-hidden") || false,
     annotationStatus: document.querySelector("#annotationRegionStatus")?.textContent?.trim() || "",
     annotationClearDisabled: document.querySelector("#clearAnnotationButton")?.disabled || false,
     runViewSummary: document.querySelector("#runViewSummary")?.textContent?.trim() || "",
@@ -253,7 +291,11 @@ try {
       action: button.dataset.historyAction,
       captureId: button.dataset.captureId,
       disabled: button.disabled
-    }))
+    })),
+    photoLibraryCount: document.querySelector("#photoLibraryCount")?.textContent?.trim() || "",
+    photoLibraryCards: document.querySelectorAll("#photoLibraryGrid .photo-library-card").length,
+    photoLibraryImages: document.querySelectorAll("#photoLibraryGrid img:not(.is-hidden)").length,
+    photoLibraryOpenLabel: document.querySelector("#openPhotoLibraryButton")?.textContent?.trim() || ""
   }));
 
   assert(popupState.title === "Lumen", "Popup title did not load.", popupState);
@@ -270,35 +312,34 @@ try {
   assert(popupState.holdActionCount === 7, "Hold menu actions did not render.", popupState);
   assert(popupState.statusHidden, "Popup status panel should start hidden.", popupState);
   assert(popupState.manualCount === "0 boxes", "Manual redaction counter did not initialize.", popupState);
-  assert(popupState.autoRedactDisabled, "Free local session should lock auto-redaction.", popupState);
+  assert(!popupState.autoRedactDisabled, "Local beta should make auto-redaction immediately usable.", popupState);
   assert(popupState.cutawayStatus === "Choose region", "Cutaway region status did not initialize.", popupState);
   assert(popupState.cutawayClearDisabled, "Cutaway clear action should start disabled without a region.", popupState);
   assert(popupState.watchCardHidden, "Timed capture card should start hidden without a saved watch.", popupState);
   assert(popupState.runWatchNowDisabled, "Run now should start disabled without a saved active watch.", popupState);
   assert(popupState.toggleWatchDisabled, "Pause/resume should start disabled without a saved watch.", popupState);
   assert(popupState.deleteWatchDisabled, "Clear watch should start disabled without a saved watch.", popupState);
+  assert(popupState.watchMode === "once" && popupState.watchDelayVisible && popupState.watchContinuousHidden, "Area monitor mode controls did not initialize to delayed once.", popupState);
   assert(popupState.annotationStatus === "Choose target", "Annotation callout status did not initialize.", popupState);
   assert(popupState.annotationClearDisabled, "Annotation clear action should start disabled without a callout.", popupState);
   assert(popupState.runViewSummary === "Desktop", "Run view summary did not initialize.", popupState);
   assert(popupState.runExportSummary === "Raw", "Run export summary did not initialize.", popupState);
   assert(popupState.runSafetySummary.includes("Cleanup"), "Run safety summary did not initialize.", popupState);
-  assert(popupState.accountPlan === "Free", "Free account plan did not render.", popupState);
-  assert(popupState.dataControlsSummary.includes("Enable advanced tools"), "Data controls summary did not explain the locked state.", popupState);
+  assert(popupState.accountPlan === "Local beta", "Local beta plan did not render.", popupState);
+  assert(popupState.dataControlsSummary.includes("clear history"), "Data controls summary did not explain local cleanup.", popupState);
   assert(popupState.retentionDisabled, "Retention control should start disabled without a backend session.", popupState);
   assert(popupState.retentionValue === "90", "Retention control should default to 90 days.", popupState);
   assert(popupState.cloudSyncDisabled, "Cloud sync control should start disabled for the free plan.", popupState);
-  assert(popupState.deleteBackendDataDisabled, "Session delete action should start disabled without an advanced session.", popupState);
-  assert(popupState.lockedFeatureCount >= 2, "Advanced feature chips should start locked for the free plan.", popupState);
+  assert(!popupState.deleteBackendDataDisabled, "Local workspace cleanup should always be available.", popupState);
+  assert(popupState.lockedFeatureCount === 1, "Only the connected cloud feature chip should remain locked in the local beta.", popupState);
   assert(
-    popupState.disabledResponsiveModes.includes("tablet") &&
-      popupState.disabledResponsiveModes.includes("mobile") &&
-      popupState.disabledResponsiveModes.includes("responsive"),
-    "Responsive modes should be gated for the free plan.",
+    popupState.disabledResponsiveModes.length === 0,
+    "Responsive modes should be available in the local beta.",
     popupState
   );
   assert(
-    popupState.disabledPosterModes.includes("browser") && popupState.disabledPosterModes.includes("phone"),
-    "Poster export modes should be gated for the free plan.",
+    popupState.disabledPosterModes.length === 0,
+    "Poster export modes should be available in the local beta.",
     popupState
   );
   assert(popupState.exportReviewHidden, "Export review screen should start hidden.", popupState);
@@ -321,6 +362,9 @@ try {
   assert(popupState.shelfCount.includes("1 capture"), "Capture shelf did not count seeded history.", popupState);
   assert(popupState.shelfCount.includes("2 timed runs"), "Capture shelf did not count seeded timed runs.", popupState);
   assert(popupState.shelfCards === 3, "Capture shelf did not render seeded captures and timed runs.", popupState);
+  assert(popupState.photoLibraryCount === "1 photo", "Local photo library count did not render.", popupState);
+  assert(popupState.photoLibraryCards === 1 && popupState.photoLibraryImages === 1, "Local photo library did not render its real preview.", popupState);
+  assert(popupState.photoLibraryOpenLabel === "Open all", "Photo library navigation action did not render.", popupState);
   assert(
     popupState.shelfKinds.filter((kind) => kind === "watch").length === 2 &&
       popupState.shelfKinds.includes("capture"),
@@ -410,6 +454,26 @@ try {
     pointerType: "mouse"
   });
 
+  const clearResponse = await popup.evaluate(() => chrome.runtime.sendMessage({
+    type: "LUMEN_CLEAR_LOCAL_DATA"
+  }));
+  assert(clearResponse?.ok, "Local workspace cleanup failed.", clearResponse);
+  assert(clearResponse.deleted?.captures === 1 && clearResponse.deleted?.watchRuns === 2 && clearResponse.deleted?.libraryPhotos === 1, "Local workspace cleanup reported the wrong counts.", clearResponse);
+
+  const clearedState = await worker.evaluate(() => chrome.storage.local.get([
+    "lumen.capture.history",
+    "lumen.watch.runs",
+    "lumen.capture.privateSettings"
+  ]));
+  assert(clearedState["lumen.capture.history"]?.length === 0, "Local capture history survived workspace cleanup.", clearedState);
+  assert(clearedState["lumen.watch.runs"]?.length === 0, "Timed run history survived workspace cleanup.", clearedState);
+  assert(clearedState["lumen.capture.privateSettings"]?.annotationText === "", "Private note draft survived workspace cleanup.", clearedState);
+  const clearedLibraryCount = await popup.evaluate(async () => {
+    const store = await import(chrome.runtime.getURL("library-store.js"));
+    return store.countLibraryCaptures();
+  });
+  assert(clearedLibraryCount === 0, "Local photo library survived workspace cleanup.", { clearedLibraryCount });
+
   await target.close();
   await popup.reload({ waitUntil: "load" });
   await popup.waitForSelector("#captureButton", { timeout: 10000 });
@@ -429,13 +493,24 @@ try {
   assert(blockedState.analyzeDisabled, "Analyze should be disabled without a capturable target tab.", blockedState);
   assert(blockedState.quickActionsDisabled, "Quick actions should be disabled without a capturable target tab.", blockedState);
 
-  const storageState = await worker.evaluate(() =>
-    chrome.storage.sync.get("lumen.capture.settings")
-  );
+  const storageState = await worker.evaluate(async () => ({
+    sync: await chrome.storage.sync.get("lumen.capture.settings"),
+    local: await chrome.storage.local.get("lumen.capture.privateSettings")
+  }));
 
   assert(
-    Boolean(storageState["lumen.capture.settings"]),
+    Boolean(storageState.sync["lumen.capture.settings"]),
     "Default capture settings were not initialized in sync storage.",
+    storageState
+  );
+  assert(
+    !Object.hasOwn(storageState.sync["lumen.capture.settings"], "annotationText"),
+    "Private capture-note text must not be copied through Chrome Sync.",
+    storageState
+  );
+  assert(
+    typeof storageState.local["lumen.capture.privateSettings"]?.annotationText === "string",
+    "Private capture-note settings were not initialized in local storage.",
     storageState
   );
 

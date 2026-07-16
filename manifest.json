@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Lumen",
   "version": "0.2.0",
-  "description": "Clean webpage capture for review work: cleanup, responsive views, redaction review, notes, signals, and local history.",
+  "description": "Local full-page and lasso capture with redaction, responsive views, a photo library, and selected-area monitors.",
   "homepage_url": "https://captainfredric.github.io/lumen-extension/",
   "minimum_chrome_version": "109",
   "permissions": [

@@ -390,6 +390,77 @@ try {
   assert(postDeleteStats.body.stats.destinationCount === 0, "Post-delete stats still count destinations.", postDeleteStats);
   assert(postDeleteStats.body.stats.deliveryCount === 0, "Post-delete stats still count deliveries.", postDeleteStats);
 
+  const concurrentDemo = await requestJson("/v1/session/demo", {
+    method: "POST",
+    body: {
+      name: "Backend Concurrency Smoke",
+      email: "concurrency-smoke@lumen.test",
+      plan: "team"
+    }
+  });
+  assert(
+    concurrentDemo.status === 200 && concurrentDemo.body.session?.id,
+    "Concurrency smoke session did not initialize.",
+    concurrentDemo
+  );
+
+  const concurrentSessionId = concurrentDemo.body.session.id;
+  const concurrentCaptureCount = 40;
+  const concurrentCaptureIds = Array.from(
+    { length: concurrentCaptureCount },
+    (_, index) => `capture-concurrent-${String(index + 1).padStart(3, "0")}`
+  );
+  const concurrentCreates = await Promise.all(concurrentCaptureIds.map((id, index) => requestJson("/v1/captures", {
+    method: "POST",
+    sessionId: concurrentSessionId,
+    body: {
+      id,
+      title: `Concurrent capture ${index + 1}`,
+      url: `https://example.com/concurrency/${index + 1}`,
+      capturedAt: new Date(Date.UTC(2026, 4, 11, 5, index)).toISOString()
+    }
+  })));
+  const failedConcurrentCreates = concurrentCreates
+    .map((result, index) => ({ id: concurrentCaptureIds[index], ...result }))
+    .filter((result) => result.status !== 201);
+  assert(
+    failedConcurrentCreates.length === 0,
+    "Concurrent capture writes did not all succeed.",
+    failedConcurrentCreates
+  );
+
+  const concurrentCaptureList = await requestJson("/v1/captures?limit=200", {
+    sessionId: concurrentSessionId
+  });
+  const storedConcurrentIds = new Set(
+    (concurrentCaptureList.body.captures || []).map((capture) => capture.id)
+  );
+  const missingConcurrentIds = concurrentCaptureIds.filter((id) => !storedConcurrentIds.has(id));
+  assert(
+    concurrentCaptureList.status === 200 &&
+      concurrentCaptureList.body.captures?.length === concurrentCaptureCount &&
+      missingConcurrentIds.length === 0,
+    "Concurrent capture writes did not all survive the read-modify-write cycle.",
+    {
+      expected: concurrentCaptureCount,
+      actual: concurrentCaptureList.body.captures?.length || 0,
+      missingConcurrentIds
+    }
+  );
+
+  const deletedConcurrentData = await requestJson("/v1/account-data", {
+    method: "DELETE",
+    sessionId: concurrentSessionId,
+    body: {
+      confirmation: "DELETE LUMEN DATA"
+    }
+  });
+  assert(
+    deletedConcurrentData.status === 200 && deletedConcurrentData.body.deleted.captures === concurrentCaptureCount,
+    "Concurrency smoke cleanup did not remove every capture.",
+    deletedConcurrentData
+  );
+
   console.log(JSON.stringify({
     ok: true,
     baseUrl,
@@ -401,6 +472,7 @@ try {
       watchPlan: watchPlan.body.watchPlan.id,
       watchRun: watchRun.body.watchRun.id,
       agentJob: agentJob.body.agentJob.id,
+      concurrentCaptures: concurrentCaptureCount,
       stats: stats.body.stats,
       deleted: deletedAccountData.body.deleted
     }

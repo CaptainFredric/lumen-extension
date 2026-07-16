@@ -1,0 +1,223 @@
+import { execFile } from "node:child_process";
+import { createServer } from "node:http";
+import { mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+
+import { chromium } from "playwright";
+import { sanitizeCaptureUrl } from "../config.js";
+
+const execFileAsync = promisify(execFile);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(__dirname, "..");
+const sourceManifest = JSON.parse(await readFile(path.join(repoRoot, "manifest.json"), "utf8"));
+const zipPath = path.join(repoRoot, "dist", `lumen-extension-${sourceManifest.version}.zip`);
+const tempRoot = await mkdtemp(path.join(os.tmpdir(), "lumen-release-package-"));
+const extensionDir = path.join(tempRoot, "extension");
+const profileDir = path.join(tempRoot, "profile");
+const popupErrors = [];
+
+let context;
+let fixtureServer;
+
+try {
+  await execFileAsync(process.execPath, [path.join(repoRoot, "scripts", "package-extension.mjs")], {
+    cwd: repoRoot
+  });
+  const zipStats = await stat(zipPath);
+  assert(zipStats.size > 0, "Release ZIP was not created.", { zipPath });
+
+  await execFileAsync("unzip", ["-q", zipPath, "-d", extensionDir]);
+  const packagedManifest = JSON.parse(await readFile(path.join(extensionDir, "manifest.json"), "utf8"));
+  const packagedFiles = await listFiles(extensionDir);
+
+  assert(packagedManifest.version === sourceManifest.version, "Packaged manifest version drifted from source.", {
+    source: sourceManifest.version,
+    packaged: packagedManifest.version
+  });
+  assert(!packagedManifest.host_permissions?.length, "Release package unexpectedly contains always-on host permissions.", packagedManifest);
+  assert(packagedManifest.optional_host_permissions?.length === 2, "Release package lost its optional site-permission declarations.", packagedManifest);
+  assert(!packagedFiles.some((file) => /^(scripts|backend|docs|\.github|node_modules)\//.test(file)), "Release ZIP contains development-only files.", packagedFiles);
+  assert(
+    ["library.html", "library.css", "library.js", "library-store.js"].every((file) => packagedFiles.includes(file)),
+    "Release ZIP is missing the local photo-library runtime.",
+    packagedFiles
+  );
+assert(
+  sanitizeCaptureUrl("https://example.test/review?view=grid&token=secret&session_id=private#account") === "https://example.test/review?view=grid",
+  "Capture URL sanitizer did not remove sensitive query keys and fragments."
+);
+assert(
+  sanitizeCaptureUrl("https://example.test/review?mode=full&apiKey=secret&accessToken=private&X-Amz-Signature=signed") === "https://example.test/review?mode=full",
+  "Capture URL sanitizer did not remove camel-case or signed URL credentials."
+);
+
+  const fixture = await startFixtureServer();
+  fixtureServer = fixture.server;
+
+  context = await chromium.launchPersistentContext(profileDir, {
+    headless: false,
+    args: [
+      `--disable-extensions-except=${extensionDir}`,
+      `--load-extension=${extensionDir}`
+    ]
+  });
+
+  let [worker] = context.serviceWorkers();
+
+  if (!worker) {
+    worker = await context.waitForEvent("serviceworker", { timeout: 10000 });
+  }
+
+  const extensionId = new URL(worker.url()).host;
+  const runtimeManifest = await worker.evaluate(() => chrome.runtime.getManifest());
+  assert(runtimeManifest.version === packagedManifest.version, "Loaded extension version does not match the release ZIP.", runtimeManifest);
+
+  const target = await context.newPage();
+  await target.goto(fixture.url, { waitUntil: "domcontentloaded" });
+
+  const popup = await context.newPage();
+  popup.on("console", (message) => {
+    if (message.type() === "error") {
+      popupErrors.push(message.text());
+    }
+  });
+  popup.on("pageerror", (error) => popupErrors.push(error.message));
+  await popup.goto(`chrome-extension://${extensionId}/popup.html`, { waitUntil: "load" });
+  await popup.waitForSelector("#onboardingPanel:not(.is-hidden)", { timeout: 10000 });
+
+  const firstRun = await popup.evaluate(async () => ({
+    title: document.querySelector("#onboardingTitle")?.textContent?.trim() || "",
+    startLabel: document.querySelector("#onboardingStartButton")?.textContent?.trim() || "",
+    startDisabled: document.querySelector("#onboardingStartButton")?.disabled || false,
+    stepCount: document.querySelectorAll("[data-onboarding-step]").length,
+    launchState: document.querySelector("#launchStatus")?.dataset.state || "",
+    permissions: await chrome.permissions.getAll(),
+    sync: await chrome.storage.sync.get("lumen.capture.settings"),
+    local: await chrome.storage.local.get([
+      "lumen.capture.privateSettings",
+      "lumen.capture.history",
+      "lumen.onboarding"
+    ])
+  }));
+
+  assert(/three steps/i.test(firstRun.title), "Clean install did not show the focused first-run guide.", firstRun);
+  assert(firstRun.startLabel === "Review first capture", "First-run primary action is unclear.", firstRun);
+  assert(firstRun.stepCount === 3, "First-run guide should have exactly three steps.", firstRun);
+  // A popup opened as a normal browser tab does not receive Chrome's toolbar
+  // activeTab grant. The production ZIP must fail safely in that state while
+  // still explaining the first-run path; toolbar-driven capture is covered by
+  // the loaded-extension and end-to-end suites.
+  assert(firstRun.launchState === "blocked" && firstRun.startDisabled, "Clean package did not fail safely without an activeTab grant.", firstRun);
+  assert(!(firstRun.permissions.origins || []).length, "Clean install started with granted site origins.", firstRun.permissions);
+  assert(!Object.hasOwn(firstRun.sync["lumen.capture.settings"] || {}, "annotationText"), "Release package synced private note text.", firstRun.sync);
+  assert(typeof firstRun.local["lumen.capture.privateSettings"]?.annotationText === "string", "Release package did not initialize private settings locally.", firstRun.local);
+  assert((firstRun.local["lumen.capture.history"] || []).length === 0, "Clean profile unexpectedly contains capture history.", firstRun.local);
+
+  await popup.click("#onboardingDismissButton");
+  await popup.waitForSelector("#onboardingPanel.is-hidden", { state: "attached" });
+  const dismissed = await worker.evaluate(() => chrome.storage.local.get("lumen.onboarding"));
+  assert(Boolean(dismissed["lumen.onboarding"]?.dismissedAt), "First-run dismissal did not persist.", dismissed);
+
+  await popup.reload({ waitUntil: "load" });
+  await popup.waitForSelector("#captureButton");
+  const onboardingStayedDismissed = await popup.$eval("#onboardingPanel", (node) => node.classList.contains("is-hidden"));
+  assert(onboardingStayedDismissed, "Dismissed first-run guide returned after reload.");
+
+  const library = await context.newPage();
+  library.on("console", (message) => {
+    if (message.type() === "error") {
+      popupErrors.push(`library: ${message.text()}`);
+    }
+  });
+  library.on("pageerror", (error) => popupErrors.push(`library: ${error.message}`));
+  await library.goto(`chrome-extension://${extensionId}/library.html`, { waitUntil: "load" });
+  await library.waitForSelector("#emptyState:not(.is-hidden)", { timeout: 10000 });
+  const cleanLibrary = await library.evaluate(() => ({
+    title: document.title,
+    captureMetric: document.querySelector("#captureMetric")?.textContent?.trim() || "",
+    resultsCount: document.querySelector("#resultsCount")?.textContent?.trim() || "",
+    emptyTitle: document.querySelector("#emptyTitle")?.textContent?.trim() || ""
+  }));
+  assert(cleanLibrary.title === "Lumen Capture Library", "Packaged photo library title did not load.", cleanLibrary);
+  assert(cleanLibrary.captureMetric === "0" && cleanLibrary.resultsCount === "0 items", "Clean release profile did not start with an empty photo library.", cleanLibrary);
+  assert(/No captures/i.test(cleanLibrary.emptyTitle), "Clean release photo library did not explain its empty state.", cleanLibrary);
+  assert(!popupErrors.length, "Packaged popup emitted runtime errors.", popupErrors);
+
+  console.log(JSON.stringify({
+    ok: true,
+    zip: {
+      path: zipPath,
+      bytes: zipStats.size,
+      fileCount: packagedFiles.length
+    },
+    manifest: {
+      name: runtimeManifest.name,
+      version: runtimeManifest.version,
+      manifestVersion: runtimeManifest.manifest_version
+    },
+    firstRun: {
+      stepCount: firstRun.stepCount,
+      launchState: firstRun.launchState,
+      grantedOrigins: firstRun.permissions.origins || [],
+      persistedDismissal: true
+    },
+    library: cleanLibrary
+  }, null, 2));
+} catch (error) {
+  console.error(JSON.stringify({
+    ok: false,
+    message: error.message,
+    details: error.details || null,
+    popupErrors
+  }, null, 2));
+  process.exitCode = 1;
+} finally {
+  await context?.close().catch(() => {});
+  await new Promise((resolve) => fixtureServer?.close(resolve) || resolve());
+  await rm(tempRoot, { recursive: true, force: true });
+}
+
+async function startFixtureServer() {
+  const server = createServer((request, response) => {
+    response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    response.end("<!doctype html><html><head><title>Release fixture</title></head><body><main><h1>Clean install target</h1></main></body></html>");
+  });
+
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+
+  return {
+    server,
+    url: `http://127.0.0.1:${address.port}/fixture`
+  };
+}
+
+async function listFiles(root, current = "") {
+  const entries = await readdir(path.join(root, current), { withFileTypes: true });
+  const files = [];
+
+  for (const entry of entries) {
+    const relative = path.join(current, entry.name);
+
+    if (entry.isDirectory()) {
+      files.push(...await listFiles(root, relative));
+    } else {
+      files.push(relative.split(path.sep).join("/"));
+    }
+  }
+
+  return files.sort();
+}
+
+function assert(condition, message, details = null) {
+  if (condition) {
+    return;
+  }
+
+  const error = new Error(message);
+  error.details = details;
+  throw error;
+}

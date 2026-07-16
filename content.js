@@ -352,11 +352,15 @@
       ...collectSensitiveTextRegions(context),
       ...collectSensitiveFieldRegions(context)
     ];
-    const regions = mergeSensitiveRegions(collected).slice(0, MAX_REDACTION_REGIONS);
+    const merged = mergeSensitiveRegions(collected);
+    const truncated = collected.length > MAX_REDACTION_REGIONS || merged.length > MAX_REDACTION_REGIONS;
+    const regions = merged.slice(0, MAX_REDACTION_REGIONS);
 
     return {
       count: regions.length,
       regions,
+      truncated,
+      limit: MAX_REDACTION_REGIONS,
       breakdown: buildRedactionBreakdown(regions)
     };
   }
@@ -1364,6 +1368,8 @@
       projection: "anchor"
     };
 
+    Object.assign(nextRegion, projectResolvedRegionShape(region, nextRegion));
+
     return isResolvedManualRegionValid(nextRegion) ? nextRegion : null;
   }
 
@@ -1400,9 +1406,41 @@
       projection: "direct"
     };
 
+    Object.assign(nextRegion, projectResolvedRegionShape(region, nextRegion));
+
     return isResolvedManualRegionValid(nextRegion) && doesManualRegionIntersectPage(nextRegion, context)
       ? nextRegion
       : null;
+  }
+
+  function projectResolvedRegionShape(sourceRegion, resolvedRegion) {
+    if (sourceRegion?.shape !== "lasso") {
+      return {};
+    }
+
+    const sourcePoints = normalizeRegionPoints(sourceRegion.points);
+    const sourceWidth = Math.max(1, Number(sourceRegion.width) || 1);
+    const sourceHeight = Math.max(1, Number(sourceRegion.height) || 1);
+    const points = sourcePoints.map((point) => ({
+      x: Math.round(
+        resolvedRegion.left +
+        Math.max(0, Math.min(1, (point.x - sourceRegion.left) / sourceWidth)) * resolvedRegion.width
+      ),
+      y: Math.round(
+        resolvedRegion.top +
+        Math.max(0, Math.min(1, (point.y - sourceRegion.top) / sourceHeight)) * resolvedRegion.height
+      )
+    }));
+
+    return points.length >= 3
+      ? {
+          shape: "lasso",
+          points
+        }
+      : {
+          shape: "rect",
+          points: []
+        };
   }
 
   function isResolvedManualRegionValid(region) {
@@ -3300,7 +3338,7 @@
       NodeFilter.SHOW_TEXT
     );
 
-    while (walker.nextNode() && regions.length < MAX_REDACTION_REGIONS) {
+    while (walker.nextNode() && regions.length <= MAX_REDACTION_REGIONS) {
       const node = walker.currentNode;
 
       if (!(node instanceof Text)) {
@@ -3318,7 +3356,7 @@
         const regex = new RegExp(pattern.regex.source, pattern.regex.flags);
         let match = regex.exec(rawText);
 
-        while (match && regions.length < MAX_REDACTION_REGIONS) {
+        while (match && regions.length <= MAX_REDACTION_REGIONS) {
           if (!match[0]?.trim()) {
             match = regex.exec(rawText);
             continue;
@@ -3338,7 +3376,7 @@
       }
     }
 
-    return regions.slice(0, MAX_REDACTION_REGIONS);
+    return regions.slice(0, MAX_REDACTION_REGIONS + 1);
   }
 
   function collectSensitiveFieldRegions(context) {
@@ -3361,7 +3399,7 @@
         regions.push(region);
       }
 
-      if (regions.length >= MAX_REDACTION_REGIONS) {
+      if (regions.length > MAX_REDACTION_REGIONS) {
         break;
       }
     }
@@ -3662,6 +3700,7 @@
     const root = context.node;
     const doc = document.documentElement;
     const body = document.body;
+    const captureRect = getCaptureViewportRect(context);
 
     const pageHeight = context.isDocument
       ? Math.max(
@@ -3676,12 +3715,44 @@
     return {
       title: document.title,
       url: window.location.href,
-      viewportWidth: Math.round(context.isDocument ? doc.clientWidth : root.clientWidth),
-      viewportHeight: Math.round(context.isDocument ? window.innerHeight : root.clientHeight),
+      viewportWidth: Math.round(captureRect.width),
+      viewportHeight: Math.round(captureRect.height),
+      browserViewportWidth: Math.round(window.innerWidth),
+      browserViewportHeight: Math.round(window.innerHeight),
+      captureRect,
       pageHeight: Math.round(pageHeight),
       devicePixelRatio: window.devicePixelRatio || 1,
       scrollMode: context.isDocument ? "document" : "container",
       scrollContainer: context.label
+    };
+  }
+
+  function getCaptureViewportRect(context) {
+    if (context.isDocument || !(context.node instanceof HTMLElement)) {
+      return {
+        left: 0,
+        top: 0,
+        width: Math.max(1, Math.round(document.documentElement.clientWidth || window.innerWidth)),
+        height: Math.max(1, Math.round(window.innerHeight))
+      };
+    }
+
+    const root = context.node;
+    const rect = root.getBoundingClientRect();
+    const contentLeft = rect.left + root.clientLeft;
+    const contentTop = rect.top + root.clientTop;
+    const contentRight = contentLeft + root.clientWidth;
+    const contentBottom = contentTop + root.clientHeight;
+    const visibleLeft = Math.max(0, contentLeft);
+    const visibleTop = Math.max(0, contentTop);
+    const visibleRight = Math.min(window.innerWidth, contentRight);
+    const visibleBottom = Math.min(window.innerHeight, contentBottom);
+
+    return {
+      left: Math.round(visibleLeft),
+      top: Math.round(visibleTop),
+      width: Math.max(1, Math.round(visibleRight - visibleLeft)),
+      height: Math.max(1, Math.round(visibleBottom - visibleTop))
     };
   }
 

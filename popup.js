@@ -3,6 +3,7 @@ import {
   STORAGE_KEYS,
   buildOriginPattern,
   getDefaultSettings,
+  getSyncSafeSettings,
   getFeatureAccess,
   getPlanEntitlements,
   getCaptureVariants,
@@ -10,8 +11,19 @@ import {
   normalizeCaptureNoteOptions,
   requiresOriginPermission
 } from "./config.js";
+import {
+  countLibraryCaptures,
+  getLibraryPreviewAsset,
+  listLibraryCaptures
+} from "./library-store.js";
 
 const ui = {
+  onboardingPanel: document.querySelector("#onboardingPanel"),
+  onboardingStartButton: document.querySelector("#onboardingStartButton"),
+  onboardingSettingsButton: document.querySelector("#onboardingSettingsButton"),
+  onboardingDismissButton: document.querySelector("#onboardingDismissButton"),
+  onboardingPageStatus: document.querySelector("#onboardingPageStatus"),
+  onboardingSteps: [...document.querySelectorAll("[data-onboarding-step]")],
   launchPanel: document.querySelector("#launchPanel"),
   launchStatus: document.querySelector("#launchStatus"),
   launchStatusTitle: document.querySelector("#launchStatusTitle"),
@@ -35,6 +47,14 @@ const ui = {
   explainCutawayPlanButton: document.querySelector("#explainCutawayPlanButton"),
   cutawaySummary: document.querySelector("#cutawaySummary"),
   watchIntervalSelect: document.querySelector("#watchIntervalSelect"),
+  watchModeSelect: document.querySelector("#watchModeSelect"),
+  watchDelaySelect: document.querySelector("#watchDelaySelect"),
+  watchContinuousIntervalSelect: document.querySelector("#watchContinuousIntervalSelect"),
+  watchMaxRunsSelect: document.querySelector("#watchMaxRunsSelect"),
+  watchSaveOnlyOnChange: document.querySelector("#watchSaveOnlyOnChange"),
+  watchModeHint: document.querySelector("#watchModeHint"),
+  watchModeFields: [...document.querySelectorAll("[data-watch-mode-field]")],
+  watchMaxRunsField: document.querySelector("#watchMaxRunsField"),
   saveWatchPlanButton: document.querySelector("#saveWatchPlanButton"),
   runWatchPlanNowButton: document.querySelector("#runWatchPlanNowButton"),
   watchPlanCard: document.querySelector("#watchPlanCard"),
@@ -97,6 +117,10 @@ const ui = {
   captureShelfCount: document.querySelector("#captureShelfCount"),
   captureShelfEmpty: document.querySelector("#captureShelfEmpty"),
   captureShelfGrid: document.querySelector("#captureShelfGrid"),
+  photoLibraryCount: document.querySelector("#photoLibraryCount"),
+  photoLibraryEmpty: document.querySelector("#photoLibraryEmpty"),
+  photoLibraryGrid: document.querySelector("#photoLibraryGrid"),
+  openPhotoLibraryButton: document.querySelector("#openPhotoLibraryButton"),
   dataControlsSummary: document.querySelector("#dataControlsSummary"),
   retentionSelect: document.querySelector("#retentionSelect"),
   cloudSyncEnabled: document.querySelector("#cloudSyncEnabled"),
@@ -159,6 +183,13 @@ let latestWatchPlans = [];
 let latestWatchRuns = [];
 let expandedHistoryId = "";
 let exportReviewDecision = null;
+let onboardingState = {
+  completedAt: "",
+  dismissedAt: ""
+};
+let oneShotPermissionOrigin = "";
+let photoLibraryObjectUrls = new Set();
+let photoLibraryRenderVersion = 0;
 
 const TIMELINE_STAGES = [
   "prepare",
@@ -217,6 +248,10 @@ chrome.runtime.onMessage.addListener((message) => {
     renderWatchRuns(message.payload || []);
   }
 
+  if (message?.type === "LUMEN_LIBRARY_UPDATED") {
+    refreshPhotoLibrary().catch(() => {});
+  }
+
   if (message?.type === "LUMEN_MANUAL_REDACTIONS_UPDATED") {
     renderManualRedactions(message.payload);
   }
@@ -232,14 +267,20 @@ chrome.runtime.onMessage.addListener((message) => {
 
 async function bootstrap() {
   await restoreSettings();
+  await restoreOnboardingState();
   bindEvents();
+  updateWatchScheduleControls();
   const launchStatusPromise = refreshLaunchStatus();
   await restoreAppState();
+  await refreshPhotoLibrary();
   applyPlanGates();
   await launchStatusPromise;
 }
 
 function bindEvents() {
+  ui.onboardingStartButton.addEventListener("click", handleCaptureClick);
+  ui.onboardingSettingsButton.addEventListener("click", handleOnboardingSettings);
+  ui.onboardingDismissButton.addEventListener("click", dismissOnboarding);
   ui.removeStickyHeaders.addEventListener("change", persistCurrentSettings);
   ui.forceLazyLoad.addEventListener("change", persistCurrentSettings);
   ui.autoRedact.addEventListener("change", () => {
@@ -266,8 +307,12 @@ function bindEvents() {
   ui.runWatchPlanNowButton.addEventListener("click", handleRunWatchPlanNow);
   ui.toggleWatchPlanButton.addEventListener("click", handleToggleWatchPlan);
   ui.deleteWatchPlanButton.addEventListener("click", handleDeleteWatchPlan);
+  ui.watchModeSelect.addEventListener("change", updateWatchScheduleControls);
+  ui.openPhotoLibraryButton.addEventListener("click", () => openPhotoLibrary());
   ui.startAnnotationPickerButton.addEventListener("click", handleStartAnnotationPicker);
   ui.clearAnnotationButton.addEventListener("click", handleClearAnnotationRegion);
+
+  window.addEventListener("unload", releasePhotoLibraryObjectUrls);
 
   for (const button of ui.deviceButtons) {
     button.addEventListener("click", () => {
@@ -317,6 +362,7 @@ function bindEvents() {
   ui.captureButton.addEventListener("click", handleCaptureButtonClick);
   ui.analyzeButton.addEventListener("click", handleAnalyzeClick);
   ui.holdMenu.addEventListener("click", handleQuickActionClick);
+  ui.holdMenu.addEventListener("keydown", handleHoldMenuKeyDown);
   ui.exportReviewCancelButton.addEventListener("click", () => settleExportReview(false));
   ui.exportReviewConfirmButton.addEventListener("click", () => settleExportReview(true));
   document.addEventListener("keydown", handleDocumentKeyDown);
@@ -333,10 +379,21 @@ function bindEvents() {
 }
 
 async function restoreSettings() {
-  const stored = await chrome.storage.sync.get(STORAGE_KEYS.settings);
+  const [stored, localPrivate] = await Promise.all([
+    chrome.storage.sync.get(STORAGE_KEYS.settings),
+    chrome.storage.local.get(STORAGE_KEYS.privateSettings)
+  ]);
+  const syncedSettings = stored[STORAGE_KEYS.settings] || {};
+  const privateSettings = localPrivate[STORAGE_KEYS.privateSettings] || {};
+  const legacyAnnotationText = typeof syncedSettings.annotationText === "string"
+    ? syncedSettings.annotationText
+    : "";
   currentSettings = {
     ...getDefaultSettings(),
-    ...(stored[STORAGE_KEYS.settings] || {})
+    ...syncedSettings,
+    annotationText: typeof privateSettings.annotationText === "string"
+      ? privateSettings.annotationText
+      : legacyAnnotationText
   };
   const captureNote = normalizeCaptureNoteOptions(currentSettings);
   currentSettings.annotationEnabled = captureNote.enabled;
@@ -357,6 +414,78 @@ async function restoreSettings() {
   renderRunSummary(currentSettings);
   renderTimeline("idle");
   renderStatusLog();
+
+  if (Object.hasOwn(syncedSettings, "annotationText") || !localPrivate[STORAGE_KEYS.privateSettings]) {
+    await Promise.all([
+      chrome.storage.sync.set({
+        [STORAGE_KEYS.settings]: getSyncSafeSettings(currentSettings)
+      }),
+      chrome.storage.local.set({
+        [STORAGE_KEYS.privateSettings]: {
+          annotationText: currentSettings.annotationText
+        }
+      })
+    ]);
+  }
+}
+
+async function restoreOnboardingState() {
+  const stored = await chrome.storage.local.get(STORAGE_KEYS.onboarding);
+  onboardingState = {
+    ...onboardingState,
+    ...(stored[STORAGE_KEYS.onboarding] || {})
+  };
+  renderOnboarding();
+}
+
+function renderOnboarding() {
+  if (!ui.onboardingPanel) {
+    return;
+  }
+
+  const hidden = Boolean(onboardingState.completedAt || onboardingState.dismissedAt || latestHistoryItems.length);
+  ui.onboardingPanel.classList.toggle("is-hidden", hidden);
+
+  if (hidden) {
+    return;
+  }
+
+  const pageReady = !launchActionsBlocked && Boolean(launchTargetTab?.url);
+  ui.onboardingPageStatus.textContent = pageReady
+    ? `${formatTabHost(launchTargetTab.url)} is ready for review.`
+    : "Open a normal web page to begin.";
+  ui.onboardingStartButton.disabled = !pageReady || actionBusy;
+
+  for (const step of ui.onboardingSteps) {
+    step.classList.toggle("is-ready", step.dataset.onboardingStep === "review" || (step.dataset.onboardingStep === "page" && pageReady));
+  }
+}
+
+function handleOnboardingSettings() {
+  const settingsPanel = document.querySelector(".controls-panel");
+  settingsPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+  window.setTimeout(() => ui.removeStickyHeaders?.focus(), 180);
+}
+
+async function dismissOnboarding() {
+  onboardingState.dismissedAt = new Date().toISOString();
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.onboarding]: onboardingState
+  });
+  renderOnboarding();
+}
+
+async function completeOnboarding() {
+  if (onboardingState.completedAt) {
+    return;
+  }
+
+  onboardingState.completedAt = new Date().toISOString();
+  onboardingState.dismissedAt = "";
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.onboarding]: onboardingState
+  });
+  renderOnboarding();
 }
 
 async function restoreAppState() {
@@ -478,9 +607,16 @@ async function persistCurrentSettings() {
   updateAnnotationControls();
   renderRunSummary(currentSettings);
 
-  await chrome.storage.sync.set({
-    [STORAGE_KEYS.settings]: currentSettings
-  });
+  await Promise.all([
+    chrome.storage.sync.set({
+      [STORAGE_KEYS.settings]: getSyncSafeSettings(currentSettings)
+    }),
+    chrome.storage.local.set({
+      [STORAGE_KEYS.privateSettings]: {
+        annotationText: currentSettings.annotationText
+      }
+    })
+  ]);
 }
 
 function updateAnnotationCounter() {
@@ -499,13 +635,17 @@ function updateAnnotationCounter() {
 
 function updateDeviceButtons() {
   for (const button of ui.deviceButtons) {
-    button.classList.toggle("is-active", button.dataset.device === currentSettings.devicePreset);
+    const isActive = button.dataset.device === currentSettings.devicePreset;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
   }
 }
 
 function updateExportButtons() {
   for (const button of ui.exportButtons) {
-    button.classList.toggle("is-active", button.dataset.export === currentSettings.exportPreset);
+    const isActive = button.dataset.export === currentSettings.exportPreset;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
   }
 }
 
@@ -513,7 +653,9 @@ function updateLongPageButtons() {
   const mode = currentSettings.longPageMode || "auto";
 
   for (const button of ui.longPageButtons) {
-    button.classList.toggle("is-active", button.dataset.longPage === mode);
+    const isActive = button.dataset.longPage === mode;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
   }
 }
 
@@ -530,6 +672,7 @@ function updateAnnotationControls() {
   for (const button of ui.annotationPositionButtons) {
     const isActive = button.dataset.annotationPosition === captureNote.position;
     button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
     button.disabled = !enabled;
   }
 }
@@ -699,6 +842,32 @@ function handleOutsidePointerDown(event) {
   }
 }
 
+function handleHoldMenuKeyDown(event) {
+  const actions = ui.holdMenuActions.filter((button) => !button.disabled);
+
+  if (!actions.length) {
+    return;
+  }
+
+  const activeIndex = actions.indexOf(document.activeElement);
+  let nextIndex = activeIndex;
+
+  if (event.key === "ArrowDown") {
+    nextIndex = activeIndex < 0 ? 0 : (activeIndex + 1) % actions.length;
+  } else if (event.key === "ArrowUp") {
+    nextIndex = activeIndex < 0 ? actions.length - 1 : (activeIndex - 1 + actions.length) % actions.length;
+  } else if (event.key === "Home") {
+    nextIndex = 0;
+  } else if (event.key === "End") {
+    nextIndex = actions.length - 1;
+  } else {
+    return;
+  }
+
+  event.preventDefault();
+  actions[nextIndex].focus();
+}
+
 async function handleQuickActionClick(event) {
   const button = event.target.closest("[data-quick-action]");
 
@@ -759,20 +928,31 @@ function openHoldMenu(source = "hold") {
   ui.captureButton.classList.remove("is-holding");
   ui.launchPanel.classList.add("is-menu-open");
   ui.holdMenu.setAttribute("aria-hidden", "false");
+  ui.holdMenu.inert = false;
   ui.captureButton.setAttribute("aria-expanded", "true");
   renderLaunchStatus({
     state: "ready",
     title: source === "keyboard" ? "Quick actions open" : "Hold menu ready",
     detail: "Choose a capture action from the main control."
   });
+
+  if (source === "keyboard") {
+    ui.holdMenuActions.find((button) => !button.disabled)?.focus();
+  }
 }
 
 function closeHoldMenu() {
+  const restoreCaptureFocus = ui.holdMenu.contains(document.activeElement);
   clearHoldTimer();
   ui.captureButton.classList.remove("is-holding");
   ui.launchPanel.classList.remove("is-menu-open");
   ui.holdMenu.setAttribute("aria-hidden", "true");
+  ui.holdMenu.inert = true;
   ui.captureButton.setAttribute("aria-expanded", "false");
+
+  if (restoreCaptureFocus) {
+    ui.captureButton.focus();
+  }
 }
 
 function clearHoldTimer() {
@@ -803,6 +983,7 @@ async function handleCaptureClick() {
     const approved = await requestExportReviewBeforeCapture();
 
     if (!approved) {
+      await releaseOneShotPermission();
       showStatus({
         tone: "neutral",
         stage: "inspect",
@@ -817,6 +998,7 @@ async function handleCaptureClick() {
 
     await runApprovedCapture();
   } catch (error) {
+    await releaseOneShotPermission();
     showStatus({
       tone: "error",
       stage: "error",
@@ -852,7 +1034,10 @@ async function runApprovedCapture() {
     const response = await chrome.runtime.sendMessage({
       type: "LUMEN_START_CAPTURE",
       payload: {
-        options: currentSettings
+        options: {
+          ...currentSettings,
+          permissionLeaseOrigin: oneShotPermissionOrigin
+        }
       }
     });
 
@@ -869,6 +1054,7 @@ async function runApprovedCapture() {
       badge: "Ready",
       progress: 1
     });
+    await completeOnboarding();
   } catch (error) {
     showStatus({
       tone: "error",
@@ -880,6 +1066,7 @@ async function runApprovedCapture() {
       progress: 0.12
     });
   } finally {
+    oneShotPermissionOrigin = "";
     setActionBusy(false);
   }
 }
@@ -1240,7 +1427,7 @@ async function handleStartLassoPicker() {
       tone: "success",
       eyebrow: "Lasso",
       title: "Lasso region stored",
-      detail: "The lasso is saved for this URL. Captures use the surrounding crop and keep the lasso shape.",
+      detail: "The lasso is saved for this URL. PNG exports keep the drawn shape and leave the outside transparent.",
       badge: "Ready",
       progress: 1
     });
@@ -1294,21 +1481,26 @@ async function handleSaveWatchPlan() {
   setActionBusy(true);
 
   try {
-    const intervalMinutes = Number(ui.watchIntervalSelect.value) || 60;
+    const schedule = buildWatchSchedulePayload();
+    const existingPlan = selectCurrentWatchPlan();
+    const planPayload = {
+      title: tab.title || new URL(tab.url).hostname,
+      url: tab.url,
+      status: "active",
+      selectionMode: cutawayRegionRecord.region.shape === "lasso" ? "lasso" : "rect",
+      region: cutawayRegionRecord.region,
+      schedule,
+      destination: "local",
+      explicitOptIn: true
+    };
     const response = await chrome.runtime.sendMessage({
-      type: "LUMEN_SAVE_WATCH_PLAN",
-      payload: {
-        title: tab.title || new URL(tab.url).hostname,
-        url: tab.url,
-        status: "active",
-        selectionMode: cutawayRegionRecord.region.shape === "lasso" ? "lasso" : "rect",
-        region: cutawayRegionRecord.region,
-        schedule: {
-          intervalMinutes,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "local"
-        },
-        destination: "local"
-      }
+      type: existingPlan ? "LUMEN_UPDATE_WATCH_PLAN" : "LUMEN_SAVE_WATCH_PLAN",
+      payload: existingPlan
+        ? {
+            watchPlanId: existingPlan.id,
+            patch: planPayload
+          }
+        : planPayload
     });
 
     if (!response?.ok) {
@@ -1326,8 +1518,8 @@ async function handleSaveWatchPlan() {
     showStatus({
       tone: "success",
       eyebrow: "Watch",
-      title: "Timed capture saved",
-      detail: `${response.watchPlan.title || tab.title || "This page"} will be checked ${formatWatchInterval(intervalMinutes)}.`,
+      title: existingPlan ? "Area monitor updated" : "Area monitor saved",
+      detail: `${response.watchPlan.title || tab.title || "This page"} will run ${formatWatchSchedule(schedule)}.`,
       badge: "Saved",
       progress: 1
     });
@@ -1343,6 +1535,49 @@ async function handleSaveWatchPlan() {
   } finally {
     setActionBusy(false);
   }
+}
+
+function buildWatchSchedulePayload() {
+  const mode = ["once", "repeat", "continuous"].includes(ui.watchModeSelect.value)
+    ? ui.watchModeSelect.value
+    : "once";
+  const delaySeconds = Math.max(5, Number(ui.watchDelaySelect.value) || 5);
+  const intervalMinutes = mode === "continuous"
+    ? Math.max(1, Number(ui.watchContinuousIntervalSelect.value) || 1)
+    : Math.max(15, Number(ui.watchIntervalSelect.value) || 60);
+  const maxRuns = mode === "once"
+    ? 1
+    : mode === "continuous"
+      ? Math.max(2, Number(ui.watchMaxRunsSelect.value) || 25)
+      : 0;
+
+  return {
+    mode,
+    intervalMinutes,
+    delaySeconds,
+    maxRuns,
+    saveOnlyWhenChanged: mode !== "once" && ui.watchSaveOnlyOnChange.checked,
+    runAt: mode === "once" ? new Date(Date.now() + delaySeconds * 1000).toISOString() : "",
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "local"
+  };
+}
+
+function updateWatchScheduleControls() {
+  const mode = ui.watchModeSelect.value || "once";
+
+  for (const field of ui.watchModeFields) {
+    field.classList.toggle("is-hidden", field.dataset.watchModeField !== mode);
+  }
+
+  ui.watchMaxRunsField.classList.toggle("is-hidden", mode !== "continuous");
+  ui.watchSaveOnlyOnChange.closest(".watch-change-row")?.classList.toggle("is-hidden", mode === "once");
+
+  const hints = {
+    once: "One reviewed area will be captured after a short delay—useful for opening a menu or preparing a hover state.",
+    repeat: "The reviewed area will be checked on a durable browser schedule until you pause it.",
+    continuous: "Lumen will check the reviewed area repeatedly, save only visual changes, and stop at the run cap."
+  };
+  ui.watchModeHint.textContent = hints[mode] || hints.once;
 }
 
 async function handleRunWatchPlanNow() {
@@ -1434,6 +1669,12 @@ async function handleToggleWatchPlan() {
   }
 
   const nextStatus = watchPlan.status === "active" ? "paused" : "active";
+  const restartSchedule = watchPlan.status === "completed" && watchPlan.schedule?.mode === "once"
+    ? {
+        ...watchPlan.schedule,
+        runAt: new Date(Date.now() + Math.max(5, Number(watchPlan.schedule.delaySeconds) || 10) * 1000).toISOString()
+      }
+    : null;
   setActionBusy(true);
 
   try {
@@ -1443,6 +1684,7 @@ async function handleToggleWatchPlan() {
         watchPlanId: watchPlan.id,
         patch: {
           status: nextStatus,
+          ...(restartSchedule ? { schedule: restartSchedule, runCount: 0 } : {}),
           explicitOptIn: true
         }
       }
@@ -1459,7 +1701,7 @@ async function handleToggleWatchPlan() {
       eyebrow: "Watch",
       title: nextStatus === "active" ? "Timed capture resumed" : "Timed capture paused",
       detail: nextStatus === "active"
-        ? `${watchPlan.title || "Timed capture"} will run ${formatWatchInterval(watchPlan.schedule?.intervalMinutes || 60)}.`
+        ? `${watchPlan.title || "Area monitor"} will run ${formatWatchSchedule(restartSchedule || watchPlan.schedule)}.`
         : `${watchPlan.title || "Timed capture"} will stay in the shelf and stop scheduled runs.`,
       badge: titleCase(nextStatus),
       progress: 1
@@ -1505,6 +1747,7 @@ async function handleDeleteWatchPlan() {
 
     renderWatchPlans(response.watchPlans || []);
     renderWatchRuns(response.watchRuns || latestWatchRuns);
+    await releaseOriginPermissionIfUnused(buildOriginPattern(watchPlan.url));
 
     showStatus({
       tone: "success",
@@ -1732,6 +1975,8 @@ function handleExplainCutawayPlan() {
 }
 
 async function ensurePermissionsForCurrentCapture() {
+  oneShotPermissionOrigin = "";
+
   if (!requiresOriginPermission(currentSettings.devicePreset)) {
     return true;
   }
@@ -1783,7 +2028,38 @@ async function ensurePermissionsForCurrentCapture() {
     });
   }
 
+  if (granted) {
+    oneShotPermissionOrigin = origin;
+  }
+
   return granted;
+}
+
+async function releaseOneShotPermission() {
+  const origin = oneShotPermissionOrigin;
+  oneShotPermissionOrigin = "";
+
+  if (!origin) {
+    return;
+  }
+
+  await releaseOriginPermissionIfUnused(origin);
+}
+
+async function releaseOriginPermissionIfUnused(origin) {
+  if (!origin || latestWatchPlans.some((plan) => {
+    try {
+      return plan?.url && buildOriginPattern(plan.url) === origin;
+    } catch {
+      return false;
+    }
+  })) {
+    return false;
+  }
+
+  return chrome.permissions.remove({
+    origins: [origin]
+  });
 }
 
 async function handleSignIn() {
@@ -1983,37 +2259,45 @@ async function updateDataControls(patch) {
 }
 
 async function handleDeleteBackendData() {
-  const confirmed = window.confirm("Delete capture history, timed runs, and delivery jobs for this Lumen session?");
+  const confirmed = window.confirm("Clear Lumen's local history, photo previews, page signals, saved regions, note draft, and area monitors? Downloaded originals stay on disk.");
 
   if (!confirmed) {
     return;
   }
 
   const response = await chrome.runtime.sendMessage({
-    type: "LUMEN_DELETE_ACCOUNT_DATA"
+    type: "LUMEN_CLEAR_LOCAL_DATA"
   });
 
   if (!response?.ok) {
     showStatus({
       tone: "error",
       eyebrow: "Data",
-      title: response?.error?.title || "Delete unavailable",
-      detail: response?.error?.description || "Session data deletion failed.",
+      title: response?.error?.title || "Clear unavailable",
+      detail: response?.error?.description || "Local workspace cleanup failed.",
       badge: "Blocked",
       progress: 0.12
     });
     return;
   }
 
-  renderDataControls(response.dataControls || currentDataControls);
   renderHistory(response.captureHistory || []);
+  renderWatchPlans(response.watchPlans || []);
   renderWatchRuns(response.watchRuns || []);
+  renderBlueprint(null);
+  renderManualRedactions({ regions: [] });
+  renderCutawayRegion({ region: null, regions: [] });
+  renderAnnotationRegion({ region: null, regions: [] });
+  await refreshPhotoLibrary();
+  currentSettings.annotationText = "";
+  ui.annotationText.value = "";
+  updateAnnotationCounter();
   showStatus({
     tone: "success",
     eyebrow: "Data",
-    title: "Session data deleted",
-    detail: formatDeletedDataSummary(response.deleted),
-    badge: "Deleted",
+    title: "Local workspace cleared",
+    detail: `${formatDeletedDataSummary(response.deleted)} Downloaded files remain on disk.`,
+    badge: "Cleared",
     progress: 1
   });
 }
@@ -2174,16 +2458,16 @@ function renderSession(session) {
 
   ui.accountTitle.textContent = signedIn
     ? `${currentSession.user?.name || "Lumen user"}`
-    : "Free local session";
+    : `${entitlements.label} session`;
   ui.accountDescription.textContent = signedIn
     ? backendReachable
       ? `${entitlements.label} access loaded. New captures can sync into session history.`
       : `${entitlements.label} access loaded locally. Captures stay in this browser until the local service is reachable.`
-    : `Free keeps local capture available. Enable advanced tools to unlock ${lockedAdvancedCount} current tool${lockedAdvancedCount === 1 ? "" : "s"} for testing.`;
+    : `${entitlements.label} includes Lumen's complete local capture toolkit. ${lockedAdvancedCount} connected or team tool${lockedAdvancedCount === 1 ? " remains" : "s remain"} separate.`;
   ui.accountPlan.textContent = entitlements.label;
   ui.accountSource.textContent = source;
   ui.backendBadge.textContent = backendReachable ? "Connected" : "Local";
-  ui.signInButton.classList.toggle("is-hidden", signedIn);
+  ui.signInButton.classList.toggle("is-hidden", signedIn || plan === "demo-pro");
   ui.signOutButton.classList.toggle("is-hidden", !signedIn);
   ui.billingButton.disabled = !signedIn || plan === "free";
   applyPlanGates();
@@ -2260,12 +2544,12 @@ function renderDataControls(dataControls = currentDataControls) {
   ui.retentionSelect.disabled = !controlsAvailable;
   ui.cloudSyncEnabled.checked = Boolean(currentDataControls.cloudSyncEnabled);
   ui.cloudSyncEnabled.disabled = !controlsAvailable || !canCloudSync;
-  ui.deleteBackendDataButton.disabled = !controlsAvailable;
+  ui.deleteBackendDataButton.disabled = false;
   ui.dataControlsSummary.textContent = controlsAvailable
     ? `Retention is ${formatRetentionDays(currentDataControls.retentionDays)}. Cloud sync is ${currentDataControls.cloudSyncEnabled ? "allowed" : "off"}.`
     : signedIn
       ? "The local service is unavailable. Captures remain local in this browser."
-      : "Enable advanced tools to test retention and delete controls.";
+      : "Captures stay local. You can clear history, saved regions, note drafts, and schedules at any time.";
 }
 
 function formatRetentionDays(days) {
@@ -2277,7 +2561,7 @@ function formatWatchInterval(minutes) {
   const normalized = Number(minutes) || 60;
 
   if (normalized < 60) {
-    return `every ${normalized} minutes`;
+    return normalized === 1 ? "every minute" : `every ${normalized} minutes`;
   }
 
   if (normalized === 60) {
@@ -2297,6 +2581,22 @@ function formatWatchInterval(minutes) {
   return `every ${normalized} minutes`;
 }
 
+function formatWatchSchedule(schedule = {}) {
+  const mode = schedule.mode || "repeat";
+
+  if (mode === "once") {
+    return `once after ${Math.max(5, Number(schedule.delaySeconds) || 10)} seconds`;
+  }
+
+  const cadence = formatWatchInterval(schedule.intervalMinutes || (mode === "continuous" ? 1 : 60));
+
+  if (mode === "continuous") {
+    return `${cadence}, up to ${Math.max(2, Number(schedule.maxRuns) || 10)} runs`;
+  }
+
+  return cadence;
+}
+
 function formatWatchRunStatus(run = null, plan = {}) {
   if (!run) {
     return `${plan.title || "Timed capture"} started. The result will appear in the capture shelf.`;
@@ -2307,6 +2607,10 @@ function formatWatchRunStatus(run = null, plan = {}) {
       ? `${run.fileCount} file${run.fileCount === 1 ? "" : "s"}`
       : "Files";
     return `${run.title || plan.title || "Timed capture"} finished with ${fileText} in the capture shelf.`;
+  }
+
+  if (run.status === "unchanged") {
+    return `${run.title || plan.title || "Selected area"} matched the previous run, so no duplicate photo was saved.`;
   }
 
   if (run.status === "skipped") {
@@ -2324,12 +2628,13 @@ function formatDeletedDataSummary(deleted = {}) {
   const parts = [
     `${deleted.captures || 0} capture${deleted.captures === 1 ? "" : "s"}`,
     `${deleted.watchPlans || 0} timed capture${deleted.watchPlans === 1 ? "" : "s"}`,
-    `${deleted.agentJobs || 0} agent job${deleted.agentJobs === 1 ? "" : "s"}`,
-    `${deleted.destinations || 0} destination${deleted.destinations === 1 ? "" : "s"}`,
-    deleted.deliveries === 1 ? "1 delivery" : `${deleted.deliveries || 0} deliveries`
+    `${deleted.watchRuns || 0} timed run${deleted.watchRuns === 1 ? "" : "s"}`,
+    `${deleted.savedRegions || 0} saved region set${deleted.savedRegions === 1 ? "" : "s"}`,
+    `${deleted.libraryPhotos || 0} library photo${deleted.libraryPhotos === 1 ? "" : "s"}`,
+    deleted.pageSignals ? "page signals" : "0 page signals"
   ];
 
-  return `Deleted ${parts.join(", ")} from this session.`;
+  return `Removed ${parts.join(", ")}.`;
 }
 
 function renderWatchRuns(watchRuns = []) {
@@ -2352,14 +2657,133 @@ function renderWatchPlans(watchPlans = []) {
   updateActionDisabledState();
 }
 
+async function refreshPhotoLibrary() {
+  const renderVersion = photoLibraryRenderVersion + 1;
+  photoLibraryRenderVersion = renderVersion;
+  releasePhotoLibraryObjectUrls();
+
+  try {
+    const [count, captures] = await Promise.all([
+      countLibraryCaptures(),
+      listLibraryCaptures({ limit: 4 })
+    ]);
+
+    if (renderVersion !== photoLibraryRenderVersion) {
+      return;
+    }
+
+    ui.photoLibraryCount.textContent = `${count} photo${count === 1 ? "" : "s"}`;
+    ui.photoLibraryGrid.replaceChildren();
+    ui.photoLibraryEmpty.classList.toggle("is-hidden", captures.length > 0);
+    ui.photoLibraryGrid.classList.toggle("is-hidden", captures.length === 0);
+
+    for (const capture of captures) {
+      const card = document.createElement("article");
+      const previewButton = document.createElement("button");
+      const image = document.createElement("img");
+      const fallback = document.createElement("span");
+      const copy = document.createElement("div");
+      const title = document.createElement("strong");
+      const meta = document.createElement("small");
+
+      card.className = "photo-library-card";
+      card.role = "listitem";
+      card.dataset.captureId = capture.id;
+      previewButton.className = "photo-library-preview";
+      previewButton.type = "button";
+      previewButton.setAttribute("aria-label", `Open ${capture.title || capture.host || "saved photo"} in the photo library`);
+      previewButton.addEventListener("click", () => openPhotoLibrary(capture.id));
+      image.className = "is-hidden";
+      image.alt = `Preview of ${capture.title || capture.host || "saved capture"}`;
+      fallback.className = "photo-library-preview-fallback";
+      fallback.textContent = capture.sourceType === "timed" ? "Timed area" : "Capture";
+      copy.className = "photo-library-copy";
+      title.textContent = capture.title || capture.host || "Saved capture";
+      meta.textContent = [
+        capture.host || "Local",
+        capture.sourceType === "timed" ? "Timed" : "Manual",
+        formatTimestamp(capture.capturedAt)
+      ].filter(Boolean).join(" · ");
+
+      previewButton.append(image, fallback);
+      copy.append(title, meta);
+      card.append(previewButton, copy);
+      ui.photoLibraryGrid.append(card);
+
+      getLibraryPreviewAsset(capture.id).then((asset) => {
+        if (!asset?.blob || renderVersion !== photoLibraryRenderVersion || !card.isConnected) {
+          return;
+        }
+
+        const objectUrl = URL.createObjectURL(asset.blob);
+        photoLibraryObjectUrls.add(objectUrl);
+        image.addEventListener("load", () => {
+          image.classList.remove("is-hidden");
+          fallback.classList.add("is-hidden");
+        }, { once: true });
+        image.src = objectUrl;
+      }).catch(() => {});
+    }
+  } catch (error) {
+    ui.photoLibraryCount.textContent = "Unavailable";
+    ui.photoLibraryGrid.classList.add("is-hidden");
+    ui.photoLibraryEmpty.classList.remove("is-hidden");
+    ui.photoLibraryEmpty.textContent = "The local photo library could not be opened in this browser context.";
+  }
+}
+
+async function openPhotoLibrary(captureId = "") {
+  const response = await chrome.runtime.sendMessage({
+    type: "LUMEN_OPEN_PHOTO_LIBRARY",
+    payload: captureId ? { captureId } : {}
+  });
+
+  if (!response?.ok) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Library",
+      title: "Photo library could not open",
+      detail: response?.error?.description || "Chrome blocked the local library page.",
+      badge: "Blocked",
+      progress: 0.12
+    });
+  }
+}
+
+function releasePhotoLibraryObjectUrls() {
+  for (const objectUrl of photoLibraryObjectUrls) {
+    URL.revokeObjectURL(objectUrl);
+  }
+
+  photoLibraryObjectUrls.clear();
+}
+
 function selectActiveWatchPlan() {
-  return latestWatchPlans.find((plan) => plan?.status === "active") || null;
+  return latestWatchPlans.find((plan) => plan?.status === "active" && isWatchPlanForLaunchTarget(plan)) || null;
 }
 
 function selectCurrentWatchPlan() {
   return selectActiveWatchPlan() ||
-    latestWatchPlans.find((plan) => plan?.id) ||
+    latestWatchPlans.find((plan) => plan?.id && isWatchPlanForLaunchTarget(plan)) ||
     null;
+}
+
+function isWatchPlanForLaunchTarget(plan = {}) {
+  if (!launchTargetTab?.url || !plan?.url) {
+    return false;
+  }
+
+  return normalizeWatchPageUrl(plan.url) === normalizeWatchPageUrl(launchTargetTab.url);
+}
+
+function normalizeWatchPageUrl(rawUrl = "") {
+  try {
+    const url = new URL(rawUrl);
+    url.hash = "";
+    return url.href;
+  } catch {
+    return "";
+  }
 }
 
 function renderWatchPlanCard(watchPlan = null) {
@@ -2373,7 +2797,9 @@ function renderWatchPlanCard(watchPlan = null) {
     return;
   }
 
-  const status = watchPlan.status === "paused" ? "paused" : "active";
+  const status = ["active", "paused", "completed"].includes(watchPlan.status)
+    ? watchPlan.status
+    : "active";
   const shapeLabel = watchPlan.selectionMode === "lasso" ? "Lasso" : "Region";
   const lastRun = latestWatchRuns.find((run) => run.watchPlanId === watchPlan.id);
   const runText = watchPlan.lastRunAt || lastRun?.completedAt || lastRun?.startedAt || lastRun?.scheduledAt
@@ -2382,14 +2808,18 @@ function renderWatchPlanCard(watchPlan = null) {
 
   ui.watchPlanCard.classList.remove("is-hidden");
   ui.watchPlanCard.dataset.status = status;
-  ui.watchPlanStatus.textContent = status === "active" ? "Active timed capture" : "Paused timed capture";
+  ui.watchPlanStatus.textContent = status === "active"
+    ? "Active area monitor"
+    : status === "completed"
+      ? "Completed area monitor"
+      : "Paused area monitor";
   ui.watchPlanTitle.textContent = watchPlan.title || watchPlan.host || "Timed capture";
   ui.watchPlanMeta.textContent = [
-    formatWatchInterval(watchPlan.schedule?.intervalMinutes || 60),
+    formatWatchSchedule(watchPlan.schedule),
     shapeLabel,
     runText
   ].join(" · ");
-  ui.toggleWatchPlanButton.textContent = status === "active" ? "Pause" : "Resume";
+  ui.toggleWatchPlanButton.textContent = status === "active" ? "Pause" : status === "completed" ? "Restart" : "Resume";
 }
 
 function renderCaptureShelf(history = latestHistoryItems, watchRuns = latestWatchRuns) {
@@ -2409,7 +2839,7 @@ function renderCaptureShelf(history = latestHistoryItems, watchRuns = latestWatc
     ].filter(Boolean).join(" · "),
     captureId: run.captureId || "",
     status: run.status || "queued",
-    badge: run.status === "captured" ? "Timed saved" : `Timed ${titleCase(run.status || "queued")}`
+    badge: run.status === "captured" ? "Timed saved" : run.status === "unchanged" ? "No change" : `Timed ${titleCase(run.status || "queued")}`
   }));
   const captureCards = captures.slice(0, 6).map((item) => ({
     type: "capture",
@@ -2519,6 +2949,7 @@ function renderCaptureShelf(history = latestHistoryItems, watchRuns = latestWatc
 function renderHistory(history) {
   const items = Array.isArray(history) ? history : [];
   latestHistoryItems = items;
+  renderOnboarding();
   renderCaptureShelf(latestHistoryItems, latestWatchRuns);
   ui.historyCount.textContent = `${items.length} item${items.length === 1 ? "" : "s"}`;
   ui.historyList.replaceChildren();
@@ -2556,7 +2987,10 @@ function renderHistory(history) {
 
     const badge = document.createElement("span");
     badge.className = "tiny-note";
-    badge.textContent = item.exportPreset || "raw";
+    badge.textContent = item.captureHealth?.status === "complete"
+      ? "Verified"
+      : item.exportPreset || "raw";
+    badge.classList.toggle("is-verified", item.captureHealth?.status === "complete");
 
     topRow.append(title, badge);
 
@@ -2571,6 +3005,7 @@ function renderHistory(history) {
       item.annotation?.text ? "note added" : "",
       item.manualRedactionCount ? `${item.manualRedactionCount} manual box${item.manualRedactionCount === 1 ? "" : "es"}` : "",
       item.cutawayCount ? `${item.cutawayCount} cutaway crop${item.cutawayCount === 1 ? "" : "s"}` : "",
+      formatCaptureHealth(item.captureHealth),
       formatManualProjectionStats(item.manualProjectionStats),
       formatCutawayResolutionStats(item.cutawayResolutionStats),
       item.redactionCount ? `${item.redactionCount} redaction${item.redactionCount === 1 ? "" : "s"}` : "",
@@ -2691,7 +3126,7 @@ function renderCutawayRegion(record) {
     `Stored for ${record?.host || "this URL"}.`,
     `Top ${Math.round(region.top)}px, left ${Math.round(region.left)}px.`,
     region.shape === "lasso"
-      ? "Captures save a focused crop and keep the lasso shape."
+      ? "Captures preserve the lasso and leave pixels outside it transparent."
       : "Captures save focused crop PNGs when this region resolves."
   ].join(" ");
   ui.watchPlanSummary.textContent = `${shapeLabel} ready for timed capture. Choose a cadence and save it after checking the region.`;
@@ -2707,10 +3142,16 @@ function renderWatchPlanSummary(watchPlan = null) {
   ui.watchPlanSummary.textContent = [
     `${watchPlan.title || "Timed capture"} saved.`,
     watchPlan.status === "paused"
-      ? `Paused at ${formatWatchInterval(watchPlan.schedule?.intervalMinutes || 60)}.`
-      : `Runs ${formatWatchInterval(watchPlan.schedule?.intervalMinutes || 60)}.`,
+      ? `Paused; cadence was ${formatWatchSchedule(watchPlan.schedule)}.`
+      : watchPlan.status === "completed"
+        ? `Completed after ${watchPlan.runCount || 0} run${watchPlan.runCount === 1 ? "" : "s"}.`
+        : `Runs ${formatWatchSchedule(watchPlan.schedule)}.`,
     watchPlan.selectionMode === "lasso" ? "Lasso region retained." : "Focused region retained.",
-    watchPlan.status === "paused" ? "Resume when you want scheduled runs again." : "Use Run now for a fresh capture."
+    watchPlan.status === "paused"
+      ? "Resume when you want scheduled runs again."
+      : watchPlan.status === "completed"
+        ? "Restart to run the selected area again."
+        : "Use Run now for a fresh capture."
   ].join(" ");
 }
 
@@ -2752,12 +3193,14 @@ function buildHistoryDetails(item) {
   const redactionCount = item.redactionCount || 0;
   const cutawayCount = item.cutawayCount || 0;
   const manifestState = item.manifestFile ? "Saved" : "Off";
+  const integrityState = formatCaptureHealth(item.captureHealth) || "Legacy";
 
   metrics.append(
     buildHistoryMetric("Views", String(viewCount)),
     buildHistoryMetric("Files", String(fileCount)),
     buildHistoryMetric("Redactions", String(redactionCount)),
     buildHistoryMetric("Cutaways", String(cutawayCount)),
+    buildHistoryMetric("Integrity", integrityState),
     buildHistoryMetric("Details", manifestState)
   );
   detail.append(metrics);
@@ -2824,7 +3267,8 @@ function buildHistoryVariantList(item) {
         : "",
       variant.fileCount ? `${variant.fileCount} file${variant.fileCount === 1 ? "" : "s"}` : "",
       variant.cutawayCount ? `${variant.cutawayCount} cutaway${variant.cutawayCount === 1 ? "" : "s"}` : "",
-      variant.redactionCount ? `${variant.redactionCount} redaction${variant.redactionCount === 1 ? "" : "s"}` : ""
+      variant.redactionCount ? `${variant.redactionCount} redaction${variant.redactionCount === 1 ? "" : "s"}` : "",
+      formatCaptureHealth(variant.captureHealth || variant.health)
     ]
       .filter(Boolean)
       .join(" | ") || "Captured";
@@ -3464,6 +3908,7 @@ async function refreshLaunchStatus() {
   try {
     const tab = await resolveActionTargetTab();
     launchTargetTab = tab;
+    renderWatchPlans(latestWatchPlans);
 
     if (!tab?.url) {
       renderLaunchStatus({
@@ -3537,6 +3982,7 @@ function renderLaunchStatus({ state, title, detail, actionsBlocked = false }) {
   ui.launchStatusDetail.textContent = detail || "Choose a Lumen action.";
   ui.launchPanel.classList.toggle("is-blocked", launchActionsBlocked);
   updateActionDisabledState();
+  renderOnboarding();
 }
 
 function showStatus({ tone, stage, eyebrow, title, detail, badge, progress }) {
@@ -3685,10 +4131,10 @@ function updateActionDisabledState() {
   ui.startLassoPickerButton.disabled = disabled;
   ui.clearCutawayButton.disabled = disabled || !cutawayRegionRecord.region;
   ui.explainCutawayPlanButton.disabled = disabled;
-  ui.saveWatchPlanButton.disabled = disabled || !cutawayRegionRecord.region || !currentSession?.signedIn || !getFeatureAccess("regionWatch", currentSession?.plan || "free");
-  ui.runWatchPlanNowButton.disabled = disabled || !selectActiveWatchPlan() || !currentSession?.signedIn || !getFeatureAccess("regionWatch", currentSession?.plan || "free");
-  ui.toggleWatchPlanButton.disabled = disabled || !selectCurrentWatchPlan() || !currentSession?.signedIn || !getFeatureAccess("regionWatch", currentSession?.plan || "free");
-  ui.deleteWatchPlanButton.disabled = disabled || !selectCurrentWatchPlan() || !currentSession?.signedIn;
+  ui.saveWatchPlanButton.disabled = disabled || !cutawayRegionRecord.region || !getFeatureAccess("regionWatch", currentSession?.plan || "free");
+  ui.runWatchPlanNowButton.disabled = disabled || !selectActiveWatchPlan() || !getFeatureAccess("regionWatch", currentSession?.plan || "free");
+  ui.toggleWatchPlanButton.disabled = disabled || !selectCurrentWatchPlan() || !getFeatureAccess("regionWatch", currentSession?.plan || "free");
+  ui.deleteWatchPlanButton.disabled = disabled || !selectCurrentWatchPlan();
   ui.startAnnotationPickerButton.disabled = disabled;
   ui.clearAnnotationButton.disabled = disabled || !annotationRegionRecord.region;
   ui.exportReviewCancelButton.disabled = actionBusy;
@@ -3871,14 +4317,33 @@ function buildCaptureSuccessMessage(response, settings) {
   const projectionSentence = projectionText ? ` ${projectionText}.` : "";
   const cutawayProjectionText = formatCutawayResolutionStats(response.cutawayResolutionStats);
   const cutawayProjectionSentence = cutawayProjectionText ? ` ${cutawayProjectionText}.` : "";
+  const healthText = response.captureHealth?.status === "complete"
+    ? ` Integrity verified across ${response.captureHealth.verifiedVariantCount || variantCount} view${(response.captureHealth.verifiedVariantCount || variantCount) === 1 ? "" : "s"}.`
+    : "";
 
   if (!response.redactionCount) {
     return variantCount > 1
-      ? `${fileText}. ${variantCount} responsive views captured.${manifestText}${folderText}${noteText}${manualText}${cutawayText}${projectionSentence}${cutawayProjectionSentence}`
-      : `${fileText}.${manifestText}${folderText}${noteText}${manualText}${cutawayText}${projectionSentence}${cutawayProjectionSentence}`;
+      ? `${fileText}. ${variantCount} responsive views captured.${healthText}${manifestText}${folderText}${noteText}${manualText}${cutawayText}${projectionSentence}${cutawayProjectionSentence}`
+      : `${fileText}.${healthText}${manifestText}${folderText}${noteText}${manualText}${cutawayText}${projectionSentence}${cutawayProjectionSentence}`;
   }
 
-  return `${fileText}. ${variantCount > 1 ? `${variantCount} responsive views captured. ` : ""}${response.redactionCount} redaction region${response.redactionCount === 1 ? "" : "s"} sanitized.${manifestText}${folderText}${noteText}${manualText}${cutawayText}${projectionSentence}${cutawayProjectionSentence}`;
+  return `${fileText}. ${variantCount > 1 ? `${variantCount} responsive views captured. ` : ""}${response.redactionCount} redaction region${response.redactionCount === 1 ? "" : "s"} sanitized.${healthText}${manifestText}${folderText}${noteText}${manualText}${cutawayText}${projectionSentence}${cutawayProjectionSentence}`;
+}
+
+function formatCaptureHealth(health) {
+  if (!health?.status) {
+    return "";
+  }
+
+  const percent = Number.isFinite(Number(health.coveragePercent))
+    ? `${Number(health.coveragePercent).toFixed(Number(health.coveragePercent) % 1 ? 1 : 0)}%`
+    : "";
+
+  if (health.status === "complete") {
+    return `Verified${percent ? ` ${percent}` : ""}`;
+  }
+
+  return `${titleCase(health.status)}${percent ? ` ${percent}` : ""}`;
 }
 
 function buildRedactionPreviewText(preview) {
@@ -3902,6 +4367,7 @@ function buildHistorySummaryText(item) {
     `Captured: ${formatTimestamp(item.capturedAt)}`,
     `Views: ${item.variants?.length || 1}`,
     `Files: ${item.files?.length || 0}`,
+    item.captureHealth ? `Integrity: ${formatCaptureHealth(item.captureHealth)}` : "Integrity: legacy capture",
     `Redactions: ${item.redactionCount || 0}`,
     item.manualRedactionCount ? `Manual boxes: ${item.manualRedactionCount}` : "",
     item.cutawayCount ? `Cutaway crops: ${item.cutawayCount}` : "",

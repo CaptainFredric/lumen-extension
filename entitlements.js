@@ -37,9 +37,9 @@ export const LUMEN_FEATURES = {
     description: "Queue reviewed capture bundles for destinations such as Drive, Slack, or Notion."
   },
   regionWatch: {
-    label: "Opt-in region watch records",
-    status: "queueable",
-    description: "Store reviewed region watch plans with cadence, destination, and saved selection metadata."
+    label: "Selected-area monitors",
+    status: "implemented",
+    description: "Run delayed, repeating, or capped continuous captures over a reviewed rectangle or lasso."
   },
   agentHandoff: {
     label: "Reviewed agent handoff records",
@@ -51,7 +51,7 @@ export const LUMEN_FEATURES = {
 const PLAN_LABELS = {
   free: "Free",
   pro: "Pro",
-  "demo-pro": "Demo Pro",
+  "demo-pro": "Local beta",
   team: "Team",
   enterprise: "Enterprise"
 };
@@ -59,7 +59,7 @@ const PLAN_LABELS = {
 const PLAN_FEATURES = {
   free: ["cleanCapture", "manualRedaction"],
   pro: ["cleanCapture", "manualRedaction", "responsiveSnap", "autoRedact", "beautify", "historySync"],
-  "demo-pro": ["cleanCapture", "manualRedaction", "responsiveSnap", "autoRedact", "beautify", "historySync"],
+  "demo-pro": ["cleanCapture", "manualRedaction", "responsiveSnap", "autoRedact", "beautify", "historySync", "regionWatch"],
   team: [
     "cleanCapture",
     "manualRedaction",
@@ -100,7 +100,7 @@ const PLAN_LIMITS = {
   "demo-pro": {
     historyItems: 100,
     responsiveVariants: 3,
-    watchPlans: 0,
+    watchPlans: 10,
     agentJobs: 0
   },
   team: {

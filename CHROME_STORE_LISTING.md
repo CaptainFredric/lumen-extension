@@ -6,7 +6,7 @@ Lumen helps people create clean webpage captures for design, QA, product, and la
 
 ## Short Description
 
-Clean webpage captures with responsive views, redaction checks, notes, page signals, and local history.
+Local webpage capture with verified full pages, transparent lassos, timed areas, redaction, and a preview library.
 
 ## Long Description
 
@@ -20,13 +20,19 @@ Lumen supports:
 2. Desktop, tablet, and mobile capture sets.
 3. Redaction checks for visible sensitive text and filled fields.
 4. Manual redaction boxes for custom areas.
-5. Focused crops, lasso-style region selection, and anchored callout notes.
+5. Focused rectangles and freeform lasso captures with transparent pixels outside the selected lasso path.
 6. Page signals such as title, URL, colors, typography, headline, CTA text, and navigation labels.
-7. Timed captures for saved regions, with pause, resume, and run-now controls.
-8. Local capture history with saved file details.
-9. Capture details JSON that keeps page context beside the images.
+7. One-time delayed selected-area capture after 5, 10, or 30 seconds.
+8. Scheduled repeat capture from every 15 minutes through daily.
+9. Capped continuous selected-area monitoring every 1, 5, or 15 minutes, stopping after 10, 25, or 50 runs.
+10. Pause, resume, run-now, and delete controls for local timed plans.
+11. An on-device photo library with actual previews, search, manual/timed filters, favorites, and sorting.
+12. Full-resolution originals retained in Chrome Downloads, with Open and Show actions from the library.
+13. Capture details JSON that keeps page context beside the images.
 
 Redaction checks are a safety aid. Check each capture before sharing it outside your workspace.
+
+Timed capture is local and runs while Chrome is available. The local beta does not provide cloud file storage, team sharing, remote monitoring, or guaranteed execution while the browser is closed.
 
 ## Privacy URL
 
@@ -43,31 +49,32 @@ https://captainfredric.github.io/lumen-extension/
 ## Permission Justification
 
 1. `activeTab`: lets Lumen read and capture the current page after the user starts an action.
-2. `alarms`: runs saved timed captures on the cadence the user chooses.
-3. `downloads`: saves capture images, focused crops, and capture details JSON to the user's Downloads folder.
+2. `alarms`: runs explicitly saved one-time, repeating, or capped continuous selected-area captures while Chrome is available.
+3. `downloads`: saves full-resolution capture images, focused crops, and capture details JSON to the user's Downloads folder.
 4. `offscreen`: composes stitched screenshots in an offscreen canvas document.
 5. `scripting`: injects the content script that prepares and reads the current page for capture.
-6. `storage`: stores settings, local capture history, manual redaction boxes, focused crop regions, timed capture plans, and callout regions.
+6. `storage`: stores settings, local capture history, manual redaction boxes, focused regions, timed capture plans, and callout regions. Compact photo-library preview blobs use extension-owned IndexedDB on the device and are not placed in Chrome Sync.
 
 ## Optional Host Permission Justification
 
-Responsive capture sets use temporary viewport tabs. Optional `http://*/*` and `https://*/*` access is requested when the user chooses a responsive capture workflow that needs those pages.
+Responsive capture sets use temporary viewport tabs. Optional `http://*/*` and `https://*/*` access is also requested when the user explicitly saves a selected-area timer plan so Chrome can reopen that page while the browser is available. One-shot grants are removed after capture when no saved plan still needs the origin; deleting the last plan removes its saved access.
 
 ## Data Disclosures To Review
 
-1. Website content: screenshots and extracted page signals come from the page the user chooses.
+1. Website content: screenshots, compact local preview copies, and extracted page signals come from the page the user chooses.
 2. User activity: local capture history may be classified as product usage activity.
 3. Personal information: captured pages may contain personal information chosen by the user.
 4. Personal communications: captured pages may contain communications chosen by the user.
 
-The extension saves capture content locally through Chrome extension storage and Chrome Downloads by default.
+The extension saves compact library previews in local extension-owned IndexedDB and full-resolution originals through Chrome Downloads. Removing a library preview does not delete the downloaded original. Screenshot content is not sent to a Lumen-owned production service by default.
 
 ## Screenshot Pack
 
 Generated assets live in `store-assets/screenshots/` and can be refreshed with `npm run store:screenshots`.
 
 1. Extension control surface on a capturable page.
-2. Hold-action menu with responsive capture, redaction scan, boxes, cutaway, lasso, callout, and signals.
+2. Hold-action menu with responsive capture, redaction scan, boxes, rectangle, lasso, callout, and signals.
 3. Responsive output set showing desktop, tablet, and mobile captures.
 4. Redaction and callout checks.
-5. Signals and local history detail.
+5. Local photo library with real previews and original-file actions.
+6. Delayed once, scheduled repeat, and capped continuous selected-area controls.

@@ -562,7 +562,6 @@ async function seedExtensionState(worker) {
       autoRedact: true,
       exportManifest: true,
       annotationEnabled: true,
-      annotationText: "Check pricing module before sharing",
       annotationPosition: "top-right",
       devicePreset: "responsive",
       exportPreset: "browser"
@@ -570,6 +569,9 @@ async function seedExtensionState(worker) {
   }));
 
   await worker.evaluate(() => chrome.storage.local.set({
+    "lumen.capture.privateSettings": {
+      annotationText: "Check pricing module before sharing"
+    },
     "lumen.capture.history": [
       {
         id: "store-shot-capture",

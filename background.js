@@ -3,9 +3,11 @@ import {
   STORAGE_KEYS,
   buildOriginPattern,
   getDefaultSettings,
+  getSyncSafeSettings,
   getCaptureVariants,
   isRestrictedCaptureUrl,
-  normalizeCaptureNoteOptions
+  normalizeCaptureNoteOptions,
+  sanitizeCaptureUrl
 } from "./config.js";
 import {
   bootstrapAppState,
@@ -24,6 +26,12 @@ import {
   updateRemoteWatchPlan,
   updateRemoteDataControls
 } from "./lumen-backend.js";
+import {
+  clearLibrary as clearCaptureLibrary,
+  getLibraryCapture,
+  pruneLibraryPreviews,
+  putLibraryCapture
+} from "./library-store.js";
 
 const OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
 const OFFSCREEN_REASON = "BLOBS";
@@ -33,29 +41,151 @@ const SESSION_UPDATE_EVENT = "LUMEN_SESSION_UPDATED";
 const HISTORY_UPDATE_EVENT = "LUMEN_HISTORY_UPDATED";
 const WATCH_PLAN_UPDATE_EVENT = "LUMEN_WATCH_PLANS_UPDATED";
 const WATCH_RUN_UPDATE_EVENT = "LUMEN_WATCH_RUNS_UPDATED";
+const LIBRARY_UPDATE_EVENT = "LUMEN_LIBRARY_UPDATED";
 const MANUAL_REDACTIONS_UPDATE_EVENT = "LUMEN_MANUAL_REDACTIONS_UPDATED";
 const CUTAWAY_REGION_UPDATE_EVENT = "LUMEN_CUTAWAY_REGION_UPDATED";
 const ANNOTATION_REGION_UPDATE_EVENT = "LUMEN_ANNOTATION_REGION_UPDATED";
 const WATCH_ALARM_PREFIX = "lumen.watch.";
+const MAX_CAPTURE_REDACTIONS = 800;
 
 let captureInFlight = false;
 let analyzeInFlight = false;
 let offscreenCreationPromise = null;
 
+async function restrictLocalStorageAccess() {
+  if (typeof chrome.storage?.local?.setAccessLevel !== "function") {
+    return;
+  }
+
+  await chrome.storage.local.setAccessLevel({
+    accessLevel: "TRUSTED_CONTEXTS"
+  });
+}
+
+function normalizeWatchSchedule(schedule = {}, nowMs = Date.now()) {
+  const mode = ["once", "repeat", "continuous"].includes(schedule?.mode)
+    ? schedule.mode
+    : "repeat";
+  const intervalMinutes = Math.max(
+    mode === "continuous" ? 1 : 15,
+    Math.round(Number(schedule?.intervalMinutes) || (mode === "continuous" ? 1 : 60))
+  );
+  const delaySeconds = Math.max(5, Math.min(86400, Math.round(Number(schedule?.delaySeconds) || 10)));
+  const requestedMaxRuns = Math.max(0, Math.round(Number(schedule?.maxRuns) || 0));
+  const maxRuns = mode === "once"
+    ? 1
+    : mode === "continuous"
+      ? Math.max(2, Math.min(100, requestedMaxRuns || 10))
+      : Math.min(1000, requestedMaxRuns);
+  const parsedRunAt = Date.parse(schedule?.runAt || "");
+  const parsedExpiry = Date.parse(schedule?.expiresAt || "");
+
+  return {
+    mode,
+    intervalMinutes,
+    delaySeconds,
+    maxRuns,
+    saveOnlyWhenChanged: Boolean(schedule?.saveOnlyWhenChanged),
+    runAt: Number.isFinite(parsedRunAt) ? new Date(parsedRunAt).toISOString() : new Date(nowMs + delaySeconds * 1000).toISOString(),
+    expiresAt: Number.isFinite(parsedExpiry) ? new Date(parsedExpiry).toISOString() : "",
+    timezone: typeof schedule?.timezone === "string" && schedule.timezone.trim()
+      ? schedule.timezone.trim().slice(0, 80)
+      : "local"
+  };
+}
+
+function buildWatchAlarmDefinition(planOrSchedule = {}, nowMs = Date.now()) {
+  const schedule = normalizeWatchSchedule(planOrSchedule?.schedule || planOrSchedule, nowMs);
+
+  if (schedule.mode === "once") {
+    return {
+      when: Math.max(nowMs + 1000, Date.parse(schedule.runAt))
+    };
+  }
+
+  return {
+    delayInMinutes: schedule.intervalMinutes,
+    periodInMinutes: schedule.intervalMinutes
+  };
+}
+
+function evaluateWatchScheduleState(planOrSchedule = {}, { completedRuns, nowMs = Date.now() } = {}) {
+  const schedule = normalizeWatchSchedule(planOrSchedule?.schedule || planOrSchedule, nowMs);
+  const status = planOrSchedule?.schedule ? planOrSchedule.status : "active";
+  const runCount = Math.max(0, Math.round(Number(completedRuns ?? planOrSchedule?.runCount) || 0));
+
+  if (status !== "active") {
+    return {
+      active: false,
+      reason: status === "completed" ? "completed" : "paused"
+    };
+  }
+
+  if (schedule.expiresAt && Date.parse(schedule.expiresAt) <= nowMs) {
+    return {
+      active: false,
+      reason: "expired"
+    };
+  }
+
+  if (schedule.maxRuns > 0 && runCount >= schedule.maxRuns) {
+    return {
+      active: false,
+      reason: "max-runs"
+    };
+  }
+
+  return {
+    active: true,
+    reason: "active"
+  };
+}
+
+function calculateVisualHashDifference(previousHash = "", currentHash = "") {
+  if (!previousHash || !currentHash || previousHash.length !== currentHash.length) {
+    return 100;
+  }
+
+  let changedBits = 0;
+  let totalBits = 0;
+
+  for (let index = 0; index < previousHash.length; index += 1) {
+    const previousNibble = Number.parseInt(previousHash[index], 16);
+    const currentNibble = Number.parseInt(currentHash[index], 16);
+
+    if (!Number.isFinite(previousNibble) || !Number.isFinite(currentNibble)) {
+      return 100;
+    }
+
+    let difference = previousNibble ^ currentNibble;
+
+    while (difference) {
+      changedBits += difference & 1;
+      difference >>= 1;
+    }
+
+    totalBits += 4;
+  }
+
+  return totalBits ? Number(((changedBits / totalBits) * 100).toFixed(2)) : 100;
+}
+
 chrome.runtime.onInstalled.addListener(async () => {
+  await restrictLocalStorageAccess();
   const [syncState, localState] = await Promise.all([
     chrome.storage.sync.get(STORAGE_KEYS.settings),
     chrome.storage.local.get([
       STORAGE_KEYS.session,
       STORAGE_KEYS.captureHistory,
       STORAGE_KEYS.watchPlans,
-      STORAGE_KEYS.watchRuns
+      STORAGE_KEYS.watchRuns,
+      STORAGE_KEYS.privateSettings
     ])
   ]);
 
   if (!syncState[STORAGE_KEYS.settings]) {
     await chrome.storage.sync.set({
-      [STORAGE_KEYS.settings]: getDefaultSettings()
+      [STORAGE_KEYS.settings]: getSyncSafeSettings(getDefaultSettings())
     });
   }
 
@@ -63,7 +193,8 @@ chrome.runtime.onInstalled.addListener(async () => {
     !localState[STORAGE_KEYS.session] ||
     !Array.isArray(localState[STORAGE_KEYS.captureHistory]) ||
     !Array.isArray(localState[STORAGE_KEYS.watchPlans]) ||
-    !Array.isArray(localState[STORAGE_KEYS.watchRuns])
+    !Array.isArray(localState[STORAGE_KEYS.watchRuns]) ||
+    !localState[STORAGE_KEYS.privateSettings]
   ) {
     const snapshot = await readLocalState();
     const localPatch = {};
@@ -84,11 +215,26 @@ chrome.runtime.onInstalled.addListener(async () => {
       localPatch[STORAGE_KEYS.watchRuns] = snapshot.watchRuns || [];
     }
 
+    if (!localState[STORAGE_KEYS.privateSettings]) {
+      localPatch[STORAGE_KEYS.privateSettings] = {
+        annotationText: ""
+      };
+    }
+
     await chrome.storage.local.set(localPatch);
   }
 
   await restoreWatchAlarms();
 });
+
+if (chrome.runtime.onStartup) {
+  chrome.runtime.onStartup.addListener(() => {
+    restrictLocalStorageAccess().catch(() => {});
+    restoreWatchAlarms().catch((error) => {
+      console.debug("Lumen timed captures could not be restored:", error);
+    });
+  });
+}
 
 if (chrome.alarms?.onAlarm) {
   chrome.alarms.onAlarm.addListener((alarm) => {
@@ -105,7 +251,10 @@ if (chrome.alarms?.onAlarm) {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "LUMEN_BOOTSTRAP_APP") {
     bootstrapAppState()
-      .then((result) => sendResponse({ ok: true, ...result }))
+      .then(async (result) => {
+        await restoreWatchAlarms();
+        sendResponse({ ok: true, ...result });
+      })
       .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
 
     return true;
@@ -125,11 +274,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     captureInFlight = true;
 
-    runCaptureFlow(message.payload?.options)
+    const captureOptions = message.payload?.options || getDefaultSettings();
+
+    runCaptureFlow(captureOptions)
       .then((result) => sendResponse({ ok: true, ...result }))
       .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }))
-      .finally(() => {
+      .finally(async () => {
         captureInFlight = false;
+        await releaseCapturePermissionLease(captureOptions.permissionLeaseOrigin);
       });
 
     return true;
@@ -285,6 +437,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "LUMEN_OPEN_LIBRARY_PHOTO" || message?.type === "LUMEN_SHOW_LIBRARY_PHOTO") {
+    runLibraryDownloadAction(
+      message.payload || {},
+      message.type === "LUMEN_OPEN_LIBRARY_PHOTO" ? "open" : "show"
+    )
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_OPEN_PHOTO_LIBRARY") {
+    const captureId = typeof message.payload?.captureId === "string" ? message.payload.captureId : "";
+    const query = captureId ? `?capture=${encodeURIComponent(captureId)}` : "";
+
+    chrome.tabs.create({
+      url: chrome.runtime.getURL(`library.html${query}`)
+    })
+      .then((tab) => sendResponse({ ok: true, tabId: tab?.id || null }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
   if (message?.type === "LUMEN_MANUAL_REDACTIONS_UPDATED") {
     persistManualRedactionsFromContent(sender.tab, message.payload)
       .then((result) => sendResponse({ ok: true, ...result }))
@@ -426,7 +602,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message?.type === "LUMEN_DELETE_WATCH_PLAN") {
     const watchPlanId = message.payload?.watchPlanId || "";
-    deleteRemoteWatchPlan(watchPlanId)
+    let deletedOrigin = "";
+
+    readLocalState()
+      .then((state) => {
+        const existing = (state.watchPlans || []).find((plan) => plan.id === watchPlanId);
+        deletedOrigin = existing?.url ? buildOriginPattern(existing.url) : "";
+        return deleteRemoteWatchPlan(watchPlanId);
+      })
       .then(async (result) => {
         if (!result.ok) {
           sendResponse({
@@ -438,6 +621,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         if (chrome.alarms?.clear) {
           await chrome.alarms.clear(`${WATCH_ALARM_PREFIX}${watchPlanId}`);
+        }
+
+        if (deletedOrigin) {
+          await releaseCapturePermissionLease(deletedOrigin);
         }
 
         const localState = await readLocalState();
@@ -506,7 +693,95 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "LUMEN_CLEAR_LOCAL_DATA") {
+    clearLocalWorkspaceData()
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
 });
+
+async function clearLocalWorkspaceData() {
+  const [localState, storedRegions, clearedLibrary] = await Promise.all([
+    readLocalState(),
+    chrome.storage.local.get([
+      STORAGE_KEYS.latestBlueprint,
+      STORAGE_KEYS.manualRedactions,
+      STORAGE_KEYS.cutawayRegions,
+      STORAGE_KEYS.annotationRegions
+    ]),
+    clearCaptureLibrary().catch(() => ({ captureCount: 0, assetCount: 0 }))
+  ]);
+  const savedRegionSets = [
+    storedRegions[STORAGE_KEYS.manualRedactions],
+    storedRegions[STORAGE_KEYS.cutawayRegions],
+    storedRegions[STORAGE_KEYS.annotationRegions]
+  ].reduce((sum, record) => sum + Object.keys(record || {}).length, 0);
+
+  for (const plan of localState.watchPlans || []) {
+    if (plan?.id) {
+      await chrome.alarms.clear(`${WATCH_ALARM_PREFIX}${plan.id}`).catch(() => false);
+    }
+  }
+
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.latestBlueprint]: null,
+    [STORAGE_KEYS.captureHistory]: [],
+    [STORAGE_KEYS.watchPlans]: [],
+    [STORAGE_KEYS.watchRuns]: [],
+    [STORAGE_KEYS.manualRedactions]: {},
+    [STORAGE_KEYS.cutawayRegions]: {},
+    [STORAGE_KEYS.annotationRegions]: {},
+    [STORAGE_KEYS.privateSettings]: {
+      annotationText: ""
+    }
+  });
+
+  const grantedPermissions = await chrome.permissions.getAll();
+  const grantedOrigins = Array.isArray(grantedPermissions.origins) ? grantedPermissions.origins : [];
+  const requiredOrigins = new Set(chrome.runtime.getManifest().host_permissions || []);
+  let revokedPermissionCount = 0;
+
+  for (const origin of grantedOrigins) {
+    if (requiredOrigins.has(origin)) {
+      continue;
+    }
+
+    try {
+      if (await chrome.permissions.remove({ origins: [origin] })) {
+        revokedPermissionCount += 1;
+      }
+    } catch (error) {
+      console.debug("Lumen optional site access cleanup skipped:", error);
+    }
+  }
+
+  broadcastHistory([]);
+  broadcastWatchPlans([]);
+  broadcastWatchRuns([]);
+  broadcastManualRedactions({ regions: [] });
+  broadcastCutawayRegion({ region: null, regions: [] });
+  broadcastAnnotationRegion({ region: null, regions: [] });
+  broadcastLibraryUpdated({ count: 0 });
+
+  return {
+    deleted: {
+      captures: localState.captureHistory.length,
+      watchPlans: localState.watchPlans.length,
+      watchRuns: localState.watchRuns.length,
+      savedRegions: savedRegionSets,
+      pageSignals: Boolean(storedRegions[STORAGE_KEYS.latestBlueprint]),
+      permissions: revokedPermissionCount,
+      libraryPhotos: clearedLibrary.captureCount || 0
+    },
+    captureHistory: [],
+    watchPlans: [],
+    watchRuns: [],
+    downloadsRemain: true
+  };
+}
 
 async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
   const captureNote = normalizeCaptureNoteOptions(options);
@@ -538,6 +813,7 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
     capturedAt
   });
   const results = [];
+  const focusedOnly = Boolean(context.focusedOnly);
   let blueprint = null;
 
   for (let index = 0; index < variants.length; index += 1) {
@@ -549,7 +825,10 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
       cutawayRegion,
       annotationRegion,
       runContext,
-      extractBlueprint: index === 0
+      extractBlueprint: index === 0,
+      focusedOnly,
+      changeBaselineHash: context.changeBaselineHash || "",
+      saveOnlyWhenChanged: Boolean(context.saveOnlyWhenChanged)
     });
 
     results.push(result);
@@ -567,6 +846,17 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
   const cutawayResolutionStats = mergeCutawayResolutionStats(results.map((result) => result.cutawayResolutionStats));
   const annotationResolutionStats = mergeCutawayResolutionStats(results.map((result) => result.annotationResolutionStats));
   const artifactStats = buildArtifactStats(results.flatMap((result) => result.downloadRecords));
+  const captureHealth = buildAggregateCaptureHealth(results.map((result) => result.captureHealth));
+  const libraryPreviews = results.flatMap((result) => (result.photoPreviews || []).map((preview, index) => ({
+    dataUrl: preview.previewDataUrl,
+    width: preview.width,
+    height: preview.height,
+    role: preview.role,
+    variantId: `${result.variant.id}-${preview.role || "image"}-${preview.partIndex || index + 1}`
+  })));
+  const visualHash = results.find((result) => result.visualHash)?.visualHash || "";
+  const changePercent = results.find((result) => Number.isFinite(result.changePercent))?.changePercent ?? 100;
+  const unchanged = focusedOnly && results.length > 0 && results.every((result) => result.unchanged);
   const variantSummaries = results.map((result) => ({
     id: result.variant.id,
     label: result.variant.label,
@@ -581,8 +871,44 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
     cutawayResolutionStats: result.cutawayResolutionStats,
     annotationResolutionStats: result.annotationResolutionStats,
     redactionBreakdown: result.redactionBreakdown,
+    captureHealth: result.captureHealth,
+    viewport: result.viewport,
     dimensions: result.dimensions
   }));
+
+  if (unchanged) {
+    broadcastProgress({
+      stage: "done",
+      title: "No visual change",
+      detail: "The selected area matched the previous run, so Lumen skipped the duplicate photo.",
+      progress: 1
+    });
+
+    return {
+      captureId: "",
+      fileName: "",
+      files: [],
+      downloads: [],
+      archiveFolder: runContext.folder,
+      segmentCount,
+      exportPreset: firstResult.exportPreset,
+      tileCount,
+      redactionCount,
+      manualRedactionCount,
+      cutawayCount,
+      manualProjectionStats,
+      cutawayResolutionStats,
+      annotationResolutionStats,
+      artifactStats,
+      captureHealth,
+      manifestFile: "",
+      variantCount: variants.length,
+      dimensions: firstResult.dimensions,
+      unchanged: true,
+      visualHash,
+      changePercent
+    };
+  }
 
   if (!blueprint) {
     blueprint = await getLatestBlueprint();
@@ -606,6 +932,12 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
     redactionBreakdown,
     segmentCount,
     tileCount,
+    captureHealth,
+    visualHash,
+    changePercent,
+    sourceType: context.captureOrigin === "timed" ? "timed" : "manual",
+    watchPlanId: context.watchPlanId || "",
+    watchRunId: context.watchRunId || "",
     blueprint
   });
 
@@ -631,7 +963,7 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
     id: captureId,
     title: firstResult.page.title,
     host: new URL(firstResult.page.url).host,
-    url: firstResult.page.url,
+    url: sanitizeCaptureUrl(firstResult.page.url),
     devicePreset: options.devicePreset,
     exportPreset: firstResult.exportPreset,
     capturedAt,
@@ -647,7 +979,13 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
     annotationResolutionStats,
     redactionBreakdown,
     artifactStats,
+    captureHealth,
     manifestFile,
+    visualHash,
+    changePercent,
+    sourceType: context.captureOrigin === "timed" ? "timed" : "manual",
+    watchPlanId: context.watchPlanId || "",
+    watchRunId: context.watchRunId || "",
     annotation: captureNote.enabled && captureNote.text ? captureNote : null,
     annotationRegion: annotationRegion.region || null,
     variants: variantSummaries,
@@ -661,6 +999,42 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
       : null
   });
 
+  let librarySaved = false;
+
+  try {
+    await putLibraryCapture({
+      id: captureId,
+      title: firstResult.page.title,
+      host: new URL(firstResult.page.url).host,
+      url: sanitizeCaptureUrl(firstResult.page.url),
+      capturedAt,
+      sourceType: context.captureOrigin === "timed" ? "timed" : "manual",
+      watchPlanId: context.watchPlanId || "",
+      watchRunId: context.watchRunId || "",
+      devicePreset: options.devicePreset,
+      exportPreset: firstResult.exportPreset,
+      archiveFolder: runContext.folder,
+      manifestFile,
+      downloads: downloadedRecords,
+      captureHealth,
+      dimensions: firstResult.dimensions,
+      variantCount: variants.length,
+      fileCount: downloadedFiles.length,
+      redactionCount,
+      manualRedactionCount,
+      cutawayCount,
+      previews: libraryPreviews
+    });
+    await pruneLibraryPreviews();
+    librarySaved = true;
+    broadcastLibraryUpdated({
+      captureId,
+      capturedAt
+    });
+  } catch (error) {
+    console.debug("Lumen local preview storage skipped:", error);
+  }
+
   broadcastHistory(captureHistory);
 
   // Backend hook:
@@ -670,7 +1044,7 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
 
   broadcastProgress({
     stage: "done",
-    title: variants.length > 1 ? "Responsive set ready" : "Capture ready",
+    title: focusedOnly ? "Selected area ready" : variants.length > 1 ? "Responsive set ready" : "Capture ready",
     detail: buildCaptureCompletionDetail({
       segmentCount,
       fileCount: downloadedFiles.length,
@@ -680,6 +1054,7 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
       manualProjectionStats,
       cutawayResolutionStats,
       variantCount: variants.length,
+      captureHealth,
       manifestSaved: Boolean(manifestFile),
       annotationAdded: Boolean(captureNote.enabled && captureNote.text),
       annotationRegionApplied: annotationResolutionStats.appliedCount > 0
@@ -703,12 +1078,44 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
     cutawayResolutionStats,
     annotationResolutionStats,
     artifactStats,
+    captureHealth,
     manifestFile,
     annotation: captureNote.enabled && captureNote.text ? captureNote : null,
     annotationRegion: annotationRegion.region || null,
     variantCount: variants.length,
-    dimensions: firstResult.dimensions
+    dimensions: firstResult.dimensions,
+    visualHash,
+    changePercent,
+    librarySaved
   };
+}
+
+async function releaseCapturePermissionLease(origin) {
+  if (typeof origin !== "string" || !/^https?:\/\/[^/]+\/\*$/.test(origin)) {
+    return false;
+  }
+
+  try {
+    const localState = await readLocalState();
+    const watchUsesOrigin = (localState.watchPlans || []).some((plan) => {
+      try {
+        return plan?.url && buildOriginPattern(plan.url) === origin;
+      } catch {
+        return false;
+      }
+    });
+
+    if (watchUsesOrigin) {
+      return false;
+    }
+
+    return chrome.permissions.remove({
+      origins: [origin]
+    });
+  } catch (error) {
+    console.debug("Lumen permission lease cleanup skipped:", error);
+    return false;
+  }
 }
 
 async function runBlueprintFlow() {
@@ -819,6 +1226,7 @@ async function runExportReviewFlow(options = getDefaultSettings()) {
 
     try {
       await ensureContentScript(target.tab.id);
+      await calibrateCaptureViewport(target, variant);
 
       const page = await requestPreparedPageMetrics(target.tab.id);
       const [autoScan, manualResolution, cutawayResolution] = await Promise.all([
@@ -992,6 +1400,8 @@ function buildExportReviewVariant({
     dimensions: {
       viewportWidth: page.viewportWidth,
       viewportHeight: page.viewportHeight,
+      browserViewportWidth: page.browserViewportWidth || page.viewportWidth,
+      browserViewportHeight: page.browserViewportHeight || page.viewportHeight,
       pageHeight: page.pageHeight
     },
     autoRedactionCount: autoScan.regions?.length || 0,
@@ -1146,6 +1556,58 @@ async function runHistoryDownloadAction(payload = {}, action = "show") {
   return {
     filename: downloadRecord.filename,
     archiveFolder: record.archiveFolder || "",
+    action
+  };
+}
+
+async function runLibraryDownloadAction(payload = {}, action = "show") {
+  const captureId = typeof payload.captureId === "string" ? payload.captureId : "";
+  const downloadId = Number.isInteger(payload.downloadId) ? payload.downloadId : null;
+  const record = captureId ? await getLibraryCapture(captureId) : null;
+
+  if (!record) {
+    throw createFriendlyError(
+      "Photo Not Found",
+      "The selected photo is no longer in Lumen's local library."
+    );
+  }
+
+  const downloadRecord = (record.downloads || []).find((entry) => entry.downloadId === downloadId);
+
+  if (!downloadRecord || downloadId === null) {
+    throw createFriendlyError(
+      "Download Handle Missing",
+      "This file is not attached to the selected local library item."
+    );
+  }
+
+  const [downloadItem] = await chrome.downloads.search({ id: downloadId });
+
+  if (!downloadItem) {
+    throw createFriendlyError(
+      "Download Not Found",
+      "Chrome no longer has a local record for this downloaded original."
+    );
+  }
+
+  if (downloadItem.state && downloadItem.state !== "complete") {
+    throw createFriendlyError(
+      "Download Still Running",
+      "Chrome has not finished writing this photo yet."
+    );
+  }
+
+  try {
+    await callDownloadsMethod(action === "open" ? "open" : "show", downloadId);
+  } catch (error) {
+    throw createFriendlyError(
+      action === "open" ? "Photo Could Not Open" : "Photo Could Not Be Revealed",
+      error.message || "The downloaded original may have been moved or deleted."
+    );
+  }
+
+  return {
+    filename: downloadRecord.filename || downloadItem.filename || "",
     action
   };
 }
@@ -1947,7 +2409,10 @@ async function captureVariant({
   cutawayRegion,
   annotationRegion,
   runContext,
-  extractBlueprint
+  extractBlueprint,
+  focusedOnly = false,
+  changeBaselineHash = "",
+  saveOnlyWhenChanged = false
 }) {
   const target = await createCaptureTarget(sourceTab, variant);
 
@@ -1959,6 +2424,7 @@ async function captureVariant({
     });
 
     await ensureContentScript(target.tab.id);
+    const viewportCalibration = await calibrateCaptureViewport(target, variant);
     await showPageUsageHud(target.tab.id, {
       stage: "prepare",
       title: `Preparing ${variant.label.toLowerCase()} capture`,
@@ -1998,6 +2464,13 @@ async function captureVariant({
       });
 
       redactionScan = await requestRedactionScan(target.tab.id);
+
+      if (redactionScan.truncated) {
+        throw createFriendlyError(
+          "Redaction Review Limit Reached",
+          `Lumen found more than ${redactionScan.limit || 80} sensitive regions in the current view. The capture stopped before saving so private pixels are not silently missed.`
+        );
+      }
     }
 
     await showPageUsageHud(target.tab.id, {
@@ -2011,10 +2484,14 @@ async function captureVariant({
     const manualRegions = manualResolution.regions;
     const cutawayResolution = await resolveCutawayRegionForTarget(target.tab.id, cutawayRegion, page);
     const annotationResolution = await resolveAnnotationRegionForTarget(target.tab.id, annotationRegion, page);
-    const combinedRedactions = [
-      ...redactionScan.regions,
-      ...manualRegions
-    ];
+    const redactionState = {
+      autoRegions: [...redactionScan.regions],
+      manualRegions
+    };
+    const combinedRedactions = mergeCaptureRedactionRegions([
+      ...redactionState.autoRegions,
+      ...redactionState.manualRegions
+    ]);
 
     if (extractBlueprint) {
       blueprint = await maybeExtractBlueprint(target.tab.id);
@@ -2040,7 +2517,14 @@ async function captureVariant({
     });
     await sleep(120);
     await hidePageUsageHud(target.tab.id);
-    const segmentCount = await capturePageSegments(target, page, sessionId, variant);
+    const segmentCount = await capturePageSegments(target, page, sessionId, variant, {
+      autoRedact: Boolean(options.autoRedact),
+      redactionState
+    });
+    const finalRedactions = mergeCaptureRedactionRegions([
+      ...redactionState.autoRegions,
+      ...redactionState.manualRegions
+    ]);
 
     await showPageUsageHud(target.tab.id, {
       stage: "save",
@@ -2056,6 +2540,31 @@ async function captureVariant({
     });
 
     const stitched = await finalizeStitchSession(sessionId);
+
+    if (stitched.captureHealth?.status && stitched.captureHealth.status !== "complete") {
+      throw createFriendlyError(
+        "Capture Integrity Check Failed",
+        `Lumen verified only ${stitched.captureHealth.coveragePercent}% of the ${variant.label.toLowerCase()} page. No files were saved; keep the page active and retry.`
+      );
+    }
+
+    const renderedOutputs = focusedOnly
+      ? stitched.outputs.filter((output) => output.role === "cutaway")
+      : stitched.outputs;
+
+    if (focusedOnly && !renderedOutputs.length) {
+      throw createFriendlyError(
+        "Selected Area Was Not Found",
+        "The page layout changed enough that Lumen could not safely resolve the saved area. No files were saved."
+      );
+    }
+
+    const visualHash = renderedOutputs[0]?.visualHash || "";
+    const changePercent = changeBaselineHash
+      ? calculateVisualHashDifference(changeBaselineHash, visualHash)
+      : 100;
+    const unchanged = Boolean(saveOnlyWhenChanged && changeBaselineHash && changePercent <= 1.5);
+
     const fileBaseName = buildCaptureFileBaseName({
       title: page.title,
       url: page.url,
@@ -2069,15 +2578,28 @@ async function captureVariant({
       detail: `Writing the ${variant.label.toLowerCase()} capture to your Downloads folder.`
     });
 
-    const downloadRecords = await downloadRenderedOutputs(stitched.outputs, {
-      folder: runContext.folder,
-      fileBaseName,
-      variantId: variant.id,
-      exportPreset: stitched.appliedPreset
-    });
+    const downloadRecords = unchanged
+      ? []
+      : await downloadRenderedOutputs(renderedOutputs, {
+          folder: runContext.folder,
+          fileBaseName,
+          variantId: variant.id,
+          exportPreset: stitched.appliedPreset
+        });
 
-    if (options.longPageMode === "print") {
-      downloadRecords.push(await downloadPrintSheet(stitched.outputs, {
+    const photoPreviews = unchanged ? [] : renderedOutputs.map((output, index) => ({
+      role: output.role || "full-page",
+      partIndex: output.partIndex || index + 1,
+      width: output.width || 0,
+      height: output.height || 0,
+      cutawayRegion: output.cutawayRegion || null,
+      previewDataUrl: output.previewDataUrl || "",
+      visualHash: output.visualHash || "",
+      download: downloadRecords[index] || null
+    }));
+
+    if (!unchanged && !focusedOnly && options.longPageMode === "print") {
+      downloadRecords.push(await downloadPrintSheet(renderedOutputs, {
         folder: runContext.folder,
         fileBaseName,
         variantId: variant.id,
@@ -2094,6 +2616,10 @@ async function captureVariant({
       blueprint,
       downloadedFiles,
       downloadRecords,
+      photoPreviews,
+      visualHash,
+      changePercent,
+      unchanged,
       segmentCount,
       tileCount: stitched.tileCount ?? stitched.outputs.length,
       redactionCount: stitched.redactionCount,
@@ -2102,7 +2628,9 @@ async function captureVariant({
       manualProjectionStats: manualResolution.stats,
       cutawayResolutionStats: cutawayResolution.stats,
       annotationResolutionStats: annotationResolution.stats,
-      redactionBreakdown: buildRedactionBreakdown(combinedRedactions),
+      redactionBreakdown: buildRedactionBreakdown(finalRedactions),
+      captureHealth: stitched.captureHealth || null,
+      viewport: viewportCalibration,
       exportPreset: stitched.appliedPreset,
       dimensions: {
         width: stitched.width,
@@ -2120,7 +2648,7 @@ async function captureVariant({
   }
 }
 
-async function capturePageSegments(target, page, sessionId, variant) {
+async function capturePageSegments(target, page, sessionId, variant, { autoRedact = false, redactionState = null } = {}) {
   const maxSegments = LUMEN_CONFIG.capture.maxSegments;
   let lastCaptureTimestamp = 0;
   let previousTop = null;
@@ -2180,11 +2708,42 @@ async function capturePageSegments(target, page, sessionId, variant) {
     stallRetries = 0;
 
     await sleep(LUMEN_CONFIG.capture.segmentSettleMs);
+
+    if (autoRedact && redactionState) {
+      const sliceScan = await requestRedactionScan(target.tab.id);
+
+      if (sliceScan.truncated) {
+        throw createFriendlyError(
+          "Redaction Review Limit Reached",
+          `Lumen found more than ${sliceScan.limit || 80} sensitive regions while scrolling. The capture stopped before any files were saved.`
+        );
+      }
+
+      redactionState.autoRegions = mergeCaptureRedactionRegions([
+        ...redactionState.autoRegions,
+        ...sliceScan.regions
+      ]);
+
+      if (redactionState.autoRegions.length + redactionState.manualRegions.length > MAX_CAPTURE_REDACTIONS) {
+        throw createFriendlyError(
+          "Redaction Safety Limit Reached",
+          `This page produced more than ${MAX_CAPTURE_REDACTIONS} redaction regions during capture. Lumen stopped before export instead of silently dropping private areas.`
+        );
+      }
+
+      await updateStitchSessionPage({
+        sessionId,
+        page,
+        redactions: mergeCaptureRedactionRegions([
+          ...redactionState.autoRegions,
+          ...redactionState.manualRegions
+        ])
+      });
+    }
+
     lastCaptureTimestamp = await waitForCaptureWindow(lastCaptureTimestamp);
 
-    const dataUrl = await chrome.tabs.captureVisibleTab(target.windowId, {
-      format: "png"
-    });
+    const dataUrl = await captureTargetVisibleTab(target);
 
     const cropTopCss =
       previousTop === null
@@ -2199,6 +2758,7 @@ async function capturePageSegments(target, page, sessionId, variant) {
         topCss: actualTop,
         cropTopCss,
         cropBottomCss,
+        captureRect: page.captureRect || null,
         dataUrl
       }
     });
@@ -2241,6 +2801,67 @@ async function capturePageSegments(target, page, sessionId, variant) {
   );
 }
 
+function mergeCaptureRedactionRegions(regions = []) {
+  const seen = new Set();
+  const merged = [];
+
+  for (const region of regions) {
+    if (
+      !region ||
+      !Number.isFinite(region.left) ||
+      !Number.isFinite(region.top) ||
+      !Number.isFinite(region.width) ||
+      !Number.isFinite(region.height)
+    ) {
+      continue;
+    }
+
+    const normalized = {
+      ...region,
+      left: Math.max(0, Math.round(region.left)),
+      top: Math.max(0, Math.round(region.top)),
+      width: Math.max(1, Math.round(region.width)),
+      height: Math.max(1, Math.round(region.height))
+    };
+    const key = [normalized.kind || "sensitive", normalized.left, normalized.top, normalized.width, normalized.height].join(":");
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    merged.push(normalized);
+  }
+
+  return merged;
+}
+
+async function captureTargetVisibleTab(target) {
+  if (!Number.isInteger(target?.tab?.id) || !Number.isInteger(target?.windowId)) {
+    throw createFriendlyError("Capture Target Lost", "Lumen could not verify the page selected for this screenshot slice.");
+  }
+
+  await chrome.tabs.update(target.tab.id, {
+    active: true
+  });
+
+  const [activeTab] = await chrome.tabs.query({
+    windowId: target.windowId,
+    active: true
+  });
+
+  if (activeTab?.id !== target.tab.id) {
+    throw createFriendlyError(
+      "Capture Target Changed",
+      "Another tab became active during the capture. Lumen stopped instead of saving pixels from the wrong page."
+    );
+  }
+
+  return chrome.tabs.captureVisibleTab(target.windowId, {
+    format: "png"
+  });
+}
+
 async function createCaptureTarget(tab, variant) {
   if (variant.mode === "desktop") {
     return {
@@ -2279,6 +2900,73 @@ async function createCaptureTarget(tab, variant) {
     kind: "viewport",
     tab: viewportTab,
     windowId: createdWindow.id
+  };
+}
+
+async function calibrateCaptureViewport(target, variant) {
+  if (target?.kind !== "viewport" || !variant?.viewport) {
+    return {
+      requestedWidth: 0,
+      requestedHeight: 0,
+      actualWidth: 0,
+      actualHeight: 0,
+      exact: true
+    };
+  }
+
+  const requestedWidth = Math.max(1, Math.round(variant.viewport.width));
+  const requestedHeight = Math.max(1, Math.round(variant.viewport.height));
+  let metrics = null;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    metrics = await requestPreparedPageMetrics(target.tab.id);
+    const actualWidth = Math.max(1, Math.round(metrics.browserViewportWidth || metrics.viewportWidth));
+    const actualHeight = Math.max(1, Math.round(metrics.browserViewportHeight || metrics.viewportHeight));
+    const widthDelta = requestedWidth - actualWidth;
+    const heightDelta = requestedHeight - actualHeight;
+
+    if (Math.abs(widthDelta) <= 1 && Math.abs(heightDelta) <= 1) {
+      return {
+        requestedWidth,
+        requestedHeight,
+        actualWidth,
+        actualHeight,
+        widthExact: true,
+        heightExact: true,
+        exact: true
+      };
+    }
+
+    const captureWindow = await chrome.windows.get(target.windowId);
+    await chrome.windows.update(target.windowId, {
+      width: Math.max(320, Math.round((captureWindow.width || requestedWidth) + widthDelta)),
+      height: Math.max(240, Math.round((captureWindow.height || requestedHeight) + heightDelta))
+    });
+    await sleep(140);
+  }
+
+  metrics = await requestPreparedPageMetrics(target.tab.id);
+  const actualWidth = Math.max(1, Math.round(metrics.browserViewportWidth || metrics.viewportWidth));
+  const actualHeight = Math.max(1, Math.round(metrics.browserViewportHeight || metrics.viewportHeight));
+
+  const widthExact = Math.abs(actualWidth - requestedWidth) <= 1;
+  const heightExact = Math.abs(actualHeight - requestedHeight) <= 1;
+
+  if (!widthExact) {
+    throw createFriendlyError(
+      `${variant.label} Viewport Could Not Be Calibrated`,
+      `Chrome produced a ${actualWidth}px-wide CSS viewport instead of ${requestedWidth}px. Lumen stopped rather than label an inexact responsive layout.`
+    );
+  }
+
+  return {
+    requestedWidth,
+    requestedHeight,
+    actualWidth,
+    actualHeight,
+    widthExact,
+    heightExact,
+    exact: widthExact && heightExact
   };
 }
 
@@ -2559,13 +3247,23 @@ async function requestPreparedPageMetrics(tabId) {
 }
 
 async function persistLatestBlueprint(blueprint) {
+  const sanitizedBlueprint = blueprint?.page
+    ? {
+        ...blueprint,
+        page: {
+          ...blueprint.page,
+          url: sanitizeCaptureUrl(blueprint.page.url)
+        }
+      }
+    : blueprint;
+
   await chrome.storage.local.set({
-    [STORAGE_KEYS.latestBlueprint]: blueprint
+    [STORAGE_KEYS.latestBlueprint]: sanitizedBlueprint
   });
 
   chrome.runtime.sendMessage({
     type: BLUEPRINT_UPDATE_EVENT,
-    payload: blueprint
+    payload: sanitizedBlueprint
   }).catch(() => {});
 }
 
@@ -2787,6 +3485,7 @@ function buildCaptureCompletionDetail({
   manualProjectionStats,
   cutawayResolutionStats,
   variantCount,
+  captureHealth,
   manifestSaved,
   annotationAdded,
   annotationRegionApplied
@@ -2811,6 +3510,10 @@ function buildCaptureCompletionDetail({
   }
 
   const fragments = [sliceText, fileText];
+
+  if (captureHealth?.status === "complete") {
+    fragments.push(`${captureHealth.verifiedVariantCount || variantCount} view${(captureHealth.verifiedVariantCount || variantCount) === 1 ? "" : "s"} integrity-verified`);
+  }
 
   if (variantText) {
     fragments.push(variantText);
@@ -2989,6 +3692,13 @@ function broadcastWatchRuns(watchRuns) {
   }).catch(() => {});
 }
 
+function broadcastLibraryUpdated(payload = {}) {
+  chrome.runtime.sendMessage({
+    type: LIBRARY_UPDATE_EVENT,
+    payload
+  }).catch(() => {});
+}
+
 async function broadcastWatchState(watchRuns) {
   broadcastWatchRuns(watchRuns);
   const localState = await readLocalState();
@@ -3016,25 +3726,30 @@ async function registerWatchPlanAlarm(plan = {}) {
   const alarmName = `${WATCH_ALARM_PREFIX}${plan.id}`;
   await chrome.alarms.clear(alarmName);
 
-  if (plan.status !== "active") {
+  const lifecycle = evaluateWatchScheduleState(plan);
+
+  if (!lifecycle.active) {
     return;
   }
 
-  const intervalMinutes = Math.max(1, Math.round(Number(plan.schedule?.intervalMinutes) || 60));
-
-  await chrome.alarms.create(alarmName, {
-    delayInMinutes: Math.min(intervalMinutes, 1),
-    periodInMinutes: intervalMinutes
-  });
+  await chrome.alarms.create(alarmName, buildWatchAlarmDefinition(plan));
 }
 
 async function handleWatchAlarm(alarm) {
   const planId = alarm.name.slice(WATCH_ALARM_PREFIX.length);
   const localState = await readLocalState();
   const plan = (localState.watchPlans || []).find((entry) => entry.id === planId);
+  const lifecycle = plan ? evaluateWatchScheduleState(plan) : { active: false, reason: "missing" };
 
-  if (!plan || plan.status !== "active") {
+  if (!plan || !lifecycle.active) {
     await chrome.alarms.clear(alarm.name);
+
+    if (plan?.status === "active" && ["expired", "max-runs"].includes(lifecycle.reason)) {
+      const result = await updateRemoteWatchPlan(plan.id, { status: "completed" });
+      const state = await readLocalState();
+      broadcastWatchPlans(state.watchPlans || (result.watchPlan ? [result.watchPlan] : []));
+    }
+
     return;
   }
 
@@ -3053,6 +3768,13 @@ async function handleWatchAlarm(alarm) {
       error: "Another Lumen run was active."
     });
     await broadcastWatchState(watchRuns);
+
+    if (normalizeWatchSchedule(plan.schedule).mode === "once") {
+      await chrome.alarms.create(alarm.name, {
+        when: Date.now() + 30000
+      });
+    }
+
     return;
   }
 
@@ -3077,11 +3799,30 @@ async function handleWatchAlarm(alarm) {
       ...getDefaultSettings(),
       devicePreset: "desktop",
       exportPreset: "raw",
-      exportManifest: true,
+      exportManifest: false,
+      autoRedact: true,
       longPageMode: "tiles"
     }, {
       sourceTab: source.tab,
-      cutawayRegionOverride: buildWatchCutawayRecord(plan)
+      cutawayRegionOverride: buildWatchCutawayRecord(plan),
+      focusedOnly: true,
+      captureOrigin: "timed",
+      watchPlanId: plan.id,
+      watchRunId: runId,
+      changeBaselineHash: plan.lastVisualHash || "",
+      saveOnlyWhenChanged: Boolean(plan.schedule?.saveOnlyWhenChanged)
+    });
+
+    if (!result.cutawayCount || (!result.unchanged && !result.files?.length)) {
+      throw createFriendlyError(
+        "Selected Area Was Not Found",
+        "Lumen stopped this timed run because the saved area could not be resolved safely on the current page."
+      );
+    }
+
+    await updateRemoteWatchPlan(plan.id, {
+      lastVisualHash: result.visualHash || plan.lastVisualHash || "",
+      lastChangePercent: result.changePercent ?? 100
     });
 
     watchRuns = await persistWatchRunRecord({
@@ -3090,12 +3831,14 @@ async function handleWatchAlarm(alarm) {
       captureId: result.captureId || "",
       title: plan.title,
       url: plan.url,
-      status: "captured",
+      status: result.unchanged ? "unchanged" : "captured",
       scheduledAt,
       startedAt: scheduledAt,
       completedAt: new Date().toISOString(),
       fileCount: result.files?.length || 0,
-      files: result.files || []
+      files: result.files || [],
+      visualHash: result.visualHash || "",
+      changePercent: result.changePercent ?? 100
     });
     await broadcastWatchState(watchRuns);
   } catch (error) {
@@ -3107,12 +3850,33 @@ async function handleWatchAlarm(alarm) {
       status: "failed",
       scheduledAt,
       completedAt: new Date().toISOString(),
-      error: error?.message || "Timed capture failed."
+      error: error?.description || error?.message || "Timed capture failed."
     });
     await broadcastWatchState(watchRuns);
   } finally {
     captureInFlight = false;
     await closeWindowSafely(sourceWindowId);
+    await completeWatchPlanIfNeeded(plan.id);
+  }
+}
+
+async function completeWatchPlanIfNeeded(planId = "") {
+  const localState = await readLocalState();
+  const currentPlan = (localState.watchPlans || []).find((entry) => entry.id === planId);
+
+  if (!currentPlan) {
+    return;
+  }
+
+  const lifecycle = evaluateWatchScheduleState(currentPlan);
+
+  if (currentPlan.status === "active" && ["expired", "max-runs"].includes(lifecycle.reason)) {
+    const result = await updateRemoteWatchPlan(currentPlan.id, {
+      status: "completed"
+    });
+    await registerWatchPlanAlarm(result.watchPlan || currentPlan);
+    const state = await readLocalState();
+    broadcastWatchPlans(state.watchPlans || []);
   }
 }
 
@@ -3133,8 +3897,8 @@ async function createWatchSource(plan = {}) {
     );
   }
 
-  const width = Math.max(900, Math.round(Number(plan.region?.sourceViewport?.width) || 1280));
-  const height = Math.max(720, Math.round(Number(plan.region?.sourceViewport?.height) || 900));
+  const width = Math.max(320, Math.round(Number(plan.region?.sourceViewport?.viewportWidth) || 1280));
+  const height = Math.max(240, Math.round(Number(plan.region?.sourceViewport?.viewportHeight) || 900));
   const createdWindow = await chrome.windows.create({
     url: plan.url,
     type: "popup",
@@ -3151,11 +3915,27 @@ async function createWatchSource(plan = {}) {
     throw createFriendlyError("Timed Capture Failed", "Chrome could not open the saved page for timed capture.");
   }
 
-  await waitForTabComplete(tab.id);
+  const readyTab = await waitForTabComplete(tab.id);
+  const captureTab = {
+    ...readyTab,
+    url: readyTab.url || readyTab.pendingUrl || plan.url,
+    title: readyTab.title || plan.title || plan.host || "Timed capture"
+  };
   await sleep(260);
+  await ensureContentScript(captureTab.id);
+  await calibrateCaptureViewport({
+    kind: "viewport",
+    tab: captureTab,
+    windowId: createdWindow.id
+  }, {
+    viewport: {
+      width,
+      height
+    }
+  });
 
   return {
-    tab,
+    tab: captureTab,
     windowId: createdWindow.id
   };
 }
@@ -3364,6 +4144,7 @@ function buildCaptureBundleManifest({
   redactionBreakdown,
   segmentCount,
   tileCount,
+  captureHealth,
   blueprint
 }) {
   const variantOutputs = variants.map((variant) => buildPortableOutputRecords(variant.downloads));
@@ -3375,7 +4156,7 @@ function buildCaptureBundleManifest({
     capturedAt,
     page: {
       title: page.title || "",
-      url: page.url,
+      url: sanitizeCaptureUrl(page.url),
       host: new URL(page.url).host
     },
     capture: {
@@ -3389,6 +4170,7 @@ function buildCaptureBundleManifest({
       variantCount: variants.length,
       segmentCount,
       tileCount,
+      health: captureHealth,
       redactionCount,
       manualRedactionCount,
       cutawayCount,
@@ -3419,6 +4201,8 @@ function buildCaptureBundleManifest({
         cutawayResolutionStats: variant.cutawayResolutionStats || buildCutawayResolutionStats(),
         annotationResolutionStats: variant.annotationResolutionStats || buildCutawayResolutionStats(),
         redactionBreakdown: variant.redactionBreakdown || buildRedactionBreakdown([]),
+        health: variant.captureHealth || null,
+        viewport: variant.viewport || null,
         dimensions: variant.dimensions
       };
     }),
@@ -3432,6 +4216,39 @@ function buildCaptureBundleManifest({
           typography: blueprint.typography?.families || []
         }
       : null
+  };
+}
+
+function buildAggregateCaptureHealth(healthRecords = []) {
+  const records = healthRecords.filter((health) => health && typeof health === "object");
+
+  if (!records.length) {
+    return null;
+  }
+
+  const expectedPixels = records.reduce((sum, health) => sum + Math.max(0, Number(health.expectedHeight) || 0), 0);
+  const coveredPixels = records.reduce((sum, health) => sum + Math.max(0, Number(health.coveredPixels) || 0), 0);
+  const coveragePercent = expectedPixels > 0
+    ? Number((coveredPixels / expectedPixels * 100).toFixed(2))
+    : Math.min(...records.map((health) => Number(health.coveragePercent) || 0));
+  const status = records.some((health) => health.status === "incomplete")
+    ? "incomplete"
+    : records.some((health) => health.status === "partial")
+      ? "partial"
+      : records.every((health) => health.status === "complete")
+        ? "complete"
+        : "unknown";
+
+  return {
+    status,
+    coveragePercent,
+    verifiedVariantCount: records.filter((health) => health.status === "complete").length,
+    variantCount: records.length,
+    reachedTail: records.every((health) => health.reachedTail !== false),
+    seamGapCount: records.reduce((sum, health) => sum + Math.max(0, Number(health.seamGapCount) || 0), 0),
+    widthMismatchCount: records.reduce((sum, health) => sum + Math.max(0, Number(health.widthMismatchCount) || 0), 0),
+    expectedPixels,
+    coveredPixels
   };
 }
 

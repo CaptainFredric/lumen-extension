@@ -7,6 +7,7 @@ import { chromium } from "playwright";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const contentScriptPath = path.join(repoRoot, "content.js");
+const offscreenScriptPath = path.join(repoRoot, "offscreen.js");
 
 const svgPixel =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='180'%3E%3Crect width='320' height='180' fill='%2364f2df'/%3E%3C/svg%3E";
@@ -54,6 +55,7 @@ async function buildPatchedContentScript() {
         resolveManualRedactions,
         clearManualRedactionPicker,
         startCutawayRegionPicker,
+        resolveCutawayRegion,
         clearCutawayRegionPicker,
         startAnnotationRegionPicker,
         resolveAnnotationRegion,
@@ -62,6 +64,35 @@ async function buildPatchedContentScript() {
     })();
     `
     )}
+  `;
+}
+
+async function buildPatchedOffscreenScript() {
+  const source = await fs.readFile(offscreenScriptPath, "utf8");
+  const withoutImport = source.replace(
+    /^import \{ LUMEN_CONFIG, normalizeCaptureNoteOptions \} from "\.\/config\.js";\s*/,
+    `
+      const LUMEN_CONFIG = {
+        capture: { tileMaxOutputHeight: 12000 },
+        studio: { maxMockupSourceHeight: 4200, posterPadding: 88 }
+      };
+      const normalizeCaptureNoteOptions = () => ({ enabled: false, text: "", position: "top-right" });
+    `
+  );
+
+  return `
+    window.chrome = window.chrome || {};
+    window.chrome.runtime = window.chrome.runtime || {};
+    window.chrome.runtime.onMessage = window.chrome.runtime.onMessage || { addListener() {} };
+    ${withoutImport}
+    window.__LUMEN_OFFSCREEN_TEST_API__ = {
+      buildRenderModel,
+      buildCaptureHealth,
+      renderSliceCanvas,
+      scaleCutawayRegion,
+      renderCutawayCanvas,
+      renderPreviewDataUrl
+    };
   `;
 }
 
@@ -246,12 +277,25 @@ async function runNestedScrollSmoke(browser, contentScript) {
         <title>Nested Scroll Fixture</title>
         <style>
           html, body { height: 100%; margin: 0; overflow: hidden; font-family: ui-sans-serif, system-ui, sans-serif; }
-          #app-shell { height: 100vh; overflow-y: auto; background: #eef4fb; }
+          body { background: #172033; }
+          .app-rail { position: fixed; inset: 0 auto 0 0; width: 180px; background: #0d1424; }
+          .app-bar { position: fixed; inset: 0 0 auto 180px; height: 72px; background: #ffffff; }
+          #app-shell {
+            position: fixed;
+            left: 200px;
+            top: 80px;
+            width: 980px;
+            height: 740px;
+            overflow-y: auto;
+            background: #eef4fb;
+          }
           .inner { min-height: 2400px; width: min(940px, calc(100% - 48px)); margin: 0 auto; padding: 64px 0; }
           .panel { margin-top: 900px; padding: 24px; border-radius: 20px; background: white; }
         </style>
       </head>
       <body>
+        <aside class="app-rail"></aside>
+        <header class="app-bar"></header>
         <div id="app-shell">
           <main class="inner">
             <h1>Application shell capture</h1>
@@ -279,14 +323,127 @@ async function runNestedScrollSmoke(browser, contentScript) {
 
     assert(prepare.page.scrollMode === "container", "Nested fixture did not detect container scroll", prepare);
     assert(/#app-shell/.test(prepare.page.scrollContainer), "Nested fixture selected the wrong scroll root", prepare.page);
+    assert(prepare.page.browserViewportWidth === 1180 && prepare.page.browserViewportHeight === 820, "Nested fixture did not retain browser viewport metrics", prepare.page);
+    assert(
+      prepare.page.captureRect?.left === 200 &&
+        prepare.page.captureRect?.top === 80 &&
+        prepare.page.captureRect?.width === 980 &&
+        prepare.page.captureRect?.height === 740,
+      "Nested fixture did not report the visible scroll-root crop",
+      prepare.page
+    );
     assert(scroll.top >= 700 && state.appScrollTop >= 700, "Nested fixture did not scroll the container", { scroll, state });
     assert(state.windowScrollY === 0, "Nested fixture should not scroll the window", state);
     assert(redactions.breakdown.byKind.email >= 1, "Nested fixture redaction scan missed lower content", redactions);
 
     record("nested scroll capture context", {
       scrollContainer: prepare.page.scrollContainer,
+      captureRect: prepare.page.captureRect,
       top: scroll.top,
       redactionCount: redactions.count
+    });
+  });
+}
+
+async function runOffsetStitchPixelSmoke(browser, offscreenScript) {
+  const page = await browser.newPage({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: 1 });
+
+  try {
+    await page.setContent("<!doctype html><html><body></body></html>");
+    await page.addScriptTag({ content: offscreenScript });
+    const result = await page.evaluate(async () => {
+      const makeSlice = (rootColor) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 1180;
+        canvas.height = 820;
+        const context = canvas.getContext("2d");
+        context.fillStyle = "rgb(210, 32, 48)";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.fillStyle = "rgb(40, 92, 214)";
+        context.fillRect(200, 0, 980, 80);
+        context.fillStyle = rootColor;
+        context.fillRect(200, 80, 980, 740);
+        return canvas.toDataURL("image/png");
+      };
+      const session = {
+        page: {
+          viewportWidth: 980,
+          viewportHeight: 740,
+          browserViewportWidth: 1180,
+          browserViewportHeight: 820,
+          pageHeight: 1480,
+          devicePixelRatio: 1,
+          scrollMode: "container",
+          captureRect: { left: 200, top: 80, width: 980, height: 740 }
+        },
+        options: {},
+        redactions: [],
+        cutawayRegion: null,
+        annotationRegion: null,
+        segments: [
+          {
+            index: 0,
+            topCss: 0,
+            cropTopCss: 0,
+            cropBottomCss: 0,
+            captureRect: { left: 200, top: 80, width: 980, height: 740 },
+            dataUrl: makeSlice("rgb(24, 190, 118)")
+          },
+          {
+            index: 1,
+            topCss: 740,
+            cropTopCss: 0,
+            cropBottomCss: 0,
+            captureRect: { left: 200, top: 80, width: 980, height: 740 },
+            dataUrl: makeSlice("rgb(242, 184, 46)")
+          }
+        ]
+      };
+      const model = await window.__LUMEN_OFFSCREEN_TEST_API__.buildRenderModel(session);
+      const output = window.__LUMEN_OFFSCREEN_TEST_API__.renderSliceCanvas(model, 0, model.canvasHeight);
+      const context = output.getContext("2d");
+      const pixel = (x, y) => [...context.getImageData(x, y, 1, 1).data];
+
+      return {
+        width: output.width,
+        height: output.height,
+        topPixel: pixel(20, 20),
+        bottomPixel: pixel(20, 760),
+        health: window.__LUMEN_OFFSCREEN_TEST_API__.buildCaptureHealth(model)
+      };
+    });
+
+    assert(result.width === 980 && result.height === 1480, "Offset stitch used the browser viewport instead of the scroll root", result);
+    assert(result.topPixel[0] === 24 && result.topPixel[1] === 190, "Offset stitch leaked fixed page chrome into the first slice", result);
+    assert(result.bottomPixel[0] === 242 && result.bottomPixel[1] === 184, "Offset stitch did not crop the second root slice", result);
+    assert(result.health.status === "complete" && result.health.coveragePercent === 100, "Offset stitch health did not verify full coverage", result.health);
+
+    record("offset scroll-root pixel stitch", {
+      width: result.width,
+      height: result.height,
+      coveragePercent: result.health.coveragePercent
+    });
+  } finally {
+    await page.close();
+  }
+}
+
+async function runRedactionLimitSmoke(browser, contentScript) {
+  const sensitiveRows = Array.from({ length: 100 }, (_, index) =>
+    `<p>Private contact ${index}: reviewer${index}@example.com</p>`
+  ).join("");
+  const html = `<!doctype html><html><head><title>Redaction Limit</title></head><body>${sensitiveRows}</body></html>`;
+
+  await withPage(browser, html, contentScript, { width: 1000, height: 800 }, async (page) => {
+    const scan = await page.evaluate(() => window.__LUMEN_TEST_API__.scanSensitiveRegions());
+
+    assert(scan.count === 80, "Redaction limit fixture did not exercise the scanner cap", scan);
+    assert(scan.truncated === true && scan.limit === 80, "Redaction scanner did not disclose truncation", scan);
+
+    record("redaction scan fails closed at limit", {
+      reported: scan.count,
+      limit: scan.limit,
+      truncated: scan.truncated
     });
   });
 }
@@ -474,9 +631,15 @@ async function runCutawayRegionSmoke(browser, contentScript) {
       label: document.querySelector("#lumen-cutaway-picker .lumen-cutaway-box")?.dataset.label || ""
     }));
     await page.getByRole("button", { name: "Save" }).click();
+    const resolvedLasso = await page.evaluate((payload) => window.__LUMEN_TEST_API__.resolveCutawayRegion(payload), {
+      region: lassoRegion,
+      context: lassoMessage?.payload?.context
+    });
 
     assert(lassoRegion?.shape === "lasso", "Lasso picker did not store lasso geometry.", lassoRegion);
     assert(lassoRegion.points?.length >= 4, "Lasso picker did not retain the drawn points.", lassoRegion);
+    assert(resolvedLasso.region?.shape === "lasso", "Resolved lasso lost its shape metadata.", resolvedLasso);
+    assert(resolvedLasso.region?.points?.length >= 4, "Resolved lasso lost its projected polygon points.", resolvedLasso);
     assert(
       lassoPickerUi.title === "Lasso capture" &&
         lassoPickerUi.count === "Lasso selected" &&
@@ -532,15 +695,64 @@ async function runCutawayRegionSmoke(browser, contentScript) {
   });
 }
 
+async function runLassoMaskPixelSmoke(browser, offscreenScript) {
+  await withPage(browser, "<!doctype html><html><body></body></html>", offscreenScript, { width: 640, height: 480 }, async (page) => {
+    const pixels = await page.evaluate(() => {
+      const source = document.createElement("canvas");
+      source.width = 160;
+      source.height = 160;
+      const sourceContext = source.getContext("2d");
+      sourceContext.fillStyle = "#f43f5e";
+      sourceContext.fillRect(0, 0, source.width, source.height);
+
+      const region = window.__LUMEN_OFFSCREEN_TEST_API__.scaleCutawayRegion({
+        id: "lasso-pixel-test",
+        shape: "lasso",
+        left: 20,
+        top: 20,
+        width: 100,
+        height: 100,
+        points: [
+          { x: 70, y: 20 },
+          { x: 120, y: 70 },
+          { x: 70, y: 120 },
+          { x: 20, y: 70 }
+        ]
+      }, 1, source.width, source.height);
+      const output = window.__LUMEN_OFFSCREEN_TEST_API__.renderCutawayCanvas(source, region);
+      const context = output.getContext("2d");
+
+      return {
+        shape: region.shape,
+        pointCount: region.points.length,
+        outsideAlpha: context.getImageData(0, 0, 1, 1).data[3],
+        insideAlpha: context.getImageData(50, 50, 1, 1).data[3],
+        previewType: window.__LUMEN_OFFSCREEN_TEST_API__.renderPreviewDataUrl(output).slice(0, 23)
+      };
+    });
+
+    assert(pixels.shape === "lasso" && pixels.pointCount === 4, "Scaled cutaway lost its lasso polygon.", pixels);
+    assert(pixels.outsideAlpha === 0, "Pixels outside the lasso should remain transparent.", pixels);
+    assert(pixels.insideAlpha === 255, "Pixels inside the lasso should contain the capture.", pixels);
+    assert(pixels.previewType === "data:image/webp;base64,", "Library preview was not encoded as WebP.", pixels);
+
+    record("transparent lasso export pixels", pixels);
+  });
+}
+
 async function main() {
   const contentScript = await buildPatchedContentScript();
+  const offscreenScript = await buildPatchedOffscreenScript();
   const browser = await chromium.launch();
 
   try {
     await runDocumentCaptureSmoke(browser, contentScript);
     await runNestedScrollSmoke(browser, contentScript);
+    await runOffsetStitchPixelSmoke(browser, offscreenScript);
+    await runRedactionLimitSmoke(browser, contentScript);
     await runManualProjectionSmoke(browser, contentScript);
     await runCutawayRegionSmoke(browser, contentScript);
+    await runLassoMaskPixelSmoke(browser, offscreenScript);
   } finally {
     await browser.close();
   }

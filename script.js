@@ -1,29 +1,34 @@
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const revealTargets = [...document.querySelectorAll("[data-reveal]")];
+const header = document.querySelector("[data-header]");
 const demo = document.querySelector("[data-demo]");
 const demoButtons = [...document.querySelectorAll("[data-mode]")];
-const tiltTargets = [...document.querySelectorAll("[data-tilt]")];
-const demoModes = ["messy", "clean", "ready"];
-const shouldRotateDemo =
-  demo &&
-  window.matchMedia("(prefers-reduced-motion: no-preference)").matches;
-let demoModeIndex = 0;
-let demoRotationTimer;
+const demoTitle = document.querySelector("[data-demo-title]");
+const demoCoverage = document.querySelector("[data-demo-coverage]");
+const demoStep = document.querySelector(".demo-step-icon");
+const demoStates = [
+  { id: "capture", title: "Page prepared", coverage: "Scanning…", step: "1" },
+  { id: "protect", title: "Details protected", coverage: "11 segments", step: "2" },
+  { id: "verify", title: "Capture complete", coverage: "100%", step: "✓" }
+];
 
-if ("IntersectionObserver" in window) {
-  const observer = new IntersectionObserver(
+if ("IntersectionObserver" in window && !reducedMotion) {
+  const revealObserver = new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
-        if (entry.isIntersecting) {
-          entry.target.classList.add("is-visible");
-          observer.unobserve(entry.target);
+        if (!entry.isIntersecting) {
+          continue;
         }
+
+        entry.target.classList.add("is-visible");
+        revealObserver.unobserve(entry.target);
       }
     },
-    { threshold: 0.16 }
+    { rootMargin: "0px 0px -8%", threshold: 0.1 }
   );
 
   for (const target of revealTargets) {
-    observer.observe(target);
+    revealObserver.observe(target);
   }
 } else {
   for (const target of revealTargets) {
@@ -31,65 +36,80 @@ if ("IntersectionObserver" in window) {
   }
 }
 
-function setDemoMode(mode) {
+function updateHeader() {
+  header?.classList.toggle("is-scrolled", window.scrollY > 24);
+}
+
+updateHeader();
+window.addEventListener("scroll", updateHeader, { passive: true });
+
+function setDemoState(stateId) {
   if (!demo) {
     return;
   }
 
-  demo.classList.toggle("is-clean", mode === "clean" || mode === "ready");
-  demo.classList.toggle("is-ready", mode === "ready");
+  const stateIndex = demoStates.findIndex((state) => state.id === stateId);
 
-  for (const button of demoButtons) {
-    button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
-  }
-
-  const nextIndex = demoModes.indexOf(mode);
-
-  if (nextIndex !== -1) {
-    demoModeIndex = nextIndex;
-  }
-}
-
-function queueDemoRotation(delay = 3600) {
-  if (!shouldRotateDemo) {
+  if (stateIndex === -1) {
     return;
   }
 
-  window.clearTimeout(demoRotationTimer);
-  demoRotationTimer = window.setTimeout(() => {
-    demoModeIndex = (demoModeIndex + 1) % demoModes.length;
-    setDemoMode(demoModes[demoModeIndex]);
-    queueDemoRotation();
-  }, delay);
+  const state = demoStates[stateIndex];
+  demo.dataset.state = state.id;
+
+  if (demoTitle) {
+    demoTitle.textContent = state.title;
+  }
+
+  if (demoCoverage) {
+    demoCoverage.textContent = state.coverage;
+  }
+
+  if (demoStep) {
+    demoStep.textContent = state.step;
+  }
+
+  for (const button of demoButtons) {
+    button.setAttribute("aria-pressed", String(button.dataset.mode === state.id));
+  }
 }
 
 for (const button of demoButtons) {
   button.addEventListener("click", () => {
-    setDemoMode(button.dataset.mode || demoModes[0]);
-    queueDemoRotation(7200);
+    setDemoState(button.dataset.mode || demoStates[0].id);
   });
 }
 
-queueDemoRotation();
+const localNavLinks = [...document.querySelectorAll('.site-nav a[href^="#"]')];
+const navSections = localNavLinks
+  .map((link) => document.querySelector(link.getAttribute("href")))
+  .filter(Boolean);
 
-if (
-  tiltTargets.length &&
-  window.matchMedia("(prefers-reduced-motion: no-preference)").matches &&
-  window.matchMedia("(pointer: fine)").matches
-) {
-  for (const target of tiltTargets) {
-    target.addEventListener("pointermove", (event) => {
-      const bounds = target.getBoundingClientRect();
-      const offsetX = (event.clientX - bounds.left) / bounds.width - 0.5;
-      const offsetY = (event.clientY - bounds.top) / bounds.height - 0.5;
+if ("IntersectionObserver" in window && navSections.length) {
+  const sectionObserver = new IntersectionObserver(
+    (entries) => {
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0];
 
-      target.style.setProperty("--tilt-x", `${Math.max(-3, Math.min(3, offsetY * -6)).toFixed(2)}deg`);
-      target.style.setProperty("--tilt-y", `${Math.max(-4, Math.min(4, offsetX * 8)).toFixed(2)}deg`);
-    });
+      if (!visible) {
+        return;
+      }
 
-    target.addEventListener("pointerleave", () => {
-      target.style.setProperty("--tilt-x", "0deg");
-      target.style.setProperty("--tilt-y", "0deg");
-    });
+      for (const link of localNavLinks) {
+        const isCurrent = link.getAttribute("href") === `#${visible.target.id}`;
+
+        if (isCurrent) {
+          link.setAttribute("aria-current", "true");
+        } else {
+          link.removeAttribute("aria-current");
+        }
+      }
+    },
+    { rootMargin: "-20% 0px -68%", threshold: [0, 0.25, 0.5] }
+  );
+
+  for (const section of navSections) {
+    sectionObserver.observe(section);
   }
 }

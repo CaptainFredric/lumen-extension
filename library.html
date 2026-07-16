@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Lumen Capture Library</title>
+    <link rel="stylesheet" href="library.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#captureGrid">Skip to captures</a>
+
+    <header class="library-header">
+      <div class="brand-lockup">
+        <span class="brand-mark" aria-hidden="true"><span></span></span>
+        <div>
+          <p class="eyebrow">Lumen</p>
+          <h1>Capture library</h1>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="refreshButton" class="quiet-button" type="button">Refresh</button>
+        <button id="clearLibraryButton" class="quiet-button danger-button" type="button">Clear library</button>
+      </div>
+    </header>
+
+    <main class="library-shell">
+      <section class="intro-panel" aria-labelledby="introTitle">
+        <div class="intro-copy">
+          <p class="eyebrow">Local by design</p>
+          <h2 id="introTitle">Your captured pages, ready to revisit.</h2>
+          <p>
+            Lumen keeps lightweight previews and capture details inside this browser profile.
+            Full-resolution originals remain in your Downloads folder.
+          </p>
+        </div>
+
+        <dl class="library-metrics" aria-label="Library summary">
+          <div>
+            <dt>Captures</dt>
+            <dd id="captureMetric">0</dd>
+          </div>
+          <div>
+            <dt>Preview cache</dt>
+            <dd id="previewMetric">0 B</dd>
+          </div>
+          <div>
+            <dt>Extension storage</dt>
+            <dd id="storageMetric">Checking</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="library-toolbar" aria-label="Find captures">
+        <label class="search-field" for="searchInput">
+          <span>Search</span>
+          <input id="searchInput" type="search" placeholder="Title, site, URL, or tag" autocomplete="off" />
+        </label>
+
+        <label class="filter-field" for="sourceFilter">
+          <span>Show</span>
+          <select id="sourceFilter">
+            <option value="all">All captures</option>
+            <option value="manual">Manual captures</option>
+            <option value="timed">Timed captures</option>
+            <option value="favorite">Favorites</option>
+          </select>
+        </label>
+
+        <label class="filter-field" for="sortSelect">
+          <span>Sort</span>
+          <select id="sortSelect">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+          </select>
+        </label>
+      </section>
+
+      <div class="results-head">
+        <div>
+          <p class="eyebrow">Saved locally</p>
+          <h2 id="resultsTitle">All captures</h2>
+        </div>
+        <p id="resultsCount" class="results-count" aria-live="polite">0 items</p>
+      </div>
+
+      <div id="libraryStatus" class="status-banner is-hidden" role="status" aria-live="polite"></div>
+
+      <section id="emptyState" class="empty-state is-hidden" aria-labelledby="emptyTitle">
+        <span class="empty-icon" aria-hidden="true"></span>
+        <h2 id="emptyTitle">No captures here yet</h2>
+        <p id="emptyCopy">Run a capture from the Lumen toolbar and its preview will appear here.</p>
+      </section>
+
+      <section id="captureGrid" class="capture-grid" aria-label="Saved captures" tabindex="-1"></section>
+    </main>
+
+    <dialog id="captureDialog" class="capture-dialog" aria-labelledby="dialogTitle">
+      <div class="dialog-shell">
+        <header class="dialog-head">
+          <div>
+            <p id="dialogEyebrow" class="eyebrow">Capture details</p>
+            <h2 id="dialogTitle">Saved capture</h2>
+          </div>
+          <button id="closeDialogButton" class="icon-button" type="button" aria-label="Close capture details">×</button>
+        </header>
+
+        <div class="dialog-body">
+          <figure class="dialog-preview">
+            <img id="dialogImage" class="is-hidden" alt="" />
+            <div id="dialogPreviewFallback" class="preview-fallback">Preview unavailable</div>
+          </figure>
+
+          <div class="dialog-copy">
+            <div id="dialogBadges" class="badge-row"></div>
+            <p id="dialogMeta" class="dialog-meta"></p>
+            <p id="dialogPath" class="dialog-path"></p>
+
+            <section aria-labelledby="artifactTitle">
+              <div class="section-head">
+                <h3 id="artifactTitle">Saved files</h3>
+                <span id="artifactCount">0 files</span>
+              </div>
+              <div id="artifactList" class="artifact-list"></div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <template id="captureCardTemplate">
+      <article class="capture-card">
+        <button class="preview-button" type="button">
+          <img class="capture-preview is-hidden" alt="" loading="lazy" />
+          <span class="preview-fallback">Preview unavailable</span>
+          <span class="preview-badges"></span>
+        </button>
+
+        <div class="card-copy">
+          <div class="card-title-row">
+            <div>
+              <p class="card-host"></p>
+              <h3 class="card-title"></h3>
+            </div>
+            <button class="favorite-button" type="button" aria-pressed="false">
+              <span aria-hidden="true">☆</span>
+              <span class="sr-only">Add to favorites</span>
+            </button>
+          </div>
+
+          <p class="card-meta"></p>
+
+          <div class="card-actions">
+            <button class="card-action open-action" type="button">Open</button>
+            <button class="card-action show-action" type="button">Show in folder</button>
+            <button class="card-action remove-action" type="button">Remove</button>
+          </div>
+        </div>
+      </article>
+    </template>
+
+    <script type="module" src="library.js"></script>
+  </body>
+</html>
