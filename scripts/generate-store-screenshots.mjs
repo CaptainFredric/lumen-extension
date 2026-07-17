@@ -1,4 +1,4 @@
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,6 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const outputDir = path.join(repoRoot, "store-assets", "screenshots");
 const tempRoot = await mkdtemp(path.join(os.tmpdir(), "lumen-store-shots-"));
+const stagingOutputDir = path.join(tempRoot, "screenshots");
 const extensionDir = path.join(tempRoot, "extension");
 const profileDir = path.join(tempRoot, "profile");
 const shotSize = {
@@ -26,8 +27,11 @@ const captureAssets = {
 };
 const publicStoreAssetCopies = [
   ["01-extension-control-surface.png", "store-control-surface.png"],
-  ["02-hold-actions-and-review.png", "store-review-actions.png"],
-  ["03-responsive-capture-set.png", "store-responsive-set.png"]
+  ["02-annotation-studio.png", "store-review-actions.png"],
+  ["02-annotation-studio.png", "store-annotation-studio.png"],
+  ["03-visual-change-review.png", "store-visual-change-review.png"],
+  ["04-responsive-capture-set.png", "store-responsive-set.png"],
+  ["05-library-and-area-monitor.png", "store-library-monitor.png"]
 ];
 
 const screenshots = [];
@@ -35,21 +39,20 @@ let extensionContext;
 let renderBrowser;
 
 try {
-  await rm(outputDir, { recursive: true, force: true });
-  await mkdir(outputDir, { recursive: true });
+  await mkdir(stagingOutputDir, { recursive: true });
 
-  const popupShots = await captureExtensionPopupShots();
+  const productShots = await captureExtensionProductShots();
   renderBrowser = await chromium.launch();
   const page = await renderBrowser.newPage({
     viewport: shotSize,
     deviceScaleFactor: 1
   });
 
-  await renderStoreShot(page, "01-extension-control-surface.png", buildControlSurfaceShot(popupShots.default));
-  await renderStoreShot(page, "02-hold-actions-and-review.png", buildHoldActionShot(popupShots.holdMenu));
-  await renderStoreShot(page, "03-responsive-capture-set.png", buildResponsiveSetShot());
-  await renderStoreShot(page, "04-redaction-and-callout-review.png", buildRedactionShot());
-  await renderStoreShot(page, "05-signals-and-local-history.png", buildSignalsShot());
+  await renderStoreShot(page, "01-extension-control-surface.png", buildControlSurfaceShot(productShots.default, productShots.holdMenu));
+  await writeStoreScreenshot("02-annotation-studio.png", productShots.editor);
+  await writeStoreScreenshot("03-visual-change-review.png", productShots.review);
+  await renderStoreShot(page, "04-responsive-capture-set.png", buildResponsiveSetShot());
+  await renderStoreShot(page, "05-library-and-area-monitor.png", buildLibraryMonitorShot(productShots.library, productShots.watch));
 
   await page.close();
 
@@ -57,13 +60,14 @@ try {
     await assertPngDimensions(filePath, shotSize.width, shotSize.height);
   }
 
+  await replaceScreenshotOutput();
   await copyPublicStoreAssets();
 
   console.log(JSON.stringify({
     ok: true,
     outputDir,
     count: screenshots.length,
-    screenshots: screenshots.map((filePath) => path.relative(repoRoot, filePath))
+    screenshots: screenshots.map((filePath) => path.join("store-assets", "screenshots", path.basename(filePath)))
   }, null, 2));
 } finally {
   await extensionContext?.close().catch(() => {});
@@ -71,7 +75,7 @@ try {
   await rm(tempRoot, { recursive: true, force: true });
 }
 
-async function captureExtensionPopupShots() {
+async function captureExtensionProductShots() {
   await prepareExtensionCopy();
 
   extensionContext = await chromium.launchPersistentContext(profileDir, {
@@ -119,17 +123,169 @@ async function captureExtensionPopupShots() {
   await popup.waitForTimeout(700);
   const holdShot = await popup.screenshot({ type: "png" });
 
+  await seedStoreMonitorState(worker);
+  await popup.reload({ waitUntil: "load" });
+  await popup.waitForSelector("#watchPlanCard:not(.is-hidden)", { timeout: 10000 });
+  const onboardingDismissButton = popup.locator("#onboardingDismissButton");
+  if (await onboardingDismissButton.isVisible().catch(() => false)) {
+    await onboardingDismissButton.click();
+  }
+  await popup.locator("#watchPlanCard").scrollIntoViewIfNeeded();
+  await popup.waitForTimeout(200);
+  const watchShot = await popup.screenshot({ type: "png" });
+
+  const editorShot = await captureExtensionPageShot({
+    extensionId,
+    route: "editor.html?demo=1",
+    ready(page) {
+      return page.waitForFunction(() =>
+        !document.querySelector("#canvasFrame")?.classList.contains("is-hidden") &&
+        document.querySelectorAll("[data-tool]").length >= 6 &&
+        !document.querySelector("#exportButton")?.disabled
+      );
+    }
+  });
+  const reviewShot = await captureExtensionPageShot({
+    extensionId,
+    route: "review.html?demo=1",
+    ready(page) {
+      return page.waitForFunction(() =>
+        !document.querySelector("#reviewContent")?.classList.contains("is-hidden") &&
+        document.querySelector("#changePercentMetric")?.textContent?.trim() !== "—" &&
+        document.querySelectorAll("#timelineList .timeline-item").length >= 3
+      );
+    }
+  });
+  const libraryShot = await captureLibraryShot(extensionId);
+
   await popup.close();
   await target.close();
 
   return {
     default: bufferToDataUrl(defaultShot),
-    holdMenu: bufferToDataUrl(holdShot)
+    holdMenu: bufferToDataUrl(holdShot),
+    watch: bufferToDataUrl(watchShot),
+    editor: editorShot,
+    review: reviewShot,
+    library: bufferToDataUrl(libraryShot)
   };
 }
 
+async function captureExtensionPageShot({ extensionId, route, ready }) {
+  const page = await extensionContext.newPage();
+
+  try {
+    await page.setViewportSize(shotSize);
+    await page.goto(`chrome-extension://${extensionId}/${route}`, { waitUntil: "load" });
+    await ready(page);
+    await page.waitForTimeout(350);
+    return await page.screenshot({ type: "png", fullPage: false });
+  } finally {
+    await page.close();
+  }
+}
+
+async function captureLibraryShot(extensionId) {
+  const page = await extensionContext.newPage();
+
+  try {
+    await page.setViewportSize({ width: 1120, height: 720 });
+    await page.goto(`chrome-extension://${extensionId}/library.html`, { waitUntil: "load" });
+    const seededLibrary = await page.evaluate(async ({ desktop, tablet }) => {
+      const { getLibraryCapture, putLibraryCapture } = await import(chrome.runtime.getURL("library-store.js"));
+      const toBlob = async (dataUrl) => (await fetch(dataUrl)).blob();
+      const now = Date.now();
+      const records = [
+        {
+          id: "store-library-manual",
+          title: "Launch page review",
+          host: "lumen-store.test",
+          url: "https://lumen-store.test/",
+          sourceType: "manual",
+          favorite: true,
+          capturedAt: new Date(now).toISOString(),
+          archiveFolder: "Lumen/2026-07-16/launch-page",
+          previewBlob: await toBlob(desktop),
+          downloads: [{ downloadId: 210, filename: "Lumen/launch-page.png", kind: "image", role: "full-page", width: 1440, height: 2600 }],
+          tags: ["responsive", "reviewed"]
+        },
+        {
+          id: "store-library-timed",
+          title: "Pricing area monitor",
+          host: "lumen-store.test",
+          url: "https://lumen-store.test/pricing",
+          sourceType: "timed",
+          watchPlanId: "store-monitor-plan",
+          capturedAt: new Date(now - 18 * 60 * 1000).toISOString(),
+          archiveFolder: "Lumen/2026-07-16/pricing-monitor",
+          previewBlob: await toBlob(tablet),
+          downloads: [{ downloadId: 211, filename: "Lumen/pricing-monitor.png", kind: "image", role: "cutaway", width: 720, height: 840 }],
+          tags: ["timed", "changed"]
+        }
+      ];
+
+      for (const record of records) {
+        await putLibraryCapture(record);
+      }
+
+      return Promise.all(records.map(async (record) => {
+        const capture = await getLibraryCapture(record.id, { includePreview: true });
+        return {
+          id: record.id,
+          previewReady: Boolean(capture?.preview?.blob?.size),
+          previewBytes: capture?.preview?.blob?.size || 0
+        };
+      }));
+    }, { desktop: captureAssets.desktop, tablet: captureAssets.tablet });
+    if (!seededLibrary.every((capture) => capture.previewReady)) {
+      throw new Error(`Store screenshot library previews were not seeded: ${JSON.stringify(seededLibrary)}`);
+    }
+    await page.reload({ waitUntil: "load" });
+    await page.waitForSelector("#captureGrid:not(.is-hidden) .capture-card", { timeout: 10000 });
+    await page.waitForFunction(() => document.querySelectorAll("#captureGrid .capture-card").length >= 2);
+    await page.locator("#captureGrid").scrollIntoViewIfNeeded();
+    const renderedPreviewCount = await page.evaluate(async () => {
+      const { getLibraryPreviewAsset } = await import(chrome.runtime.getURL("library-store.js"));
+      let rendered = 0;
+
+      for (const card of document.querySelectorAll("#captureGrid .capture-card")) {
+        const captureId = card.dataset.captureId || "";
+        const asset = await getLibraryPreviewAsset(captureId);
+        const image = card.querySelector(".capture-preview");
+        const fallback = card.querySelector(".preview-fallback");
+
+        if (!asset?.blob || !image) {
+          continue;
+        }
+
+        image.loading = "eager";
+        image.src = URL.createObjectURL(asset.blob);
+        await image.decode();
+        image.classList.remove("is-hidden");
+        fallback?.classList.add("is-hidden");
+        rendered += 1;
+      }
+
+      return rendered;
+    });
+    if (renderedPreviewCount < 2) {
+      throw new Error(`Expected two rendered store-library previews, got ${renderedPreviewCount}.`);
+    }
+    await page.waitForTimeout(350);
+    return await page.screenshot({ type: "png", fullPage: false });
+  } finally {
+    await page.close();
+  }
+}
+
+async function writeStoreScreenshot(filename, buffer) {
+  const filePath = path.join(stagingOutputDir, filename);
+  await writeFile(filePath, buffer);
+  screenshots.push(filePath);
+}
+
 async function renderStoreShot(page, filename, bodyHtml) {
-  const filePath = path.join(outputDir, filename);
+  const filePath = path.join(stagingOutputDir, filename);
   await page.setContent(buildStoreShell(bodyHtml), { waitUntil: "load" });
   await page.screenshot({
     path: filePath,
@@ -138,17 +294,18 @@ async function renderStoreShot(page, filename, bodyHtml) {
   screenshots.push(filePath);
 }
 
-function buildControlSurfaceShot(popupImage) {
+function buildControlSurfaceShot(popupImage, holdImage) {
   return `
-    <section class="hero-grid">
+    <section class="control-shot">
       <div class="copy">
         <p class="eyebrow">Lumen capture workflow</p>
-        <h1>Clean, responsive captures from any webpage.</h1>
-        <p class="lede">Capture the page, clear overlays, check sensitive regions, and keep page context with the saved files.</p>
-        <div class="cta-row"><span>Full-page capture</span><span>Responsive set</span><span>Save check</span></div>
+        <h1>Capture the whole page. Keep the useful part.</h1>
+        <p class="lede">Clean overlays, check sensitive regions, capture a responsive set, or hold for focused actions.</p>
+        <div class="cta-row"><span>Full page</span><span>Transparent lasso</span><span>Timed area</span></div>
       </div>
-      <div class="phone-frame">
-        <img src="${popupImage}" alt="Lumen extension popup" />
+      <div class="popup-pair">
+        <div class="phone-frame mini"><img src="${popupImage}" alt="Lumen extension popup" /></div>
+        <div class="phone-frame mini raised"><img src="${holdImage}" alt="Lumen quick actions" /></div>
       </div>
     </section>
   `;
@@ -179,12 +336,31 @@ function buildResponsiveSetShot() {
     <section class="output-shot">
       <div class="shot-head">
         <p class="eyebrow">Responsive output</p>
-        <h2>One run can save desktop, tablet, and mobile views.</h2>
+        <h2>Responsive, redacted, and focused outputs in one run.</h2>
+        <p>Save desktop, tablet, and mobile views, then keep a rectangle or transparent lasso beside the full page.</p>
       </div>
       <div class="device-grid">
         <figure class="browser-card wide"><img src="${captureAssets.desktop}" alt="Desktop capture output" /><figcaption>Desktop full page</figcaption></figure>
         <figure class="browser-card"><img src="${captureAssets.tablet}" alt="Tablet capture output" /><figcaption>Tablet</figcaption></figure>
         <figure class="browser-card phone"><img src="${captureAssets.mobile}" alt="Mobile capture output" /><figcaption>Mobile</figcaption></figure>
+      </div>
+    </section>
+  `;
+}
+
+function buildLibraryMonitorShot(libraryImage, watchImage) {
+  return `
+    <section class="workspace-shot">
+      <div class="shot-head">
+        <div>
+          <p class="eyebrow">Local capture workspace</p>
+          <h2>Photos, monitor runs, and reviewed exports stay connected.</h2>
+        </div>
+        <p>Browse real local previews, keep favorites, inspect a timed area, and send only the reviewed image to Drive when you choose.</p>
+      </div>
+      <div class="workspace-pair">
+        <figure class="browser-card library-card"><img src="${libraryImage}" alt="Lumen local capture library" /><figcaption>Local photo library</figcaption></figure>
+        <div class="phone-frame workspace-phone"><img src="${watchImage}" alt="Lumen active area monitor" /></div>
       </div>
     </section>
   `;
@@ -279,7 +455,9 @@ function buildStoreShell(bodyHtml) {
           .hero-grid,
           .split-grid,
           .output-shot,
-          .review-grid-shot {
+          .review-grid-shot,
+          .control-shot,
+          .workspace-shot {
             position: relative;
             display: grid;
             height: 100%;
@@ -288,8 +466,10 @@ function buildStoreShell(bodyHtml) {
           }
           .hero-grid { grid-template-columns: 1fr 430px; }
           .split-grid { grid-template-columns: 430px 1fr; }
+          .control-shot { grid-template-columns: 0.82fr 1.18fr; }
           .output-shot,
-          .review-grid-shot { align-content: center; }
+          .review-grid-shot,
+          .workspace-shot { align-content: center; }
           .copy,
           .panel-stack,
           .artifact-card {
@@ -377,6 +557,24 @@ function buildStoreShell(bodyHtml) {
             object-fit: contain;
             background: #050811;
           }
+          .popup-pair {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 16px;
+            min-width: 0;
+          }
+          .phone-frame.mini {
+            justify-self: auto;
+            padding: 10px;
+            border-radius: 28px;
+          }
+          .phone-frame.mini img {
+            width: 294px;
+            height: 534px;
+            border-radius: 20px;
+          }
+          .phone-frame.mini.raised { transform: translateY(-18px); }
           .metric-grid {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -426,6 +624,23 @@ function buildStoreShell(bodyHtml) {
             gap: 22px;
             align-items: stretch;
           }
+          .workspace-pair {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 294px;
+            gap: 22px;
+            min-height: 452px;
+            align-items: stretch;
+          }
+          .workspace-phone {
+            justify-self: stretch;
+            padding: 10px;
+            border-radius: 28px;
+          }
+          .workspace-phone img {
+            width: 100%;
+            height: 430px;
+            border-radius: 20px;
+          }
           .browser-card {
             position: relative;
             min-height: 420px;
@@ -464,6 +679,12 @@ function buildStoreShell(bodyHtml) {
           .browser-card.wide img { height: 480px; }
           .browser-card.phone img { object-position: top center; }
           .browser-card.redaction img { height: 500px; }
+          .browser-card.library-card { min-height: 452px; }
+          .browser-card.library-card img {
+            height: 414px;
+            object-fit: cover;
+            object-position: top left;
+          }
           figcaption {
             position: absolute;
             left: 16px;
@@ -535,6 +756,40 @@ function buildTargetFixture() {
     </html>`;
 }
 
+async function replaceScreenshotOutput() {
+  const parentDir = path.dirname(outputDir);
+  const nextDir = path.join(parentDir, `.screenshots-next-${process.pid}`);
+  const backupDir = path.join(parentDir, `.screenshots-backup-${process.pid}`);
+  let movedExistingOutput = false;
+
+  await mkdir(parentDir, { recursive: true });
+  await rm(nextDir, { recursive: true, force: true });
+  await rm(backupDir, { recursive: true, force: true });
+  await cp(stagingOutputDir, nextDir, { recursive: true });
+
+  try {
+    await rename(outputDir, backupDir);
+    movedExistingOutput = true;
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      throw error;
+    }
+  }
+
+  try {
+    await rename(nextDir, outputDir);
+  } catch (error) {
+    if (movedExistingOutput) {
+      await rename(backupDir, outputDir).catch(() => {});
+    }
+    throw error;
+  }
+
+  if (movedExistingOutput) {
+    await rm(backupDir, { recursive: true, force: true });
+  }
+}
+
 async function copyPublicStoreAssets() {
   const targets = [
     path.join(repoRoot, "assets"),
@@ -552,6 +807,68 @@ async function copyPublicStoreAssets() {
       await cp(source, path.join(targetDir, targetName));
     }
   }
+}
+
+async function seedStoreMonitorState(worker) {
+  const now = Date.now();
+  const planId = "store-monitor-plan";
+
+  await worker.evaluate(({ now, planId }) => chrome.storage.local.set({
+    "lumen.watch.plans": [
+      {
+        id: planId,
+        title: "Pricing area monitor",
+        host: "lumen-store.test",
+        url: "https://lumen-store.test/",
+        status: "active",
+        selectionMode: "lasso",
+        explicitOptIn: true,
+        destination: "local",
+        runCount: 7,
+        lastRunAt: new Date(now - 4 * 60 * 1000).toISOString(),
+        createdAt: new Date(now - 74 * 60 * 1000).toISOString(),
+        updatedAt: new Date(now - 4 * 60 * 1000).toISOString(),
+        region: {
+          id: "store-monitor-region",
+          kind: "cutaway",
+          shape: "lasso",
+          left: 260,
+          top: 430,
+          width: 520,
+          height: 220
+        },
+        schedule: {
+          mode: "continuous",
+          intervalMinutes: 5,
+          maxRuns: 25,
+          saveOnlyWhenChanged: true
+        }
+      }
+    ],
+    "lumen.watch.runs": [
+      {
+        id: "store-monitor-run-3",
+        watchPlanId: planId,
+        captureId: "store-library-timed",
+        title: "Pricing area monitor",
+        url: "https://lumen-store.test/",
+        status: "captured",
+        changePercent: 6.4,
+        fileCount: 1,
+        completedAt: new Date(now - 4 * 60 * 1000).toISOString()
+      },
+      {
+        id: "store-monitor-run-2",
+        watchPlanId: planId,
+        title: "Pricing area monitor",
+        url: "https://lumen-store.test/",
+        status: "unchanged",
+        changePercent: 0,
+        fileCount: 0,
+        completedAt: new Date(now - 9 * 60 * 1000).toISOString()
+      }
+    ]
+  }), { now, planId });
 }
 
 async function seedExtensionState(worker) {
@@ -651,6 +968,10 @@ async function prepareExtensionCopy() {
   const manifestPath = path.join(extensionDir, "manifest.json");
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   manifest.host_permissions = ["https://lumen-store.test/*"];
+  manifest.oauth2 = {
+    client_id: "123456789-lumen-store-screenshot.apps.googleusercontent.com",
+    scopes: ["https://www.googleapis.com/auth/drive.file"]
+  };
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 }
 

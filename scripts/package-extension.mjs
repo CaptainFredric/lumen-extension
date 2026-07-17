@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { cp, mkdir, readdir, readFile, rm, stat } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -14,6 +14,7 @@ const publicHomepageUrl = "https://captainfredric.github.io/lumen-extension/";
 const requiredRuntimeFiles = [
   "manifest.json",
   "background.js",
+  "annotation-engine.js",
   "content.js",
   "config.js",
   "entitlements.js",
@@ -22,11 +23,21 @@ const requiredRuntimeFiles = [
   "library.css",
   "library.html",
   "library.js",
+  "drive-export.js",
+  "editor.css",
+  "editor.html",
+  "editor.js",
+  "editor-drive.js",
   "offscreen.html",
   "offscreen.js",
   "popup.css",
   "popup.html",
-  "popup.js"
+  "popup.js",
+  "review.css",
+  "review.html",
+  "review.js",
+  "review-actions.js",
+  "visual-diff-engine.js"
 ];
 
 const requiredIconFiles = [
@@ -64,14 +75,17 @@ const blockedRootFiles = new Set([
 ]);
 
 try {
-  const manifest = JSON.parse(await readFile(path.join(repoRoot, "manifest.json"), "utf8"));
+  const sourceManifest = JSON.parse(await readFile(path.join(repoRoot, "manifest.json"), "utf8"));
+  const manifest = buildPackageManifest(sourceManifest);
   const zipName = `lumen-extension-${manifest.version}.zip`;
   const zipPath = path.join(distDir, zipName);
 
   await rm(stagingDir, { recursive: true, force: true });
   await mkdir(stagingDir, { recursive: true });
+  await removeOutdatedExtensionPackages(zipName);
 
   await copyRuntimeFiles();
+  await writeFile(path.join(stagingDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 
   const validation = await validatePackage({ manifest, zipPath });
 
@@ -115,6 +129,16 @@ async function copyRuntimeFiles() {
   }
 }
 
+async function removeOutdatedExtensionPackages(currentZipName) {
+  const entries = await readdir(distDir).catch(() => []);
+
+  for (const entry of entries) {
+    if (/^lumen-extension-[0-9.]+\.zip$/.test(entry) && entry !== currentZipName) {
+      await rm(path.join(distDir, entry), { force: true });
+    }
+  }
+}
+
 async function validatePackage({ manifest, zipPath }) {
   const errors = [];
   const warnings = [];
@@ -124,6 +148,7 @@ async function validatePackage({ manifest, zipPath }) {
   await validateRequiredFiles(errors);
   await validateIcons(manifest, errors, warnings);
   await validatePermissionDocumentation(manifest, errors);
+  await validateNoProductionLumenEndpoint(errors);
   validateBlockedFiles(files, errors);
 
   return {
@@ -190,6 +215,30 @@ function validateManifest(manifest, errors, warnings) {
     errors.push(`Unexpected permissions: ${unexpectedPermissions.join(", ")}.`);
   }
 
+  const allowedOptionalPermissions = new Set(["identity"]);
+  const unexpectedOptionalPermissions = (manifest.optional_permissions || [])
+    .filter((permission) => !allowedOptionalPermissions.has(permission));
+
+  if (unexpectedOptionalPermissions.length) {
+    errors.push(`Unexpected optional permissions: ${unexpectedOptionalPermissions.join(", ")}.`);
+  }
+
+  if (manifest.oauth2) {
+    if (!manifest.oauth2.client_id?.endsWith(".apps.googleusercontent.com")) {
+      errors.push("Google Drive OAuth client ID is malformed.");
+    }
+
+    if (!manifest.oauth2.scopes?.includes("https://www.googleapis.com/auth/drive.file")) {
+      errors.push("Google Drive OAuth must use the narrow drive.file scope.");
+    }
+
+    if (!(manifest.optional_permissions || []).includes("identity")) {
+      errors.push("Google Drive OAuth requires the optional identity permission.");
+    }
+  } else {
+    warnings.push("Google Drive export is disabled until LUMEN_GOOGLE_DRIVE_CLIENT_ID is supplied at package time.");
+  }
+
   if ((manifest.optional_host_permissions || []).some((permission) => !/^https?:\/\/\*\/\*$/.test(permission))) {
     errors.push("Optional host permissions should stay limited to http://*/* and https://*/*.");
   }
@@ -197,6 +246,27 @@ function validateManifest(manifest, errors, warnings) {
   if (!manifest.minimum_chrome_version) {
     warnings.push("minimum_chrome_version is not declared.");
   }
+}
+
+function buildPackageManifest(sourceManifest) {
+  const manifest = structuredClone(sourceManifest);
+  const clientId = String(process.env.LUMEN_GOOGLE_DRIVE_CLIENT_ID || "").trim();
+
+  if (!clientId) {
+    delete manifest.oauth2;
+    return manifest;
+  }
+
+  if (!/^[a-zA-Z0-9._-]+\.apps\.googleusercontent\.com$/.test(clientId)) {
+    throw new Error("LUMEN_GOOGLE_DRIVE_CLIENT_ID must be a Google OAuth client ID ending in .apps.googleusercontent.com.");
+  }
+
+  manifest.oauth2 = {
+    client_id: clientId,
+    scopes: ["https://www.googleapis.com/auth/drive.file"]
+  };
+
+  return manifest;
 }
 
 async function validateRequiredFiles(errors) {
@@ -284,6 +354,24 @@ async function validatePermissionDocumentation(manifest, errors) {
         errors.push(`${document.label} is missing optional host permission rationale for ${escapedPermission}.`);
       }
     }
+  }
+
+  for (const permission of manifest.optional_permissions || []) {
+    const needle = `\`${permission}\``;
+
+    for (const document of documents) {
+      if (!document.body.includes(needle)) {
+        errors.push(`${document.label} is missing optional permission rationale for ${needle}.`);
+      }
+    }
+  }
+}
+
+async function validateNoProductionLumenEndpoint(errors) {
+  const configSource = await readFile(path.join(stagingDir, "config.js"), "utf8");
+
+  if (/https:\/\/api\.lumen\.app/i.test(configSource)) {
+    errors.push("Store packages must not contain an unconfigured Lumen-owned production API endpoint.");
   }
 }
 

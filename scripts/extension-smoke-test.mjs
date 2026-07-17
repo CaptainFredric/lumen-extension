@@ -196,10 +196,233 @@ try {
         height: 240,
         role: "full-page",
         variantId: "desktop"
-      }]
+      }],
+      editorSource: {
+        dataUrl: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='720' height='1200'%3E%3Crect width='720' height='1200' fill='%230b1b2d'/%3E%3Crect x='80' y='860' width='560' height='220' fill='%2364f2df'/%3E%3C/svg%3E",
+        width: 720,
+        height: 1200,
+        originalWidth: 720,
+        originalHeight: 1200,
+        scaled: false,
+        kind: "lossless-full-output",
+        role: "full-page",
+        variantId: "desktop"
+      }
     });
   }, seededCaptureId);
+
+  const storedEditorSource = await librarySeedPage.evaluate(async (captureId) => {
+    const store = await import(chrome.runtime.getURL("library-store.js"));
+    const capture = await store.getLibraryCapture(captureId, {
+      includePreview: true,
+      includeEditorSource: true
+    });
+    const dedicatedEditorSource = await store.getLibraryEditorAsset(captureId);
+
+    return {
+      previewWidth: capture?.preview?.width || 0,
+      previewHeight: capture?.preview?.height || 0,
+      editorWidth: capture?.editorSource?.width || 0,
+      editorHeight: capture?.editorSource?.height || 0,
+      editorPurpose: capture?.editorSource?.purpose || "",
+      editorBytes: capture?.editorSource?.blob?.size || 0,
+      dedicatedEditorAssetId: dedicatedEditorSource?.id || ""
+    };
+  }, seededCaptureId);
+  assert(
+    storedEditorSource.previewWidth === 360 &&
+      storedEditorSource.previewHeight === 240 &&
+      storedEditorSource.editorWidth === 720 &&
+      storedEditorSource.editorHeight === 1200 &&
+      storedEditorSource.editorPurpose === "editor-source" &&
+      storedEditorSource.editorBytes > 0 &&
+      Boolean(storedEditorSource.dedicatedEditorAssetId),
+    "The local library did not preserve a distinct whole-image editor source.",
+    storedEditorSource
+  );
+
+  const libraryIntegrity = await librarySeedPage.evaluate(async (captureId) => {
+    const store = await import(chrome.runtime.getURL("library-store.js"));
+    const database = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("lumen.capture.library");
+      request.addEventListener("success", () => resolve(request.result), { once: true });
+      request.addEventListener("error", () => reject(request.error), { once: true });
+    });
+    const foreignAssetId = "foreign-preview-asset";
+    const foreignBlob = new Blob([
+      "<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'></svg>"
+    ], { type: "image/svg+xml" });
+    const changeForeignAsset = (action) => new Promise((resolve, reject) => {
+      const transaction = database.transaction("assets", "readwrite");
+      const assetStore = transaction.objectStore("assets");
+
+      if (action === "put") {
+        assetStore.put({
+          id: foreignAssetId,
+          captureId: "different-capture",
+          purpose: "preview",
+          role: "full-page",
+          variantId: "foreign",
+          mime: foreignBlob.type,
+          width: 10,
+          height: 10,
+          byteLength: foreignBlob.size,
+          blob: foreignBlob,
+          createdAt: new Date().toISOString()
+        });
+      } else {
+        assetStore.delete(foreignAssetId);
+      }
+
+      transaction.addEventListener("complete", resolve, { once: true });
+      transaction.addEventListener("error", () => reject(transaction.error), { once: true });
+      transaction.addEventListener("abort", () => reject(transaction.error), { once: true });
+    });
+
+    await changeForeignAsset("put");
+    const crossCapture = await store.getLibraryCapture(captureId, {
+      includePreview: true,
+      assetId: foreignAssetId
+    });
+    await changeForeignAsset("delete");
+    database.close();
+    const ownCapture = await store.getLibraryCapture(captureId, { includePreview: true });
+
+    return {
+      crossCapturePreviewRejected: crossCapture?.preview === null,
+      ownCapturePreviewAvailable: Boolean(ownCapture?.preview?.blob),
+      previewMetadataAvailable: store.hasLibraryPreview(ownCapture)
+    };
+  }, seededCaptureId);
+  assert(
+    libraryIntegrity.crossCapturePreviewRejected &&
+      libraryIntegrity.ownCapturePreviewAvailable &&
+      libraryIntegrity.previewMetadataAvailable,
+    "The local library did not enforce capture-to-preview asset integrity.",
+    libraryIntegrity
+  );
+
+  const unavailableCaptureId = "smoke-capture-without-preview";
+  await librarySeedPage.evaluate(async (captureId) => {
+    const store = await import(chrome.runtime.getURL("library-store.js"));
+    await store.putLibraryCapture({
+      id: captureId,
+      title: "Unavailable preview capture",
+      host: "example.test",
+      url: "https://example.test/unavailable",
+      capturedAt: new Date().toISOString(),
+      sourceType: "manual"
+    });
+  }, unavailableCaptureId);
+  await librarySeedPage.reload({ waitUntil: "load" });
+  await librarySeedPage.waitForSelector(`.capture-card[data-capture-id="${unavailableCaptureId}"]`);
+  const unavailableToolState = await librarySeedPage.evaluate((captureId) => {
+    const card = document.querySelector(`.capture-card[data-capture-id="${captureId}"]`);
+    const annotate = card?.querySelector(".edit-action");
+    const compare = card?.querySelector(".review-action");
+    return {
+      annotateDisabled: annotate?.disabled,
+      compareDisabled: compare?.disabled,
+      annotateLabel: annotate?.getAttribute("aria-label") || "",
+      compareLabel: compare?.getAttribute("aria-label") || ""
+    };
+  }, unavailableCaptureId);
+  assert(
+    unavailableToolState.annotateDisabled &&
+      unavailableToolState.compareDisabled &&
+      unavailableToolState.annotateLabel.includes("unavailable") &&
+      unavailableToolState.compareLabel.includes("unavailable"),
+    "Unavailable local images should disable annotation and comparison actions.",
+    unavailableToolState
+  );
+  await librarySeedPage.evaluate(async (captureId) => {
+    const store = await import(chrome.runtime.getURL("library-store.js"));
+    await store.deleteLibraryCapture(captureId);
+  }, unavailableCaptureId);
+
+  const editorOnlyCaptureId = "smoke-capture-editor-source-only";
+  await librarySeedPage.evaluate(async (captureId) => {
+    const store = await import(chrome.runtime.getURL("library-store.js"));
+    await store.putLibraryCapture({
+      id: captureId,
+      title: "Whole-image source only",
+      host: "example.test",
+      url: "https://example.test/editor-source",
+      capturedAt: new Date().toISOString(),
+      sourceType: "manual",
+      editorSource: {
+        dataUrl: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='600'%3E%3Crect width='360' height='600' fill='%230b1b2d'/%3E%3C/svg%3E",
+        width: 360,
+        height: 600,
+        originalWidth: 360,
+        originalHeight: 600,
+        role: "full-page",
+        variantId: "desktop"
+      }
+    });
+  }, editorOnlyCaptureId);
+  await librarySeedPage.reload({ waitUntil: "load" });
+  await librarySeedPage.waitForSelector(`.capture-card[data-capture-id="${editorOnlyCaptureId}"]`);
+  const editorOnlyToolState = await librarySeedPage.evaluate((captureId) => {
+    const card = document.querySelector(`.capture-card[data-capture-id="${captureId}"]`);
+    return {
+      annotateDisabled: card?.querySelector(".edit-action")?.disabled,
+      compareDisabled: card?.querySelector(".review-action")?.disabled
+    };
+  }, editorOnlyCaptureId);
+  assert(
+    !editorOnlyToolState.annotateDisabled && !editorOnlyToolState.compareDisabled,
+    "The whole-image review source should keep annotation and comparison available without a gallery preview.",
+    editorOnlyToolState
+  );
+  await librarySeedPage.evaluate(async (captureId) => {
+    const store = await import(chrome.runtime.getURL("library-store.js"));
+    await store.deleteLibraryCapture(captureId);
+  }, editorOnlyCaptureId);
   await librarySeedPage.close();
+
+  const editorPage = await context.newPage();
+  editorPage.on("console", (message) => {
+    if (message.type() === "error") {
+      popupConsoleErrors.push(`editor: ${message.text()}`);
+    }
+  });
+  editorPage.on("pageerror", (error) => popupConsoleErrors.push(`editor: ${error.message}`));
+  await editorPage.setViewportSize({ width: 920, height: 820 });
+  await editorPage.goto(`chrome-extension://${extensionId}/editor.html?capture=${encodeURIComponent(seededCaptureId)}`, { waitUntil: "load" });
+  await editorPage.waitForSelector("#canvasFrame:not(.is-hidden)", { timeout: 10000 });
+  const loadedEditor = await editorPage.evaluate(() => ({
+    metadata: globalThis.LumenAnnotationEditor?.getMetadata?.(),
+    toolNames: [...document.querySelectorAll("[data-tool]")].map((button) => button.getAttribute("aria-label")),
+    driveActionCount: document.querySelectorAll("[data-lumen-export-actions] button").length
+  }));
+  assert(
+    loadedEditor.metadata?.width === 720 &&
+      loadedEditor.metadata?.height === 1200 &&
+      loadedEditor.metadata?.sourceOrigin === "library-editor-source",
+    "Annotation Studio loaded the cropped preview instead of the stored whole-image source.",
+    loadedEditor
+  );
+  assert(
+    loadedEditor.toolNames.every((name) => /tool$/.test(name || "")),
+    "Compact editor tools lost their accessible names.",
+    loadedEditor.toolNames
+  );
+  assert(loadedEditor.driveActionCount === 0, "Unconfigured Drive controls should stay hidden.", loadedEditor);
+  await editorPage.keyboard.press("a");
+  await editorPage.keyboard.press("Enter");
+  await editorPage.keyboard.press("]");
+  const keyboardEditor = await editorPage.evaluate(() => ({
+    annotationCount: globalThis.LumenAnnotationEditor?.getAnnotationCount?.(),
+    status: document.querySelector("#statusMessage")?.textContent?.trim() || "",
+    canvasFocused: document.activeElement === document.querySelector("#editorCanvas")
+  }));
+  assert(
+    keyboardEditor.annotationCount === 1 && keyboardEditor.canvasFocused && /selected/i.test(keyboardEditor.status),
+    "Keyboard-only creation and selection did not complete in Annotation Studio.",
+    keyboardEditor
+  );
+  await editorPage.close();
 
   await context.route("https://lumen-smoke.test/", (route) => route.fulfill({
     status: 200,

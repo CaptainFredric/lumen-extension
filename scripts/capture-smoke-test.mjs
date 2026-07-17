@@ -88,6 +88,7 @@ async function buildPatchedOffscreenScript() {
     window.__LUMEN_OFFSCREEN_TEST_API__ = {
       buildRenderModel,
       buildCaptureHealth,
+      renderSession,
       renderSliceCanvas,
       scaleCutawayRegion,
       renderCutawayCanvas,
@@ -401,6 +402,11 @@ async function runOffsetStitchPixelSmoke(browser, offscreenScript) {
       };
       const model = await window.__LUMEN_OFFSCREEN_TEST_API__.buildRenderModel(session);
       const output = window.__LUMEN_OFFSCREEN_TEST_API__.renderSliceCanvas(model, 0, model.canvasHeight);
+      const exactRender = await window.__LUMEN_OFFSCREEN_TEST_API__.renderSession(session);
+      const tiledRender = await window.__LUMEN_OFFSCREEN_TEST_API__.renderSession({
+        ...session,
+        options: { longPageMode: "tiles" }
+      });
       const context = output.getContext("2d");
       const pixel = (x, y) => [...context.getImageData(x, y, 1, 1).data];
 
@@ -409,7 +415,25 @@ async function runOffsetStitchPixelSmoke(browser, offscreenScript) {
         height: output.height,
         topPixel: pixel(20, 20),
         bottomPixel: pixel(20, 760),
-        health: window.__LUMEN_OFFSCREEN_TEST_API__.buildCaptureHealth(model)
+        health: window.__LUMEN_OFFSCREEN_TEST_API__.buildCaptureHealth(model),
+        exactEditorSource: {
+          width: exactRender.editorSource?.width,
+          height: exactRender.editorSource?.height,
+          originalWidth: exactRender.editorSource?.originalWidth,
+          originalHeight: exactRender.editorSource?.originalHeight,
+          kind: exactRender.editorSource?.kind,
+          scaled: exactRender.editorSource?.scaled,
+          type: exactRender.editorSource?.dataUrl?.slice(0, 22)
+        },
+        tiledEditorSource: {
+          width: tiledRender.editorSource?.width,
+          height: tiledRender.editorSource?.height,
+          originalWidth: tiledRender.editorSource?.originalWidth,
+          originalHeight: tiledRender.editorSource?.originalHeight,
+          kind: tiledRender.editorSource?.kind,
+          scaled: tiledRender.editorSource?.scaled,
+          type: tiledRender.editorSource?.dataUrl?.slice(0, 22)
+        }
       };
     });
 
@@ -417,11 +441,31 @@ async function runOffsetStitchPixelSmoke(browser, offscreenScript) {
     assert(result.topPixel[0] === 24 && result.topPixel[1] === 190, "Offset stitch leaked fixed page chrome into the first slice", result);
     assert(result.bottomPixel[0] === 242 && result.bottomPixel[1] === 184, "Offset stitch did not crop the second root slice", result);
     assert(result.health.status === "complete" && result.health.coveragePercent === 100, "Offset stitch health did not verify full coverage", result.health);
+    assert(
+      result.exactEditorSource.kind === "lossless-full-output" &&
+        result.exactEditorSource.width === 980 &&
+        result.exactEditorSource.height === 1480 &&
+        result.exactEditorSource.scaled === false &&
+        result.exactEditorSource.type === "data:image/png;base64,",
+      "Safe captures should retain a distinct lossless whole-image editor source",
+      result.exactEditorSource
+    );
+    assert(
+      result.tiledEditorSource.kind === "whole-page-proxy" &&
+        result.tiledEditorSource.scaled === true &&
+        result.tiledEditorSource.originalWidth === 980 &&
+        result.tiledEditorSource.originalHeight === 1480 &&
+        Math.abs(result.tiledEditorSource.width / result.tiledEditorSource.height - 980 / 1480) < 0.01,
+      "Tiled captures should retain a downscaled proxy spanning the whole page",
+      result.tiledEditorSource
+    );
 
     record("offset scroll-root pixel stitch", {
       width: result.width,
       height: result.height,
-      coveragePercent: result.health.coveragePercent
+      coveragePercent: result.health.coveragePercent,
+      editorSource: result.exactEditorSource,
+      tiledEditorSource: result.tiledEditorSource
     });
   } finally {
     await page.close();

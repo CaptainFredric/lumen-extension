@@ -38,7 +38,9 @@ export const LUMEN_CONFIG = {
     posterPadding: 88
   },
   api: {
-    baseUrl: "https://api.lumen.app",
+    // Store builds do not ship a Lumen-owned production endpoint. The local
+    // loopback backend exists only for explicit development and contract tests.
+    baseUrl: "",
     localBaseUrl: "http://127.0.0.1:8787",
     endpoints: {
       session: "/v1/session",

@@ -41,10 +41,28 @@ try {
   assert(packagedManifest.optional_host_permissions?.length === 2, "Release package lost its optional site-permission declarations.", packagedManifest);
   assert(!packagedFiles.some((file) => /^(scripts|backend|docs|\.github|node_modules)\//.test(file)), "Release ZIP contains development-only files.", packagedFiles);
   assert(
-    ["library.html", "library.css", "library.js", "library-store.js"].every((file) => packagedFiles.includes(file)),
-    "Release ZIP is missing the local photo-library runtime.",
+    [
+      "library.html", "library.css", "library.js", "library-store.js",
+      "annotation-engine.js", "editor.html", "editor.css", "editor.js", "editor-drive.js",
+      "visual-diff-engine.js", "review.html", "review.css", "review.js", "review-actions.js",
+      "drive-export.js"
+    ].every((file) => packagedFiles.includes(file)),
+    "Release ZIP is missing a capture-review runtime file.",
     packagedFiles
   );
+  assert(
+    packagedManifest.optional_permissions?.includes("identity") && !packagedManifest.permissions?.includes("identity"),
+    "Drive identity access must remain optional.",
+    packagedManifest
+  );
+  if (packagedManifest.oauth2) {
+    assert(
+      packagedManifest.oauth2.scopes?.length === 1
+        && packagedManifest.oauth2.scopes[0] === "https://www.googleapis.com/auth/drive.file",
+      "Packaged Google OAuth configuration widened beyond drive.file.",
+      packagedManifest.oauth2
+    );
+  }
 assert(
   sanitizeCaptureUrl("https://example.test/review?view=grid&token=secret&session_id=private#account") === "https://example.test/review?view=grid",
   "Capture URL sanitizer did not remove sensitive query keys and fragments."
@@ -144,6 +162,70 @@ assert(
   assert(cleanLibrary.title === "Lumen Capture Library", "Packaged photo library title did not load.", cleanLibrary);
   assert(cleanLibrary.captureMetric === "0" && cleanLibrary.resultsCount === "0 items", "Clean release profile did not start with an empty photo library.", cleanLibrary);
   assert(/No captures/i.test(cleanLibrary.emptyTitle), "Clean release photo library did not explain its empty state.", cleanLibrary);
+
+  const editor = await context.newPage();
+  editor.on("console", (message) => {
+    if (message.type() === "error") {
+      popupErrors.push(`editor: ${message.text()}`);
+    }
+  });
+  editor.on("pageerror", (error) => popupErrors.push(`editor: ${error.message}`));
+  await editor.goto(`chrome-extension://${extensionId}/editor.html?demo=1`, { waitUntil: "load" });
+  await editor.waitForSelector("#canvasFrame:not(.is-hidden)", { timeout: 10000 });
+  if (packagedManifest.oauth2) {
+    await editor.waitForSelector("[data-lumen-export-actions] button", { timeout: 10000 });
+  }
+  const editorState = await editor.evaluate(() => ({
+    title: document.title,
+    exportReady: !document.querySelector("#exportButton")?.disabled,
+    toolCount: document.querySelectorAll("button[data-tool]").length,
+    driveActionCount: document.querySelectorAll("[data-lumen-export-actions] button").length,
+    driveLabel: document.querySelector("[data-lumen-export-actions] button")?.textContent?.trim() || "",
+    driveDisabled: document.querySelector("[data-lumen-export-actions] button")?.disabled || false
+  }));
+  assert(editorState.title === "Lumen Annotation Studio", "Packaged annotation editor title did not load.", editorState);
+  assert(editorState.exportReady && editorState.toolCount === 6, "Packaged annotation editor did not initialize its complete toolset.", editorState);
+  if (!packagedManifest.oauth2) {
+    assert(editorState.driveActionCount === 0, "Unconfigured Drive export should stay hidden.", editorState);
+  }
+  const initialAnnotationCount = await editor.evaluate(() => globalThis.LumenAnnotationEditor?.getAnnotationCount?.() || 0);
+  await editor.keyboard.press("r");
+  await editor.keyboard.press("Enter");
+  const packagedEditorExecution = await editor.evaluate(async () => {
+    const blob = await globalThis.LumenAnnotationEditor?.getRenderedBlob?.();
+    return {
+      annotationCount: globalThis.LumenAnnotationEditor?.getAnnotationCount?.() || 0,
+      blobSize: blob?.size || 0,
+      blobType: blob?.type || ""
+    };
+  });
+  assert(
+    packagedEditorExecution.annotationCount === initialAnnotationCount + 1 &&
+      packagedEditorExecution.blobSize > 0 &&
+      packagedEditorExecution.blobType === "image/png",
+    "The exact release ZIP did not execute keyboard annotation creation and PNG rendering.",
+    packagedEditorExecution
+  );
+
+  const review = await context.newPage();
+  review.on("console", (message) => {
+    if (message.type() === "error") {
+      popupErrors.push(`review: ${message.text()}`);
+    }
+  });
+  review.on("pageerror", (error) => popupErrors.push(`review: ${error.message}`));
+  await review.goto(`chrome-extension://${extensionId}/review.html?demo=1`, { waitUntil: "load" });
+  await review.waitForSelector("#reviewContent:not(.is-hidden)", { timeout: 10000 });
+  await review.waitForSelector("[data-lumen-review-actions] button", { timeout: 10000 });
+  const reviewState = await review.evaluate(() => ({
+    title: document.title,
+    regionCount: document.querySelectorAll("#regionList li").length,
+    timelineCount: document.querySelectorAll("#timelineList li").length,
+    actionCount: document.querySelectorAll("[data-lumen-review-actions] button").length,
+    metric: document.querySelector("#changePercentMetric")?.textContent?.trim() || ""
+  }));
+  assert(reviewState.title === "Lumen Visual Change Review", "Packaged visual review title did not load.", reviewState);
+  assert(reviewState.timelineCount > 0 && reviewState.actionCount === 2 && /%/.test(reviewState.metric), "Packaged visual review did not initialize its demo comparison.", reviewState);
   assert(!popupErrors.length, "Packaged popup emitted runtime errors.", popupErrors);
 
   console.log(JSON.stringify({
@@ -164,7 +246,9 @@ assert(
       grantedOrigins: firstRun.permissions.origins || [],
       persistedDismissal: true
     },
-    library: cleanLibrary
+    library: cleanLibrary,
+    editor: editorState,
+    review: reviewState
   }, null, 2));
 } catch (error) {
   console.error(JSON.stringify({

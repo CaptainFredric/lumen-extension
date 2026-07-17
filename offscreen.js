@@ -2,6 +2,11 @@ import { LUMEN_CONFIG, normalizeCaptureNoteOptions } from "./config.js";
 
 const MAX_CANVAS_EDGE = 16384;
 const MAX_CANVAS_AREA = 268435456;
+const MAX_EDITOR_SOURCE_EDGE = 8192;
+const MAX_EDITOR_SOURCE_AREA = 64 * 1024 * 1024;
+const MAX_EDITOR_SOURCE_BYTES = 48 * 1024 * 1024;
+const MAX_EDITOR_PROXY_EDGE = 4096;
+const MAX_EDITOR_PROXY_AREA = 16 * 1024 * 1024;
 
 const stitchSessions = new Map();
 
@@ -155,24 +160,37 @@ async function renderSession(session) {
     }
   }
 
-  return {
-    outputs: outputItems.map((output) => {
-      const previewDataUrl = renderPreviewDataUrl(output.canvas);
+  const outputs = outputItems.map((output) => {
+    const previewDataUrl = renderPreviewDataUrl(output.canvas);
 
-      return {
-        dataUrl: output.canvas.toDataURL("image/png"),
-        previewDataUrl,
-        visualHash: buildVisualHash(output.canvas),
-        width: output.canvas.width,
-        height: output.canvas.height,
-        index: output.index,
-        total: output.total,
-        role: output.role,
-        partIndex: output.index + 1,
-        partTotal: output.total,
-        cutawayRegion: output.cutawayRegion || null
-      };
-    }),
+    return {
+      dataUrl: output.canvas.toDataURL("image/png"),
+      previewDataUrl,
+      visualHash: buildVisualHash(output.canvas),
+      width: output.canvas.width,
+      height: output.canvas.height,
+      index: output.index,
+      total: output.total,
+      role: output.role,
+      partIndex: output.index + 1,
+      partTotal: output.total,
+      cutawayRegion: output.cutawayRegion || null
+    };
+  });
+  const exactEditorOutputIndex = outputItems.findIndex((output, index) =>
+    output.role === "full-page" &&
+    output.total === 1 &&
+    !forceTiled &&
+    canFitEditorSource(output.canvas.width, output.canvas.height) &&
+    estimateDataUrlBytes(outputs[index]?.dataUrl) <= MAX_EDITOR_SOURCE_BYTES
+  );
+  const editorSource = exactEditorOutputIndex >= 0
+    ? buildExactEditorSource(outputs[exactEditorOutputIndex], renderModel)
+    : renderEditorSourceProxy(renderModel, outputItems, { forceDownscale: forceTiled });
+
+  return {
+    outputs,
+    editorSource,
     width: renderModel.canvasWidth,
     height: renderModel.canvasHeight,
     pixelRatio: renderModel.effectiveScale,
@@ -431,14 +449,7 @@ function scaleAnnotationRegion(region, effectiveScale, canvasWidth, canvasHeight
 }
 
 function renderTiledCanvases(renderModel) {
-  const tileHeight = Math.max(
-    2048,
-    Math.min(
-      LUMEN_CONFIG.capture.tileMaxOutputHeight,
-      MAX_CANVAS_EDGE,
-      Math.floor(MAX_CANVAS_AREA / renderModel.canvasWidth)
-    )
-  );
+  const tileHeight = getRenderTileHeight(renderModel.canvasWidth);
   const canvases = [];
 
   for (let startY = 0; startY < renderModel.canvasHeight; startY += tileHeight) {
@@ -447,6 +458,112 @@ function renderTiledCanvases(renderModel) {
   }
 
   return canvases;
+}
+
+function getRenderTileHeight(canvasWidth) {
+  const safeWidth = Math.max(1, Math.round(Number(canvasWidth) || 1));
+  const maximumHeight = Math.max(
+    1,
+    Math.min(
+      LUMEN_CONFIG.capture.tileMaxOutputHeight,
+      MAX_CANVAS_EDGE,
+      Math.floor(MAX_CANVAS_AREA / safeWidth)
+    )
+  );
+
+  return maximumHeight;
+}
+
+function buildExactEditorSource(output, renderModel) {
+  return {
+    dataUrl: output.dataUrl,
+    mime: "image/png",
+    width: output.width,
+    height: output.height,
+    originalWidth: output.width,
+    originalHeight: output.height,
+    pageWidth: renderModel.canvasWidth,
+    pageHeight: renderModel.canvasHeight,
+    scaled: false,
+    kind: "lossless-full-output",
+    role: "full-page"
+  };
+}
+
+function renderEditorSourceProxy(renderModel, outputItems, options = {}) {
+  const fullPageCanvases = outputItems
+    .filter((output) => output.role === "full-page")
+    .sort((left, right) => left.index - right.index)
+    .map((output) => output.canvas)
+    .filter(Boolean);
+  const sourceWidth = fullPageCanvases[0]?.width || 0;
+  const sourceHeight = fullPageCanvases.reduce((sum, canvas) => sum + canvas.height, 0);
+
+  if (!sourceWidth || !sourceHeight) {
+    return null;
+  }
+
+  const edgeScale = Math.min(
+    1,
+    MAX_EDITOR_PROXY_EDGE / sourceWidth,
+    MAX_EDITOR_PROXY_EDGE / sourceHeight
+  );
+  const areaScale = Math.min(
+    1,
+    Math.sqrt(MAX_EDITOR_PROXY_AREA / Math.max(1, sourceWidth * sourceHeight))
+  );
+  const requestedScale = options.forceDownscale ? 0.85 : 1;
+  const scale = Math.min(edgeScale, areaScale, requestedScale);
+  const width = Math.max(1, Math.round(sourceWidth * scale));
+  const height = Math.max(1, Math.round(sourceHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { alpha: false });
+
+  if (!context) {
+    return null;
+  }
+
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+
+  let sourceTop = 0;
+
+  for (const sourceCanvas of fullPageCanvases) {
+    const sourceBottom = sourceTop + sourceCanvas.height;
+    const destinationTop = Math.round(sourceTop * scale);
+    const destinationBottom = Math.round(sourceBottom * scale);
+
+    context.drawImage(
+      sourceCanvas,
+      0,
+      0,
+      sourceCanvas.width,
+      sourceCanvas.height,
+      0,
+      destinationTop,
+      width,
+      Math.max(1, destinationBottom - destinationTop)
+    );
+    sourceTop = sourceBottom;
+  }
+
+  return {
+    dataUrl: canvas.toDataURL("image/png"),
+    mime: "image/png",
+    width,
+    height,
+    originalWidth: sourceWidth,
+    originalHeight: sourceHeight,
+    pageWidth: renderModel.canvasWidth,
+    pageHeight: renderModel.canvasHeight,
+    scaled: width !== sourceWidth || height !== sourceHeight,
+    kind: "whole-page-proxy",
+    role: "full-page"
+  };
 }
 
 function renderSliceCanvas(renderModel, sliceStart, sliceEnd) {
@@ -800,6 +917,24 @@ function renderPhonePoster(sourceCanvas, devicePreset) {
 
 function canFitCanvas(width, height) {
   return width <= MAX_CANVAS_EDGE && height <= MAX_CANVAS_EDGE && width * height <= MAX_CANVAS_AREA;
+}
+
+function canFitEditorSource(width, height) {
+  return width <= MAX_EDITOR_SOURCE_EDGE &&
+    height <= MAX_EDITOR_SOURCE_EDGE &&
+    width * height <= MAX_EDITOR_SOURCE_AREA;
+}
+
+function estimateDataUrlBytes(dataUrl) {
+  const source = String(dataUrl || "");
+  const commaIndex = source.indexOf(",");
+
+  if (commaIndex < 0) {
+    return 0;
+  }
+
+  const encoded = source.slice(commaIndex + 1);
+  return Math.max(0, Math.floor(encoded.length * 3 / 4) - (encoded.endsWith("==") ? 2 : encoded.endsWith("=") ? 1 : 0));
 }
 
 function createPosterGradient(context, width, height) {

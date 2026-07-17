@@ -269,7 +269,9 @@ function getTargetUrls() {
 
   return [
     "https://captainfredric.github.io/lumen-extension/docs/",
-    "https://github.com/CaptainFredric/lumen-extension"
+    "https://github.com/CaptainFredric/lumen-extension",
+    "https://developer.chrome.com/docs/extensions/develop/concepts/activeTab",
+    "https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API"
   ];
 }
 

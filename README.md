@@ -1,6 +1,6 @@
 # Lumen
 
-Lumen is a Manifest V3 Chrome extension for clean, responsive webpage capture.
+Lumen is a Manifest V3 Chrome extension for clean webpage capture, annotation, visual comparison, and local monitoring.
 
 Lumen focuses on:
 
@@ -34,7 +34,7 @@ The extension includes:
 14. capture details JSON exports with view, redaction, manual projection, focused crop, callout, signal, output health, and note metadata
 15. dated per-run download folders so capture sets, tiles, and detail files stay together
 16. local capture history with file, folder, summary, and Chrome download-handle metadata
-17. an IndexedDB photo library with real preview images, search, manual/timed filters, favorites, sorting, storage usage, and per-item removal
+17. an IndexedDB photo library with gallery previews, bounded whole-capture editor images, search, manual/timed filters, favorites, sorting, storage usage, and per-item removal
 18. library file actions that open or reveal the full-resolution originals retained in Chrome Downloads
 19. capture-time popup UI with run settings, cutaway state, a live stage timeline, and recent status log
 20. an on-page usage HUD that appears during preparation and review setup, then hides before screenshots so exports stay clean
@@ -55,6 +55,10 @@ The extension includes:
 35. one-shot site-permission leases that are removed after responsive capture unless a timed capture still needs them
 36. an always-available local workspace clear for history, previews, page signals, regions, note drafts, schedules, and optional site access
 37. a clean-profile smoke test that installs and boots the exact release ZIP
+38. a full annotation studio with arrows, rectangles, text, blur, pixelation, selection, resizing, undo, redo, keyboard shortcuts, and PNG export
+39. a visual-change review workspace with a before/after reveal slider, highlighted changed regions, difference metrics, and a monitor-run timeline
+40. reviewed, edited, and exported states stored beside each item in the local photo library
+41. optional user-initiated Google Drive export for one reviewed image at a time, using `drive.file` and revocable Chrome Identity access
 
 ## Current Limits
 
@@ -63,11 +67,12 @@ These limits are important:
 1. redaction checks text and filled inputs again before every screenshot slice, but iframe, canvas, closed shadow-root, and image-only secrets still require manual review
 2. manual redaction boxes can project into responsive captures through DOM anchors, but the result still needs review before external sharing
 3. delayed, repeating, and continuous selected-area capture uses Chrome alarms, saved site access, and a local run shelf; Chrome can defer runs while the browser is closed, asleep, or unavailable
-4. the current annotation pass is one anchored callout plus one capture note, not a full drawing suite
-5. cloud sync, billing, destination delivery workers, remote monitoring, and visual diffs remain outside the local extension package
-6. highly dynamic sites with unusual scroll behavior can still need site-specific fallback work; Lumen now blocks exports whose slice coverage cannot be verified
-7. retention and delete controls cover the local backend slice, but cloud deletion and account recovery are still production work
-8. the local backend slice checks entitlements, retention, watch records, and delivery queues, while production account and billing systems remain separate work
+4. Google Drive export is optional, review-first, and limited to one user-selected reviewed image at a time; it is not automatic cloud backup or full-Drive synchronization
+5. very large or tiled captures use a scaled whole-page editor image; open the downloaded original with the image picker when full-resolution annotation is required
+6. billing, team sharing, remote monitoring, and remote destination workers remain outside the local extension package
+7. highly dynamic sites with unusual scroll behavior can still need site-specific fallback work; Lumen now blocks exports whose slice coverage cannot be verified
+8. retention and delete controls cover the local backend slice, but cloud deletion and account recovery are still production work
+9. the local backend slice checks entitlements, retention, watch records, and delivery queues, while production account and billing systems remain separate work
 
 ## Architecture
 
@@ -83,13 +88,25 @@ The current capture flow is:
 6. content script resolves manual redactions, any stored cutaway region, and the optional callout region against the current layout
 7. offscreen crops the selected scroll surface, stitches the final output using device-pixel-ratio aware composition, verifies full vertical coverage, renders one capture note and callout marker, and can export a rectangular or transparent lasso crop from the stitched result
 8. if the page is too large for one safe canvas, the export falls back to tiled raw output and skips cutaway cropping for that view
-9. background downloads the full-resolution files, writes capture details and local history, and places compact image previews in the on-device photo library before restoring the page
+9. background downloads the full-resolution files, writes capture details and local history, and places gallery previews plus a bounded whole-capture editor image in the on-device photo library before restoring the page
 
 ### Local Photo Library
 
-The library keeps compact preview blobs and capture metadata in extension-owned IndexedDB. It does not duplicate the full-resolution originals: those remain in Chrome Downloads and are opened or revealed through stored download handles.
+The library keeps compact gallery previews, capture metadata, and one bounded whole-capture working image per eligible capture in extension-owned IndexedDB. Safe-size single images stay lossless; very large or tiled outputs use a scaled whole-page proxy. Full-resolution originals remain in Chrome Downloads and are opened or revealed through stored download handles.
 
-The library supports title, site, URL, and tag search; manual or timed capture filters; favorite-only filtering; newest or oldest sorting; and per-capture removal. Preview cleanup defaults to a 50 MB or 500-preview budget. It removes the oldest non-favorite preview blobs first while preserving capture metadata, favorites, and downloaded originals.
+The library supports title, site, URL, and tag search; manual or timed capture filters; favorite-only filtering; newest or oldest sorting; and per-capture removal. Gallery cleanup defaults to 50 MB or 500 preview-bearing captures. Whole-capture editor sources have a separate 250 MB or 75-capture budget. Each cleanup removes the oldest non-favorite local image assets first while preserving capture metadata, favorites, and downloaded originals.
+
+### Annotation And Change Review
+
+Each saved preview can open in Annotation Studio for editable arrows, rectangles, text, blur, and pixelation. The editor keeps undo and redo history, supports keyboard controls and resizing, and renders a flattened reviewed PNG only when the user exports it.
+
+The same library item can open in Change Review. Lumen pairs local captures, computes pixel differences in the browser, shows a draggable before/after reveal, clusters changed regions, and builds a timeline from saved monitor runs. A reviewed comparison and its metrics are written back to the local library.
+
+### Reviewed Google Drive Export
+
+Google Drive is an optional destination inside Annotation Studio. It is never background backup: Lumen requests the optional Chrome Identity and Google API permissions only after the user presses **Export to Drive**, then uploads that one rendered image with minimal review metadata. Disconnect removes the cached token and optional permissions; existing files remain in the user's Drive.
+
+The publisher must create a Chrome Extension OAuth client for the permanent extension ID and package with `LUMEN_GOOGLE_DRIVE_CLIENT_ID`. Without that value, Drive stays disabled while local editing and PNG export continue to work. See `GOOGLE_DRIVE_SETUP.md`.
 
 ### Entitlements
 
@@ -97,7 +114,7 @@ The library supports title, site, URL, and tag search; manual or timed capture f
 
 ### Data Controls
 
-The popup always exposes local workspace deletion for capture history, library previews, signals, regions, note drafts, schedules, and optional site access. Removing one library item or clearing the library deletes its local metadata and preview blobs, not downloaded originals. The backend separately exposes retention and account-data deletion routes for a connected session. Capture metadata is uploaded only when cloud sync has been explicitly enabled and the data-control service confirms that choice.
+The popup always exposes local workspace deletion for capture history, library images, signals, regions, note drafts, schedules, and optional site access. Removing one library item or clearing the library deletes its local metadata, gallery previews, and whole-capture editor source, not downloaded originals. The checked-in backend is a developer-run loopback contract test; the Web Store build contains no Lumen-owned production sync endpoint.
 
 ### Page Signals
 
@@ -164,10 +181,13 @@ The public landing page will be available at `http://127.0.0.1:3000/`.
 9. Use `Mark cutaway` or `Lasso area` to store one reusable page region; rectangle captures save clean crops and lasso captures keep pixels outside the selected path transparent
 10. Choose `Once` for a 5, 10, or 30 second delayed area capture, `Repeat` for a 15-minute through daily schedule, or `Continuous` for a 1, 5, or 15 minute cadence capped at 10, 25, or 50 runs
 11. Use `Open library` to browse real local previews, search or filter them, mark favorites, and return to the originals in Downloads
-12. Use `Open` or `Show in folder` from recent captures to get back to the saved original
-13. When the pre-export review appears, check auto-redaction counts, manual projection status, focused-region status, and warnings, then click `Run export`
-14. Expand recent capture details to review views, artifacts, redactions, detail-file status, notes, and page signals
-15. Copy a capture summary when you need to paste evidence into a review note or bug report
+12. Choose `Annotate` to add arrows, rectangles, text, blur, or pixelation; use undo and redo; then export a reviewed PNG locally
+13. Choose `Compare` to pair captures, drag the before/after reveal, inspect highlighted changes, and mark the comparison reviewed
+14. In a publisher-configured build, choose `Export to Drive` only after reviewing the image; use `Disconnect Drive` to revoke the cached connection and optional permissions
+15. Use `Open` or `Show in folder` from recent captures to get back to the saved original
+16. When the pre-export review appears, check auto-redaction counts, manual projection status, focused-region status, and warnings, then click `Run export`
+17. Expand recent capture details to review views, artifacts, redactions, detail-file status, notes, and page signals
+18. Copy a capture summary when you need to paste evidence into a review note or bug report
 
 If the launch indicator says the page is blocked, switch to a normal `http://` or `https://` page. Chrome does not allow extension capture scripts on internal browser pages, Web Store pages, or other extension pages.
 
@@ -208,6 +228,27 @@ To verify delayed, repeating, and capped continuous schedule rules—including f
 npm run smoke:watch
 ```
 
+To verify hostile but deterministic page classes—including long pages, fixed overlays, nested app shells, late growth, lazy and transformed content, canvas, sandboxed iframes, and open and closed shadow roots:
+
+```bash
+npm run smoke:difficult-sites
+```
+
+To verify optional host access starts empty, survives while a timed plan needs it, and is revoked after last-plan deletion or local workspace cleanup:
+
+```bash
+npm run smoke:permissions
+```
+
+To verify annotation state, undo/redo, selection transforms, visual-diff clustering, the full review page, and reviewed Drive upload behavior:
+
+```bash
+npm run smoke:editor
+npm run smoke:diff
+npm run smoke:review
+npm run smoke:drive
+```
+
 To verify the unpacked MV3 extension can boot, start its service worker, initialize settings, and render the popup:
 
 ```bash
@@ -222,7 +263,7 @@ To verify the loaded extension can capture a real local page and produce finishe
 npm run smoke:e2e
 ```
 
-GitHub Actions runs syntax, backend, sync, capture, site, package, clean-release, loaded-extension, and end-to-end capture checks on every pull request and push to `main`. The browser-backed checks run Chromium in a virtual display so they exercise the same headed extension path used locally.
+GitHub Actions runs syntax, backend, sync, capture, difficult-site, watch-schedule, annotation, visual-diff, review-page, Drive, site, package, clean-release, loaded-extension, permission-revoke, and end-to-end capture checks on every pull request and push to `main`. The browser-backed checks run Chromium in a virtual display so they exercise the same headed extension path used locally.
 
 To package the production allowlist and boot that exact ZIP in a clean profile:
 
@@ -244,7 +285,7 @@ To test the loaded extension against live pages tied to this project:
 npm run smoke:real-sites
 ```
 
-The default list captures the public Lumen docs page and the GitHub repository. Set `LUMEN_REAL_SITE_URLS` to a comma separated list if you want to test a personal page list.
+The default live matrix captures the public Lumen site, the GitHub repository, Chrome's `activeTab` documentation, and MDN's Intersection Observer documentation. Set `LUMEN_REAL_SITE_URLS` to a comma separated list if you want to test a personal page list. This live check is intentionally separate from CI because third-party availability and markup can change.
 
 To install Chromium for Playwright, run:
 
@@ -270,7 +311,14 @@ This creates Chrome Web Store sized screenshots in `store-assets/screenshots/` f
 npm run package:extension
 ```
 
-This validates the Manifest V3 upload package, checks required runtime files, verifies declared PNG icon dimensions, rejects development folders, and writes `dist/lumen-extension-0.2.0.zip`. The ZIP contains only the runtime extension files, not docs, tests, backend code, node_modules, or sample capture assets.
+This validates the Manifest V3 upload package, checks required runtime files, verifies declared PNG icon dimensions, rejects development folders, and writes `dist/lumen-extension-0.3.0.zip`. The ZIP contains only the runtime extension files, not docs, tests, backend code, node_modules, or sample capture assets.
+
+Release and store handoff documents:
+
+1. `RELEASE_NOTES.md` summarizes the launch-candidate behavior and known limits.
+2. `CHROME_WEB_STORE_PRIVACY_FORM.md` contains field-by-field privacy and permission drafts plus the publisher-only dashboard checklist.
+3. `CHROME_STORE_LISTING.md` contains listing copy, disclosures, permission justifications, screenshot captions, and reviewer instructions.
+4. `STORE_READINESS.md` tracks automated evidence and remaining manual launch gates.
 
 ## Publish The Landing Site
 
@@ -293,12 +341,11 @@ This checks the mirrored public files, the root landing page, privacy page, lega
 
 Potential product layers:
 
-1. freeform annotation tools
-2. visual diffs and change alerts for local monitored areas
-3. multiple named monitored regions per page
-4. explicit agent handoff for selected bundles
-5. cloud sync destinations
-6. production auth and billing
+1. multiple named monitored regions per page
+2. explicit agent handoff for selected bundles
+3. optional change notifications after local review
+4. additional review-first destinations after Google Drive
+5. production auth, billing, support, and account recovery
 
 See `PRODUCT_ROADMAP.md` for the longer product direction and Chrome Web Store guardrails.
 See `STORE_READINESS.md` for the current submission checklist, permission rationale, and policy references.
@@ -308,9 +355,9 @@ See `CHROME_STORE_LISTING.md` for the single-purpose listing copy, permission ra
 
 ## Next Work
 
-The highest-leverage next steps are:
+The highest-leverage next steps are publisher and production gates:
 
-1. improve capture reliability on difficult real-world sites
-2. review the generated Chrome Web Store screenshots against final listing copy
-3. expand annotation from one callout into arrows, labels, and editable shapes; the capture lasso is already separate and shape-true
-4. turn the entitlement contract into production auth, billing, retention, and deletion controls
+1. create the final Chrome Extension OAuth client and verify Drive consent with a non-publisher account
+2. complete the Chrome Web Store privacy attestations, distribution settings, and submission
+3. keep the four-site live matrix and difficult-site fixtures green for every release
+4. turn the entitlement contract into production auth, billing, support, retention, and deletion controls

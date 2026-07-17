@@ -3333,46 +3333,51 @@
 
   function collectSensitiveTextRegions(context) {
     const regions = [];
-    const walker = document.createTreeWalker(
-      document.body || document.documentElement,
-      NodeFilter.SHOW_TEXT
-    );
+    const scanRoots = [document.body || document.documentElement, ...collectOpenShadowRoots(document)];
 
-    while (walker.nextNode() && regions.length <= MAX_REDACTION_REGIONS) {
-      const node = walker.currentNode;
+    for (const root of scanRoots) {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
 
-      if (!(node instanceof Text)) {
-        continue;
-      }
+      while (walker.nextNode() && regions.length <= MAX_REDACTION_REGIONS) {
+        const node = walker.currentNode;
 
-      const parent = node.parentElement;
-      const rawText = node.nodeValue || "";
-
-      if (!parent || !rawText.trim() || shouldSkipSensitiveScan(parent) || !isElementScannable(parent)) {
-        continue;
-      }
-
-      for (const pattern of SENSITIVE_TEXT_PATTERNS) {
-        const regex = new RegExp(pattern.regex.source, pattern.regex.flags);
-        let match = regex.exec(rawText);
-
-        while (match && regions.length <= MAX_REDACTION_REGIONS) {
-          if (!match[0]?.trim()) {
-            match = regex.exec(rawText);
-            continue;
-          }
-
-          const range = document.createRange();
-          range.setStart(node, match.index);
-          range.setEnd(node, match.index + match[0].length);
-
-          const rects = [...range.getClientRects()]
-            .map((rect) => buildRedactionRegion(rect, context, pattern.kind))
-            .filter(Boolean);
-
-          regions.push(...rects);
-          match = regex.exec(rawText);
+        if (!(node instanceof Text)) {
+          continue;
         }
+
+        const parent = node.parentElement;
+        const rawText = node.nodeValue || "";
+
+        if (!parent || !rawText.trim() || shouldSkipSensitiveScan(parent) || !isElementScannable(parent)) {
+          continue;
+        }
+
+        for (const pattern of SENSITIVE_TEXT_PATTERNS) {
+          const regex = new RegExp(pattern.regex.source, pattern.regex.flags);
+          let match = regex.exec(rawText);
+
+          while (match && regions.length <= MAX_REDACTION_REGIONS) {
+            if (!match[0]?.trim()) {
+              match = regex.exec(rawText);
+              continue;
+            }
+
+            const range = document.createRange();
+            range.setStart(node, match.index);
+            range.setEnd(node, match.index + match[0].length);
+
+            const rects = [...range.getClientRects()]
+              .map((rect) => buildRedactionRegion(rect, context, pattern.kind))
+              .filter(Boolean);
+
+            regions.push(...rects);
+            match = regex.exec(rawText);
+          }
+        }
+      }
+
+      if (regions.length > MAX_REDACTION_REGIONS) {
+        break;
       }
     }
 
@@ -3382,7 +3387,7 @@
   function collectSensitiveFieldRegions(context) {
     const regions = [];
 
-    for (const node of document.querySelectorAll("input, textarea, [contenteditable='true'], a[href^='mailto:'], a[href^='tel:']")) {
+    for (const node of querySelectorAllDeep(document, "input, textarea, [contenteditable='true'], a[href^='mailto:'], a[href^='tel:']")) {
       if (!(node instanceof HTMLElement) || !isElementScannable(node) || shouldSkipSensitiveScan(node)) {
         continue;
       }
@@ -3723,7 +3728,11 @@
       pageHeight: Math.round(pageHeight),
       devicePixelRatio: window.devicePixelRatio || 1,
       scrollMode: context.isDocument ? "document" : "container",
-      scrollContainer: context.label
+      scrollContainer: context.label,
+      renderingRisks: {
+        iframeCount: document.querySelectorAll("iframe").length,
+        canvasCount: document.querySelectorAll("canvas").length
+      }
     };
   }
 
@@ -3870,9 +3879,7 @@
 
   async function waitForMedia() {
     const container = getScrollContainerNode();
-    const mediaNodes = [
-      ...container.querySelectorAll("img, iframe, video")
-    ]
+    const mediaNodes = querySelectorAllDeep(container, "img, iframe, video")
       .filter((node) => node instanceof HTMLElement && isElementVisible(node))
       .slice(0, 28);
 
@@ -3888,7 +3895,7 @@
 
   function primeLazyMedia(root) {
     const scope = root instanceof HTMLElement ? root : document;
-    const lazyCandidates = scope.querySelectorAll("img[loading='lazy'], iframe[loading='lazy'], video[preload='none'], [data-src], [data-srcset]");
+    const lazyCandidates = querySelectorAllDeep(scope, "img[loading='lazy'], iframe[loading='lazy'], video[preload='none'], [data-src], [data-srcset]");
 
     for (const node of lazyCandidates) {
       if (!(node instanceof HTMLElement)) {
@@ -3921,6 +3928,56 @@
         node.setAttribute(to, value);
       }
     }
+  }
+
+  function querySelectorAllDeep(root, selector, limit = 12000) {
+    const matches = [];
+    const roots = [root, ...collectOpenShadowRoots(root, limit)];
+
+    for (const currentRoot of roots) {
+      if (typeof currentRoot?.querySelectorAll !== "function") {
+        continue;
+      }
+
+      for (const node of currentRoot.querySelectorAll(selector)) {
+        matches.push(node);
+
+        if (matches.length >= limit) {
+          return matches;
+        }
+      }
+    }
+
+    return matches;
+  }
+
+  function collectOpenShadowRoots(root = document, limit = 12000) {
+    const shadowRoots = [];
+    const queuedRoots = [root];
+    let visitedElements = 0;
+
+    while (queuedRoots.length && visitedElements < limit) {
+      const currentRoot = queuedRoots.shift();
+
+      if (typeof currentRoot?.querySelectorAll !== "function") {
+        continue;
+      }
+
+      for (const node of currentRoot.querySelectorAll("*")) {
+        visitedElements += 1;
+
+        if (node.shadowRoot) {
+          shadowRoots.push(node.shadowRoot);
+          queuedRoots.push(node.shadowRoot);
+        }
+
+        if (visitedElements >= limit) {
+          break;
+        }
+      }
+    }
+
+    return shadowRoots;
   }
 
   function getScrollContainerNode() {

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Lumen",
-  "version": "0.2.0",
-  "description": "Local full-page and lasso capture with redaction, responsive views, a photo library, and selected-area monitors.",
+  "version": "0.3.0",
+  "description": "Capture, annotate, compare, redact, and monitor webpages with a local library and reviewed Drive export.",
   "homepage_url": "https://captainfredric.github.io/lumen-extension/",
   "minimum_chrome_version": "109",
   "permissions": [
@@ -12,6 +12,9 @@
     "offscreen",
     "scripting",
     "storage"
+  ],
+  "optional_permissions": [
+    "identity"
   ],
   "optional_host_permissions": [
     "http://*/*",

@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Lumen Annotation Studio</title>
+    <link rel="stylesheet" href="editor.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#editorCanvas">Skip to canvas</a>
+
+    <header class="app-header">
+      <div class="brand-lockup" aria-label="Lumen Annotation Studio">
+        <span class="brand-mark" aria-hidden="true"><span></span></span>
+        <div>
+          <p class="eyebrow">Lumen</p>
+          <h1>Annotation Studio</h1>
+        </div>
+      </div>
+
+      <div class="document-summary" aria-live="polite">
+        <strong id="documentTitle">No capture loaded</strong>
+        <span id="documentMeta">Open an image to begin</span>
+      </div>
+
+      <div class="header-actions">
+        <label class="button quiet-button file-button" for="fileInput">
+          <span>Open image</span>
+          <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" />
+        </label>
+        <button id="undoButton" class="icon-action" type="button" title="Undo (Ctrl/⌘ Z)" aria-label="Undo" disabled>
+          <span aria-hidden="true">↶</span>
+        </button>
+        <button id="redoButton" class="icon-action" type="button" title="Redo (Ctrl/⌘ Shift Z)" aria-label="Redo" disabled>
+          <span aria-hidden="true">↷</span>
+        </button>
+        <div id="externalExportActions" class="external-export-actions" data-lumen-export-actions aria-label="Additional export destinations"></div>
+        <button id="exportButton" class="button primary-button" type="button" title="Export PNG (Ctrl/⌘ S)" disabled>
+          Export PNG
+        </button>
+      </div>
+    </header>
+
+    <main class="editor-layout">
+      <aside class="tool-panel" aria-label="Annotation tools">
+        <p class="panel-label">Tools</p>
+        <div class="tool-list" role="toolbar" aria-label="Choose an annotation tool">
+          <button class="tool-button is-active" type="button" data-tool="select" aria-label="Select tool" aria-pressed="true">
+            <span class="tool-icon" aria-hidden="true">⌁</span>
+            <span>Select</span>
+            <kbd>V</kbd>
+          </button>
+          <button class="tool-button" type="button" data-tool="arrow" aria-label="Arrow tool" aria-pressed="false">
+            <span class="tool-icon" aria-hidden="true">↗</span>
+            <span>Arrow</span>
+            <kbd>A</kbd>
+          </button>
+          <button class="tool-button" type="button" data-tool="rectangle" aria-label="Rectangle tool" aria-pressed="false">
+            <span class="tool-icon shape-icon" aria-hidden="true"></span>
+            <span>Rectangle</span>
+            <kbd>R</kbd>
+          </button>
+          <button class="tool-button" type="button" data-tool="text" aria-label="Text tool" aria-pressed="false">
+            <span class="tool-icon text-icon" aria-hidden="true">T</span>
+            <span>Text</span>
+            <kbd>T</kbd>
+          </button>
+          <button class="tool-button" type="button" data-tool="blur" aria-label="Blur tool" aria-pressed="false">
+            <span class="tool-icon blur-icon" aria-hidden="true"></span>
+            <span>Blur</span>
+            <kbd>B</kbd>
+          </button>
+          <button class="tool-button" type="button" data-tool="pixelate" aria-label="Pixelate tool" aria-pressed="false">
+            <span class="tool-icon pixel-icon" aria-hidden="true"></span>
+            <span>Pixelate</span>
+            <kbd>P</kbd>
+          </button>
+        </div>
+
+        <div class="tool-tip">
+          <strong id="toolTipTitle">Select and arrange</strong>
+          <p id="toolTipCopy">Click an annotation to move or resize it. Press Delete to remove it.</p>
+        </div>
+      </aside>
+
+      <section id="workspace" class="workspace" aria-label="Annotation workspace">
+        <div id="dropZone" class="canvas-stage">
+          <div id="emptyState" class="empty-state">
+            <span class="empty-art" aria-hidden="true"><span></span></span>
+            <p class="eyebrow">Private, local editing</p>
+            <h2>Mark up a Lumen capture.</h2>
+            <p>Open an image, drop one here, or launch this studio from the capture library.</p>
+            <label class="button primary-button file-button" for="emptyFileInput">
+              Choose an image
+              <input id="emptyFileInput" type="file" accept="image/png,image/jpeg,image/webp" />
+            </label>
+          </div>
+
+          <div id="canvasFrame" class="canvas-frame is-hidden">
+            <canvas
+              id="editorCanvas"
+              tabindex="0"
+              role="img"
+              aria-label="Capture annotation canvas. Use a tool button and pointer, or press a tool shortcut then Enter to create with the keyboard."
+            ></canvas>
+          </div>
+
+          <div id="dropOverlay" class="drop-overlay is-hidden" aria-hidden="true">
+            <span>Drop image to open</span>
+          </div>
+        </div>
+
+        <footer class="workspace-footer">
+          <div id="statusMessage" class="status-message" role="status" aria-live="polite">
+            Open a capture to start annotating.
+          </div>
+          <div class="zoom-controls" aria-label="Canvas zoom">
+            <button id="zoomOutButton" class="zoom-button" type="button" aria-label="Zoom out" disabled>−</button>
+            <span id="zoomLabel">Fit</span>
+            <button id="zoomInButton" class="zoom-button" type="button" aria-label="Zoom in" disabled>+</button>
+            <button id="fitButton" class="fit-button" type="button" disabled>Fit</button>
+          </div>
+        </footer>
+      </section>
+
+      <aside class="properties-panel" aria-label="Annotation properties">
+        <div class="properties-heading">
+          <div>
+            <p class="panel-label">Inspector</p>
+            <h2 id="inspectorTitle">New annotation</h2>
+          </div>
+          <button id="deleteButton" class="delete-button" type="button" disabled>Delete</button>
+        </div>
+
+        <div class="property-group annotation-style-properties">
+          <label class="field-label" for="colorInput">
+            <span>Color</span>
+            <span class="color-control">
+              <input id="colorInput" type="color" value="#ff5f87" />
+              <output id="colorValue" for="colorInput">#FF5F87</output>
+            </span>
+          </label>
+
+          <label class="field-label" for="strokeWidthInput">
+            <span>Line weight <output id="strokeWidthValue" for="strokeWidthInput">4 px</output></span>
+            <input id="strokeWidthInput" type="range" min="2" max="16" step="1" value="4" />
+          </label>
+        </div>
+
+        <div id="textProperties" class="property-group is-hidden">
+          <label class="field-label" for="textInput">
+            <span>Text</span>
+            <textarea id="textInput" rows="4" maxlength="2000" placeholder="Type your annotation">Note</textarea>
+          </label>
+          <label class="field-label" for="fontSizeInput">
+            <span>Text size <output id="fontSizeValue" for="fontSizeInput">28 px</output></span>
+            <input id="fontSizeInput" type="range" min="14" max="72" step="1" value="28" />
+          </label>
+          <label class="checkbox-field" for="textBackgroundInput">
+            <input id="textBackgroundInput" type="checkbox" checked />
+            <span>Add dark text backing</span>
+          </label>
+        </div>
+
+        <div id="blurProperties" class="property-group is-hidden">
+          <label class="field-label" for="blurRadiusInput">
+            <span>Blur strength <output id="blurRadiusValue" for="blurRadiusInput">14 px</output></span>
+            <input id="blurRadiusInput" type="range" min="4" max="40" step="1" value="14" />
+          </label>
+        </div>
+
+        <div id="pixelateProperties" class="property-group is-hidden">
+          <label class="field-label" for="pixelSizeInput">
+            <span>Pixel size <output id="pixelSizeValue" for="pixelSizeInput">14 px</output></span>
+            <input id="pixelSizeInput" type="range" min="5" max="50" step="1" value="14" />
+          </label>
+        </div>
+
+        <section class="shortcut-card" aria-labelledby="shortcutTitle">
+          <div class="shortcut-heading">
+            <h3 id="shortcutTitle">Keyboard</h3>
+            <span>Fast editing</span>
+          </div>
+          <dl>
+            <div><dt>Undo / redo</dt><dd><kbd>⌘Z</kbd> <kbd>⇧⌘Z</kbd></dd></div>
+            <div><dt>Create centered</dt><dd><kbd>Tool</kbd> <kbd>Enter</kbd></dd></div>
+            <div><dt>Select previous / next</dt><dd><kbd>[</kbd> <kbd>]</kbd></dd></div>
+            <div><dt>Nudge</dt><dd><kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd></dd></div>
+            <div><dt>Delete</dt><dd><kbd>⌫</kbd></dd></div>
+            <div><dt>Export</dt><dd><kbd>⌘S</kbd></dd></div>
+          </dl>
+        </section>
+
+        <p class="privacy-note">Edits stay in this tab unless you explicitly export a PNG or choose the optional reviewed-image Drive action.</p>
+      </aside>
+    </main>
+
+    <script type="module" src="editor.js"></script>
+    <script type="module" src="editor-drive.js"></script>
+  </body>
+</html>

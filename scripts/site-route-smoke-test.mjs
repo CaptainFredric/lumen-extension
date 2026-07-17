@@ -18,14 +18,28 @@ const siteRoots = [
     root: path.join(repoRoot, "docs"),
     legacyDocsMode: "redirect",
     assetPath: "/assets/lumen-social-card.png",
-    storeAssetPath: "/assets/store-control-surface.png"
+    storeAssetPaths: [
+      "/assets/store-control-surface.png",
+      "/assets/store-annotation-studio.png",
+      "/assets/store-visual-change-review.png",
+      "/assets/store-responsive-set.png",
+      "/assets/store-review-actions.png",
+      "/assets/store-library-monitor.png"
+    ]
   },
   {
     name: "repository root",
     root: repoRoot,
     legacyDocsMode: "landing",
     assetPath: "/assets/lumen-social-card.png",
-    storeAssetPath: "/assets/store-control-surface.png"
+    storeAssetPaths: [
+      "/assets/store-control-surface.png",
+      "/assets/store-annotation-studio.png",
+      "/assets/store-visual-change-review.png",
+      "/assets/store-responsive-set.png",
+      "/assets/store-review-actions.png",
+      "/assets/store-library-monitor.png"
+    ]
   }
 ];
 const results = [];
@@ -125,9 +139,17 @@ async function runRouteChecks(target) {
     assert(socialCard.status === 200, `Expected ${target.name} social image asset to load.`, socialCard);
     assert(socialCard.bytes > 1024, `Expected ${target.name} social image asset to contain data.`, socialCard);
 
-    const storeAsset = await fetchBytes(`${fixture.origin}${target.storeAssetPath}`);
-    assert(storeAsset.status === 200, `Expected ${target.name} store screenshot asset to load.`, storeAsset);
-    assert(storeAsset.bytes > 1024, `Expected ${target.name} store screenshot asset to contain data.`, storeAsset);
+    for (const storeAssetPath of target.storeAssetPaths) {
+      const storeAsset = await fetchBytes(`${fixture.origin}${storeAssetPath}`);
+      assert(storeAsset.status === 200, `Expected ${target.name} store screenshot asset to load.`, {
+        storeAssetPath,
+        ...storeAsset
+      });
+      assert(storeAsset.bytes > 1024, `Expected ${target.name} store screenshot asset to contain data.`, {
+        storeAssetPath,
+        ...storeAsset
+      });
+    }
 
     return {
       name: target.name,
@@ -139,7 +161,7 @@ async function runRouteChecks(target) {
         "/missing-route",
         "/..%2fpackage.json",
         target.assetPath,
-        target.storeAssetPath
+        ...target.storeAssetPaths
       ]
     };
   } finally {

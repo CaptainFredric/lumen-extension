@@ -11,6 +11,8 @@ The product can become ambitious without changing the first wedge. The screensho
 3. Redact visible sensitive data during export.
 4. Attach useful page signals beside the image.
 5. Keep local history and portable capture details.
+6. Annotate and compare saved captures before they leave the browser.
+7. Monitor one selected area on an explicit local schedule.
 
 ## Implemented Now
 
@@ -23,6 +25,11 @@ The product can become ambitious without changing the first wedge. The screensho
 7. Local history with run details, artifacts, copyable summaries, and file actions.
 8. Cutaway region picker that stores one reusable page area per URL and exports focused crops when the region resolves during capture.
 9. Pre-export review that checks auto-redaction, manual projection, and cutaway resolution across the requested view set.
+10. Local photo library with real previews, favorites, review state, and original-file actions.
+11. Annotation Studio with arrows, rectangles, text, blur, pixelation, selection, undo, redo, and reviewed PNG export.
+12. Local visual-change review with a before/after reveal, highlighted change regions, metrics, and monitor timeline.
+13. One-time, repeating, and capped continuous selected-area monitoring with pause, resume, run-now, and delete controls.
+14. Optional review-first Google Drive export using narrow `drive.file` access.
 
 ## Near-Term Product Bets
 
@@ -34,11 +41,11 @@ Implemented review layer:
 
 1. Popup history can filter artifacts by full-page image, cutaway crop, and manifest.
 2. Cutaway runs show a compact preview map, dimensions, variant, and projection status in the run detail.
-3. External handoff still needs its own review screen before anything leaves the browser.
+3. Reviewed editor output can go to Drive explicitly; any additional destination still needs its own review and consent path.
 
-### Region Watch
+### Region Watch — Implemented Locally
 
-Let the user opt into repeated captures of a marked region. This should start as local, visible, pauseable automation rather than silent surveillance.
+The user can opt into delayed, repeated, or capped continuous captures of a marked region. The implementation is local, visible, pauseable, and bounded rather than silent surveillance.
 
 Store-ready rules for this feature:
 
@@ -62,15 +69,13 @@ Required guardrails:
 
 ## Future Feature Backlog
 
-1. Freeform annotation tools: arrow, text, highlight, blur, and numbered callouts.
-2. Region watch: scheduled local captures of a selected area.
-3. Visual diff: compare the latest region or page capture against the previous run.
-4. Agent handoff: summarize change, prepare bug evidence, or draft review notes.
-5. Team sync: push selected bundles to Drive, Slack, Notion, GitHub, or Jira.
-6. Capture inbox: local queue of captures that need review, redaction approval, or export.
-7. Capture templates: QA bug report, design review, competitor reference, release evidence.
-8. Safer sharing: outbound checklist that confirms redactions, source URL, and included files.
-9. Store package readiness: permissions audit, public privacy URL, screenshots, listing copy, and rejection-risk review.
+1. Numbered callouts, highlight strokes, and reusable annotation styles.
+2. Multiple named monitored regions per page and optional post-review change notifications.
+3. Agent handoff: summarize change, prepare bug evidence, or draft review notes.
+4. Additional review-first destinations such as Slack, Notion, GitHub, or Jira.
+5. Capture inbox: local queue of captures that need review, redaction approval, or export.
+6. Capture templates: QA bug report, design review, competitor reference, release evidence.
+7. Safer sharing: outbound checklist that confirms redactions, source URL, and included files.
 
 ## Chrome Web Store Direction
 
@@ -80,7 +85,7 @@ The current extension should stay usable with `activeTab`, optional host access 
 
 ## Next Engineering Milestones
 
-1. Add one real annotation tool that works on exported images.
-2. Prepare Chrome Web Store screenshots from current extension output.
-3. Keep privacy disclosure aligned as sync, agent handoff, or watch features move beyond prototype status.
+1. Complete publisher-owned Web Store fields, OAuth setup, signed-ID testing, and submission.
+2. Keep the four-site live matrix and deterministic difficult-page suite green for releases.
+3. Keep privacy disclosure aligned as new destinations or remote automation are added.
 4. Tighten the backend from demo session state into a real account path.

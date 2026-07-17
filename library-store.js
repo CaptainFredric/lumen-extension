@@ -6,8 +6,21 @@ const CAPTURE_STORE = "captures";
 const ASSET_STORE = "assets";
 const DEFAULT_PREVIEW_BUDGET_BYTES = 50 * 1024 * 1024;
 const DEFAULT_PREVIEW_CAPTURE_LIMIT = 500;
+const DEFAULT_EDITOR_SOURCE_BUDGET_BYTES = 250 * 1024 * 1024;
+const DEFAULT_EDITOR_SOURCE_CAPTURE_LIMIT = 75;
 
 let databasePromise = null;
+
+export function hasLibraryPreview(capture) {
+  if (!capture || capture.previewStatus !== "ready") {
+    return false;
+  }
+
+  const previewAssetIds = Array.isArray(capture.previewAssetIds)
+    ? capture.previewAssetIds.filter(Boolean)
+    : [];
+  return Boolean(capture.primaryPreviewAssetId || previewAssetIds.length);
+}
 
 export async function putLibraryCapture(input = {}) {
   const captureId = normalizeText(input.id, "", 160);
@@ -23,6 +36,12 @@ export async function putLibraryCapture(input = {}) {
   const previewAssets = hasPreviewInput
     ? await preparePreviewAssets(captureId, collectPreviewInputs(input))
     : [];
+  const hasEditorSourceInput = Object.hasOwn(input, "editorSource") ||
+    Object.hasOwn(input, "editorSourceBlob") ||
+    Object.hasOwn(input, "editorSourceDataUrl");
+  const editorSourceAsset = hasEditorSourceInput
+    ? await prepareEditorSourceAsset(captureId, collectEditorSourceInput(input))
+    : null;
   const database = await openLibraryDatabase();
   const transaction = database.transaction([CAPTURE_STORE, ASSET_STORE], "readwrite");
   const captureStore = transaction.objectStore(CAPTURE_STORE);
@@ -31,6 +50,7 @@ export async function putLibraryCapture(input = {}) {
   const existingAssetIds = Array.isArray(existing?.previewAssetIds)
     ? existing.previewAssetIds
     : [];
+  const existingEditorAssetId = normalizeText(existing?.editorAssetId, "", 260);
   const normalized = normalizeCaptureRecord(input, existing);
 
   if (hasPreviewInput) {
@@ -51,6 +71,36 @@ export async function putLibraryCapture(input = {}) {
     normalized.primaryPreviewAssetId = existing?.primaryPreviewAssetId || existingAssetIds[0] || "";
     normalized.previewBytes = Math.max(0, Number(existing?.previewBytes) || 0);
     normalized.previewStatus = existing?.previewStatus || "unavailable";
+  }
+
+  if (hasEditorSourceInput) {
+    if (existingEditorAssetId) {
+      assetStore.delete(existingEditorAssetId);
+    }
+
+    if (editorSourceAsset) {
+      assetStore.put(editorSourceAsset);
+    }
+
+    normalized.editorAssetId = editorSourceAsset?.id || "";
+    normalized.editorBytes = editorSourceAsset?.byteLength || 0;
+    normalized.editorStatus = editorSourceAsset ? "ready" : "unavailable";
+    normalized.editorSourceWidth = editorSourceAsset?.width || 0;
+    normalized.editorSourceHeight = editorSourceAsset?.height || 0;
+    normalized.editorSourceOriginalWidth = editorSourceAsset?.originalWidth || 0;
+    normalized.editorSourceOriginalHeight = editorSourceAsset?.originalHeight || 0;
+    normalized.editorSourceScaled = Boolean(editorSourceAsset?.scaled);
+    normalized.editorSourceKind = editorSourceAsset?.kind || "";
+  } else {
+    normalized.editorAssetId = existingEditorAssetId;
+    normalized.editorBytes = Math.max(0, Number(existing?.editorBytes) || 0);
+    normalized.editorStatus = existing?.editorStatus || "unavailable";
+    normalized.editorSourceWidth = Math.max(0, Math.round(Number(existing?.editorSourceWidth) || 0));
+    normalized.editorSourceHeight = Math.max(0, Math.round(Number(existing?.editorSourceHeight) || 0));
+    normalized.editorSourceOriginalWidth = Math.max(0, Math.round(Number(existing?.editorSourceOriginalWidth) || 0));
+    normalized.editorSourceOriginalHeight = Math.max(0, Math.round(Number(existing?.editorSourceOriginalHeight) || 0));
+    normalized.editorSourceScaled = Boolean(existing?.editorSourceScaled);
+    normalized.editorSourceKind = normalizeText(existing?.editorSourceKind, "", 80);
   }
 
   captureStore.put(normalized);
@@ -102,24 +152,39 @@ export async function getLibraryCapture(captureId, options = {}) {
   }
 
   const database = await openLibraryDatabase();
-  const stores = options.includePreview ? [CAPTURE_STORE, ASSET_STORE] : [CAPTURE_STORE];
+  const includeAssets = Boolean(options.includePreview || options.includeEditorSource);
+  const stores = includeAssets ? [CAPTURE_STORE, ASSET_STORE] : [CAPTURE_STORE];
   const transaction = database.transaction(stores, "readonly");
   const capture = await requestResult(transaction.objectStore(CAPTURE_STORE).get(normalizedId));
 
-  if (!capture || !options.includePreview) {
+  if (!capture || !includeAssets) {
     await transactionComplete(transaction);
     return capture || null;
   }
 
-  const previewAssetId = options.assetId || capture.primaryPreviewAssetId || capture.previewAssetIds?.[0] || "";
-  const preview = previewAssetId
-    ? await requestResult(transaction.objectStore(ASSET_STORE).get(previewAssetId))
-    : null;
+  const assetStore = transaction.objectStore(ASSET_STORE);
+  const previewAssetId = options.includePreview
+    ? options.assetId || capture.primaryPreviewAssetId || capture.previewAssetIds?.[0] || ""
+    : "";
+  const editorAssetId = options.includeEditorSource
+    ? options.editorAssetId || capture.editorAssetId || ""
+    : "";
+  const [preview, editorSource] = await Promise.all([
+    previewAssetId ? requestResult(assetStore.get(previewAssetId)) : null,
+    editorAssetId ? requestResult(assetStore.get(editorAssetId)) : null
+  ]);
   await transactionComplete(transaction);
 
   return {
     ...capture,
-    preview: preview || null
+    ...(options.includePreview ? {
+      preview: preview?.captureId === capture.id && preview?.purpose !== "editor-source" ? preview : null
+    } : {}),
+    ...(options.includeEditorSource ? {
+      editorSource: editorSource?.captureId === capture.id && editorSource?.purpose === "editor-source"
+        ? editorSource
+        : null
+    } : {})
   };
 }
 
@@ -136,7 +201,23 @@ export async function getLibraryPreviewAsset(captureId, assetId = "") {
   const asset = await requestResult(transaction.objectStore(ASSET_STORE).get(resolvedAssetId));
   await transactionComplete(transaction);
 
-  return asset?.captureId === capture.id ? asset : null;
+  return asset?.captureId === capture.id && asset?.purpose !== "editor-source" ? asset : null;
+}
+
+export async function getLibraryEditorAsset(captureId) {
+  const capture = await getLibraryCapture(captureId);
+  const editorAssetId = capture?.editorAssetId || "";
+
+  if (!capture || !editorAssetId) {
+    return null;
+  }
+
+  const database = await openLibraryDatabase();
+  const transaction = database.transaction(ASSET_STORE, "readonly");
+  const asset = await requestResult(transaction.objectStore(ASSET_STORE).get(editorAssetId));
+  await transactionComplete(transaction);
+
+  return asset?.captureId === capture.id && asset?.purpose === "editor-source" ? asset : null;
 }
 
 export async function deleteLibraryCapture(captureId) {
@@ -214,6 +295,34 @@ export async function updateLibraryFavorite(captureId, favorite) {
   return updated;
 }
 
+export async function updateLibraryReview(captureId, patch = {}) {
+  const normalizedId = normalizeText(captureId, "", 160);
+
+  if (!normalizedId) {
+    throw new Error("A capture ID is required before review metadata can be saved.");
+  }
+
+  const database = await openLibraryDatabase();
+  const transaction = database.transaction(CAPTURE_STORE, "readwrite");
+  const captureStore = transaction.objectStore(CAPTURE_STORE);
+  const capture = await requestResult(captureStore.get(normalizedId));
+
+  if (!capture) {
+    transaction.abort();
+    throw new Error("The reviewed library item could not be found.");
+  }
+
+  const updated = {
+    ...capture,
+    review: normalizeReviewMetadata(patch, capture.review),
+    updatedAt: new Date().toISOString()
+  };
+
+  captureStore.put(updated);
+  await transactionComplete(transaction);
+  return updated;
+}
+
 export async function pruneLibraryPreviews(options = {}) {
   const maxBytes = options.maxBytes === undefined
     ? DEFAULT_PREVIEW_BUDGET_BYTES
@@ -229,15 +338,16 @@ export async function pruneLibraryPreviews(options = {}) {
   ]);
   await transactionComplete(readTransaction);
 
+  const previewAssets = assets.filter((asset) => asset.purpose !== "editor-source");
   const assetsByCapture = new Map();
 
-  for (const asset of assets) {
+  for (const asset of previewAssets) {
     const existing = assetsByCapture.get(asset.captureId) || [];
     existing.push(asset);
     assetsByCapture.set(asset.captureId, existing);
   }
 
-  let totalBytes = assets.reduce((sum, asset) => sum + Math.max(0, Number(asset.byteLength) || asset.blob?.size || 0), 0);
+  let totalBytes = previewAssets.reduce((sum, asset) => sum + readAssetBytes(asset), 0);
   let previewCaptureCount = captures.filter((capture) => (assetsByCapture.get(capture.id) || []).length).length;
   const candidates = captures
     .filter((capture) => !capture.favorite && (assetsByCapture.get(capture.id) || []).length)
@@ -257,7 +367,7 @@ export async function pruneLibraryPreviews(options = {}) {
       const captureAssets = assetsByCapture.get(capture.id) || [];
 
       for (const asset of captureAssets) {
-        totalBytes -= Math.max(0, Number(asset.byteLength) || asset.blob?.size || 0);
+        totalBytes -= readAssetBytes(asset);
         assetStore.delete(asset.id);
       }
 
@@ -276,13 +386,88 @@ export async function pruneLibraryPreviews(options = {}) {
     await transactionComplete(writeTransaction);
   }
 
+  const editorPrune = await pruneLibraryEditorSources({
+    maxBytes: options.editorMaxBytes,
+    maxCaptures: options.editorMaxCaptures
+  });
+
   return {
     prunedCaptureIds,
     previewCaptureCount,
     previewBytes: Math.max(0, totalBytes),
     maxBytes,
     maxCaptures,
-    overBudget: totalBytes > maxBytes || previewCaptureCount > maxCaptures
+    overBudget: totalBytes > maxBytes || previewCaptureCount > maxCaptures,
+    editorPrunedCaptureIds: editorPrune.prunedCaptureIds,
+    editorCaptureCount: editorPrune.editorCaptureCount,
+    editorBytes: editorPrune.editorBytes,
+    editorOverBudget: editorPrune.overBudget
+  };
+}
+
+export async function pruneLibraryEditorSources(options = {}) {
+  const maxBytes = options.maxBytes === undefined
+    ? DEFAULT_EDITOR_SOURCE_BUDGET_BYTES
+    : Math.max(0, Number(options.maxBytes) || 0);
+  const maxCaptures = options.maxCaptures === undefined
+    ? DEFAULT_EDITOR_SOURCE_CAPTURE_LIMIT
+    : Math.max(0, Math.round(Number(options.maxCaptures) || 0));
+  const database = await openLibraryDatabase();
+  const readTransaction = database.transaction([CAPTURE_STORE, ASSET_STORE], "readonly");
+  const [captures, assets] = await Promise.all([
+    requestResult(readTransaction.objectStore(CAPTURE_STORE).getAll()),
+    requestResult(readTransaction.objectStore(ASSET_STORE).getAll())
+  ]);
+  await transactionComplete(readTransaction);
+
+  const editorAssets = assets.filter((asset) => asset.purpose === "editor-source");
+  const assetsByCapture = new Map(editorAssets.map((asset) => [asset.captureId, asset]));
+  let totalBytes = editorAssets.reduce((sum, asset) => sum + readAssetBytes(asset), 0);
+  let editorCaptureCount = assetsByCapture.size;
+  const candidates = captures
+    .filter((capture) => !capture.favorite && assetsByCapture.has(capture.id))
+    .sort((left, right) => readCaptureTimestamp(left) - readCaptureTimestamp(right));
+  const prunedCaptureIds = [];
+
+  if (totalBytes > maxBytes || editorCaptureCount > maxCaptures) {
+    const writeTransaction = database.transaction([CAPTURE_STORE, ASSET_STORE], "readwrite");
+    const captureStore = writeTransaction.objectStore(CAPTURE_STORE);
+    const assetStore = writeTransaction.objectStore(ASSET_STORE);
+
+    for (const capture of candidates) {
+      if (totalBytes <= maxBytes && editorCaptureCount <= maxCaptures) {
+        break;
+      }
+
+      const asset = assetsByCapture.get(capture.id);
+
+      if (!asset) {
+        continue;
+      }
+
+      totalBytes -= readAssetBytes(asset);
+      editorCaptureCount -= 1;
+      assetStore.delete(asset.id);
+      captureStore.put({
+        ...capture,
+        editorAssetId: "",
+        editorBytes: 0,
+        editorStatus: "pruned",
+        updatedAt: new Date().toISOString()
+      });
+      prunedCaptureIds.push(capture.id);
+    }
+
+    await transactionComplete(writeTransaction);
+  }
+
+  return {
+    prunedCaptureIds,
+    editorCaptureCount,
+    editorBytes: Math.max(0, totalBytes),
+    maxBytes,
+    maxCaptures,
+    overBudget: totalBytes > maxBytes || editorCaptureCount > maxCaptures
   };
 }
 
@@ -295,18 +480,20 @@ export async function getLibraryStorageEstimate() {
   ]);
   await transactionComplete(transaction);
 
-  const previewBytes = assets.reduce(
-    (sum, asset) => sum + Math.max(0, Number(asset.byteLength) || asset.blob?.size || 0),
-    0
-  );
+  const previewAssets = assets.filter((asset) => asset.purpose !== "editor-source");
+  const editorAssets = assets.filter((asset) => asset.purpose === "editor-source");
+  const previewBytes = previewAssets.reduce((sum, asset) => sum + readAssetBytes(asset), 0);
+  const editorBytes = editorAssets.reduce((sum, asset) => sum + readAssetBytes(asset), 0);
   const originEstimate = typeof navigator?.storage?.estimate === "function"
     ? await navigator.storage.estimate().catch(() => ({}))
     : {};
 
   return {
     captureCount,
-    previewCount: assets.length,
+    previewCount: previewAssets.length,
     previewBytes,
+    editorCount: editorAssets.length,
+    editorBytes,
     usage: Math.max(0, Number(originEstimate.usage) || 0),
     quota: Math.max(0, Number(originEstimate.quota) || 0)
   };
@@ -411,6 +598,27 @@ function collectPreviewInputs(input) {
   return [];
 }
 
+function collectEditorSourceInput(input) {
+  if (input.editorSource && typeof input.editorSource === "object") {
+    return input.editorSource;
+  }
+
+  if (input.editorSourceBlob instanceof Blob || typeof input.editorSourceDataUrl === "string") {
+    return {
+      blob: input.editorSourceBlob,
+      dataUrl: input.editorSourceDataUrl,
+      width: input.editorSourceWidth,
+      height: input.editorSourceHeight,
+      originalWidth: input.editorSourceOriginalWidth,
+      originalHeight: input.editorSourceOriginalHeight,
+      scaled: input.editorSourceScaled,
+      kind: input.editorSourceKind
+    };
+  }
+
+  return null;
+}
+
 async function preparePreviewAssets(captureId, previewInputs) {
   const assets = [];
 
@@ -448,11 +656,50 @@ async function preparePreviewAssets(captureId, previewInputs) {
   return assets;
 }
 
+async function prepareEditorSourceAsset(captureId, input) {
+  if (!input || typeof input !== "object") {
+    return null;
+  }
+
+  const blob = input.blob instanceof Blob
+    ? input.blob
+    : typeof input.dataUrl === "string" && input.dataUrl.startsWith("data:image/")
+      ? await dataUrlToBlob(input.dataUrl)
+      : null;
+
+  if (!blob || !blob.size || !blob.type.startsWith("image/")) {
+    return null;
+  }
+
+  const variantId = normalizeText(input.variantId, "primary", 80);
+  const role = input.role === "cutaway" ? "cutaway" : "full-page";
+
+  return {
+    id: normalizeText(input.id, `${captureId}:editor-source:${variantId}`, 260),
+    captureId,
+    purpose: "editor-source",
+    role,
+    variantId,
+    kind: normalizeText(input.kind, "whole-page-proxy", 80),
+    mime: normalizeText(blob.type, "image/png", 80),
+    width: Math.max(0, Math.round(Number(input.width) || 0)),
+    height: Math.max(0, Math.round(Number(input.height) || 0)),
+    originalWidth: Math.max(0, Math.round(Number(input.originalWidth) || Number(input.width) || 0)),
+    originalHeight: Math.max(0, Math.round(Number(input.originalHeight) || Number(input.height) || 0)),
+    pageWidth: Math.max(0, Math.round(Number(input.pageWidth) || Number(input.originalWidth) || Number(input.width) || 0)),
+    pageHeight: Math.max(0, Math.round(Number(input.pageHeight) || Number(input.originalHeight) || Number(input.height) || 0)),
+    scaled: Boolean(input.scaled),
+    byteLength: blob.size,
+    blob,
+    createdAt: new Date().toISOString()
+  };
+}
+
 async function dataUrlToBlob(dataUrl) {
   const response = await fetch(dataUrl);
 
   if (!response.ok) {
-    throw new Error("The capture preview could not be prepared for local storage.");
+    throw new Error("The capture image could not be prepared for local storage.");
   }
 
   return response.blob();
@@ -492,13 +739,87 @@ function normalizeCaptureRecord(input, existing = null) {
     redactionCount: Math.max(0, Math.round(Number(input.redactionCount ?? existing?.redactionCount) || 0)),
     manualRedactionCount: Math.max(0, Math.round(Number(input.manualRedactionCount ?? existing?.manualRedactionCount) || 0)),
     cutawayCount: Math.max(0, Math.round(Number(input.cutawayCount ?? existing?.cutawayCount) || 0)),
+    review: normalizeReviewMetadata(input.review, existing?.review),
     favorite: typeof input.favorite === "boolean" ? input.favorite : Boolean(existing?.favorite),
     tags: Array.isArray(input.tags) ? normalizeTags(input.tags) : normalizeTags(existing?.tags),
     previewAssetIds: [],
     primaryPreviewAssetId: "",
     previewBytes: 0,
-    previewStatus: "unavailable"
+    previewStatus: "unavailable",
+    editorAssetId: "",
+    editorBytes: 0,
+    editorStatus: "unavailable",
+    editorSourceWidth: 0,
+    editorSourceHeight: 0,
+    editorSourceOriginalWidth: 0,
+    editorSourceOriginalHeight: 0,
+    editorSourceScaled: false,
+    editorSourceKind: ""
   };
+}
+
+function normalizeReviewMetadata(input, existing = null) {
+  const source = input && typeof input === "object" ? input : {};
+  const previous = existing && typeof existing === "object" ? existing : {};
+  const exports = Array.isArray(source.driveExports)
+    ? source.driveExports
+    : Array.isArray(previous.driveExports)
+      ? previous.driveExports
+      : [];
+
+  return {
+    status: ["unreviewed", "reviewed", "edited", "exported"].includes(source.status)
+      ? source.status
+      : ["unreviewed", "reviewed", "edited", "exported"].includes(previous.status)
+        ? previous.status
+        : "unreviewed",
+    lastReviewedAt: normalizeOptionalTimestamp(source.lastReviewedAt ?? previous.lastReviewedAt),
+    lastEditedAt: normalizeOptionalTimestamp(source.lastEditedAt ?? previous.lastEditedAt),
+    lastExportedAt: normalizeOptionalTimestamp(source.lastExportedAt ?? previous.lastExportedAt),
+    annotationCount: Math.max(0, Math.min(500, Math.round(Number(source.annotationCount ?? previous.annotationCount) || 0))),
+    driveExports: exports.slice(0, 20).map((item) => ({
+      id: normalizeText(item?.id, "", 240),
+      name: normalizeText(item?.name, "", 260),
+      webViewLink: sanitizeGoogleDriveLink(item?.webViewLink),
+      exportedAt: normalizeOptionalTimestamp(item?.exportedAt)
+    })).filter((item) => item.id),
+    lastComparison: normalizeReviewComparison(source.lastComparison ?? previous.lastComparison)
+  };
+}
+
+function normalizeReviewComparison(input) {
+  if (!input || typeof input !== "object") {
+    return null;
+  }
+
+  return {
+    beforeCaptureId: normalizeText(input.beforeCaptureId, "", 160),
+    changePercent: Math.max(0, Math.min(100, Number(input.changePercent) || 0)),
+    similarityPercent: Math.max(0, Math.min(100, Number(input.similarityPercent) || 0)),
+    regionCount: Math.max(0, Math.min(5000, Math.round(Number(input.regionCount) || 0))),
+    reviewedAt: normalizeOptionalTimestamp(input.reviewedAt)
+  };
+}
+
+function sanitizeGoogleDriveLink(value) {
+  try {
+    const url = new URL(String(value || ""));
+    const hostname = url.hostname.toLowerCase();
+    return url.protocol === "https:" && (hostname === "drive.google.com" || hostname.endsWith(".drive.google.com"))
+      ? url.href
+      : "";
+  } catch {
+    return "";
+  }
+}
+
+function readAssetBytes(asset) {
+  return Math.max(0, Number(asset?.byteLength) || asset?.blob?.size || 0);
+}
+
+function normalizeOptionalTimestamp(value) {
+  const timestamp = Date.parse(value || "");
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : "";
 }
 
 function normalizeDownloads(downloads) {

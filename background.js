@@ -29,6 +29,7 @@ import {
 import {
   clearLibrary as clearCaptureLibrary,
   getLibraryCapture,
+  hasLibraryPreview,
   pruneLibraryPreviews,
   putLibraryCapture
 } from "./library-store.js";
@@ -461,6 +462,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "LUMEN_OPEN_ANNOTATION_EDITOR") {
+    openCaptureToolPage("editor.html", message.payload?.captureId)
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_OPEN_VISUAL_REVIEW") {
+    openCaptureToolPage("review.html", message.payload?.captureId)
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
   if (message?.type === "LUMEN_MANUAL_REDACTIONS_UPDATED") {
     persistManualRedactionsFromContent(sender.tab, message.payload)
       .then((result) => sendResponse({ ok: true, ...result }))
@@ -703,6 +720,54 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 });
 
+async function openCaptureToolPage(pageName, captureId = "") {
+  const normalizedCaptureId = typeof captureId === "string" ? captureId.trim().slice(0, 160) : "";
+
+  if (!normalizedCaptureId) {
+    throw createFriendlyError(
+      "Capture Not Selected",
+      "Choose a photo from the local library before opening this review tool."
+    );
+  }
+
+  const isEditor = pageName === "editor.html";
+  const capture = await getLibraryCapture(normalizedCaptureId, {
+    includePreview: true,
+    includeEditorSource: true
+  });
+
+  if (!capture) {
+    throw createFriendlyError(
+      "Capture Not Found",
+      "The selected photo is no longer available in Lumen's local library."
+    );
+  }
+
+  const previewAvailable = hasLibraryPreview(capture) &&
+    capture.preview?.captureId === capture.id &&
+    Boolean(capture.preview?.blob);
+  const editorSourceAvailable = capture.editorStatus === "ready" &&
+    capture.editorSource?.captureId === capture.id &&
+    capture.editorSource?.purpose === "editor-source" &&
+    Boolean(capture.editorSource?.blob);
+
+  if (!previewAvailable && !editorSourceAvailable) {
+    throw createFriendlyError(
+      isEditor ? "Annotation Unavailable" : "Comparison Unavailable",
+      "This capture no longer has a local image preview. Capture the page again to use this tool."
+    );
+  }
+
+  const tab = await chrome.tabs.create({
+    url: chrome.runtime.getURL(`${pageName}?capture=${encodeURIComponent(normalizedCaptureId)}`)
+  });
+
+  return {
+    tabId: tab?.id || null,
+    captureId: normalizedCaptureId
+  };
+}
+
 async function clearLocalWorkspaceData() {
   const [localState, storedRegions, clearedLibrary] = await Promise.all([
     readLocalState(),
@@ -742,6 +807,8 @@ async function clearLocalWorkspaceData() {
   const grantedPermissions = await chrome.permissions.getAll();
   const grantedOrigins = Array.isArray(grantedPermissions.origins) ? grantedPermissions.origins : [];
   const requiredOrigins = new Set(chrome.runtime.getManifest().host_permissions || []);
+  const requiredPermissions = new Set(chrome.runtime.getManifest().permissions || []);
+  const optionalPermissions = new Set(chrome.runtime.getManifest().optional_permissions || []);
   let revokedPermissionCount = 0;
 
   for (const origin of grantedOrigins) {
@@ -755,6 +822,20 @@ async function clearLocalWorkspaceData() {
       }
     } catch (error) {
       console.debug("Lumen optional site access cleanup skipped:", error);
+    }
+  }
+
+  for (const permission of Array.isArray(grantedPermissions.permissions) ? grantedPermissions.permissions : []) {
+    if (requiredPermissions.has(permission) || !optionalPermissions.has(permission)) {
+      continue;
+    }
+
+    try {
+      if (await chrome.permissions.remove({ permissions: [permission] })) {
+        revokedPermissionCount += 1;
+      }
+    } catch (error) {
+      console.debug("Lumen optional feature access cleanup skipped:", error);
     }
   }
 
@@ -854,6 +935,7 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
     role: preview.role,
     variantId: `${result.variant.id}-${preview.role || "image"}-${preview.partIndex || index + 1}`
   })));
+  const libraryEditorSource = results.find((result) => result.editorSource)?.editorSource || null;
   const visualHash = results.find((result) => result.visualHash)?.visualHash || "";
   const changePercent = results.find((result) => Number.isFinite(result.changePercent))?.changePercent ?? 100;
   const unchanged = focusedOnly && results.length > 0 && results.every((result) => result.unchanged);
@@ -1023,7 +1105,8 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
       redactionCount,
       manualRedactionCount,
       cutawayCount,
-      previews: libraryPreviews
+      previews: libraryPreviews,
+      editorSource: libraryEditorSource
     });
     await pruneLibraryPreviews();
     librarySaved = true;
@@ -1032,7 +1115,7 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
       capturedAt
     });
   } catch (error) {
-    console.debug("Lumen local preview storage skipped:", error);
+    console.debug("Lumen local capture storage skipped:", error);
   }
 
   broadcastHistory(captureHistory);
@@ -1266,7 +1349,8 @@ async function runExportReviewFlow(options = getDefaultSettings()) {
     manualRedactions,
     cutawayRegion,
     manualProjectionStats,
-    cutawayResolutionStats
+    cutawayResolutionStats,
+    variantReviews
   });
 
   return {
@@ -1420,6 +1504,10 @@ function buildExportReviewVariant({
         }
       : null,
     cutawayResolutionStats,
+    renderingRisks: {
+      iframeCount: Math.max(0, Number(page.renderingRisks?.iframeCount) || 0),
+      canvasCount: Math.max(0, Number(page.renderingRisks?.canvasCount) || 0)
+    },
     preview: buildExportReviewPreview({
       page,
       autoRegions: autoScan.regions || [],
@@ -1473,7 +1561,8 @@ function buildExportReviewWarnings({
   manualRedactions,
   cutawayRegion,
   manualProjectionStats,
-  cutawayResolutionStats
+  cutawayResolutionStats,
+  variantReviews = []
 }) {
   const warnings = [];
   const manualCount = manualRedactions.regions?.length || 0;
@@ -1496,6 +1585,17 @@ function buildExportReviewWarnings({
 
   if ((manualCount || cutawayRegion.region) && variants.length > 1) {
     warnings.push("Responsive projection is checked per viewport before export. The capture details file records the capture-time result for each view.");
+  }
+
+  const iframeCount = Math.max(0, ...variantReviews.map((variant) => Number(variant.renderingRisks?.iframeCount) || 0));
+  const canvasCount = Math.max(0, ...variantReviews.map((variant) => Number(variant.renderingRisks?.canvasCount) || 0));
+
+  if (iframeCount) {
+    warnings.push(`${iframeCount} embedded frame${iframeCount === 1 ? " is" : "s are"} captured visually. Cross-origin frame contents cannot be inspected for automatic redaction.`);
+  }
+
+  if (canvasCount) {
+    warnings.push(`${canvasCount} canvas surface${canvasCount === 1 ? " is" : "s are"} captured visually. Text drawn into canvas pixels needs a manual review.`);
   }
 
   return warnings;
@@ -2597,6 +2697,30 @@ async function captureVariant({
       visualHash: output.visualHash || "",
       download: downloadRecords[index] || null
     }));
+    const primaryRenderedOutput = renderedOutputs[0] || null;
+    const editorSource = unchanged
+      ? null
+      : focusedOnly && primaryRenderedOutput
+        ? {
+            dataUrl: primaryRenderedOutput.dataUrl || "",
+            mime: "image/png",
+            width: primaryRenderedOutput.width || 0,
+            height: primaryRenderedOutput.height || 0,
+            originalWidth: primaryRenderedOutput.width || 0,
+            originalHeight: primaryRenderedOutput.height || 0,
+            pageWidth: stitched.width || primaryRenderedOutput.width || 0,
+            pageHeight: stitched.height || primaryRenderedOutput.height || 0,
+            scaled: false,
+            kind: "lossless-cutaway-output",
+            role: "cutaway",
+            variantId: variant.id
+          }
+        : stitched.editorSource
+          ? {
+              ...stitched.editorSource,
+              variantId: variant.id
+            }
+          : null;
 
     if (!unchanged && !focusedOnly && options.longPageMode === "print") {
       downloadRecords.push(await downloadPrintSheet(renderedOutputs, {
@@ -2617,6 +2741,7 @@ async function captureVariant({
       downloadedFiles,
       downloadRecords,
       photoPreviews,
+      editorSource,
       visualHash,
       changePercent,
       unchanged,

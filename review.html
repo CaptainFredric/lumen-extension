@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Lumen Visual Change Review</title>
+    <link rel="stylesheet" href="review.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#comparisonPanel">Skip to comparison</a>
+
+    <header class="review-header">
+      <a class="brand-lockup" href="library.html" aria-label="Back to Lumen capture library">
+        <span class="brand-mark" aria-hidden="true"><span></span></span>
+        <span>
+          <span class="eyebrow">Lumen</span>
+          <strong>Change review</strong>
+        </span>
+      </a>
+
+      <nav class="header-actions" aria-label="Review actions">
+        <a class="quiet-button" href="library.html">Capture library</a>
+        <button id="refreshButton" class="quiet-button" type="button">Refresh</button>
+      </nav>
+    </header>
+
+    <main class="review-shell">
+      <section class="review-intro" aria-labelledby="pageTitle">
+        <div>
+          <p class="eyebrow">Visual monitoring</p>
+          <h1 id="pageTitle">See exactly what moved.</h1>
+          <p>
+            Compare two local capture previews, inspect detected change regions, and trace every
+            selected-area monitor run without uploading the page anywhere.
+          </p>
+        </div>
+        <div class="privacy-pill">
+          <span aria-hidden="true"></span>
+          Analysis stays in this browser
+        </div>
+      </section>
+
+      <section class="pair-toolbar" aria-labelledby="pairTitle">
+        <div class="toolbar-heading">
+          <p class="eyebrow">Comparison pair</p>
+          <h2 id="pairTitle">Choose two captures</h2>
+        </div>
+
+        <label class="capture-field" for="beforeSelect">
+          <span>Before</span>
+          <select id="beforeSelect" aria-describedby="pairHint">
+            <option value="">Choose an earlier capture</option>
+          </select>
+        </label>
+
+        <button id="swapButton" class="swap-button" type="button" aria-label="Swap before and after captures">⇄</button>
+
+        <label class="capture-field" for="afterSelect">
+          <span>After</span>
+          <select id="afterSelect" aria-describedby="pairHint">
+            <option value="">Choose a later capture</option>
+          </select>
+        </label>
+        <p id="pairHint" class="sr-only">The selected captures need locally stored preview images.</p>
+      </section>
+
+      <div id="reviewStatus" class="status-banner is-hidden" role="status" aria-live="polite"></div>
+
+      <section id="emptyState" class="empty-state is-hidden" aria-labelledby="emptyTitle">
+        <span class="empty-icon" aria-hidden="true"></span>
+        <p class="eyebrow">Nothing to compare yet</p>
+        <h2 id="emptyTitle">Two local previews are required.</h2>
+        <p id="emptyCopy">
+          Run the same timed area capture twice, or choose any two captures from your library.
+        </p>
+        <a class="primary-link" href="library.html">Open capture library</a>
+      </section>
+
+      <div id="reviewContent" class="review-layout is-hidden">
+        <div class="review-main">
+          <section id="comparisonPanel" class="comparison-panel" aria-labelledby="comparisonTitle">
+            <header class="panel-head">
+              <div>
+                <p class="eyebrow">Before / after</p>
+                <h2 id="comparisonTitle">Visual comparison</h2>
+              </div>
+              <div class="comparison-actions">
+                <div
+                  id="reviewActions"
+                  class="review-actions"
+                  data-lumen-review-actions
+                  role="group"
+                  aria-label="Capture review actions"
+                ></div>
+                <label class="highlight-toggle" for="highlightToggle">
+                  <input id="highlightToggle" type="checkbox" checked />
+                  <span>Highlight changes</span>
+                </label>
+              </div>
+            </header>
+
+            <div
+              id="comparisonStage"
+              class="comparison-stage"
+              tabindex="0"
+              role="group"
+              aria-label="Before and after image comparison. Use left and right arrow keys to move the reveal."
+            >
+              <canvas id="beforeCanvas" role="img" aria-label="Before capture"></canvas>
+              <div id="afterLayer" class="after-layer">
+                <canvas id="afterCanvas" role="img" aria-label="After capture"></canvas>
+                <div id="regionOverlay" class="region-overlay" aria-hidden="true"></div>
+              </div>
+              <div id="revealLine" class="reveal-line" aria-hidden="true">
+                <span>↔</span>
+              </div>
+              <span class="stage-label before-label">Before</span>
+              <span class="stage-label after-label">After</span>
+            </div>
+
+            <div class="reveal-controls">
+              <span aria-hidden="true">Before</span>
+              <input
+                id="revealSlider"
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value="50"
+                aria-label="Reveal amount: 50 percent after"
+              />
+              <span aria-hidden="true">After</span>
+              <output id="revealOutput" for="revealSlider">50% after</output>
+            </div>
+          </section>
+
+          <section class="statistics-panel" aria-labelledby="statisticsTitle">
+            <header class="panel-head compact-head">
+              <div>
+                <p class="eyebrow">Measured locally</p>
+                <h2 id="statisticsTitle">Difference statistics</h2>
+              </div>
+              <span id="changeClassification" class="classification-badge">Waiting</span>
+            </header>
+
+            <dl class="statistics-grid">
+              <div class="primary-stat">
+                <dt>Pixels changed</dt>
+                <dd id="changePercentMetric">—</dd>
+                <span id="changedPixelsMetric">No comparison loaded</span>
+              </div>
+              <div>
+                <dt>Similarity</dt>
+                <dd id="similarityMetric">—</dd>
+              </div>
+              <div>
+                <dt>Change regions</dt>
+                <dd id="regionCountMetric">—</dd>
+              </div>
+              <div>
+                <dt>Average intensity</dt>
+                <dd id="intensityMetric">—</dd>
+              </div>
+            </dl>
+
+            <p id="dimensionNote" class="dimension-note"></p>
+          </section>
+
+          <section class="regions-panel" aria-labelledby="regionsTitle">
+            <header class="panel-head compact-head">
+              <div>
+                <p class="eyebrow">Detected areas</p>
+                <h2 id="regionsTitle">Change regions</h2>
+              </div>
+              <span id="regionsSummary" class="panel-count">0 regions</span>
+            </header>
+            <ol id="regionList" class="region-list"></ol>
+            <p id="noRegionsMessage" class="no-regions">No meaningful visual changes were detected.</p>
+          </section>
+        </div>
+
+        <aside class="timeline-panel" aria-labelledby="timelineTitle">
+          <header class="panel-head compact-head">
+            <div>
+              <p class="eyebrow">Monitor history</p>
+              <h2 id="timelineTitle">Timeline</h2>
+            </div>
+            <span id="timelineCount" class="panel-count">0 runs</span>
+          </header>
+          <p class="timeline-help">Choose a saved run to compare it with the preceding capture.</p>
+          <ol id="timelineList" class="timeline-list"></ol>
+          <div id="timelineEmpty" class="timeline-empty">
+            Timed and continuous capture runs will appear here after the monitor runs.
+          </div>
+        </aside>
+      </div>
+    </main>
+
+    <script type="module" src="review.js"></script>
+    <script type="module" src="review-actions.js"></script>
+  </body>
+</html>

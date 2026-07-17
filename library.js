@@ -4,6 +4,7 @@ import {
   getLibraryCapture,
   getLibraryPreviewAsset,
   getLibraryStorageEstimate,
+  hasLibraryPreview,
   listLibraryCaptures,
   pruneLibraryPreviews,
   requestLibraryPersistence,
@@ -186,7 +187,11 @@ function buildCaptureCard(capture) {
   const openButton = card.querySelector(".open-action");
   const showButton = card.querySelector(".show-action");
   const removeButton = card.querySelector(".remove-action");
+  const editButton = card.querySelector(".edit-action");
+  const reviewButton = card.querySelector(".review-action");
 
+  configureCaptureToolAction(editButton, capture, "editor");
+  configureCaptureToolAction(reviewButton, capture, "review");
   configureFileAction(openButton, capture.id, primaryDownload, "open");
   configureFileAction(showButton, capture.id, primaryDownload, "show");
   removeButton.addEventListener("click", () => removeCapture(capture));
@@ -194,10 +199,55 @@ function buildCaptureCard(capture) {
   return card;
 }
 
+function configureCaptureToolAction(button, capture, tool) {
+  const hasEditorSource = capture.editorStatus === "ready" && Boolean(capture.editorAssetId);
+  const available = hasLibraryPreview(capture) || hasEditorSource;
+
+  if (!available) {
+    disableCaptureToolAction(button, tool);
+    return;
+  }
+
+  button.addEventListener("click", () => openCaptureTool(capture.id, tool));
+}
+
+function disableCaptureToolAction(button, tool) {
+  const action = tool === "editor" ? "Annotation" : "Comparison";
+  button.disabled = true;
+  button.title = `${action} is unavailable because this capture has no local image.`;
+  button.setAttribute("aria-label", `${action} unavailable: no local image`);
+}
+
+async function openCaptureTool(captureId, tool) {
+  const messageType = tool === "editor"
+    ? "LUMEN_OPEN_ANNOTATION_EDITOR"
+    : "LUMEN_OPEN_VISUAL_REVIEW";
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: messageType,
+      payload: { captureId }
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error?.description || response?.error?.message || "The review tool could not open.");
+    }
+  } catch (error) {
+    showStatus(error.message || "The review tool could not open.", "error");
+  }
+}
+
 async function loadCardPreview(card, capture, renderVersion) {
   const asset = await getLibraryPreviewAsset(capture.id);
 
   if (!asset?.blob || renderVersion !== state.renderVersion || !card.isConnected) {
+    if (renderVersion === state.renderVersion && card.isConnected) {
+      if (!(capture.editorStatus === "ready" && capture.editorAssetId)) {
+        disableCaptureToolAction(card.querySelector(".review-action"), "review");
+        disableCaptureToolAction(card.querySelector(".edit-action"), "editor");
+      }
+    }
+
     return;
   }
 
@@ -389,7 +439,7 @@ async function removeCapture(capture) {
 
 async function handleClearLibrary() {
   const confirmed = window.confirm(
-    "Clear all Lumen library previews and library metadata from this browser profile? Downloaded originals will stay on your device."
+    "Clear all Lumen library images and library metadata from this browser profile? Downloaded originals will stay on your device."
   );
 
   if (!confirmed) {
@@ -420,7 +470,7 @@ async function refreshStorageEstimate() {
 
 function renderStorageEstimate(estimate) {
   ui.captureMetric.textContent = String(estimate.captureCount || 0);
-  ui.previewMetric.textContent = formatBytes(estimate.previewBytes || 0);
+  ui.previewMetric.textContent = formatBytes((estimate.previewBytes || 0) + (estimate.editorBytes || 0));
   ui.storageMetric.textContent = estimate.quota
     ? `${formatBytes(estimate.usage || 0)} of ${formatBytes(estimate.quota)}`
     : formatBytes(estimate.usage || 0);
@@ -439,6 +489,13 @@ function appendCaptureBadges(container, capture) {
 
   if (capture.cutawayCount) {
     badges.push({ label: `${capture.cutawayCount} crop${capture.cutawayCount === 1 ? "" : "s"}`, className: "" });
+  }
+
+  if (["reviewed", "edited", "exported"].includes(capture.review?.status)) {
+    badges.push({
+      label: capture.review.status === "exported" ? "Exported" : capture.review.status === "edited" ? "Edited" : "Reviewed",
+      className: "is-reviewed"
+    });
   }
 
   if (!badges.length) {

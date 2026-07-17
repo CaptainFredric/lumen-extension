@@ -47,11 +47,35 @@ jobs:
       - name: Test capture behavior
         run: npm run smoke:capture
 
+      - name: Test difficult-site fixtures
+        run: npm run smoke:difficult-sites
+
       - name: Test area-monitor schedules
         run: npm run smoke:watch
 
+      - name: Test annotation editing
+        run: npm run smoke:editor
+
+      - name: Test visual diff engine
+        run: npm run smoke:diff
+
+      - name: Test visual review page
+        run: xvfb-run --auto-servernum npm run smoke:review
+
+      - name: Test reviewed Drive export
+        run: npm run smoke:drive
+
       - name: Test public site routes
         run: npm run smoke:site
+
+      - name: Regenerate and validate Web Store screenshots
+        run: xvfb-run --auto-servernum npm run store:screenshots
+
+      - name: Upload validated Web Store screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: lumen-store-screenshots-${{ github.sha }}
+          path: store-assets/screenshots/*.png
 
       - name: Validate extension package
         run: npm run smoke:package
@@ -61,6 +85,9 @@ jobs:
 
       - name: Test loaded extension
         run: xvfb-run --auto-servernum npm run smoke:extension
+
+      - name: Test optional site-access revocation
+        run: xvfb-run --auto-servernum npm run smoke:permissions
 
       - name: Test end-to-end capture
         run: xvfb-run --auto-servernum npm run smoke:e2e

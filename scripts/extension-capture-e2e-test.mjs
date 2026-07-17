@@ -131,7 +131,10 @@ try {
 
   const libraryState = await popup.evaluate(async (captureId) => {
     const store = await import(chrome.runtime.getURL("library-store.js"));
-    const capture = await store.getLibraryCapture(captureId, { includePreview: true });
+    const capture = await store.getLibraryCapture(captureId, {
+      includePreview: true,
+      includeEditorSource: true
+    });
     const localStorage = await chrome.storage.local.get(null);
 
     return {
@@ -141,6 +144,15 @@ try {
       previewCount: capture?.previewAssetIds?.length || 0,
       previewType: capture?.preview?.blob?.type || "",
       previewBytes: capture?.preview?.blob?.size || 0,
+      previewWidth: capture?.preview?.width || 0,
+      previewHeight: capture?.preview?.height || 0,
+      editorType: capture?.editorSource?.blob?.type || "",
+      editorBytes: capture?.editorSource?.blob?.size || 0,
+      editorWidth: capture?.editorSource?.width || 0,
+      editorHeight: capture?.editorSource?.height || 0,
+      editorOriginalWidth: capture?.editorSource?.originalWidth || 0,
+      editorOriginalHeight: capture?.editorSource?.originalHeight || 0,
+      editorPurpose: capture?.editorSource?.purpose || "",
       downloadCount: capture?.downloads?.length || 0,
       storageContainsPreviewDataUrl: JSON.stringify(localStorage).includes("data:image/")
     };
@@ -150,6 +162,21 @@ try {
   assert(libraryState.sourceType === "manual", "Expected the library to distinguish manual captures.", libraryState);
   assert(libraryState.previewCount === expectedVariantCount + expectedCutawayCount, "Expected a preview for every downloaded PNG view.", libraryState);
   assert(libraryState.previewType === "image/webp" && libraryState.previewBytes > 0, "Expected a real WebP preview blob in IndexedDB.", libraryState);
+  assert(
+    libraryState.editorType === "image/png" &&
+      libraryState.editorBytes > 0 &&
+      libraryState.editorWidth > 360 &&
+      libraryState.editorHeight > 240 &&
+      libraryState.editorPurpose === "editor-source",
+    "Expected a distinct whole-capture PNG editor source in IndexedDB.",
+    libraryState
+  );
+  assert(
+    libraryState.editorOriginalWidth >= libraryState.editorWidth &&
+      libraryState.editorOriginalHeight >= libraryState.editorHeight,
+    "Stored editor source dimensions lost their full-page provenance.",
+    libraryState
+  );
   assert(libraryState.downloadCount === response.downloads.length, "Expected library file actions to retain all download handles.", libraryState);
   assert(!libraryState.storageContainsPreviewDataUrl, "Preview image data leaked into chrome.storage.local.", libraryState);
 

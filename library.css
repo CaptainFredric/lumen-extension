@@ -457,6 +457,12 @@ select:focus-visible,
   background: rgba(134, 221, 255, 0.94);
 }
 
+.capture-badge.is-reviewed {
+  border-color: rgba(255, 206, 112, 0.28);
+  color: #ffe0a3;
+  background: rgba(255, 206, 112, 0.1);
+}
+
 .card-copy {
   padding: 15px;
 }
