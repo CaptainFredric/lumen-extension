@@ -1,16 +1,5 @@
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const revealTargets = [...document.querySelectorAll("[data-reveal]")];
-const header = document.querySelector("[data-header]");
-const demo = document.querySelector("[data-demo]");
-const demoButtons = [...document.querySelectorAll("[data-mode]")];
-const demoTitle = document.querySelector("[data-demo-title]");
-const demoCoverage = document.querySelector("[data-demo-coverage]");
-const demoStep = document.querySelector(".demo-step-icon");
-const demoStates = [
-  { id: "capture", title: "Page prepared", coverage: "Scanning…", step: "1" },
-  { id: "protect", title: "Details protected", coverage: "11 segments", step: "2" },
-  { id: "verify", title: "Capture complete", coverage: "100%", step: "✓" }
-];
 
 if ("IntersectionObserver" in window && !reducedMotion) {
   const revealObserver = new IntersectionObserver(
@@ -24,7 +13,7 @@ if ("IntersectionObserver" in window && !reducedMotion) {
         revealObserver.unobserve(entry.target);
       }
     },
-    { rootMargin: "0px 0px -8%", threshold: 0.1 }
+    { rootMargin: "0px 0px -5%", threshold: 0.08 }
   );
 
   for (const target of revealTargets) {
@@ -36,52 +25,59 @@ if ("IntersectionObserver" in window && !reducedMotion) {
   }
 }
 
-function updateHeader() {
-  header?.classList.toggle("is-scrolled", window.scrollY > 24);
-}
+const tour = document.querySelector("[data-tour]");
+const tourTabs = [...document.querySelectorAll("[data-tour-tab]")];
+const tourPanels = [...document.querySelectorAll("[data-tour-panel]")];
 
-updateHeader();
-window.addEventListener("scroll", updateHeader, { passive: true });
-
-function setDemoState(stateId) {
-  if (!demo) {
+function selectTourTab(selectedTab, { moveFocus = false } = {}) {
+  if (!tour || !selectedTab) {
     return;
   }
 
-  const stateIndex = demoStates.findIndex((state) => state.id === stateId);
+  const selectedId = selectedTab.dataset.tourTab;
 
-  if (stateIndex === -1) {
-    return;
+  for (const tab of tourTabs) {
+    const isSelected = tab === selectedTab;
+    tab.setAttribute("aria-selected", String(isSelected));
+    tab.tabIndex = isSelected ? 0 : -1;
   }
 
-  const state = demoStates[stateIndex];
-  demo.dataset.state = state.id;
-
-  if (demoTitle) {
-    demoTitle.textContent = state.title;
+  for (const panel of tourPanels) {
+    panel.hidden = panel.dataset.tourPanel !== selectedId;
   }
 
-  if (demoCoverage) {
-    demoCoverage.textContent = state.coverage;
-  }
+  tour.dataset.activeTour = selectedId || "capture";
 
-  if (demoStep) {
-    demoStep.textContent = state.step;
-  }
-
-  for (const button of demoButtons) {
-    button.setAttribute("aria-pressed", String(button.dataset.mode === state.id));
+  if (moveFocus) {
+    selectedTab.focus();
   }
 }
 
-for (const button of demoButtons) {
-  button.addEventListener("click", () => {
-    setDemoState(button.dataset.mode || demoStates[0].id);
+for (const tab of tourTabs) {
+  tab.addEventListener("click", () => selectTourTab(tab));
+  tab.addEventListener("keydown", (event) => {
+    const currentIndex = tourTabs.indexOf(tab);
+    let nextIndex = currentIndex;
+
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      nextIndex = (currentIndex + 1) % tourTabs.length;
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      nextIndex = (currentIndex - 1 + tourTabs.length) % tourTabs.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = tourTabs.length - 1;
+    } else {
+      return;
+    }
+
+    event.preventDefault();
+    selectTourTab(tourTabs[nextIndex], { moveFocus: true });
   });
 }
 
-const localNavLinks = [...document.querySelectorAll('.site-nav a[href^="#"]')];
-const navSections = localNavLinks
+const navLinks = [...document.querySelectorAll('.site-nav a[href^="#"]')];
+const navSections = navLinks
   .map((link) => document.querySelector(link.getAttribute("href")))
   .filter(Boolean);
 
@@ -96,7 +92,7 @@ if ("IntersectionObserver" in window && navSections.length) {
         return;
       }
 
-      for (const link of localNavLinks) {
+      for (const link of navLinks) {
         const isCurrent = link.getAttribute("href") === `#${visible.target.id}`;
 
         if (isCurrent) {
@@ -106,7 +102,7 @@ if ("IntersectionObserver" in window && navSections.length) {
         }
       }
     },
-    { rootMargin: "-20% 0px -68%", threshold: [0, 0.25, 0.5] }
+    { rootMargin: "-18% 0px -66%", threshold: [0, 0.2, 0.5] }
   );
 
   for (const section of navSections) {

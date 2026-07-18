@@ -97,7 +97,10 @@ async function runRouteChecks(target) {
   try {
     const root = await fetchText(`${fixture.origin}/`);
     assert(root.status === 200, `Expected ${target.name} root route to load.`, root);
-    assert(root.body.includes("<h1>Lumen</h1>"), `Expected ${target.name} root route to serve the Lumen landing page.`, {
+    assert(root.body.includes('id="hero-title"') && root.body.includes("See the whole page."), `Expected ${target.name} root route to serve the rebuilt Lumen landing page.`, {
+      sample: root.body.slice(0, 240)
+    });
+    assert(root.body.includes('data-tour-tab="compare"') && root.body.includes('data-tour-tab="monitor"'), `Expected ${target.name} landing page to include the product workflow tour.`, {
       sample: root.body.slice(0, 240)
     });
 
@@ -121,7 +124,7 @@ async function runRouteChecks(target) {
         sample: legacyDocs.body.slice(0, 240)
       });
     } else {
-      assert(legacyDocs.body.includes("<h1>Lumen</h1>"), "Expected repository-root docs route to serve the landing page.", {
+      assert(legacyDocs.body.includes('id="hero-title"') && legacyDocs.body.includes("See the whole page."), "Expected repository-root docs route to serve the rebuilt landing page.", {
         sample: legacyDocs.body.slice(0, 240)
       });
     }
