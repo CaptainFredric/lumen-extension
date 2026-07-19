@@ -25,6 +25,50 @@ if ("IntersectionObserver" in window && !reducedMotion) {
   }
 }
 
+const heroComparison = document.querySelector("[data-hero-comparison]");
+const heroComparisonStage = heroComparison?.querySelector("[data-hero-comparison-stage]");
+const heroSlider = heroComparison?.querySelector("[data-hero-slider]");
+const heroOutput = heroComparison?.querySelector("[data-hero-output]");
+
+function updateHeroComparison(rawValue) {
+  if (!heroComparisonStage || !heroSlider || !heroOutput) {
+    return;
+  }
+
+  const beforePercent = Math.min(100, Math.max(0, Number(rawValue) || 0));
+  const afterPercent = 100 - beforePercent;
+  const label = `${beforePercent}% before, ${afterPercent}% after`;
+
+  heroComparisonStage.style.setProperty("--divider", `${beforePercent}%`);
+  heroSlider.value = String(beforePercent);
+  heroSlider.setAttribute("aria-valuetext", label);
+  heroOutput.textContent = `${beforePercent}% before · ${afterPercent}% after`;
+}
+
+if (heroSlider) {
+  updateHeroComparison(heroSlider.value);
+  heroSlider.addEventListener("input", () => updateHeroComparison(heroSlider.value));
+  heroSlider.addEventListener("keydown", (event) => {
+    const currentValue = Number(heroSlider.value);
+    let nextValue = currentValue;
+
+    if (event.key === "Home") {
+      nextValue = 0;
+    } else if (event.key === "End") {
+      nextValue = 100;
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
+      nextValue = currentValue - 1;
+    } else if (event.key === "ArrowRight" || event.key === "ArrowUp") {
+      nextValue = currentValue + 1;
+    } else {
+      return;
+    }
+
+    event.preventDefault();
+    updateHeroComparison(nextValue);
+  });
+}
+
 const tour = document.querySelector("[data-tour]");
 const tourTabs = [...document.querySelectorAll("[data-tour-tab]")];
 const tourPanels = [...document.querySelectorAll("[data-tour-panel]")];

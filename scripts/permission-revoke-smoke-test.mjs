@@ -12,6 +12,8 @@ const tempRoot = await mkdtemp(path.join(os.tmpdir(), "lumen-permission-revoke-"
 const extensionDir = path.join(tempRoot, "extension");
 const profileDir = path.join(tempRoot, "profile");
 const runtimeErrors = [];
+const permissionPromptTimeout = Number(process.env.LUMEN_PERMISSION_PROMPT_TIMEOUT || 10000);
+const permissionBrowserExecutable = process.env.LUMEN_PERMISSION_BROWSER_EXECUTABLE || undefined;
 
 let context;
 let fixtureServer;
@@ -23,6 +25,7 @@ try {
 
   context = await chromium.launchPersistentContext(profileDir, {
     headless: false,
+    executablePath: permissionBrowserExecutable,
     args: [
       `--disable-extensions-except=${extensionDir}`,
       `--load-extension=${extensionDir}`
@@ -182,7 +185,24 @@ async function requestOriginPermission(harness) {
     document.body.dataset.permissionResult = "pending";
   });
   await harness.click("#requestPermissionButton");
-  await harness.waitForFunction(() => document.body.dataset.permissionResult !== "pending", null, { timeout: 10000 });
+
+  try {
+    await harness.waitForFunction(() => document.body.dataset.permissionResult !== "pending", null, { timeout: permissionPromptTimeout });
+  } catch (error) {
+    const session = await harness.context().newCDPSession(harness);
+    const { targetInfos } = await session.send("Target.getTargets");
+    const pageState = await harness.evaluate(() => ({
+      result: document.body.dataset.permissionResult,
+      error: document.body.dataset.permissionError || ""
+    }));
+    const promptError = new Error("Chrome did not resolve the optional-host permission prompt before the test timeout.");
+    promptError.details = {
+      cause: error.message,
+      pageState,
+      targets: targetInfos.map(({ targetId, type, title, url }) => ({ targetId, type, title, url }))
+    };
+    throw promptError;
+  }
 
   return harness.evaluate(async () => ({
     granted: document.body.dataset.permissionResult === "granted",

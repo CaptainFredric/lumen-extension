@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { chromium } from "playwright";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -10,7 +11,9 @@ const publicMirrors = [
   "index.html",
   "privacy.html",
   "script.js",
-  "styles.css"
+  "styles.css",
+  "assets/hero-before.png",
+  "assets/hero-after.png"
 ];
 const siteRoots = [
   {
@@ -24,7 +27,9 @@ const siteRoots = [
       "/assets/store-visual-change-review.png",
       "/assets/store-responsive-set.png",
       "/assets/store-review-actions.png",
-      "/assets/store-library-monitor.png"
+      "/assets/store-library-monitor.png",
+      "/assets/hero-before.png",
+      "/assets/hero-after.png"
     ]
   },
   {
@@ -38,7 +43,9 @@ const siteRoots = [
       "/assets/store-visual-change-review.png",
       "/assets/store-responsive-set.png",
       "/assets/store-review-actions.png",
-      "/assets/store-library-monitor.png"
+      "/assets/store-library-monitor.png",
+      "/assets/hero-before.png",
+      "/assets/hero-after.png"
     ]
   }
 ];
@@ -51,10 +58,13 @@ try {
     results.push(await runRouteChecks(target));
   }
 
+  const browserChecks = await runBrowserChecks(repoRoot);
+
   console.log(JSON.stringify({
     ok: true,
     mirrors,
-    results
+    results,
+    browserChecks
   }, null, 2));
 } catch (error) {
   console.error(JSON.stringify({
@@ -97,7 +107,22 @@ async function runRouteChecks(target) {
   try {
     const root = await fetchText(`${fixture.origin}/`);
     assert(root.status === 200, `Expected ${target.name} root route to load.`, root);
-    assert(root.body.includes('id="hero-title"') && root.body.includes("See the whole page."), `Expected ${target.name} root route to serve the rebuilt Lumen landing page.`, {
+    assert(root.body.includes('id="hero-title"') && root.body.includes("Lumen shows what changed."), `Expected ${target.name} root route to serve the rebuilt Lumen landing page.`, {
+      sample: root.body.slice(0, 240)
+    });
+    assert(root.body.includes("data-hero-comparison") && root.body.includes('id="heroReveal"'), `Expected ${target.name} landing page to include the interactive hero comparison.`, {
+      sample: root.body.slice(0, 240)
+    });
+    assert(root.body.includes('src="assets/hero-before.png"') && root.body.includes('src="assets/hero-after.png"'), `Expected ${target.name} landing page to use the aligned demo pair.`, {
+      sample: root.body.slice(0, 240)
+    });
+    assert(root.body.includes("data-shortcut-comparison") && root.body.includes('data-capture-path="shortcut"') && root.body.includes('data-capture-path="lumen"'), `Expected ${target.name} landing page to explain shortcut and Lumen use cases.`, {
+      sample: root.body.slice(0, 240)
+    });
+    assert(root.body.includes("Open Lumen") && root.body.includes("Chrome’s toolbar"), `Expected ${target.name} landing page to describe the real toolbar entry point.`, {
+      sample: root.body.slice(0, 240)
+    });
+    assert(root.body.includes("GoFullPage") && root.body.includes("FireShot"), `Expected ${target.name} landing page to include honest competitor positioning.`, {
       sample: root.body.slice(0, 240)
     });
     assert(root.body.includes('data-tour-tab="compare"') && root.body.includes('data-tour-tab="monitor"'), `Expected ${target.name} landing page to include the product workflow tour.`, {
@@ -124,7 +149,7 @@ async function runRouteChecks(target) {
         sample: legacyDocs.body.slice(0, 240)
       });
     } else {
-      assert(legacyDocs.body.includes('id="hero-title"') && legacyDocs.body.includes("See the whole page."), "Expected repository-root docs route to serve the rebuilt landing page.", {
+      assert(legacyDocs.body.includes('id="hero-title"') && legacyDocs.body.includes("Lumen shows what changed."), "Expected repository-root docs route to serve the rebuilt landing page.", {
         sample: legacyDocs.body.slice(0, 240)
       });
     }
@@ -168,6 +193,146 @@ async function runRouteChecks(target) {
       ]
     };
   } finally {
+    await new Promise((resolve) => fixture.server.close(resolve));
+  }
+}
+
+async function runBrowserChecks(siteRoot) {
+  const fixture = await startStaticServer(siteRoot);
+  const browser = await chromium.launch({ headless: true });
+  const viewports = [
+    { width: 320, height: 700 },
+    { width: 390, height: 844 },
+    { width: 768, height: 900 },
+    { width: 1024, height: 900 },
+    { width: 1440, height: 1000 }
+  ];
+  const checks = [];
+
+  try {
+    for (const viewport of viewports) {
+      const page = await browser.newPage({ viewport });
+      const runtimeErrors = [];
+
+      page.on("pageerror", (error) => runtimeErrors.push(error.message));
+      page.on("console", (message) => {
+        if (message.type() === "error") {
+          runtimeErrors.push(message.text());
+        }
+      });
+
+      await page.goto(`${fixture.origin}/`, { waitUntil: "networkidle" });
+
+      const initial = await page.evaluate(() => {
+        const before = document.querySelector('img[src="assets/hero-before.png"]');
+        const after = document.querySelector('img[src="assets/hero-after.png"]');
+        const stage = document.querySelector("[data-hero-comparison-stage]");
+        const slider = document.querySelector("#heroReveal");
+        const label = document.querySelector('label[for="heroReveal"]');
+        const activeTourImage = document.querySelector('[data-tour-panel="capture"] img');
+        const reliabilityImage = document.querySelector(".reliability-visual img");
+
+        return {
+          clientWidth: document.documentElement.clientWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          before: before ? [before.complete, before.naturalWidth, before.naturalHeight] : null,
+          after: after ? [after.complete, after.naturalWidth, after.naturalHeight] : null,
+          divider: stage ? getComputedStyle(stage).getPropertyValue("--divider").trim() : null,
+          sliderValue: slider?.value || null,
+          sliderLabel: label?.textContent?.trim() || null,
+          activeTourImage: activeTourImage
+            ? [activeTourImage.loading, activeTourImage.complete, activeTourImage.naturalWidth, activeTourImage.naturalHeight]
+            : null,
+          reliabilityImage: reliabilityImage
+            ? [reliabilityImage.loading, reliabilityImage.complete, reliabilityImage.naturalWidth, reliabilityImage.naturalHeight]
+            : null,
+          changeRegions: document.querySelectorAll(".change-box").length,
+          shortcutPaths: document.querySelectorAll("[data-capture-path]").length,
+          bodyText: document.body.innerText
+        };
+      });
+
+      assert(initial.scrollWidth === initial.clientWidth, `Expected ${viewport.width}px landing page to avoid horizontal overflow.`, initial);
+      assert(JSON.stringify(initial.before) === JSON.stringify([true, 1136, 710]), `Expected ${viewport.width}px before image to decode at its aligned dimensions.`, initial);
+      assert(JSON.stringify(initial.after) === JSON.stringify([true, 1136, 710]), `Expected ${viewport.width}px after image to decode at its aligned dimensions.`, initial);
+      assert(initial.divider === "48%" && initial.sliderValue === "48", `Expected ${viewport.width}px comparison divider to match its slider thumb.`, initial);
+      assert(initial.sliderLabel === "Move the divider to compare captures", `Expected ${viewport.width}px comparison slider to have a visible associated label.`, initial);
+      assert(initial.changeRegions === 6, `Expected ${viewport.width}px demo to draw all six reported changed regions.`, initial);
+      assert(initial.shortcutPaths === 2, `Expected ${viewport.width}px page to present distinct shortcut and Lumen paths.`, initial);
+      assert(initial.bodyText.includes("Open Lumen") && initial.bodyText.includes("Chrome’s toolbar"), `Expected ${viewport.width}px page to explain the toolbar entry point.`, initial);
+      assert(initial.bodyText.includes("GoFullPage") && initial.bodyText.includes("FireShot"), `Expected ${viewport.width}px page to include competitor positioning.`, initial);
+      assert(initial.activeTourImage?.[0] === "lazy", `Expected ${viewport.width}px tour proof to preserve initial-load bandwidth.`, initial);
+      assert(initial.reliabilityImage?.[0] === "lazy", `Expected ${viewport.width}px reliability proof to preserve initial-load bandwidth.`, initial);
+
+      const slider = page.locator("#heroReveal");
+      const output = page.locator("[data-hero-output]");
+      const stage = page.locator("[data-hero-comparison-stage]");
+
+      await slider.fill("0");
+      assert(await output.textContent() === "0% before · 100% after", `Expected ${viewport.width}px comparison output to update at the left edge.`);
+      assert(await stage.evaluate((element) => getComputedStyle(element).getPropertyValue("--divider").trim()) === "0%", `Expected ${viewport.width}px comparison divider to meet the slider at the left edge.`);
+
+      await slider.fill("100");
+      assert(await output.textContent() === "100% before · 0% after", `Expected ${viewport.width}px comparison output to update at the right edge.`);
+      assert(await stage.evaluate((element) => getComputedStyle(element).getPropertyValue("--divider").trim()) === "100%", `Expected ${viewport.width}px comparison divider to meet the slider at the right edge.`);
+
+      await slider.focus();
+      await slider.press("Home");
+      assert(await slider.getAttribute("aria-valuetext") === "0% before, 100% after", `Expected ${viewport.width}px Home key to move the divider left.`);
+      await slider.press("End");
+      assert(await slider.getAttribute("aria-valuetext") === "100% before, 0% after", `Expected ${viewport.width}px End key to move the divider right.`);
+      await slider.fill("48");
+
+      const activeTourProof = page.locator('[data-tour-panel="capture"] img');
+      await activeTourProof.scrollIntoViewIfNeeded();
+      await page.waitForFunction(() => {
+        const image = document.querySelector('[data-tour-panel="capture"] img');
+        return Boolean(image?.complete && image.naturalWidth > 1000);
+      });
+
+      const reliabilityProof = page.locator(".reliability-visual img");
+      await reliabilityProof.scrollIntoViewIfNeeded();
+      await page.waitForFunction(() => {
+        const image = document.querySelector(".reliability-visual img");
+        return Boolean(image?.complete && image.naturalWidth > 1000);
+      });
+
+      if (viewport.width <= 390) {
+        const boundedControls = await page.evaluate(() => {
+          const selectors = ["#heroReveal", "[data-hero-output]", ".key-groups"];
+          return selectors.map((selector) => {
+            const rect = document.querySelector(selector)?.getBoundingClientRect();
+            return rect ? { selector, left: rect.left, right: rect.right } : null;
+          });
+        });
+
+        assert(boundedControls.every((control) => control && control.left >= 0 && control.right <= viewport.width), `Expected ${viewport.width}px comparison and shortcut controls to remain inside the viewport.`, boundedControls);
+      }
+
+      if (viewport.width === 1440) {
+        const compareTab = page.locator('[data-tour-tab="compare"]');
+        await compareTab.click();
+        assert(await compareTab.getAttribute("aria-selected") === "true", "Expected comparison tour tab to activate by click.");
+        assert(await page.locator('[data-tour-panel="compare"]').isVisible(), "Expected comparison tour panel to become visible.");
+        await compareTab.press("ArrowRight");
+        assert(await page.locator('[data-tour-tab="monitor"]').getAttribute("aria-selected") === "true", "Expected tour arrow-key navigation to activate Monitor.");
+      }
+
+      assert(runtimeErrors.length === 0, `Expected ${viewport.width}px landing page to avoid console and runtime errors.`, runtimeErrors);
+      checks.push({
+        viewport: `${viewport.width}x${viewport.height}`,
+        noOverflow: true,
+        alignedDemoPair: true,
+        keyboardComparison: true,
+        runtimeErrors: runtimeErrors.length
+      });
+
+      await page.close();
+    }
+
+    return checks;
+  } finally {
+    await browser.close();
     await new Promise((resolve) => fixture.server.close(resolve));
   }
 }

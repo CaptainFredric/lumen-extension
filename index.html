@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Lumen | Capture the page. See what changed.</title>
+    <title>Lumen | Capture, compare, and monitor what changes</title>
     <meta
       name="description"
       content="Lumen is a local-first Chrome extension for full-page capture, annotation, visual-change review, selected-area monitoring, and a private on-device library."
@@ -11,7 +11,7 @@
     <meta name="theme-color" content="#07111c" />
     <link rel="canonical" href="https://captainfredric.github.io/lumen-extension/" />
     <meta property="og:site_name" content="Lumen" />
-    <meta property="og:title" content="Lumen | Capture the page. See what changed." />
+    <meta property="og:title" content="Lumen | Capture, compare, and monitor what changes" />
     <meta
       property="og:description"
       content="Capture full pages or selected regions, mark up the result, and compare any two moments with highlighted changes and a visual timeline."
@@ -26,7 +26,7 @@
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Lumen | Capture the page. See what changed." />
+    <meta name="twitter:title" content="Lumen | Capture, compare, and monitor what changes" />
     <meta
       name="twitter:description"
       content="Full-page capture, visual comparison, annotation, selected-area monitoring, and a local photo library in one Chrome extension."
@@ -38,7 +38,7 @@
     <meta name="twitter:image:alt" content="The Lumen browser capture workspace." />
     <link rel="icon" href="brandmark.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/brandmark-512.png" />
-    <link rel="stylesheet" href="styles.css?v=20260717-rebuild" />
+    <link rel="stylesheet" href="styles.css?v=20260718-proof3" />
     <script>document.documentElement.classList.add("js");</script>
   </head>
   <body>
@@ -64,19 +64,18 @@
         target="_blank"
         rel="noreferrer"
       >
-        Get Lumen <span aria-hidden="true">↗</span>
+        Install beta <span aria-hidden="true">↗</span>
       </a>
     </header>
 
     <main id="main">
       <section class="hero" id="top" aria-labelledby="hero-title">
         <div class="hero-copy" data-reveal>
-          <p class="eyebrow"><span></span> Full-page capture + visual change review</p>
-          <h1 id="hero-title">See the whole page.<br /><em>Then see what changed.</em></h1>
+          <p class="eyebrow"><span></span> Capture, compare, and monitor—locally</p>
+          <h1 id="hero-title">Screenshots show a moment. <em>Lumen shows what changed.</em></h1>
           <p class="hero-lede">
-            Capture full pages or selected regions, mark up the result, and compare any two moments
-            with highlighted changes and a visual timeline—all without sending your library to a
-            Lumen cloud.
+            Capture a whole page or one selected area, annotate it, repeat it on a schedule, and
+            review changed regions in a private local timeline.
           </p>
 
           <div class="hero-actions">
@@ -86,112 +85,204 @@
               target="_blank"
               rel="noreferrer"
             >
-              Get the open beta <span aria-hidden="true">↗</span>
+              Install the GitHub beta <span aria-hidden="true">↗</span>
             </a>
-            <a class="button button-secondary" href="#workflow">
-              Tour the workflow <span aria-hidden="true">↓</span>
+            <a class="button button-secondary" href="#hero-demo">
+              Try the comparison <span aria-hidden="true">↓</span>
             </a>
           </div>
 
+          <p class="install-note">Load unpacked · about 2 minutes · Chrome</p>
+
           <ul class="hero-assurances" aria-label="Product assurances">
-            <li><span aria-hidden="true">●</span> Local by default</li>
             <li><span aria-hidden="true">●</span> No account required</li>
-            <li><span aria-hidden="true">●</span> Open source</li>
+            <li><span aria-hidden="true">●</span> Local library</li>
+            <li><span aria-hidden="true">●</span> Bounded monitors</li>
+            <li><span aria-hidden="true">●</span> Source available</li>
           </ul>
         </div>
 
-        <div class="hero-visual" data-reveal>
-          <div class="hero-orbit hero-orbit-one" aria-hidden="true"></div>
-          <div class="hero-orbit hero-orbit-two" aria-hidden="true"></div>
-          <figure class="product-frame">
-            <div class="product-frame-bar" aria-hidden="true">
-              <span><i></i><i></i><i></i></span>
-              <small>Visual change review</small>
-              <b>Local</b>
+        <figure
+          class="hero-comparison"
+          id="hero-demo"
+          data-hero-comparison
+          data-reveal
+          aria-labelledby="hero-demo-title"
+        >
+          <div class="comparison-topline">
+            <div>
+              <span class="live-dot" aria-hidden="true"></span>
+              <strong id="hero-demo-title">Real Lumen review demo</strong>
             </div>
+            <span class="demo-badge">Demo pair</span>
+          </div>
+
+          <div
+            class="comparison-stage"
+            data-hero-comparison-stage
+            style="--divider: 48%"
+            aria-hidden="true"
+          >
             <img
-              src="assets/store-visual-change-review.png"
-              alt="Lumen comparing two local webpage captures with a reveal slider and monitor timeline"
-              width="1280"
-              height="800"
+              class="comparison-image comparison-before"
+              src="assets/hero-before.png"
+              alt=""
+              width="1136"
+              height="710"
+              loading="eager"
+              decoding="async"
               fetchpriority="high"
             />
-          </figure>
+            <div class="comparison-after" data-hero-after>
+              <img
+                class="comparison-image"
+                src="assets/hero-after.png"
+                alt=""
+                width="1136"
+                height="710"
+                loading="eager"
+                decoding="async"
+                fetchpriority="high"
+              />
+            </div>
+            <span class="change-box change-shipping"></span>
+            <span class="change-box change-tax"></span>
+            <span class="change-box change-total"></span>
+            <span class="change-box change-action"></span>
+            <span class="change-box change-product"></span>
+            <span class="change-box change-banner"></span>
+            <span class="comparison-side-label comparison-label-before">Before</span>
+            <span class="comparison-side-label comparison-label-after">After</span>
+            <span class="comparison-divider"><i>↔</i></span>
+          </div>
 
-          <div class="floating-proof proof-change" aria-label="Example visual change result">
-            <span class="proof-icon" aria-hidden="true">↗</span>
-            <span><small>Changed pixels</small><strong>6.4%</strong></span>
+          <div class="comparison-controls">
+            <label for="heroReveal">Move the divider to compare captures</label>
+            <div class="comparison-range-row">
+              <span aria-hidden="true">Before on left</span>
+              <input
+                id="heroReveal"
+                data-hero-slider
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value="48"
+                aria-valuetext="48% before, 52% after"
+              />
+              <span aria-hidden="true">After on right</span>
+              <output for="heroReveal" data-hero-output>48% before · 52% after</output>
+            </div>
           </div>
-          <div class="floating-proof proof-timeline" aria-label="Example monitor history">
-            <span class="pulse" aria-hidden="true"></span>
-            <span><small>Area monitor</small><strong>5 checkpoints</strong></span>
-          </div>
-        </div>
+
+          <figcaption>
+            <p>Same checkout, two moments. Shipping, tax, total, product state, and the primary action changed.</p>
+            <dl aria-label="Demo comparison metrics">
+              <div><dt>2.4%</dt><dd>changed</dd></div>
+              <div><dt>97.6%</dt><dd>similar</dd></div>
+              <div><dt>6</dt><dd>regions</dd></div>
+            </dl>
+          </figcaption>
+        </figure>
       </section>
 
-      <section class="capability-strip" aria-label="Lumen capabilities">
-        <p>One extension, the whole review loop</p>
-        <ul>
-          <li>Full page</li>
-          <li>Rectangle + lasso</li>
-          <li>Annotate</li>
-          <li>Compare</li>
-          <li>Monitor</li>
-          <li>Local library</li>
-        </ul>
-      </section>
-
-      <section class="product-story section-shell" id="product" aria-labelledby="product-title">
-        <div class="section-intro" data-reveal>
-          <p class="eyebrow"><span></span> The screenshot is step one</p>
-          <h2 id="product-title">Keep the useful part of the page—and the story around it.</h2>
+      <section
+        class="shortcut-section section-shell"
+        id="product"
+        data-shortcut-comparison
+        aria-labelledby="shortcut-title"
+      >
+        <div class="shortcut-intro" data-reveal>
+          <p class="eyebrow"><span></span> Use the right tool for the moment</p>
+          <h2 id="shortcut-title">A quick snip is fast. Lumen is built for what happens next.</h2>
           <p>
-            Lumen replaces the usual download-and-forget routine with a connected local workflow.
-            Capture once, review precisely, and return to the same page over time.
+            If you need one disposable visible-viewport image, use the system shortcut. Open Lumen
+            from Chrome’s toolbar when the page needs context, explanation, or another look later.
           </p>
         </div>
 
-        <ol class="story-steps">
-          <li data-reveal>
-            <span class="step-number">01</span>
-            <div class="step-icon" aria-hidden="true">⌗</div>
-            <h3>Capture without babysitting</h3>
-            <p>Take a full page, a responsive set, a rectangle, or a transparent freeform lasso.</p>
-            <span class="step-detail">Full page · responsive · selected area</span>
-          </li>
-          <li data-reveal>
-            <span class="step-number">02</span>
-            <div class="step-icon" aria-hidden="true">↗</div>
-            <h3>Mark up what matters</h3>
-            <p>Add arrows, text, rectangles, blur, and pixelation with real undo and redo.</p>
-            <span class="step-detail">Editable · keyboard-ready · exportable</span>
-          </li>
-          <li data-reveal>
-            <span class="step-number">03</span>
-            <div class="step-icon" aria-hidden="true">◐</div>
-            <h3>Review the difference</h3>
-            <p>Reveal before and after, highlight changed regions, and inspect measured pixel drift.</p>
-            <span class="step-detail">Slider · regions · similarity</span>
-          </li>
-          <li data-reveal>
-            <span class="step-number">04</span>
-            <div class="step-icon" aria-hidden="true">◎</div>
-            <h3>Watch one area over time</h3>
-            <p>Delay once, repeat on a schedule, or run a bounded continuous area monitor.</p>
-            <span class="step-detail">Timed · repeat · capped continuous</span>
-          </li>
-        </ol>
+        <div class="capture-paths" data-reveal>
+          <article class="capture-path shortcut-path" data-capture-path="shortcut">
+            <div class="path-heading">
+              <span class="path-label">Quick screenshot</span>
+              <span class="path-verdict">Fastest for one visible snip</span>
+            </div>
+            <div class="key-groups" aria-label="Common screenshot shortcuts">
+              <span><kbd>⌘</kbd><kbd>⇧</kbd><kbd>4</kbd></span>
+              <i>or</i>
+              <span><kbd>Win</kbd><kbd>⇧</kbd><kbd>S</kbd></span>
+            </div>
+            <p>Great when the image is temporary and everything already fits on screen.</p>
+          </article>
+
+          <article class="capture-path lumen-path" data-capture-path="lumen">
+            <div class="path-heading">
+              <span class="path-label"><img src="brandmark.svg" alt="" width="28" height="28" /> Lumen capture</span>
+              <span class="path-verdict">Best when the page matters tomorrow</span>
+            </div>
+            <ol class="lumen-loop" aria-label="Lumen capture workflow">
+              <li>Capture</li>
+              <li>Verify</li>
+              <li>Annotate</li>
+              <li>Repeat</li>
+              <li>Compare</li>
+            </ol>
+            <p>Full scrollable page or selected area, saved with source context in one local history.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="monitor-proof section-shell" aria-labelledby="monitor-proof-title">
+        <div class="monitor-proof-copy" data-reveal>
+          <p class="eyebrow"><span></span> One selected area, a reviewable history</p>
+          <h2 id="monitor-proof-title">Capture the part that changes—then let Lumen remember the routine.</h2>
+          <p>
+            Draw a rectangle or transparent lasso once. Delay a capture, repeat it on a schedule,
+            or run a bounded continuous monitor with duplicate suppression and a local timeline.
+          </p>
+          <ul class="monitor-chips" aria-label="Monitor schedule options">
+            <li>Repeat every 15 min–daily</li>
+            <li>Continuous 1 / 5 / 15 min</li>
+            <li>Caps at 10 / 25 / 50 runs</li>
+            <li>Pause · run now · stop</li>
+          </ul>
+          <small>
+            Monitors run while Chrome is available. Sleep, browser shutdown, or revoked site access
+            can defer a run; Lumen keeps the monitor bounded and visible.
+          </small>
+        </div>
+
+        <div class="monitor-timeline" data-reveal aria-label="Example local monitor timeline">
+          <div class="timeline-head">
+            <span>Selected area · Checkout total</span>
+            <b>Every 15 min</b>
+          </div>
+          <ol>
+            <li class="timeline-changed">
+              <span>Now</span><div><strong>Change captured</strong><small>2.4% changed · 6 regions</small></div><b>Review</b>
+            </li>
+            <li class="timeline-same">
+              <span>6:15</span><div><strong>Duplicate skipped</strong><small>No meaningful visual change</small></div><b>Saved space</b>
+            </li>
+            <li>
+              <span>6:00</span><div><strong>Baseline saved</strong><small>Selected area · local library</small></div><b>Start</b>
+            </li>
+          </ol>
+          <div class="timeline-actions" aria-hidden="true">
+            <span>Pause</span><span>Run now</span><span>Stop after 10</span>
+          </div>
+        </div>
       </section>
 
       <section class="tour-section" id="workflow" aria-labelledby="tour-title">
         <div class="tour-heading" data-reveal>
           <div>
-            <p class="eyebrow eyebrow-light"><span></span> A real workflow, not a feature collage</p>
-            <h2 id="tour-title">One capture. Four ways to make it useful.</h2>
+            <p class="eyebrow eyebrow-light"><span></span> The complete local review loop</p>
+            <h2 id="tour-title">From first capture to change history.</h2>
           </div>
           <p>
-            Move from the first click to a reviewed timeline without handing the work to a separate
-            editor, comparison site, or cloud gallery.
+            Capture, explain, repeat, and compare without handing the work to a separate editor,
+            comparison site, or cloud gallery.
           </p>
         </div>
 
@@ -365,17 +456,27 @@
             </div>
           </article>
         </div>
+
+        <div class="tour-cta" data-reveal>
+          <p>Want to try the full loop? The open beta installs from GitHub in about two minutes.</p>
+          <a
+            class="button button-mint"
+            href="https://github.com/CaptainFredric/lumen-extension#load-the-extension-locally"
+            target="_blank"
+            rel="noreferrer"
+          >Install the GitHub beta <span aria-hidden="true">↗</span></a>
+        </div>
       </section>
 
       <section class="reliability-section section-shell" id="reliability" aria-labelledby="reliability-title">
         <div class="reliability-layout">
           <div class="reliability-copy" data-reveal>
-            <p class="eyebrow"><span></span> Measured, not hand-waved</p>
+            <p class="eyebrow"><span></span> Current public beta evidence</p>
             <h2 id="reliability-title">Built for the web as it really behaves.</h2>
             <p>
               Long pages, lazy media, sticky interface chrome, app shells, canvases, and embedded
-              content all create capture risk. Lumen surfaces the hard cases and keeps a repeatable
-              reliability suite around them.
+              content all create capture risk. Lumen tests those cases in deterministic fixtures
+              and a published live-site matrix instead of hiding the edge cases.
             </p>
             <a
               class="text-link"
@@ -386,9 +487,9 @@
           </div>
 
           <dl class="reliability-stats" data-reveal>
-            <div><dt>4/4</dt><dd>public reliability scenarios passed</dd></div>
-            <div><dt>52</dt><dd>stitched segments in the live run</dd></div>
-            <div><dt>41,184 px</dt><dd>tallest page captured in the matrix</dd></div>
+            <div><dt>4/4</dt><dd>current live targets passed: Lumen, GitHub, Chrome Docs, and MDN</dd></div>
+            <div><dt>52</dt><dd>segments composed across single-image and tiled-output paths</dd></div>
+            <div><dt>41,184 px</dt><dd>longest page completed in the published July beta run</dd></div>
           </dl>
         </div>
 
@@ -414,12 +515,12 @@
           <h2 id="privacy-title">Stored locally.<br />Exported deliberately.</h2>
           <p>
             Lumen keeps its working library, monitor history, annotation source, and visual analysis
-            on your device. There is no Lumen cloud account to create. Connect Google Drive only
-            when you choose to send one reviewed image.
+            on your device. There is no Lumen cloud account to create. The GitHub beta exports to
+            Downloads; Google Drive export is prepared for the publisher-configured Web Store build.
           </p>
           <div class="privacy-actions">
             <a class="button button-mint" href="privacy.html">Read the privacy policy <span aria-hidden="true">→</span></a>
-            <span>No background cloud backup in the local beta.</span>
+            <span>No background cloud backup. Drive access is optional and user-initiated.</span>
           </div>
         </div>
 
@@ -436,63 +537,67 @@
           <div class="flow-line" aria-hidden="true"></div>
           <div class="flow-card flow-card-final">
             <span>✓</span>
-            <div><strong>Keep or export</strong><small>Downloads by default. Drive only on request.</small></div>
+            <div><strong>Keep or export</strong><small>Downloads now. Drive when the Web Store OAuth build is configured.</small></div>
           </div>
         </div>
       </section>
 
       <section class="difference-section section-shell" id="difference" aria-labelledby="difference-title">
         <div class="difference-intro" data-reveal>
-          <p class="eyebrow"><span></span> Beyond a screenshot downloader</p>
-          <h2 id="difference-title">A PNG is an output.<br />Lumen keeps the workflow.</h2>
+          <p class="eyebrow"><span></span> Honest tool choice</p>
+          <h2 id="difference-title">Use Lumen when the screenshot matters tomorrow.</h2>
           <p>
-            Basic capture tools are excellent at making a file. Lumen is for the work that starts
-            immediately after: explaining it, comparing it, repeating it, and finding it again.
+            A system shortcut wins for a disposable snip. GoFullPage is established for one-click
+            full-page capture and PDF. FireShot offers broad editing and export depth. Lumen’s edge
+            is the connected local loop: capture, explain, repeat, compare, and return.
           </p>
         </div>
 
-        <div class="difference-table" role="table" aria-label="Capture-only workflow compared with Lumen" data-reveal>
+        <div class="difference-table" role="table" aria-label="When to use Lumen, a screenshot shortcut, GoFullPage, or FireShot" data-reveal>
           <div class="difference-row difference-head" role="row">
-            <span role="columnheader">After the click</span>
-            <span role="columnheader">Capture-only workflow</span>
-            <span role="columnheader">Lumen</span>
+            <span role="columnheader">Tool</span>
+            <span role="columnheader">Best fit</span>
+            <span role="columnheader">What Lumen adds</span>
           </div>
           <div class="difference-row" role="row">
-            <strong role="rowheader">Review</strong>
-            <span role="cell">Open another editor</span>
-            <span role="cell">Editable annotations, blur, and pixelate</span>
+            <strong role="rowheader">Screenshot shortcut</strong>
+            <span role="cell">The fastest one-off visible-viewport snip</span>
+            <span role="cell">Full scrollable pages, repeatable areas, annotation, context, and history</span>
           </div>
           <div class="difference-row" role="row">
-            <strong role="rowheader">Compare</strong>
-            <span role="cell">Manual side-by-side check</span>
-            <span role="cell">Reveal slider, change regions, and metrics</span>
+            <strong role="rowheader">GoFullPage</strong>
+            <span role="cell">Proven one-click full-page capture and PDF</span>
+            <span role="cell">Scheduled selected-area recapture, changed regions, metrics, and a local timeline</span>
           </div>
           <div class="difference-row" role="row">
-            <strong role="rowheader">Repeat</strong>
-            <span role="cell">Recreate the capture by hand</span>
-            <span role="cell">Timed selected-area runs with a monitor timeline</span>
+            <strong role="rowheader">FireShot</strong>
+            <span role="cell">Broad editor, batch, and export-format depth</span>
+            <span role="cell">A focused local capture-to-change-review loop with bounded monitors and duplicate suppression</span>
           </div>
           <div class="difference-row" role="row">
-            <strong role="rowheader">Return</strong>
-            <span role="cell">Search the Downloads folder</span>
-            <span role="cell">Searchable local previews, favorites, and context</span>
+            <strong role="rowheader">Lumen</strong>
+            <span role="cell">Tracking one page or region across time</span>
+            <span role="cell">Capture → explain → repeat → compare, in one private local workspace</span>
           </div>
         </div>
+
+        <p class="difference-close" data-reveal>Other tools make the screenshot. Lumen helps you return to it.</p>
       </section>
 
       <section class="final-cta section-shell" aria-labelledby="final-title" data-reveal>
         <div>
-          <p class="eyebrow eyebrow-light"><span></span> Open beta for Chrome</p>
+          <p class="eyebrow eyebrow-light"><span></span> GitHub beta for Chrome</p>
           <h2 id="final-title">Stop collecting screenshots.<br /><em>Start keeping track.</em></h2>
         </div>
         <div class="final-actions">
-          <p>Install the current open-source build and try the complete local workflow.</p>
+          <p>Load the current source-available build unpacked in Chrome and try the complete local workflow.</p>
           <a
             class="button button-mint"
             href="https://github.com/CaptainFredric/lumen-extension#load-the-extension-locally"
             target="_blank"
             rel="noreferrer"
-          >Get Lumen for Chrome <span aria-hidden="true">↗</span></a>
+          >Install the GitHub beta <span aria-hidden="true">↗</span></a>
+          <small>Load unpacked · about 2 minutes · no account</small>
         </div>
       </section>
     </main>
@@ -503,7 +608,7 @@
           <img src="brandmark.svg" alt="" width="36" height="36" loading="lazy" />
           <span class="brand-name">Lumen</span>
         </a>
-        <p>Capture the page. See what changed.</p>
+        <p>Capture the page. Return to what changed.</p>
       </div>
       <nav aria-label="Footer">
         <a href="#product">Product</a>
@@ -515,6 +620,6 @@
       <p class="footer-note">Local-first · User-initiated · Built in the open</p>
     </footer>
 
-    <script src="script.js?v=20260717-rebuild" defer></script>
+    <script src="script.js?v=20260718-proof2" defer></script>
   </body>
 </html>

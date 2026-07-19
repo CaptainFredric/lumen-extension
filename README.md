@@ -240,6 +240,12 @@ To verify optional host access starts empty, survives while a timed plan needs i
 npm run smoke:permissions
 ```
 
+This check is intentionally headed because Chrome owns the optional-host-access consent sheet.
+Click **Allow** when the isolated `127.0.0.1` prompt appears; the test then proves last-plan
+revocation, alarm cleanup, and full local-workspace permission cleanup. For a deliberate local
+review session, extend the prompt window with
+`LUMEN_PERMISSION_PROMPT_TIMEOUT=120000 npm run smoke:permissions`.
+
 To verify annotation state, undo/redo, selection transforms, visual-diff clustering, the full review page, and reviewed Drive upload behavior:
 
 ```bash
