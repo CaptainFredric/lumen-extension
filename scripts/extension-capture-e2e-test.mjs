@@ -190,12 +190,14 @@ try {
     libraryState.pdfType === "application/pdf" &&
       libraryState.pdfBytes > 0 &&
       libraryState.pdfPageCount >= 1 &&
-      libraryState.pdfRasterWidth >= 1200 &&
-      libraryState.pdfSourceWidth >= 1200 &&
+      libraryState.pdfSourceWidth === libraryState.editorOriginalWidth &&
+      libraryState.pdfSourceHeight === libraryState.editorOriginalHeight &&
+      libraryState.pdfRasterWidth === Math.min(libraryState.pdfSourceWidth, 3200) &&
+      libraryState.pdfSourceWidth >= 900 &&
       libraryState.pdfSourceHeight >= 900 &&
       libraryState.pdfSourceExact &&
       libraryState.pdfPurpose === "pdf-source",
-    "Expected a reusable zoom-legible PDF rendered from the original capture output in IndexedDB.",
+    "Expected a reusable original-size PDF rendered from the exact capture output in IndexedDB.",
     libraryState
   );
   assert(libraryState.downloadCount === response.downloads.length, "Expected library file actions to retain all download handles.", libraryState);
