@@ -22,6 +22,14 @@ export const EXISTING_INSTALL_APP_SETTINGS = Object.freeze({
   shieldRestore: null
 });
 
+export function getNewInstallCaptureSettings() {
+  return getSyncSafeSettings({
+    ...getDefaultSettings(),
+    autoRedact: true,
+    exportManifest: false
+  });
+}
+
 export function normalizeAppSettings(value = {}, fallback = EXISTING_INSTALL_APP_SETTINGS) {
   const source = value && typeof value === "object" ? value : {};
   const restore = source.shieldRestore && typeof source.shieldRestore === "object"
@@ -169,26 +177,35 @@ export async function initializeAppSettings({
 
   if (existingAppSettings && typeof existingAppSettings === "object") {
     const appSettings = normalizeAppSettings(existingAppSettings);
-    await writeAppSettings(appSettings, { chromeApi });
+    const captureSettings = existingCaptureSettings || getNewInstallCaptureSettings();
+
+    await Promise.all([
+      writeAppSettings(appSettings, { chromeApi }),
+      !existingCaptureSettings
+        ? chromeApi.storage.sync.set({ [STORAGE_KEYS.settings]: captureSettings })
+        : Promise.resolve()
+    ]);
+
     return {
       appSettings,
-      captureSettings: existingCaptureSettings || getSyncSafeSettings(getDefaultSettings()),
+      captureSettings,
       created: false,
       freshInstall: false
     };
   }
 
-  const freshInstall = installReason === "install" && !existingCaptureSettings;
-  const appSettings = normalizeAppSettings(
-    {},
-    freshInstall ? NEW_INSTALL_APP_SETTINGS : EXISTING_INSTALL_APP_SETTINGS
-  );
+  // The options page and the service worker can start at the same time on a
+  // new profile. Missing capture preferences must therefore converge on safe
+  // first-run defaults from either context instead of depending on which one
+  // observes Chrome's install reason first.
+  const freshInstall = installReason === "install" || !existingCaptureSettings;
+  // Missing app settings can also be the other half of the same first-run
+  // race (sync storage finished first). Use the local-first app defaults for
+  // every uninitialized profile while preserving any capture choices already
+  // present from an older install.
+  const appSettings = normalizeAppSettings({}, NEW_INSTALL_APP_SETTINGS);
   const captureSettings = freshInstall
-    ? getSyncSafeSettings({
-        ...getDefaultSettings(),
-        autoRedact: true,
-        exportManifest: false
-      })
+    ? getNewInstallCaptureSettings()
     : existingCaptureSettings || getSyncSafeSettings(getDefaultSettings());
 
   await Promise.all([

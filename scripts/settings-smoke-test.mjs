@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import {
   applyPrivacyShieldToCaptureSettings,
+  initializeAppSettings,
   normalizeAppSettings,
   writeSettingsTransaction
 } from "../settings-store.js";
@@ -23,6 +24,7 @@ let fixtureServer;
 
 try {
   await verifyShieldStorageTransactions();
+  await verifySettingsInitializationRaceSafety();
   const fixture = await startFixtureServer();
   fixtureServer = fixture.server;
   await prepareExtensionCopy(fixture.originPattern);
@@ -438,6 +440,119 @@ async function verifyShieldStorageTransactions() {
     "A failed local Shield write did not roll synchronized capture settings back.",
     localFailure
   );
+}
+
+async function verifySettingsInitializationRaceSafety() {
+  const emptyProfile = createStorageStateHarness();
+  const [optionsInitialization, workerInitialization] = await Promise.all([
+    initializeAppSettings({
+      chromeApi: emptyProfile.chromeApi,
+      installReason: "update"
+    }),
+    initializeAppSettings({
+      chromeApi: emptyProfile.chromeApi,
+      installReason: "install"
+    })
+  ]);
+  const emptyState = emptyProfile.read();
+
+  assert(
+    optionsInitialization.captureSettings.autoRedact === true &&
+      optionsInitialization.captureSettings.exportManifest === false &&
+      workerInitialization.captureSettings.autoRedact === true &&
+      workerInitialization.captureSettings.exportManifest === false &&
+      emptyState.local["lumen.app.settings"].localOnlyMode === true &&
+      emptyState.local["lumen.app.settings"].reviewBeforeSave === false &&
+      emptyState.sync["lumen.capture.settings"].autoRedact === true &&
+      emptyState.sync["lumen.capture.settings"].exportManifest === false,
+    "Concurrent first-run contexts did not converge on safe one-click defaults.",
+    { optionsInitialization, workerInitialization, emptyState }
+  );
+
+  const halfInitializedProfile = createStorageStateHarness({
+    local: {
+      "lumen.app.settings": {
+        version: 1,
+        privacyShieldEnabled: false,
+        localOnlyMode: true,
+        reviewBeforeSave: false,
+        shieldRestore: null
+      }
+    }
+  });
+  const resumed = await initializeAppSettings({
+    chromeApi: halfInitializedProfile.chromeApi,
+    installReason: "update"
+  });
+  const resumedState = halfInitializedProfile.read();
+
+  assert(
+    resumed.captureSettings.autoRedact === true &&
+      resumed.captureSettings.exportManifest === false &&
+      resumedState.sync["lumen.capture.settings"].autoRedact === true &&
+      resumedState.sync["lumen.capture.settings"].exportManifest === false,
+    "A half-initialized profile fell back to unsafe capture defaults.",
+    { resumed, resumedState }
+  );
+
+  const syncFirstProfile = createStorageStateHarness({
+    sync: {
+      "lumen.capture.settings": {
+        autoRedact: true,
+        exportManifest: false,
+        removeStickyHeaders: true,
+        forceLazyLoad: true,
+        devicePreset: "desktop",
+        exportPreset: "raw",
+        longPageMode: "auto"
+      }
+    }
+  });
+  const syncFirst = await initializeAppSettings({
+    chromeApi: syncFirstProfile.chromeApi,
+    installReason: "update"
+  });
+  const syncFirstState = syncFirstProfile.read();
+
+  assert(
+    syncFirst.appSettings.localOnlyMode === true &&
+      syncFirst.appSettings.reviewBeforeSave === false &&
+      syncFirstState.local["lumen.app.settings"].localOnlyMode === true &&
+      syncFirstState.local["lumen.app.settings"].reviewBeforeSave === false,
+    "A sync-first profile fell back to legacy connected app defaults.",
+    { syncFirst, syncFirstState }
+  );
+}
+
+function createStorageStateHarness({ local = {}, sync = {} } = {}) {
+  const state = {
+    local: structuredClone(local),
+    sync: structuredClone(sync)
+  };
+
+  const createArea = (areaName) => ({
+    async get(key) {
+      return Object.hasOwn(state[areaName], key)
+        ? { [key]: structuredClone(state[areaName][key]) }
+        : {};
+    },
+    async set(patch) {
+      await Promise.resolve();
+      Object.assign(state[areaName], structuredClone(patch));
+    }
+  });
+
+  return {
+    chromeApi: {
+      storage: {
+        local: createArea("local"),
+        sync: createArea("sync")
+      }
+    },
+    read() {
+      return structuredClone(state);
+    }
+  };
 }
 
 function createStorageFailureHarness({ failSyncWrite = false, failLocalWrite = false } = {}) {

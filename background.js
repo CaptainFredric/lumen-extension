@@ -35,6 +35,7 @@ import {
 } from "./library-store.js";
 import {
   applyPrivacyShieldToCaptureSettings,
+  getNewInstallCaptureSettings,
   initializeAppSettings,
   readAppSettings
 } from "./settings-store.js";
@@ -198,7 +199,7 @@ chrome.runtime.onInstalled.addListener(async (details = {}) => {
 
   if (!syncState[STORAGE_KEYS.settings]) {
     await chrome.storage.sync.set({
-      [STORAGE_KEYS.settings]: getSyncSafeSettings(getDefaultSettings())
+      [STORAGE_KEYS.settings]: getNewInstallCaptureSettings()
     });
   }
 
