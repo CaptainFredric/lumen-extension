@@ -78,6 +78,9 @@ async function buildPatchedOffscreenScript() {
       };
       const normalizeCaptureNoteOptions = () => ({ enabled: false, text: "", position: "top-right" });
     `
+  ).replace(
+    /import \{ createCanvasSequencePdfBlob \} from "\.\/export-utils\.js";\s*/,
+    "const createCanvasSequencePdfBlob = async () => { throw new Error('PDF cache is outside this render smoke test.'); };\n"
   );
 
   return `

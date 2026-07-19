@@ -10,7 +10,7 @@ This file tracks what Lumen needs before a serious Chrome Web Store submission.
 4. Local-first history and region storage.
 5. Clear blocked-page handling for Chrome, Web Store, extension, and internal browser pages.
 6. Manifest description shortened to 131 characters.
-7. Landing page keeps present features separate from broader product planning.
+7. The landing page identifies the Chrome extension as the actual capture app and limits the website to installation guidance, product explanation, and demo surfaces.
 8. Store package script builds a narrow upload ZIP and validates manifest fields, icons, permissions, and blocked development files.
 9. Production manifest no longer requests the broad `tabs` permission.
 10. Public privacy policy exists at `https://captainfredric.github.io/lumen-extension/privacy.html`.
@@ -24,13 +24,17 @@ This file tracks what Lumen needs before a serious Chrome Web Store submission.
 18. Local workspace deletion is available without an account or backend connection.
 19. Stored capture URLs remove fragments and common token, auth, session, secret, and key parameters.
 20. The local photo library stores gallery previews, bounded whole-capture editor images, and metadata in extension-owned IndexedDB while full-resolution originals remain in Chrome Downloads.
-21. Gallery cleanup is bounded to 50 MB or 500 preview-bearing captures; editor-source cleanup has a separate 250 MB or 75-capture budget. Both preserve favorites, capture metadata, and downloaded originals.
+21. Gallery cleanup is bounded to 50 MB or 500 preview-bearing captures; editor-source cleanup and cached-review-PDF cleanup each have separate 250 MB or 75-capture budgets. All preserve favorites, capture metadata, and downloaded originals.
 22. Freeform lasso capture preserves its polygon through projection and exports transparent pixels outside the selected path.
 23. Selected-area timers are explicit and local: one delayed run, scheduled repeat, or continuous monitoring capped at 10, 25, or 50 runs.
 24. Timed runs save the resolved selected area rather than a silent full-page fallback and stop when the saved region can no longer be resolved safely.
 25. Deterministic difficult-site fixtures cover long pages, nested application scrollers, late-growing tails, sticky and fixed overlays, lazy media, transforms, canvas, sandboxed iframes, and open and closed shadow-root behavior.
 26. A loaded-extension permission test proves a clean install starts without host access, a user gesture can grant one origin, the last timed-plan deletion revokes that origin and clears its alarm, and local workspace cleanup revokes remaining optional site access.
 27. Reviewed-image Google Drive export is optional, starts from an explicit user action, uses Chrome Identity with the narrow `drive.file` scope, and removes cached authorization and optional permissions on disconnect.
+28. Dedicated Settings expose reversible Privacy Shield, local-only mode, review-before-save, monitor pause/resume behavior, optional-permission revocation, Drive disconnect, and verified local-workspace deletion outcomes.
+29. Local exports include PNG and paginated raster PDF, with Fit, 100%, and keyboard zoom controls for the local working image; connected export remains separately consented.
+30. Fresh installs default to one-click local capture with automatic redaction enabled, capture-details JSON disabled, review-before-save disabled, and Privacy Shield available as an explicit stronger mode.
+31. Capture-time review PDFs are generated from the original rendered output or tiles at up to 3200 raster pixels per page and stored under their own bounded local cache.
 
 ## Public URLs
 
@@ -44,10 +48,10 @@ Current permissions:
 
 1. `activeTab`: temporary access after user action.
 2. `alarms`: run explicitly saved one-time, repeating, or capped continuous selected-area captures while Chrome is available.
-3. `downloads`: save full-resolution capture artifacts and manifests; the local library keeps gallery previews, bounded editor images, and references to these originals.
+3. `downloads`: save full-resolution capture artifacts, optional manifests, and user-exported PNG and raster PDF files; the local library keeps gallery previews, bounded editor images, cached review PDFs, and references to downloaded originals.
 4. `offscreen`: compose stitched images in an offscreen document.
 5. `scripting`: inject the capture and cleanup content script.
-6. `storage`: keep settings, local history, manual redactions, focused regions, timed capture plans, and callout regions. Gallery previews and bounded whole-capture editor images use extension-owned IndexedDB rather than Chrome Sync.
+6. `storage`: keep settings, local history, manual redactions, focused regions, timed capture plans, and callout regions. Gallery previews, bounded whole-capture editor images, and capture-time raster PDF caches use extension-owned IndexedDB rather than Chrome Sync.
 
 Optional permissions:
 
@@ -81,7 +85,7 @@ Run:
 npm run package:extension
 ```
 
-The script creates `dist/lumen-extension-0.3.0.zip` and checks:
+The script creates `dist/lumen-extension-0.4.0.zip` and checks:
 
 1. Manifest V3 fields, description length, background worker, popup, and version format.
 2. Manifest homepage URL points to the public site.
@@ -95,9 +99,11 @@ The script creates `dist/lumen-extension-0.3.0.zip` and checks:
 
 Run `npm run smoke:release` to rebuild that ZIP, extract it without source changes, load it in a clean profile, and verify first-run, storage privacy, initial permissions, and runtime errors.
 
-Run `npm run smoke:permissions` to load a temporary unpacked copy and verify optional origin grant, timed-plan lease retention, last-plan revocation, alarm cleanup, and local-workspace permission cleanup.
+Run `npm run smoke:permissions` manually in a headed stock-Chrome release session, click the isolated fixture's **Allow** prompt, and verify optional origin grant, timed-plan lease retention, last-plan revocation, alarm cleanup, and local-workspace permission cleanup. This native consent flow is intentionally not an unattended CI gate.
 
-Run `npm run smoke:difficult-sites` for deterministic hostile-page classes. Run `npm run smoke:real-sites` separately for the live Lumen site, GitHub, Chrome extension documentation, and MDN; live-site checks are intentionally not a CI gate because third-party availability and markup can change.
+Run `npm run smoke:settings`, `npm run smoke:export`, and `npm run smoke:export-integrity` to verify the dedicated Settings contract, reversible Privacy Shield enforcement, local working-image zoom, raster PDF generation, cached-PDF provenance and pruning, and export download lifecycle.
+
+Run `npm run smoke:difficult-sites` for deterministic hostile-page classes. Run `npm run smoke:real-sites` separately for the live Lumen site, GitHub, Chrome extension documentation, and MDN. All four live captures completed in the 0.4.0 release verification pass; live-site checks are intentionally not a CI gate because third-party availability and markup can change.
 
 ## Screenshot Generation
 
@@ -136,3 +142,4 @@ Lumen should only ship to the Web Store when these are true:
 5. Permission warnings are understood and justified.
 6. Local timed capture is opt-in, selected-area-only, visibly controllable, and capped where continuous.
 7. Optional Drive export is review-first, explicitly initiated, narrowly scoped, accurately disclosed, and tested with the final publisher OAuth configuration.
+8. Settings, local PNG/raster-PDF export, cached-PDF integrity, and the four-site live matrix pass for the release candidate.

@@ -31,6 +31,14 @@ async function initializeDriveExport() {
     return;
   }
 
+  const initialStatus = await getDriveExportStatus();
+
+  if (initialStatus.localOnly) {
+    slot.replaceChildren();
+    slot.hidden = true;
+    return;
+  }
+
   slot.hidden = false;
 
   const exportButton = document.createElement("button");
@@ -148,7 +156,10 @@ async function initializeDriveExport() {
     statusNode.textContent = "Disconnecting Drive…";
 
     try {
-      await disconnectGoogleDrive();
+      const result = await disconnectGoogleDrive();
+      if (result.complete === false) {
+        throw new Error("Chrome kept part of the Drive permission. Open Lumen Settings and try again.");
+      }
       disconnectButton.hidden = true;
       statusNode.textContent = "Drive disconnected. Existing Drive files remain under your control.";
     } catch (error) {

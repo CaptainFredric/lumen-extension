@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Lumen",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Capture, annotate, compare, redact, and monitor webpages with a local library and reviewed Drive export.",
   "homepage_url": "https://captainfredric.github.io/lumen-extension/",
   "minimum_chrome_version": "109",
+  "options_page": "settings.html",
   "permissions": [
     "activeTab",
     "alarms",

@@ -48,7 +48,7 @@ try {
     deviceScaleFactor: 1
   });
 
-  await renderStoreShot(page, "01-extension-control-surface.png", buildControlSurfaceShot(productShots.default, productShots.holdMenu));
+  await renderStoreShot(page, "01-extension-control-surface.png", buildControlSurfaceShot(productShots.default, productShots.settings));
   await writeStoreScreenshot("02-annotation-studio.png", productShots.editor);
   await writeStoreScreenshot("03-visual-change-review.png", productShots.review);
   await renderStoreShot(page, "04-responsive-capture-set.png", buildResponsiveSetShot());
@@ -115,14 +115,6 @@ async function captureExtensionProductShots() {
   });
   const defaultShot = await popup.screenshot({ type: "png" });
 
-  await popup.dispatchEvent("#captureButton", "pointerdown", {
-    button: 0,
-    pointerId: 1,
-    pointerType: "mouse"
-  });
-  await popup.waitForTimeout(700);
-  const holdShot = await popup.screenshot({ type: "png" });
-
   await seedStoreMonitorState(worker);
   await popup.reload({ waitUntil: "load" });
   await popup.waitForSelector("#watchPlanCard:not(.is-hidden)", { timeout: 10000 });
@@ -156,6 +148,23 @@ async function captureExtensionProductShots() {
       );
     }
   });
+  const settingsShot = await captureExtensionPageShot({
+    extensionId,
+    route: "settings.html",
+    viewport: { width: 430, height: 780 },
+    async ready(page) {
+      await page.waitForFunction(() => document.querySelector("#saveStateTitle")?.textContent?.includes("Saved"));
+      const shield = page.locator("#privacyShieldToggle");
+      if (!(await shield.isChecked())) {
+        await shield.check();
+      }
+      await page.waitForFunction(() =>
+        document.querySelector(".shield-card")?.classList.contains("is-enabled") &&
+        document.querySelector("#shieldStateLabel")?.textContent?.trim() === "On"
+      );
+      await page.locator(".shield-card").scrollIntoViewIfNeeded();
+    }
+  });
   const libraryShot = await captureLibraryShot(extensionId);
 
   await popup.close();
@@ -163,19 +172,19 @@ async function captureExtensionProductShots() {
 
   return {
     default: bufferToDataUrl(defaultShot),
-    holdMenu: bufferToDataUrl(holdShot),
     watch: bufferToDataUrl(watchShot),
     editor: editorShot,
     review: reviewShot,
+    settings: bufferToDataUrl(settingsShot),
     library: bufferToDataUrl(libraryShot)
   };
 }
 
-async function captureExtensionPageShot({ extensionId, route, ready }) {
+async function captureExtensionPageShot({ extensionId, route, ready, viewport = shotSize }) {
   const page = await extensionContext.newPage();
 
   try {
-    await page.setViewportSize(shotSize);
+    await page.setViewportSize(viewport);
     await page.goto(`chrome-extension://${extensionId}/${route}`, { waitUntil: "load" });
     await ready(page);
     await page.waitForTimeout(350);
@@ -294,18 +303,18 @@ async function renderStoreShot(page, filename, bodyHtml) {
   screenshots.push(filePath);
 }
 
-function buildControlSurfaceShot(popupImage, holdImage) {
+function buildControlSurfaceShot(popupImage, settingsImage) {
   return `
     <section class="control-shot">
       <div class="copy">
         <p class="eyebrow">Lumen capture workflow</p>
-        <h1>Capture the whole page. Keep the useful part.</h1>
-        <p class="lede">Clean overlays, check sensitive regions, capture a responsive set, or hold for focused actions.</p>
-        <div class="cta-row"><span>Full page</span><span>Transparent lasso</span><span>Timed area</span></div>
+        <h1>Capture fast. Control what leaves.</h1>
+        <p class="lede">One-click capture, focused actions, and a dedicated Privacy Shield stay one step from the page.</p>
+        <div class="cta-row"><span>Full page</span><span>Privacy Shield</span><span>Local-only</span></div>
       </div>
       <div class="popup-pair">
         <div class="phone-frame mini"><img src="${popupImage}" alt="Lumen extension popup" /></div>
-        <div class="phone-frame mini raised"><img src="${holdImage}" alt="Lumen quick actions" /></div>
+        <div class="phone-frame mini raised"><img src="${settingsImage}" alt="Lumen Privacy Shield settings" /></div>
       </div>
     </section>
   `;

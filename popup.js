@@ -9,13 +9,18 @@ import {
   getCaptureVariants,
   isOriginPermissionSupported,
   normalizeCaptureNoteOptions,
-  requiresOriginPermission
+  requiresOriginPermission,
+  sanitizeCaptureUrl
 } from "./config.js";
 import {
   countLibraryCaptures,
   getLibraryPreviewAsset,
   listLibraryCaptures
 } from "./library-store.js";
+import {
+  applyPrivacyShieldToCaptureSettings,
+  readAppSettings
+} from "./settings-store.js";
 
 const ui = {
   onboardingPanel: document.querySelector("#onboardingPanel"),
@@ -24,6 +29,7 @@ const ui = {
   onboardingDismissButton: document.querySelector("#onboardingDismissButton"),
   onboardingPageStatus: document.querySelector("#onboardingPageStatus"),
   onboardingSteps: [...document.querySelectorAll("[data-onboarding-step]")],
+  openSettingsButton: document.querySelector("#openSettingsButton"),
   launchPanel: document.querySelector("#launchPanel"),
   launchStatus: document.querySelector("#launchStatus"),
   launchStatusTitle: document.querySelector("#launchStatusTitle"),
@@ -149,6 +155,7 @@ const ui = {
 };
 
 let currentSettings = getDefaultSettings();
+let currentAppSettings = null;
 let actionBusy = false;
 let currentSession = {
   signedIn: false,
@@ -278,9 +285,10 @@ async function bootstrap() {
 }
 
 function bindEvents() {
-  ui.onboardingStartButton.addEventListener("click", handleCaptureClick);
+  ui.onboardingStartButton.addEventListener("click", () => handleCaptureClick({ forceReview: true }));
   ui.onboardingSettingsButton.addEventListener("click", handleOnboardingSettings);
   ui.onboardingDismissButton.addEventListener("click", dismissOnboarding);
+  ui.openSettingsButton.addEventListener("click", openSettingsPage);
   ui.removeStickyHeaders.addEventListener("change", persistCurrentSettings);
   ui.forceLazyLoad.addEventListener("change", persistCurrentSettings);
   ui.autoRedact.addEventListener("change", () => {
@@ -379,10 +387,12 @@ function bindEvents() {
 }
 
 async function restoreSettings() {
-  const [stored, localPrivate] = await Promise.all([
+  const [stored, localPrivate, storedAppSettings] = await Promise.all([
     chrome.storage.sync.get(STORAGE_KEYS.settings),
-    chrome.storage.local.get(STORAGE_KEYS.privateSettings)
+    chrome.storage.local.get(STORAGE_KEYS.privateSettings),
+    readAppSettings()
   ]);
+  currentAppSettings = storedAppSettings;
   const syncedSettings = stored[STORAGE_KEYS.settings] || {};
   const privateSettings = localPrivate[STORAGE_KEYS.privateSettings] || {};
   const legacyAnnotationText = typeof syncedSettings.annotationText === "string"
@@ -395,6 +405,7 @@ async function restoreSettings() {
       ? privateSettings.annotationText
       : legacyAnnotationText
   };
+  currentSettings = applyPrivacyShieldToCaptureSettings(currentSettings, currentAppSettings);
   const captureNote = normalizeCaptureNoteOptions(currentSettings);
   currentSettings.annotationEnabled = captureNote.enabled;
   currentSettings.annotationText = captureNote.text;
@@ -462,9 +473,27 @@ function renderOnboarding() {
 }
 
 function handleOnboardingSettings() {
-  const settingsPanel = document.querySelector(".controls-panel");
-  settingsPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
-  window.setTimeout(() => ui.removeStickyHeaders?.focus(), 180);
+  openSettingsPage();
+}
+
+async function openSettingsPage() {
+  try {
+    if (typeof chrome.runtime.openOptionsPage === "function") {
+      await chrome.runtime.openOptionsPage();
+      return;
+    }
+
+    await chrome.tabs.create({ url: chrome.runtime.getURL("settings.html") });
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      eyebrow: "Settings",
+      title: "Settings could not open",
+      detail: error?.message || "Open Lumen's extension details in Chrome, then choose Extension options.",
+      badge: "Blocked",
+      progress: 0.08
+    });
+  }
 }
 
 async function dismissOnboarding() {
@@ -596,6 +625,9 @@ async function persistCurrentSettings() {
     exportPreset: currentSettings.exportPreset,
     longPageMode: currentSettings.longPageMode || "auto"
   };
+  currentSettings = applyPrivacyShieldToCaptureSettings(currentSettings, currentAppSettings);
+  ui.autoRedact.checked = Boolean(currentSettings.autoRedact);
+  ui.exportManifest.checked = currentSettings.exportManifest !== false;
 
   const captureNote = normalizeCaptureNoteOptions(currentSettings);
   currentSettings.annotationEnabled = captureNote.enabled;
@@ -699,9 +731,17 @@ function applyPlanGates() {
   const canResponsive = getFeatureAccess("responsiveSnap", plan);
   const canBeautify = getFeatureAccess("beautify", plan);
 
-  ui.autoRedact.disabled = !canAutoRedact;
+  const privacyShieldEnabled = Boolean(currentAppSettings?.privacyShieldEnabled);
+  ui.autoRedact.disabled = !canAutoRedact || privacyShieldEnabled;
+  ui.exportManifest.disabled = privacyShieldEnabled;
+  ui.autoRedact.title = privacyShieldEnabled
+    ? "Privacy Shield keeps automatic redaction on. Change this in Lumen Settings."
+    : "";
+  ui.exportManifest.title = privacyShieldEnabled
+    ? "Privacy Shield minimizes exported metadata. Change this in Lumen Settings."
+    : "";
 
-  if (!canAutoRedact && currentSettings.autoRedact) {
+  if (!canAutoRedact && currentSettings.autoRedact && !privacyShieldEnabled) {
     currentSettings.autoRedact = false;
     ui.autoRedact.checked = false;
   }
@@ -914,6 +954,11 @@ async function runQuickAction(action) {
     return;
   }
 
+  if (action === "review") {
+    await handleCaptureClick({ forceReview: true });
+    return;
+  }
+
   if (action === "analyze") {
     await handleAnalyzeClick();
   }
@@ -964,7 +1009,7 @@ function clearHoldTimer() {
   holdTimer = null;
 }
 
-async function handleCaptureClick() {
+async function handleCaptureClick({ forceReview = false } = {}) {
   if (actionBusy) {
     return;
   }
@@ -980,7 +1025,7 @@ async function handleCaptureClick() {
       return;
     }
 
-    const approved = await requestExportReviewBeforeCapture();
+    const approved = await requestExportReviewBeforeCapture({ forceReview });
 
     if (!approved) {
       await releaseOneShotPermission();
@@ -1071,7 +1116,7 @@ async function runApprovedCapture() {
   }
 }
 
-async function requestExportReviewBeforeCapture() {
+async function requestExportReviewBeforeCapture({ forceReview = false } = {}) {
   setActionBusy(true);
   if (exportReviewDecision) {
     settleExportReview(false);
@@ -1098,6 +1143,24 @@ async function requestExportReviewBeforeCapture() {
 
     if (!response?.ok) {
       throw new Error(response?.error?.description || "Save check failed to prepare.");
+    }
+
+    const requiresReview = forceReview ||
+      currentAppSettings?.reviewBeforeSave !== false ||
+      Boolean(response.requiresConfirmation);
+
+    if (!requiresReview) {
+      hideExportReview();
+      showStatus({
+        tone: "neutral",
+        stage: "inspect",
+        eyebrow: "Preflight",
+        title: "Checks passed",
+        detail: "No unresolved safety warning needs confirmation. Starting the saved one-click capture.",
+        badge: "Passed",
+        progress: 0.24
+      });
+      return true;
     }
 
     renderExportReview(response);
@@ -2218,6 +2281,19 @@ async function handleRetentionChange() {
 }
 
 async function handleCloudSyncToggle() {
+  if (ui.cloudSyncEnabled.checked && currentAppSettings?.localOnlyMode) {
+    ui.cloudSyncEnabled.checked = false;
+    showStatus({
+      tone: "neutral",
+      eyebrow: "Privacy",
+      title: "Local-only mode is on",
+      detail: "Open Lumen Settings and turn off Local-only mode before enabling a connected sync destination.",
+      badge: "Local",
+      progress: 0.18
+    });
+    return;
+  }
+
   if (ui.cloudSyncEnabled.checked && !enforceFeatureAccess("cloudSync", "Cloud sync")) {
     ui.cloudSyncEnabled.checked = false;
     return;
@@ -2292,13 +2368,16 @@ async function handleDeleteBackendData() {
   currentSettings.annotationText = "";
   ui.annotationText.value = "";
   updateAnnotationCounter();
+  const partialFailures = Array.isArray(response.partialFailures) ? response.partialFailures : [];
   showStatus({
-    tone: "success",
+    tone: partialFailures.length ? "error" : "success",
     eyebrow: "Data",
-    title: "Local workspace cleared",
-    detail: `${formatDeletedDataSummary(response.deleted)} Downloaded files remain on disk.`,
-    badge: "Cleared",
-    progress: 1
+    title: partialFailures.length ? "Workspace cleared with warnings" : "Local workspace cleared",
+    detail: partialFailures.length
+      ? `${formatDeletedDataSummary(response.deleted)} ${partialFailures[0]?.description || "One cleanup area needs another pass."} Downloaded files remain on disk.`
+      : `${formatDeletedDataSummary(response.deleted)} Downloaded files remain on disk.`,
+    badge: partialFailures.length ? "Partial" : "Cleared",
+    progress: partialFailures.length ? 0.72 : 1
   });
 }
 
@@ -2539,13 +2618,16 @@ function renderDataControls(dataControls = currentDataControls) {
   const backendReachable = Boolean(currentSession?.backendReachable && currentDataControls.backendReachable !== false);
   const canCloudSync = getFeatureAccess("cloudSync", currentSession?.plan || "free");
   const controlsAvailable = signedIn && backendReachable;
+  const localOnly = Boolean(currentAppSettings?.localOnlyMode);
 
   ui.retentionSelect.value = String(currentDataControls.retentionDays ?? 90);
   ui.retentionSelect.disabled = !controlsAvailable;
   ui.cloudSyncEnabled.checked = Boolean(currentDataControls.cloudSyncEnabled);
-  ui.cloudSyncEnabled.disabled = !controlsAvailable || !canCloudSync;
+  ui.cloudSyncEnabled.disabled = !controlsAvailable || !canCloudSync || localOnly;
   ui.deleteBackendDataButton.disabled = false;
-  ui.dataControlsSummary.textContent = controlsAvailable
+  ui.dataControlsSummary.textContent = localOnly
+    ? "Local-only mode is on. Cloud destinations are blocked, and you can clear history or saved workspace data at any time."
+    : controlsAvailable
     ? `Retention is ${formatRetentionDays(currentDataControls.retentionDays)}. Cloud sync is ${currentDataControls.cloudSyncEnabled ? "allowed" : "off"}.`
     : signedIn
       ? "The local service is unavailable. Captures remain local in this browser."
@@ -4387,7 +4469,7 @@ function buildWatchRunSummaryText(run) {
   const lines = [
     "Lumen timed capture summary",
     `Title: ${run.title || run.host || "Timed capture"}`,
-    `URL: ${run.url || "Unknown"}`,
+    `URL: ${sanitizeCaptureUrl(run.url) || "Unknown"}`,
     `Status: ${titleCase(run.status || "queued")}`,
     `Scheduled: ${formatTimestamp(run.scheduledAt)}`,
     run.startedAt ? `Started: ${formatTimestamp(run.startedAt)}` : "",

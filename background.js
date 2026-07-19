@@ -33,6 +33,11 @@ import {
   pruneLibraryPreviews,
   putLibraryCapture
 } from "./library-store.js";
+import {
+  applyPrivacyShieldToCaptureSettings,
+  initializeAppSettings,
+  readAppSettings
+} from "./settings-store.js";
 
 const OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
 const OFFSCREEN_REASON = "BLOBS";
@@ -142,6 +147,10 @@ function evaluateWatchScheduleState(planOrSchedule = {}, { completedRuns, nowMs 
   };
 }
 
+function shouldPauseAutomaticCapture(appSettings = {}) {
+  return Boolean(appSettings?.privacyShieldEnabled);
+}
+
 function calculateVisualHashDifference(previousHash = "", currentHash = "") {
   if (!previousHash || !currentHash || previousHash.length !== currentHash.length) {
     return 100;
@@ -171,8 +180,11 @@ function calculateVisualHashDifference(previousHash = "", currentHash = "") {
   return totalBits ? Number(((changedBits / totalBits) * 100).toFixed(2)) : 100;
 }
 
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async (details = {}) => {
   await restrictLocalStorageAccess();
+  await initializeAppSettings({
+    installReason: details.reason || ""
+  });
   const [syncState, localState] = await Promise.all([
     chrome.storage.sync.get(STORAGE_KEYS.settings),
     chrome.storage.local.get([
@@ -233,6 +245,18 @@ if (chrome.runtime.onStartup) {
     restrictLocalStorageAccess().catch(() => {});
     restoreWatchAlarms().catch((error) => {
       console.debug("Lumen timed captures could not be restored:", error);
+    });
+  });
+}
+
+if (chrome.storage?.onChanged) {
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== "local" || !changes[STORAGE_KEYS.appSettings]) {
+      return;
+    }
+
+    syncWatchAlarmsForPrivacyShield().catch((error) => {
+      console.debug("Lumen could not synchronize timed captures with Privacy Shield:", error);
     });
   });
 }
@@ -676,7 +700,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message?.type === "LUMEN_UPDATE_DATA_CONTROLS") {
-    updateRemoteDataControls(message.payload || {})
+    updateDataControlsWithPrivacyPolicy(message.payload || {})
       .then((result) => sendResponse(result.ok ? result : {
         ok: false,
         error: createFriendlyError("Data Controls Unavailable", result.error)
@@ -768,8 +792,24 @@ async function openCaptureToolPage(pageName, captureId = "") {
   };
 }
 
+async function updateDataControlsWithPrivacyPolicy(patch = {}) {
+  if (patch.cloudSyncEnabled) {
+    const appSettings = await readAppSettings();
+
+    if (appSettings.localOnlyMode) {
+      return {
+        ok: false,
+        error: "Local-only mode blocks background cloud sync. Turn it off in Lumen Settings before enabling a connected destination."
+      };
+    }
+  }
+
+  return updateRemoteDataControls(patch);
+}
+
 async function clearLocalWorkspaceData() {
-  const [localState, storedRegions, clearedLibrary] = await Promise.all([
+  const partialFailures = [];
+  const [localState, storedRegions, libraryOutcome] = await Promise.all([
     readLocalState(),
     chrome.storage.local.get([
       STORAGE_KEYS.latestBlueprint,
@@ -777,8 +817,21 @@ async function clearLocalWorkspaceData() {
       STORAGE_KEYS.cutawayRegions,
       STORAGE_KEYS.annotationRegions
     ]),
-    clearCaptureLibrary().catch(() => ({ captureCount: 0, assetCount: 0 }))
+    clearCaptureLibrary()
+      .then((result) => ({ ok: true, result }))
+      .catch((error) => ({ ok: false, error }))
   ]);
+  const clearedLibrary = libraryOutcome.ok
+    ? libraryOutcome.result
+    : { captureCount: 0, assetCount: 0 };
+
+  if (!libraryOutcome.ok) {
+    partialFailures.push({
+      area: "photo-library",
+      description: "Chrome did not clear one or more locally cached capture previews. Reload Lumen and try Clear local workspace again."
+    });
+    console.debug("Lumen photo library cleanup was incomplete:", libraryOutcome.error);
+  }
   const savedRegionSets = [
     storedRegions[STORAGE_KEYS.manualRedactions],
     storedRegions[STORAGE_KEYS.cutawayRegions],
@@ -787,7 +840,23 @@ async function clearLocalWorkspaceData() {
 
   for (const plan of localState.watchPlans || []) {
     if (plan?.id) {
-      await chrome.alarms.clear(`${WATCH_ALARM_PREFIX}${plan.id}`).catch(() => false);
+      try {
+        const alarmName = `${WATCH_ALARM_PREFIX}${plan.id}`;
+        const existingAlarm = await chrome.alarms.get(alarmName);
+
+        if (existingAlarm && !(await chrome.alarms.clear(alarmName))) {
+          partialFailures.push({
+            area: "monitor-alarm",
+            description: "Chrome kept one timed-capture alarm. The saved monitor record was cleared; check Chrome's extension controls before scheduling it again."
+          });
+        }
+      } catch (error) {
+        partialFailures.push({
+          area: "monitor-alarm",
+          description: "Chrome did not confirm removal of one timed-capture alarm. The saved monitor record was cleared."
+        });
+        console.debug("Lumen monitor alarm cleanup was incomplete:", error);
+      }
     }
   }
 
@@ -819,8 +888,17 @@ async function clearLocalWorkspaceData() {
     try {
       if (await chrome.permissions.remove({ origins: [origin] })) {
         revokedPermissionCount += 1;
+      } else {
+        partialFailures.push({
+          area: "site-access",
+          description: "Chrome kept one optional site permission. Revoke it from Lumen Settings or Chrome's extension controls."
+        });
       }
     } catch (error) {
+      partialFailures.push({
+        area: "site-access",
+        description: "Chrome could not revoke one optional site permission. Revoke it from Lumen Settings or Chrome's extension controls."
+      });
       console.debug("Lumen optional site access cleanup skipped:", error);
     }
   }
@@ -833,8 +911,17 @@ async function clearLocalWorkspaceData() {
     try {
       if (await chrome.permissions.remove({ permissions: [permission] })) {
         revokedPermissionCount += 1;
+      } else {
+        partialFailures.push({
+          area: "optional-feature-access",
+          description: "Chrome kept one optional feature permission. Revoke it from Lumen Settings or Chrome's extension controls."
+        });
       }
     } catch (error) {
+      partialFailures.push({
+        area: "optional-feature-access",
+        description: "Chrome could not revoke one optional feature permission. Revoke it from Lumen Settings or Chrome's extension controls."
+      });
       console.debug("Lumen optional feature access cleanup skipped:", error);
     }
   }
@@ -845,7 +932,9 @@ async function clearLocalWorkspaceData() {
   broadcastManualRedactions({ regions: [] });
   broadcastCutawayRegion({ region: null, regions: [] });
   broadcastAnnotationRegion({ region: null, regions: [] });
-  broadcastLibraryUpdated({ count: 0 });
+  if (libraryOutcome.ok) {
+    broadcastLibraryUpdated({ count: 0 });
+  }
 
   return {
     deleted: {
@@ -860,11 +949,23 @@ async function clearLocalWorkspaceData() {
     captureHistory: [],
     watchPlans: [],
     watchRuns: [],
+    complete: partialFailures.length === 0,
+    partialFailures,
     downloadsRemain: true
   };
 }
 
 async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
+  const appSettings = await readAppSettings();
+
+  if (context.captureOrigin === "timed" && shouldPauseAutomaticCapture(appSettings)) {
+    throw createFriendlyError(
+      "Timed Capture Paused",
+      "Privacy Shield pauses unattended captures so every saved image can be reviewed first. Turn the Shield off to resume this monitor."
+    );
+  }
+
+  options = applyPrivacyShieldToCaptureSettings(options, appSettings);
   const captureNote = normalizeCaptureNoteOptions(options);
   const sourceTab = context.sourceTab || await getCurrentTab();
   const capturedAt = new Date().toISOString();
@@ -907,6 +1008,7 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
       annotationRegion,
       runContext,
       extractBlueprint: index === 0,
+      cacheReviewPdf: index === 0,
       focusedOnly,
       changeBaselineHash: context.changeBaselineHash || "",
       saveOnlyWhenChanged: Boolean(context.saveOnlyWhenChanged)
@@ -936,6 +1038,7 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
     variantId: `${result.variant.id}-${preview.role || "image"}-${preview.partIndex || index + 1}`
   })));
   const libraryEditorSource = results.find((result) => result.editorSource)?.editorSource || null;
+  const libraryPdfSource = results.find((result) => result.pdfSource)?.pdfSource || null;
   const visualHash = results.find((result) => result.visualHash)?.visualHash || "";
   const changePercent = results.find((result) => Number.isFinite(result.changePercent))?.changePercent ?? 100;
   const unchanged = focusedOnly && results.length > 0 && results.every((result) => result.unchanged);
@@ -1106,7 +1209,8 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
       manualRedactionCount,
       cutawayCount,
       previews: libraryPreviews,
-      editorSource: libraryEditorSource
+      editorSource: libraryEditorSource,
+      pdfSource: libraryPdfSource
     });
     await pruneLibraryPreviews();
     librarySaved = true;
@@ -1281,6 +1385,7 @@ async function runRedactionPreviewFlow() {
 }
 
 async function runExportReviewFlow(options = getDefaultSettings()) {
+  options = applyPrivacyShieldToCaptureSettings(options, await readAppSettings());
   const sourceTab = await getCurrentTab();
 
   if (!sourceTab?.id || !sourceTab.url) {
@@ -1352,6 +1457,14 @@ async function runExportReviewFlow(options = getDefaultSettings()) {
     cutawayResolutionStats,
     variantReviews
   });
+  const requiresConfirmation = exportReviewRequiresConfirmation({
+    options,
+    manualRedactions,
+    cutawayRegion,
+    manualProjectionStats,
+    cutawayResolutionStats,
+    variantReviews
+  });
 
   return {
     page: {
@@ -1384,8 +1497,30 @@ async function runExportReviewFlow(options = getDefaultSettings()) {
       warnings,
       options
     }),
-    warnings
+    warnings,
+    requiresConfirmation
   };
+}
+
+function exportReviewRequiresConfirmation({
+  options = {},
+  manualRedactions = {},
+  cutawayRegion = {},
+  manualProjectionStats = {},
+  cutawayResolutionStats = {},
+  variantReviews = []
+} = {}) {
+  const manualCount = manualRedactions.regions?.length || 0;
+  const iframeCount = Math.max(0, ...variantReviews.map((variant) => Number(variant.renderingRisks?.iframeCount) || 0));
+  const canvasCount = Math.max(0, ...variantReviews.map((variant) => Number(variant.renderingRisks?.canvasCount) || 0));
+
+  return Boolean(
+    (!options.autoRedact && !manualCount) ||
+    manualProjectionStats.skippedCount ||
+    (cutawayRegion.region && cutawayResolutionStats.skippedCount) ||
+    iframeCount ||
+    canvasCount
+  );
 }
 
 function buildExportReviewOutputPlan({ variants = [], variantCount = 1, cutawayAppliedCount = 0, warnings = [], options = {} } = {}) {
@@ -2510,6 +2645,7 @@ async function captureVariant({
   annotationRegion,
   runContext,
   extractBlueprint,
+  cacheReviewPdf = false,
   focusedOnly = false,
   changeBaselineHash = "",
   saveOnlyWhenChanged = false
@@ -2602,7 +2738,9 @@ async function captureVariant({
       page,
       options: {
         ...options,
-        devicePreset: variant.id
+        devicePreset: variant.id,
+        cacheReviewPdf,
+        reviewPdfRole: focusedOnly ? "cutaway" : "full-page"
       },
       redactions: combinedRedactions,
       cutawayRegion: cutawayResolution.region,
@@ -2742,6 +2880,7 @@ async function captureVariant({
       downloadRecords,
       photoPreviews,
       editorSource,
+      pdfSource: unchanged ? null : stitched.pdfSource || null,
       visualHash,
       changePercent,
       unchanged,
@@ -3835,12 +3974,42 @@ async function restoreWatchAlarms() {
     return;
   }
 
+  if (shouldPauseAutomaticCapture(await readAppSettings())) {
+    await clearWatchAlarms();
+    return;
+  }
+
   const localState = await readLocalState();
   const plans = Array.isArray(localState.watchPlans) ? localState.watchPlans : [];
 
   for (const plan of plans) {
     await registerWatchPlanAlarm(plan);
   }
+}
+
+async function clearWatchAlarms() {
+  if (!chrome.alarms?.getAll || !chrome.alarms?.clear) {
+    return 0;
+  }
+
+  const alarms = await chrome.alarms.getAll();
+  const watchAlarms = alarms.filter((alarm) => alarm?.name?.startsWith(WATCH_ALARM_PREFIX));
+  const cleared = await Promise.all(watchAlarms.map((alarm) => chrome.alarms.clear(alarm.name)));
+  return cleared.filter(Boolean).length;
+}
+
+async function syncWatchAlarmsForPrivacyShield() {
+  const appSettings = await readAppSettings();
+
+  if (shouldPauseAutomaticCapture(appSettings)) {
+    return {
+      paused: true,
+      cleared: await clearWatchAlarms()
+    };
+  }
+
+  await restoreWatchAlarms();
+  return { paused: false, cleared: 0 };
 }
 
 async function registerWatchPlanAlarm(plan = {}) {
@@ -3875,6 +4044,23 @@ async function handleWatchAlarm(alarm) {
       broadcastWatchPlans(state.watchPlans || (result.watchPlan ? [result.watchPlan] : []));
     }
 
+    return;
+  }
+
+  if (shouldPauseAutomaticCapture(await readAppSettings())) {
+    const skippedAt = new Date().toISOString();
+    const watchRuns = await persistWatchRunRecord({
+      id: `watch-run-${createLocalId()}`,
+      watchPlanId: plan.id,
+      title: plan.title,
+      url: plan.url,
+      status: "skipped",
+      scheduledAt: skippedAt,
+      completedAt: skippedAt,
+      error: "Privacy Shield paused this unattended capture because every saved image requires review."
+    });
+    await chrome.alarms.clear(alarm.name);
+    await broadcastWatchState(watchRuns);
     return;
   }
 

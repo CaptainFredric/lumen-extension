@@ -189,6 +189,7 @@ assert(resumableStep === 2 && resumableUpload.file.id === "drive-file-large", "R
 
 const disconnected = await disconnectGoogleDrive({ chromeApi });
 assert(disconnected.permissionRemoved && !permissionGranted && !originGranted, "Drive disconnect did not revoke local permissions.", disconnected);
+assert(disconnected.complete && !disconnected.permissionGranted && !disconnected.originGranted, "Drive disconnect did not verify that access was fully revoked.", disconnected);
 assert(removedToken === token, "Drive disconnect did not remove the cached token.", { removedToken });
 assert(sameMembers(removedOrigins, DRIVE_ORIGINS), "Drive disconnect did not revoke both upload origins.", { removedOrigins });
 

@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Lumen Settings</title>
+    <link rel="stylesheet" href="settings.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#settingsMain">Skip to settings</a>
+
+    <header class="app-header">
+      <a class="brand-lockup" href="library.html" aria-label="Open Lumen capture library">
+        <span class="brand-mark" aria-hidden="true"><span></span></span>
+        <span>
+          <span class="eyebrow">Lumen</span>
+          <strong>Settings</strong>
+        </span>
+      </a>
+
+      <nav class="header-actions" aria-label="Lumen navigation">
+        <a class="quiet-link" href="library.html">Capture library</a>
+        <a class="quiet-link" href="https://captainfredric.github.io/lumen-extension/privacy.html" target="_blank" rel="noreferrer">Privacy policy</a>
+      </nav>
+    </header>
+
+    <main id="settingsMain" class="settings-shell">
+      <section class="intro" aria-labelledby="pageTitle">
+        <div class="intro-copy">
+          <p class="eyebrow">The actual extension app</p>
+          <h1 id="pageTitle">Your defaults, in one place.</h1>
+          <p>
+            Choose a one-click capture or a deliberate review, control what leaves the browser,
+            and revoke optional access without hunting through Chrome menus.
+          </p>
+        </div>
+
+        <div class="save-state" role="status" aria-live="polite">
+          <span class="save-dot" aria-hidden="true"></span>
+          <span>
+            <strong id="saveStateTitle">Saved automatically</strong>
+            <small id="saveStateDetail">These choices stay with this Chrome profile.</small>
+          </span>
+        </div>
+      </section>
+
+      <section class="shield-card" aria-labelledby="shieldTitle">
+        <div class="shield-art" aria-hidden="true">
+          <span></span>
+        </div>
+        <div class="shield-copy">
+          <p class="eyebrow">Coordinated protection</p>
+          <h2 id="shieldTitle">Privacy Shield</h2>
+          <p>
+            One switch for Lumen's strictest capture path. It enables automatic redaction,
+            removes the exported details file, requires a save review, blocks optional cloud exports,
+            and pauses unattended monitors until the Shield is turned off.
+          </p>
+          <ul id="shieldEffects" class="effect-list" aria-label="Privacy Shield effects">
+            <li data-shield-effect="redact"><span aria-hidden="true"></span>Auto-redaction on</li>
+            <li data-shield-effect="metadata"><span aria-hidden="true"></span>Export metadata minimized</li>
+            <li data-shield-effect="review"><span aria-hidden="true"></span>Review saves · monitors paused</li>
+            <li data-shield-effect="local"><span aria-hidden="true"></span>External exports blocked</li>
+          </ul>
+        </div>
+        <label class="master-switch" for="privacyShieldToggle">
+          <span class="switch-copy">
+            <strong id="shieldStateLabel">Off</strong>
+            <small>Restore individual choices when turned off</small>
+          </span>
+          <input id="privacyShieldToggle" type="checkbox" role="switch" aria-describedby="shieldDescription" />
+          <span class="switch-track" aria-hidden="true"><span></span></span>
+        </label>
+        <p id="shieldDescription" class="sr-only">
+          Privacy Shield coordinates automatic redaction, capture details, save review, local-only mode, and pauses unattended monitors.
+        </p>
+      </section>
+
+      <div class="settings-grid">
+        <section class="settings-card" aria-labelledby="privacyControlsTitle">
+          <header class="card-heading">
+            <div>
+              <p class="eyebrow">Privacy</p>
+              <h2 id="privacyControlsTitle">Capture protections</h2>
+            </div>
+            <span id="privacyModeBadge" class="status-badge">Custom</span>
+          </header>
+
+          <label class="setting-row" for="autoRedactToggle">
+            <span class="setting-icon redact-icon" aria-hidden="true"></span>
+            <span class="setting-copy">
+              <strong>Auto-redact recognized details</strong>
+              <small>Obscures detected emails, phone numbers, IP addresses, filled inputs, and card-like values before export. Always review sensitive work.</small>
+            </span>
+            <input id="autoRedactToggle" type="checkbox" role="switch" />
+            <span class="compact-track" aria-hidden="true"><span></span></span>
+          </label>
+
+          <label class="setting-row" for="captureDetailsToggle">
+            <span class="setting-icon details-icon" aria-hidden="true"></span>
+            <span class="setting-copy">
+              <strong>Include capture details file</strong>
+              <small>Saves a JSON companion beside the image. Turn this off to minimize exported page metadata; Lumen still keeps enough local history to reopen the capture.</small>
+            </span>
+            <input id="captureDetailsToggle" type="checkbox" role="switch" />
+            <span class="compact-track" aria-hidden="true"><span></span></span>
+          </label>
+
+          <label class="setting-row" for="localOnlyToggle">
+            <span class="setting-icon local-icon" aria-hidden="true"></span>
+            <span class="setting-copy">
+              <strong>Local-only mode</strong>
+              <small>Blocks new Google Drive connections and uploads inside Lumen. Local PNG, image-tile, and print-to-PDF exports still work.</small>
+            </span>
+            <input id="localOnlyToggle" type="checkbox" role="switch" />
+            <span class="compact-track" aria-hidden="true"><span></span></span>
+          </label>
+        </section>
+
+        <section class="settings-card" aria-labelledby="convenienceTitle">
+          <header class="card-heading">
+            <div>
+              <p class="eyebrow">Convenience</p>
+              <h2 id="convenienceTitle">Click and capture</h2>
+            </div>
+            <span class="status-badge mint-badge">Fast path</span>
+          </header>
+
+          <label class="setting-row featured-setting" for="reviewBeforeSaveToggle">
+            <span class="setting-icon review-icon" aria-hidden="true"></span>
+            <span class="setting-copy">
+              <strong>Review before save</strong>
+              <small>Off makes the main toolbar action a single-click capture. Lumen still runs its preflight and opens review automatically if it finds unresolved safety warnings.</small>
+            </span>
+            <input id="reviewBeforeSaveToggle" type="checkbox" role="switch" />
+            <span class="compact-track" aria-hidden="true"><span></span></span>
+          </label>
+
+          <label class="setting-row" for="stickyCleanupToggle">
+            <span class="setting-icon clean-icon" aria-hidden="true"></span>
+            <span class="setting-copy">
+              <strong>Remove repeated sticky UI</strong>
+              <small>Temporarily hides sticky headers and floating overlays while stitching a full page.</small>
+            </span>
+            <input id="stickyCleanupToggle" type="checkbox" role="switch" />
+            <span class="compact-track" aria-hidden="true"><span></span></span>
+          </label>
+
+          <label class="setting-row" for="lazyLoadToggle">
+            <span class="setting-icon image-icon" aria-hidden="true"></span>
+            <span class="setting-copy">
+              <strong>Load the whole page first</strong>
+              <small>Pre-scrolls long pages so deferred images are ready before Lumen captures them.</small>
+            </span>
+            <input id="lazyLoadToggle" type="checkbox" role="switch" />
+            <span class="compact-track" aria-hidden="true"><span></span></span>
+          </label>
+
+          <div class="one-click-note">
+            <span aria-hidden="true">1</span>
+            <p><strong>Fast capture stays reversible.</strong> Hold the toolbar capture button and choose <em>Review capture</em> whenever one run needs the full confirmation screen.</p>
+          </div>
+        </section>
+      </div>
+
+      <section class="access-card" aria-labelledby="accessTitle">
+        <header class="card-heading">
+          <div>
+            <p class="eyebrow">Chrome permissions</p>
+            <h2 id="accessTitle">Access you can take back.</h2>
+          </div>
+          <button id="refreshAccessButton" class="quiet-button" type="button">Refresh</button>
+        </header>
+
+        <div class="access-grid">
+          <article class="access-item">
+            <div class="access-topline">
+              <span class="access-icon site-icon" aria-hidden="true"></span>
+              <span>
+                <strong>Optional site access</strong>
+                <small id="siteAccessSummary">Checking Chrome access…</small>
+              </span>
+            </div>
+            <ul id="siteAccessList" class="permission-list" aria-label="Sites Lumen can currently access"></ul>
+            <p class="access-explanation">
+              Manual captures use the active tab. Tablet, mobile, and timed captures ask for site access only when needed. One-shot access is revoked after capture; active monitors retain their site until stopped.
+            </p>
+            <button id="revokeSiteAccessButton" class="danger-button" type="button">Revoke optional site access</button>
+          </article>
+
+          <article class="access-item">
+            <div class="access-topline">
+              <span class="access-icon drive-icon" aria-hidden="true"></span>
+              <span>
+                <strong>Google Drive</strong>
+                <small id="driveAccessSummary">Checking optional connection…</small>
+              </span>
+            </div>
+            <p class="access-explanation">
+              Drive is optional, uses the narrow <code>drive.file</code> scope, and uploads only after you choose the reviewed-image action. Revoking it does not delete files already in Drive.
+            </p>
+            <button id="revokeDriveAccessButton" class="danger-button" type="button">Disconnect and revoke Drive</button>
+          </article>
+        </div>
+      </section>
+
+      <section class="data-card" aria-labelledby="dataTitle">
+        <div class="data-copy">
+          <p class="eyebrow">Local workspace</p>
+          <h2 id="dataTitle">Stored here, removable here.</h2>
+          <p>
+            Clear Lumen's capture history, preview and PDF cache, saved regions, note draft, page signals,
+            and monitor schedules. Images already downloaded to your computer are not deleted.
+          </p>
+        </div>
+
+        <dl class="data-metrics" aria-label="Local workspace summary">
+          <div><dt>Captures</dt><dd id="captureCount">0</dd></div>
+          <div><dt>Library items</dt><dd id="photoCount">0</dd></div>
+          <div><dt>Area monitors</dt><dd id="monitorCount">0</dd></div>
+        </dl>
+
+        <button id="clearWorkspaceButton" class="danger-button strong-danger" type="button">Clear local workspace</button>
+      </section>
+
+      <footer class="settings-footer">
+        <p>Lumen has no production cloud account in this beta. Working data remains in this browser unless you explicitly download or export it.</p>
+        <a href="https://captainfredric.github.io/lumen-extension/" target="_blank" rel="noreferrer">Open the Lumen website <span aria-hidden="true">↗</span></a>
+      </footer>
+    </main>
+
+    <script type="module" src="settings.js"></script>
+  </body>
+</html>

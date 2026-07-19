@@ -2,16 +2,24 @@ import {
   LUMEN_CONFIG,
   STORAGE_KEYS,
   getApiBaseUrls,
-  getPlanEntitlements
+  getPlanEntitlements,
+  sanitizeCaptureUrl
 } from "./config.js";
 import { normalizePlan } from "./entitlements.js";
+import { readAppSettings } from "./settings-store.js";
 
 const REQUEST_TIMEOUT_MS = 2500;
 
 export async function bootstrapAppState() {
   const localState = await readLocalState();
 
-  if (!localState.session.signedIn) {
+  if (!localState.session.signedIn || (await readAppSettings()).localOnlyMode) {
+    return localState;
+  }
+
+  // A signed-in session is not consent to synchronize capture content. Only
+  // the data-controls endpoint is consulted until cloud sync is explicitly on.
+  if (!(await hasExplicitCloudSync(localState))) {
     return localState;
   }
 
@@ -48,15 +56,18 @@ export async function bootstrapAppState() {
       sortFields: ["capturedAt", "updatedAt", "createdAt"]
     }
   );
-  const watchPlans = reconcileRecords(
-    localState.watchPlans,
-    remoteWatchPlans?.ok && Array.isArray(remoteWatchPlans.data?.watchPlans)
-      ? remoteWatchPlans.data.watchPlans
-      : [],
-    {
-      freshnessFields: ["updatedAt", "lastRunAt", "createdAt"],
-      sortFields: ["updatedAt", "lastRunAt", "createdAt"]
-    }
+  const watchPlans = preserveLocalOperationalTargets(
+    reconcileRecords(
+      localState.watchPlans,
+      remoteWatchPlans?.ok && Array.isArray(remoteWatchPlans.data?.watchPlans)
+        ? remoteWatchPlans.data.watchPlans
+        : [],
+      {
+        freshnessFields: ["updatedAt", "lastRunAt", "createdAt"],
+        sortFields: ["updatedAt", "lastRunAt", "createdAt"]
+      }
+    ),
+    localState.watchPlans
   );
   const watchRuns = reconcileRecords(
     localState.watchRuns,
@@ -121,6 +132,31 @@ function reconcileRecords(localRecords, remoteRecords, { freshnessFields = [], s
     }
 
     return String(left?.id || "").localeCompare(String(right?.id || ""));
+  });
+}
+
+function preserveLocalOperationalTargets(records, localRecords) {
+  const localById = indexRecordsById(localRecords);
+
+  return records.map((record) => {
+    const localRecord = localById.get(record?.id);
+
+    // The remote copy intentionally omits sensitive query parameters. When it
+    // still identifies the same page, retain the complete URL only on-device
+    // so scheduled captures of authenticated/tokenized pages continue to run.
+    if (
+      !localRecord?.url ||
+      !record?.url ||
+      sanitizeCaptureUrl(localRecord.url) !== sanitizeCaptureUrl(record.url)
+    ) {
+      return record;
+    }
+
+    return {
+      ...record,
+      url: localRecord.url,
+      host: localRecord.host || record.host || ""
+    };
   });
 }
 
@@ -339,35 +375,38 @@ export async function readRemoteDestinations() {
 
 export async function saveRemoteWatchPlan(payload = {}) {
   const localState = await readLocalState();
+  const localPlan = buildLocalWatchPlan(payload, localState.session.id);
 
   if (!(await hasExplicitCloudSync(localState))) {
     return {
       ok: true,
       backendReachable: Boolean(localState.session.backendReachable),
-      watchPlan: await persistLocalWatchPlan(buildLocalWatchPlan(payload, localState.session.id))
+      watchPlan: await persistLocalWatchPlan(localPlan)
     };
   }
 
   const remote = await fetchJson(LUMEN_CONFIG.api.endpoints.watchPlans, {
     method: "POST",
     sessionId: localState.session.id,
-    body: {
+    body: sanitizeRemoteRecord({
       explicitOptIn: true,
       status: "active",
       destination: "local",
       ...payload
-    }
+    })
   });
 
-  return remote?.ok
+  return remote?.ok && remote.data?.watchPlan
     ? {
         ok: true,
-        watchPlan: await persistLocalWatchPlan(remote.data.watchPlan)
+        watchPlan: await persistLocalWatchPlan(
+          mergeRemoteWatchPlanWithLocalTarget(remote.data.watchPlan, localPlan)
+        )
       }
     : {
         ok: true,
         backendReachable: false,
-        watchPlan: await persistLocalWatchPlan(buildLocalWatchPlan(payload, localState.session.id))
+        watchPlan: await persistLocalWatchPlan(localPlan)
       };
 }
 
@@ -394,16 +433,18 @@ export async function updateRemoteWatchPlan(watchPlanId = "", patch = {}) {
     const remote = await fetchJson(`${LUMEN_CONFIG.api.endpoints.watchPlans}/${encodeURIComponent(watchPlanId)}`, {
       method: "PATCH",
       sessionId: localState.session.id,
-      body: {
+      body: sanitizeRemoteRecord({
         explicitOptIn: true,
         ...patch
-      }
+      })
     });
 
     if (remote?.ok && remote.data?.watchPlan) {
       return {
         ok: true,
-        watchPlan: await persistLocalWatchPlan(remote.data.watchPlan)
+        watchPlan: await persistLocalWatchPlan(
+          mergeRemoteWatchPlanWithLocalTarget(remote.data.watchPlan, nextPlan)
+        )
       };
     }
   }
@@ -430,6 +471,9 @@ export async function deleteRemoteWatchPlan(watchPlanId = "") {
     [STORAGE_KEYS.watchPlans]: nextPlans
   });
 
+  // Deleting a previously synchronized monitor reduces retained remote data.
+  // Keep this explicit privacy action available even while Local-only is on so
+  // a later bootstrap cannot resurrect the record.
   if (localState.session.signedIn && localState.session.id) {
     await fetchJson(`${LUMEN_CONFIG.api.endpoints.watchPlans}/${encodeURIComponent(watchPlanId)}`, {
       method: "DELETE",
@@ -486,7 +530,7 @@ export async function persistWatchRunRecord(record = {}) {
     await fetchJson(LUMEN_CONFIG.api.endpoints.watchRuns, {
       method: "POST",
       sessionId: localState.session.id,
-      body: normalized
+      body: sanitizeRemoteRecord(normalized)
     }).catch(() => null);
   }
 
@@ -495,6 +539,13 @@ export async function persistWatchRunRecord(record = {}) {
 
 export async function queueRemoteDelivery(payload = {}) {
   const localState = await readLocalState();
+
+  if ((await readAppSettings()).localOnlyMode) {
+    return {
+      ok: false,
+      error: "Local-only mode blocks remote deliveries. Turn it off in Lumen Settings before choosing a connected destination."
+    };
+  }
 
   if (!localState.session.signedIn || !localState.session.id) {
     return {
@@ -506,13 +557,13 @@ export async function queueRemoteDelivery(payload = {}) {
   const remote = await fetchJson(LUMEN_CONFIG.api.endpoints.deliveries, {
     method: "POST",
     sessionId: localState.session.id,
-    body: {
+    body: sanitizeRemoteRecord({
       explicitOptIn: true,
       payloadReviewed: true,
       destinationId: "local",
       trigger: "manual",
       ...payload
-    }
+    })
   });
 
   return remote?.ok
@@ -539,7 +590,7 @@ export async function persistCaptureRecord(record) {
     await fetchJson(LUMEN_CONFIG.api.endpoints.captures, {
       method: "POST",
       sessionId: localState.session.id,
-      body: record
+      body: sanitizeRemoteRecord(record)
     }).catch(() => null);
   }
 
@@ -551,11 +602,38 @@ async function hasExplicitCloudSync(localState) {
     return false;
   }
 
+  if ((await readAppSettings()).localOnlyMode) {
+    return false;
+  }
+
   const remote = await fetchJson(LUMEN_CONFIG.api.endpoints.dataControls, {
     sessionId: localState.session.id
   });
 
   return Boolean(remote?.ok && normalizeDataControls(remote.data?.dataControls).cloudSyncEnabled);
+}
+
+function sanitizeRemoteRecord(record = {}) {
+  if (!record || typeof record !== "object" || Array.isArray(record)) {
+    return {};
+  }
+
+  return Object.hasOwn(record, "url")
+    ? {
+        ...record,
+        url: sanitizeCaptureUrl(record.url)
+      }
+    : { ...record };
+}
+
+function mergeRemoteWatchPlanWithLocalTarget(remotePlan = {}, localPlan = {}) {
+  return {
+    ...localPlan,
+    ...(remotePlan && typeof remotePlan === "object" ? remotePlan : {}),
+    id: remotePlan?.id || localPlan.id,
+    url: localPlan.url || "",
+    host: localPlan.host || ""
+  };
 }
 
 export async function readLocalState() {

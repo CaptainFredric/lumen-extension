@@ -133,7 +133,8 @@ try {
     const store = await import(chrome.runtime.getURL("library-store.js"));
     const capture = await store.getLibraryCapture(captureId, {
       includePreview: true,
-      includeEditorSource: true
+      includeEditorSource: true,
+      includePdfSource: true
     });
     const localStorage = await chrome.storage.local.get(null);
 
@@ -153,6 +154,14 @@ try {
       editorOriginalWidth: capture?.editorSource?.originalWidth || 0,
       editorOriginalHeight: capture?.editorSource?.originalHeight || 0,
       editorPurpose: capture?.editorSource?.purpose || "",
+      pdfType: capture?.pdfSource?.blob?.type || "",
+      pdfBytes: capture?.pdfSource?.blob?.size || 0,
+      pdfPageCount: capture?.pdfSource?.pageCount || 0,
+      pdfRasterWidth: capture?.pdfSource?.rasterWidth || 0,
+      pdfSourceWidth: capture?.pdfSource?.sourceWidth || 0,
+      pdfSourceHeight: capture?.pdfSource?.sourceHeight || 0,
+      pdfSourceExact: capture?.pdfSource?.sourceExact || false,
+      pdfPurpose: capture?.pdfSource?.purpose || "",
       downloadCount: capture?.downloads?.length || 0,
       storageContainsPreviewDataUrl: JSON.stringify(localStorage).includes("data:image/")
     };
@@ -175,6 +184,18 @@ try {
     libraryState.editorOriginalWidth >= libraryState.editorWidth &&
       libraryState.editorOriginalHeight >= libraryState.editorHeight,
     "Stored editor source dimensions lost their full-page provenance.",
+    libraryState
+  );
+  assert(
+    libraryState.pdfType === "application/pdf" &&
+      libraryState.pdfBytes > 0 &&
+      libraryState.pdfPageCount >= 1 &&
+      libraryState.pdfRasterWidth >= 1200 &&
+      libraryState.pdfSourceWidth >= 1200 &&
+      libraryState.pdfSourceHeight >= 900 &&
+      libraryState.pdfSourceExact &&
+      libraryState.pdfPurpose === "pdf-source",
+    "Expected a reusable zoom-legible PDF rendered from the original capture output in IndexedDB.",
     libraryState
   );
   assert(libraryState.downloadCount === response.downloads.length, "Expected library file actions to retain all download handles.", libraryState);

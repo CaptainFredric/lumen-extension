@@ -4,6 +4,7 @@ const SESSION_KEY = "lumen.account.session";
 const CAPTURE_HISTORY_KEY = "lumen.capture.history";
 const WATCH_PLANS_KEY = "lumen.watch.plans";
 const WATCH_RUNS_KEY = "lumen.watch.runs";
+const APP_SETTINGS_KEY = "lumen.app.settings";
 
 let storedState = {};
 let remoteState = {};
@@ -32,12 +33,19 @@ globalThis.chrome = {
 
 globalThis.fetch = async (input, options = {}) => {
   const pathname = new URL(input).pathname;
+  const method = options.method || "GET";
+  const body = options.body ? JSON.parse(options.body) : null;
+
   remoteRequests.push({
     pathname,
-    method: options.method || "GET"
+    method,
+    body: body ? structuredClone(body) : null
   });
-  const payload = {
-    "/v1/session": {
+
+  let payload = null;
+
+  if (pathname === "/v1/session" && method === "GET") {
+    payload = {
       session: {
         id: "session-sync-smoke",
         plan: "pro",
@@ -49,30 +57,41 @@ globalThis.fetch = async (input, options = {}) => {
       meta: {
         backendReachable: true
       }
-    },
-    "/v1/captures": {
-      captures: remoteState.captureHistory || []
-    },
-    "/v1/watch-plans": {
-      watchPlans: remoteState.watchPlans || []
-    },
-    "/v1/watch-runs": {
-      watchRuns: remoteState.watchRuns || []
-    },
-    "/v1/data-controls": {
+    };
+  } else if (pathname === "/v1/data-controls" && method === "GET") {
+    payload = {
       dataControls: {
         cloudSyncEnabled,
         retentionDays: 90
       }
-    },
-    "/v1/captures": options.method === "POST"
-      ? {
-          capture: JSON.parse(options.body || "{}")
-        }
-      : {
-          captures: remoteState.captureHistory || []
-    }
-  }[pathname];
+    };
+  } else if (pathname === "/v1/captures") {
+    payload = method === "POST"
+      ? { capture: body || {} }
+      : { captures: remoteState.captureHistory || [] };
+  } else if (pathname === "/v1/watch-plans") {
+    payload = method === "POST"
+      ? { watchPlan: body || {} }
+      : { watchPlans: remoteState.watchPlans || [] };
+  } else if (pathname.startsWith("/v1/watch-plans/") && method === "PATCH") {
+    payload = {
+      watchPlan: {
+        id: decodeURIComponent(pathname.split("/").at(-1)),
+        ...(body || {})
+      }
+    };
+  } else if (pathname === "/v1/watch-runs") {
+    payload = method === "POST"
+      ? { watchRun: body || {} }
+      : { watchRuns: remoteState.watchRuns || [] };
+  } else if (pathname === "/v1/deliveries" && method === "POST") {
+    payload = {
+      delivery: {
+        id: "delivery-sync-smoke",
+        ...(body || {})
+      }
+    };
+  }
 
   return new Response(JSON.stringify(payload || {}), {
     status: payload ? 200 : 404,
@@ -82,11 +101,21 @@ globalThis.fetch = async (input, options = {}) => {
   });
 };
 
-const { bootstrapAppState, persistCaptureRecord } = await import("../lumen-backend.js");
+const {
+  bootstrapAppState,
+  persistCaptureRecord,
+  persistWatchRunRecord,
+  queueRemoteDelivery,
+  saveRemoteWatchPlan,
+  updateRemoteWatchPlan
+} = await import("../lumen-backend.js");
 
 await verifyEmptyRemoteListsPreserveLocalData();
 await verifyStableIdReconciliationAndOrdering();
+await verifyBootstrapRequiresExplicitSync();
 await verifyCaptureUploadRequiresExplicitSync();
+await verifyOutboundUrlsAreSanitizedWithoutBreakingLocalTargets();
+await verifyLocalOnlyBlocksEveryContentBoundary();
 
 console.log(JSON.stringify({
   ok: true,
@@ -95,11 +124,17 @@ console.log(JSON.stringify({
     "shared IDs reconcile by freshness",
     "equal-version conflicts preserve local fields",
     "merged lists use deterministic newest-first ordering",
-    "capture metadata uploads require explicit cloud sync"
+    "remote content bootstrap requires explicit cloud sync",
+    "capture metadata uploads require explicit cloud sync",
+    "outbound URLs are sanitized while local monitor targets remain complete",
+    "local-only blocks bootstrap, capture, monitor, run, and delivery network boundaries"
   ]
 }, null, 2));
 
 async function verifyEmptyRemoteListsPreserveLocalData() {
+  cloudSyncEnabled = true;
+  remoteRequests = [];
+
   const capture = {
     id: "capture-local-only",
     title: "Unsynced capture",
@@ -138,6 +173,9 @@ async function verifyEmptyRemoteListsPreserveLocalData() {
 }
 
 async function verifyStableIdReconciliationAndOrdering() {
+  cloudSyncEnabled = true;
+  remoteRequests = [];
+
   seedLocalState({
     captureHistory: [
       {
@@ -261,6 +299,40 @@ async function verifyStableIdReconciliationAndOrdering() {
   }
 }
 
+async function verifyBootstrapRequiresExplicitSync() {
+  const localCapture = {
+    id: "capture-bootstrap-local",
+    title: "Local capture",
+    capturedAt: "2026-07-15T13:30:00.000Z"
+  };
+
+  seedLocalState({
+    captureHistory: [localCapture],
+    watchPlans: [],
+    watchRuns: []
+  });
+  remoteState = {
+    captureHistory: [{
+      id: "capture-bootstrap-remote",
+      title: "Remote capture",
+      capturedAt: "2026-07-15T13:31:00.000Z"
+    }],
+    watchPlans: [],
+    watchRuns: []
+  };
+  cloudSyncEnabled = false;
+  remoteRequests = [];
+
+  const bootstrapped = await bootstrapAppState();
+
+  assert.deepEqual(bootstrapped.captureHistory, [localCapture]);
+  assert.deepEqual(storedState[CAPTURE_HISTORY_KEY], [localCapture]);
+  assert.deepEqual(
+    remoteRequests.map(({ pathname, method }) => ({ pathname, method })),
+    [{ pathname: "/v1/data-controls", method: "GET" }]
+  );
+}
+
 async function verifyCaptureUploadRequiresExplicitSync() {
   seedLocalState({
     captureHistory: [],
@@ -294,7 +366,142 @@ async function verifyCaptureUploadRequiresExplicitSync() {
   );
 }
 
-function seedLocalState({ captureHistory, watchPlans, watchRuns }) {
+async function verifyOutboundUrlsAreSanitizedWithoutBreakingLocalTargets() {
+  const rawUrl = "https://example.test/monitor?token=secret&view=full#private-fragment";
+  const updatedRawUrl = "https://example.test/monitor?access_token=rotated&view=detail#new-fragment";
+  const expectedRawUrl = new URL(rawUrl).href;
+  const expectedUpdatedRawUrl = new URL(updatedRawUrl).href;
+
+  seedLocalState({
+    captureHistory: [],
+    watchPlans: [],
+    watchRuns: []
+  });
+  remoteState = {
+    captureHistory: [],
+    watchPlans: [],
+    watchRuns: []
+  };
+  cloudSyncEnabled = true;
+  remoteRequests = [];
+
+  const saved = await saveRemoteWatchPlan({
+    id: "watch-sensitive-url",
+    title: "Authenticated monitor",
+    url: rawUrl,
+    status: "active",
+    schedule: { mode: "repeat", intervalMinutes: 60 }
+  });
+  const savedRequest = findRequest("/v1/watch-plans", "POST");
+
+  assert.equal(saved.watchPlan.url, expectedRawUrl);
+  assert.equal(storedState[WATCH_PLANS_KEY][0].url, expectedRawUrl);
+  assertSanitizedUrl(savedRequest.body.url, "view", "full");
+
+  remoteRequests = [];
+  const updated = await updateRemoteWatchPlan(saved.watchPlan.id, {
+    url: updatedRawUrl,
+    status: "paused"
+  });
+  const updatedRequest = findRequest(`/v1/watch-plans/${saved.watchPlan.id}`, "PATCH");
+
+  assert.equal(updated.watchPlan.url, expectedUpdatedRawUrl);
+  assert.equal(storedState[WATCH_PLANS_KEY][0].url, expectedUpdatedRawUrl);
+  assertSanitizedUrl(updatedRequest.body.url, "view", "detail");
+
+  // A newer sanitized server copy must not erase the complete on-device target
+  // when both URLs identify the same page.
+  remoteState.watchPlans = [{
+    ...updated.watchPlan,
+    url: updatedRequest.body.url,
+    updatedAt: "2030-07-15T14:02:00.000Z"
+  }];
+  remoteRequests = [];
+  const bootstrapped = await bootstrapAppState();
+  assert.equal(
+    bootstrapped.watchPlans.find((plan) => plan.id === saved.watchPlan.id)?.url,
+    expectedUpdatedRawUrl
+  );
+
+  remoteRequests = [];
+  await persistWatchRunRecord({
+    id: "watch-run-sensitive-url",
+    watchPlanId: saved.watchPlan.id,
+    title: "Authenticated run",
+    url: updatedRawUrl,
+    status: "captured",
+    completedAt: "2026-07-15T14:03:00.000Z"
+  });
+  const runRequest = findRequest("/v1/watch-runs", "POST");
+  assert.equal(storedState[WATCH_RUNS_KEY][0].url, expectedUpdatedRawUrl);
+  assertSanitizedUrl(runRequest.body.url, "view", "detail");
+
+  remoteRequests = [];
+  await persistCaptureRecord({
+    id: "capture-sensitive-url",
+    url: rawUrl,
+    capturedAt: "2026-07-15T14:04:00.000Z"
+  });
+  const captureRequest = findRequest("/v1/captures", "POST");
+  assert.equal(storedState[CAPTURE_HISTORY_KEY][0].url, rawUrl);
+  assertSanitizedUrl(captureRequest.body.url, "view", "full");
+
+  remoteRequests = [];
+  const delivery = await queueRemoteDelivery({
+    captureId: "capture-sensitive-url",
+    destinationId: "drive-fixture",
+    url: rawUrl
+  });
+  const deliveryRequest = findRequest("/v1/deliveries", "POST");
+  assert.equal(delivery.ok, true);
+  assertSanitizedUrl(deliveryRequest.body.url, "view", "full");
+}
+
+async function verifyLocalOnlyBlocksEveryContentBoundary() {
+  seedLocalState({
+    captureHistory: [],
+    watchPlans: [],
+    watchRuns: [],
+    localOnlyMode: true
+  });
+  remoteRequests = [];
+  cloudSyncEnabled = true;
+
+  await bootstrapAppState();
+  await persistCaptureRecord({
+    id: "capture-blocked-by-local-only",
+    capturedAt: "2026-07-15T15:00:00.000Z"
+  });
+  const watchPlan = await saveRemoteWatchPlan({
+    id: "watch-blocked-by-local-only",
+    title: "Local-only monitor",
+    url: "https://example.test/local-only",
+    status: "active",
+    schedule: { mode: "repeat", intervalMinutes: 60 }
+  });
+  await updateRemoteWatchPlan(watchPlan.watchPlan.id, { status: "paused" });
+  await persistWatchRunRecord({
+    id: "watch-run-blocked-by-local-only",
+    watchPlanId: watchPlan.watchPlan.id,
+    title: "Local-only run",
+    url: "https://example.test/local-only",
+    status: "captured",
+    completedAt: "2026-07-15T15:01:00.000Z"
+  });
+  const delivery = await queueRemoteDelivery({
+    captureId: "capture-blocked-by-local-only",
+    destinationId: "drive-fixture"
+  });
+
+  assert.equal(delivery.ok, false);
+  assert.match(delivery.error, /local-only/i);
+  assert.equal(remoteRequests.length, 0, `Local-only mode reached remote endpoints: ${JSON.stringify(remoteRequests)}`);
+  assert.equal(storedState[CAPTURE_HISTORY_KEY][0].id, "capture-blocked-by-local-only");
+  assert.equal(storedState[WATCH_PLANS_KEY][0].id, "watch-blocked-by-local-only");
+  assert.equal(storedState[WATCH_RUNS_KEY][0].id, "watch-run-blocked-by-local-only");
+}
+
+function seedLocalState({ captureHistory, watchPlans, watchRuns, localOnlyMode = false }) {
   storedState = {
     [SESSION_KEY]: {
       id: "session-sync-smoke",
@@ -309,6 +516,32 @@ function seedLocalState({ captureHistory, watchPlans, watchRuns }) {
     },
     [CAPTURE_HISTORY_KEY]: structuredClone(captureHistory),
     [WATCH_PLANS_KEY]: structuredClone(watchPlans),
-    [WATCH_RUNS_KEY]: structuredClone(watchRuns)
+    [WATCH_RUNS_KEY]: structuredClone(watchRuns),
+    [APP_SETTINGS_KEY]: {
+      version: 1,
+      privacyShieldEnabled: false,
+      localOnlyMode,
+      reviewBeforeSave: false,
+      shieldRestore: null
+    }
   };
+}
+
+function findRequest(pathname, method) {
+  const request = remoteRequests.find((entry) => (
+    entry.pathname === pathname && entry.method === method
+  ));
+
+  assert.ok(request, `Expected ${method} ${pathname}; received ${JSON.stringify(remoteRequests)}`);
+  return request;
+}
+
+function assertSanitizedUrl(rawUrl, benignKey, benignValue) {
+  const url = new URL(rawUrl);
+
+  assert.equal(url.hash, "");
+  assert.equal(url.searchParams.get(benignKey), benignValue);
+  assert.equal(url.searchParams.has("token"), false);
+  assert.equal(url.searchParams.has("access_token"), false);
+  assert.doesNotMatch(rawUrl, /secret|rotated|fragment/i);
 }

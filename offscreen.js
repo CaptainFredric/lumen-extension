@@ -1,4 +1,5 @@
 import { LUMEN_CONFIG, normalizeCaptureNoteOptions } from "./config.js";
+import { createCanvasSequencePdfBlob } from "./export-utils.js";
 
 const MAX_CANVAS_EDGE = 16384;
 const MAX_CANVAS_AREA = 268435456;
@@ -160,6 +161,12 @@ async function renderSession(session) {
     }
   }
 
+  // Encode the paginated review PDF before retaining the PNG data URLs. This
+  // keeps the expensive page-slice work out of the peak where both encodings
+  // coexist for a near-limit capture.
+  const pdfSource = session.options?.cacheReviewPdf === true
+    ? await renderReviewPdfSource(outputItems, session.options?.reviewPdfRole || "full-page")
+    : null;
   const outputs = outputItems.map((output) => {
     const previewDataUrl = renderPreviewDataUrl(output.canvas);
 
@@ -191,6 +198,7 @@ async function renderSession(session) {
   return {
     outputs,
     editorSource,
+    pdfSource,
     width: renderModel.canvasWidth,
     height: renderModel.canvasHeight,
     pixelRatio: renderModel.effectiveScale,
@@ -212,6 +220,51 @@ async function renderSession(session) {
         },
     annotationRegion: renderModel.annotationRegion
   };
+}
+
+async function renderReviewPdfSource(outputItems, requestedRole) {
+  const role = requestedRole === "cutaway" ? "cutaway" : "full-page";
+  const sourceCanvases = outputItems
+    .filter((output) => (output.role || "full-page") === role)
+    .sort((left, right) => left.index - right.index)
+    .map((output) => output.canvas)
+    .filter(Boolean);
+
+  if (!sourceCanvases.length) {
+    return null;
+  }
+
+  try {
+    const pdf = await createCanvasSequencePdfBlob(sourceCanvases, {
+      maxRasterWidth: 3200,
+      jpegQuality: 0.94,
+      sourceExact: true
+    });
+
+    return {
+      dataUrl: await blobToDataUrl(pdf.blob),
+      mime: "application/pdf",
+      sourceWidth: pdf.sourceWidth,
+      sourceHeight: pdf.sourceHeight,
+      rasterWidth: pdf.rasterWidth,
+      pageCount: pdf.pageCount,
+      sourceExact: true,
+      role,
+      kind: sourceCanvases.length > 1 ? "capture-tile-pdf" : "capture-output-pdf"
+    };
+  } catch (error) {
+    console.debug("Lumen capture-time PDF cache skipped:", error);
+    return null;
+  }
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result || "")), { once: true });
+    reader.addEventListener("error", () => reject(reader.error || new Error("The local PDF cache could not be encoded.")), { once: true });
+    reader.readAsDataURL(blob);
+  });
 }
 
 function buildCaptureHealth(renderModel) {

@@ -31,11 +31,11 @@ Paste:
 
 ### `downloads`
 
-> Saves full-resolution captures, reviewed annotation exports, focused crops, and capture-details JSON to the user's Downloads folder, and supports Open and Show actions for those saved originals.
+> Saves full-resolution captures, reviewed PNG and paginated raster PDF exports, focused crops, and capture-details JSON to the user's Downloads folder, and supports Open and Show actions for those saved originals.
 
 ### `offscreen`
 
-> Uses an extension-owned offscreen document to stitch screenshot slices, apply opaque redactions, render focused rectangles or transparent lassos, generate previews, and compose export files. It is not used for hidden browsing or remote code.
+> Uses an extension-owned offscreen document to stitch screenshot slices, apply opaque redactions, render focused rectangles or transparent lassos, generate previews, and compose capture-time raster PDF caches and export files. It is not used for hidden browsing or remote code.
 
 ### `scripting`
 
@@ -43,7 +43,7 @@ Paste:
 
 ### `storage`
 
-> Stores capture preferences and local workflow state, including history, redaction boxes, focused regions, annotations, monitor plans and runs, review metadata, and data-control settings. Compact gallery previews and bounded whole-capture editor images stay in extension-owned IndexedDB; full-resolution originals stay in Downloads. Safe-size editor images can be lossless, while very large or tiled captures use a scaled whole-page proxy.
+> Stores capture preferences and local workflow state, including history, redaction boxes, focused regions, annotations, monitor plans and runs, review metadata, and data-control settings. Compact gallery previews, bounded whole-capture editor images, and capture-time raster PDF caches stay in extension-owned IndexedDB; full-resolution original images stay in Downloads. Safe-size editor images can be lossless, while very large or tiled captures use a scaled whole-page proxy. Cached PDFs are generated from the original rendered output or tiles, limited to 3200 raster pixels per page, and kept under a separate 250 MB or 75-capture budget.
 
 ### Optional `identity`
 
@@ -87,7 +87,7 @@ If the dashboard separately lists **Form data** or **User-generated content**, s
 
 Use this explanation wherever the dashboard provides a data-use text field:
 
-> Lumen uses the selected page content, URL, capture settings, selected regions, annotations, and local run history only to create, review, compare, organize, and export captures requested by the user. The Web Store build has no Lumen-owned production sync endpoint, so data stays on the device unless the user explicitly chooses Export to Drive. That action sends the reviewed image, its filename, review timestamp, Lumen capture identifier, and source host to the user's Google Drive over HTTPS. Lumen does not use capture data for advertising, credit decisions, data brokerage, or unrelated analytics.
+> Lumen uses the selected page content, URL, capture settings, selected regions, annotations, and local run history only to create, review, compare, organize, and export captures requested by the user. Dedicated Settings expose reversible Privacy Shield, local-only mode, review-before-save, permission revocation, Drive disconnect, and local deletion controls. A fresh install defaults to local-only one-click capture with automatic redaction on and capture-details JSON off; Privacy Shield is an explicit stronger review mode that pauses unattended monitor alarms until it is turned off. The Web Store build has no Lumen-owned production sync endpoint, so data stays on the device unless the user explicitly chooses Export to Drive. That action sends the reviewed image, its filename, review timestamp, Lumen capture identifier, and source host to the user's Google Drive over HTTPS. Lumen does not use capture data for advertising, credit decisions, data brokerage, or unrelated analytics.
 
 ## Limited Use certifications
 

@@ -53,6 +53,7 @@
 
       <nav class="site-nav" aria-label="Primary">
         <a href="#product">Product</a>
+        <a href="#actual-app">Live app</a>
         <a href="#workflow">Workflow</a>
         <a href="#reliability">Reliability</a>
         <a href="#privacy">Privacy</a>
@@ -87,8 +88,8 @@
             >
               Install the GitHub beta <span aria-hidden="true">↗</span>
             </a>
-            <a class="button button-secondary" href="#hero-demo">
-              Try the comparison <span aria-hidden="true">↓</span>
+            <a class="button button-secondary" href="review.html?demo=1">
+              Open live app demo <span aria-hidden="true">↗</span>
             </a>
           </div>
 
@@ -230,6 +231,63 @@
             <p>Full scrollable page or selected area, saved with source context in one local history.</p>
           </article>
         </div>
+      </section>
+
+      <section class="actual-app-section section-shell" id="actual-app" aria-labelledby="actual-app-title">
+        <div class="actual-app-copy" data-reveal>
+          <p class="eyebrow eyebrow-light"><span></span> Website outside, workspace inside Chrome</p>
+          <h2 id="actual-app-title">The website is the front door. The extension is the actual app.</h2>
+          <p>
+            Install Lumen, click its toolbar icon, and the capture control opens on the page already
+            in front of you. Captures then move through dedicated library, annotation, settings,
+            and change-review screens—without requiring a Lumen account.
+          </p>
+          <div class="actual-app-actions">
+            <a class="button button-mint" href="review.html?demo=1">Try the live review app <span aria-hidden="true">↗</span></a>
+            <a
+              class="text-link text-link-light"
+              href="https://github.com/CaptainFredric/lumen-extension#load-the-extension-locally"
+              target="_blank"
+              rel="noreferrer"
+            >Install the extension <span aria-hidden="true">↗</span></a>
+          </div>
+        </div>
+
+        <ol class="app-surface-map" data-reveal aria-label="Lumen application surfaces">
+          <li>
+            <span>01</span>
+            <div><strong>Capture control</strong><small>Click once for a saved full-page capture. Hold for selected areas and advanced tools.</small></div>
+          </li>
+          <li>
+            <span>02</span>
+            <div><strong>Settings &amp; privacy</strong><small>Choose fast capture or turn on Privacy Shield for review-first, local-only output with unattended monitors paused.</small></div>
+          </li>
+          <li>
+            <span>03</span>
+            <div><strong>Annotation &amp; export</strong><small>Zoom into the best local working image, explain it, then export PNG or PDF.</small></div>
+          </li>
+          <li>
+            <span>04</span>
+            <div><strong>Library &amp; change review</strong><small>Return to saved captures, monitor runs, changed regions, and the comparison timeline.</small></div>
+          </li>
+        </ol>
+
+        <figure class="app-demo-frame" data-reveal>
+          <figcaption>
+            <span>Product tour</span>
+            <p>Capture, review, annotate, export, compare, and control privacy in the extension itself.</p>
+          </figcaption>
+          <video
+            controls
+            playsinline
+            preload="metadata"
+            poster="assets/lumen-product-demo-poster.png"
+            aria-label="Lumen extension product tour"
+          >
+            <source src="assets/lumen-product-demo.webm" type="video/webm" />
+            <a href="assets/lumen-product-demo.webm">Open the Lumen product tour video</a>.
+          </video>
+        </figure>
       </section>
 
       <section class="monitor-proof section-shell" aria-labelledby="monitor-proof-title">

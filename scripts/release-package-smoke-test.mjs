@@ -43,9 +43,9 @@ try {
   assert(
     [
       "library.html", "library.css", "library.js", "library-store.js",
-      "annotation-engine.js", "editor.html", "editor.css", "editor.js", "editor-drive.js",
+      "annotation-engine.js", "export-utils.js", "editor.html", "editor.css", "editor.js", "editor-drive.js",
       "visual-diff-engine.js", "review.html", "review.css", "review.js", "review-actions.js",
-      "drive-export.js"
+      "drive-export.js", "settings-store.js", "settings.html", "settings.css", "settings.js"
     ].every((file) => packagedFiles.includes(file)),
     "Release ZIP is missing a capture-review runtime file.",
     packagedFiles
@@ -117,7 +117,8 @@ assert(
     local: await chrome.storage.local.get([
       "lumen.capture.privateSettings",
       "lumen.capture.history",
-      "lumen.onboarding"
+      "lumen.onboarding",
+      "lumen.app.settings"
     ])
   }));
 
@@ -132,6 +133,12 @@ assert(
   assert(!(firstRun.permissions.origins || []).length, "Clean install started with granted site origins.", firstRun.permissions);
   assert(!Object.hasOwn(firstRun.sync["lumen.capture.settings"] || {}, "annotationText"), "Release package synced private note text.", firstRun.sync);
   assert(typeof firstRun.local["lumen.capture.privateSettings"]?.annotationText === "string", "Release package did not initialize private settings locally.", firstRun.local);
+  assert(
+    firstRun.local["lumen.app.settings"]?.localOnlyMode === true &&
+      firstRun.local["lumen.app.settings"]?.reviewBeforeSave === false,
+    "Release package did not initialize safe local-only and one-click capture defaults.",
+    firstRun.local
+  );
   assert((firstRun.local["lumen.capture.history"] || []).length === 0, "Clean profile unexpectedly contains capture history.", firstRun.local);
 
   await popup.click("#onboardingDismissButton");
@@ -225,7 +232,7 @@ assert(
     metric: document.querySelector("#changePercentMetric")?.textContent?.trim() || ""
   }));
   assert(reviewState.title === "Lumen Visual Change Review", "Packaged visual review title did not load.", reviewState);
-  assert(reviewState.timelineCount > 0 && reviewState.actionCount === 2 && /%/.test(reviewState.metric), "Packaged visual review did not initialize its demo comparison.", reviewState);
+  assert(reviewState.timelineCount > 0 && reviewState.actionCount === 4 && /%/.test(reviewState.metric), "Packaged visual review did not initialize its demo comparison.", reviewState);
   assert(!popupErrors.length, "Packaged popup emitted runtime errors.", popupErrors);
 
   console.log(JSON.stringify({

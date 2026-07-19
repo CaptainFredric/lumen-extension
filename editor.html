@@ -36,8 +36,25 @@
           <span aria-hidden="true">↷</span>
         </button>
         <div id="externalExportActions" class="external-export-actions" data-lumen-export-actions aria-label="Additional export destinations"></div>
-        <button id="exportButton" class="button primary-button" type="button" title="Export PNG (Ctrl/⌘ S)" disabled>
+        <button
+          id="exportButton"
+          class="button primary-button"
+          type="button"
+          title="Export full-resolution PNG (Ctrl/⌘ S)"
+          aria-keyshortcuts="Control+S Meta+S"
+          disabled
+        >
           Export PNG
+        </button>
+        <button
+          id="exportPdfButton"
+          class="button quiet-button pdf-export-button"
+          type="button"
+          title="Export paginated PDF (Ctrl/⌘ Shift S)"
+          aria-keyshortcuts="Control+Shift+S Meta+Shift+S"
+          disabled
+        >
+          Export PDF
         </button>
       </div>
     </header>
@@ -116,10 +133,11 @@
             Open a capture to start annotating.
           </div>
           <div class="zoom-controls" aria-label="Canvas zoom">
-            <button id="zoomOutButton" class="zoom-button" type="button" aria-label="Zoom out" disabled>−</button>
-            <span id="zoomLabel">Fit</span>
-            <button id="zoomInButton" class="zoom-button" type="button" aria-label="Zoom in" disabled>+</button>
-            <button id="fitButton" class="fit-button" type="button" disabled>Fit</button>
+            <button id="zoomOutButton" class="zoom-button" type="button" aria-label="Zoom out" title="Zoom out (Ctrl/⌘ −)" disabled>−</button>
+            <output id="zoomLabel" aria-live="polite">Fit</output>
+            <button id="zoomInButton" class="zoom-button" type="button" aria-label="Zoom in" title="Zoom in (Ctrl/⌘ +)" disabled>+</button>
+            <button id="actualSizeButton" class="fit-button" type="button" title="Show actual pixels (Ctrl/⌘ 1)" disabled>100%</button>
+            <button id="fitButton" class="fit-button" type="button" title="Fit capture to workspace (Ctrl/⌘ 0)" disabled>Fit</button>
           </div>
         </footer>
       </section>
@@ -188,11 +206,12 @@
             <div><dt>Select previous / next</dt><dd><kbd>[</kbd> <kbd>]</kbd></dd></div>
             <div><dt>Nudge</dt><dd><kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd></dd></div>
             <div><dt>Delete</dt><dd><kbd>⌫</kbd></dd></div>
-            <div><dt>Export</dt><dd><kbd>⌘S</kbd></dd></div>
+            <div><dt>PNG / PDF</dt><dd><kbd>⌘S</kbd> <kbd>⇧⌘S</kbd></dd></div>
+            <div><dt>Fit / actual size</dt><dd><kbd>⌘0</kbd> <kbd>⌘1</kbd></dd></div>
           </dl>
         </section>
 
-        <p class="privacy-note">Edits stay in this tab unless you explicitly export a PNG or choose the optional reviewed-image Drive action.</p>
+        <p class="privacy-note">Edits stay in this tab unless you explicitly export a local PNG/PDF or choose the optional reviewed-image Drive action.</p>
       </aside>
     </main>
 

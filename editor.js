@@ -16,6 +16,10 @@ import {
   translateAnnotation,
   undoHistory
 } from "./annotation-engine.js";
+import {
+  createCanvasPdfBlob,
+  downloadBlob
+} from "./export-utils.js";
 
 const MAX_IMAGE_EDGE = 8192;
 const MAX_IMAGE_AREA = 64 * 1024 * 1024;
@@ -37,6 +41,7 @@ const ui = {
   undoButton: document.querySelector("#undoButton"),
   redoButton: document.querySelector("#redoButton"),
   exportButton: document.querySelector("#exportButton"),
+  exportPdfButton: document.querySelector("#exportPdfButton"),
   toolButtons: [...document.querySelectorAll("[data-tool]")],
   toolTipTitle: document.querySelector("#toolTipTitle"),
   toolTipCopy: document.querySelector("#toolTipCopy"),
@@ -49,6 +54,7 @@ const ui = {
   statusMessage: document.querySelector("#statusMessage"),
   zoomOutButton: document.querySelector("#zoomOutButton"),
   zoomInButton: document.querySelector("#zoomInButton"),
+  actualSizeButton: document.querySelector("#actualSizeButton"),
   fitButton: document.querySelector("#fitButton"),
   zoomLabel: document.querySelector("#zoomLabel"),
   inspectorTitle: document.querySelector("#inspectorTitle"),
@@ -179,9 +185,11 @@ function bindEvents() {
   ui.undoButton.addEventListener("click", undo);
   ui.redoButton.addEventListener("click", redo);
   ui.exportButton.addEventListener("click", () => exportAnnotatedPng());
+  ui.exportPdfButton.addEventListener("click", () => exportAnnotatedPdf());
   ui.deleteButton.addEventListener("click", deleteSelectedAnnotation);
-  ui.zoomInButton.addEventListener("click", () => adjustZoom(1.25));
-  ui.zoomOutButton.addEventListener("click", () => adjustZoom(0.8));
+  ui.zoomInButton.addEventListener("click", () => adjustZoom(1.25, { announce: true }));
+  ui.zoomOutButton.addEventListener("click", () => adjustZoom(0.8, { announce: true }));
+  ui.actualSizeButton.addEventListener("click", () => setActualSize());
   ui.fitButton.addEventListener("click", fitCanvas);
 
   for (const button of ui.toolButtons) {
@@ -229,6 +237,13 @@ function bindEvents() {
         return true;
       }
 
+      if (message?.type === "LUMEN_EDITOR_EXPORT_PDF") {
+        exportAnnotatedPdf()
+          .then((result) => sendResponse({ ok: true, ...result }))
+          .catch((error) => sendResponse({ ok: false, error: error.message }));
+        return true;
+      }
+
       return undefined;
     });
   }
@@ -264,7 +279,11 @@ function exposeIntegrationApi() {
     getMetadata: getAnnotationExportMetadata,
     getAnnotationCount: () => state.history.present.length,
     load: loadImagePayload,
-    exportPng: exportAnnotatedPng
+    exportPng: exportAnnotatedPng,
+    exportPdf: exportAnnotatedPdf,
+    fit: fitCanvas,
+    actualSize: setActualSize,
+    getZoom: () => state.zoom
   });
 
   Object.defineProperty(globalThis, "LumenAnnotationEditor", {
@@ -1327,10 +1346,16 @@ function updateControls() {
   ui.undoButton.disabled = !state.history.past.length;
   ui.redoButton.disabled = !state.history.future.length;
   ui.exportButton.disabled = !hasImage || state.exporting;
-  ui.zoomInButton.disabled = !hasImage;
-  ui.zoomOutButton.disabled = !hasImage;
+  ui.exportButton.title = hasImage && state.source.scaled
+    ? `Export ${ui.canvas.width}×${ui.canvas.height}px editor-source PNG (Ctrl/⌘ S)`
+    : "Export full-resolution PNG (Ctrl/⌘ S)";
+  ui.exportPdfButton.disabled = !hasImage || state.exporting;
+  ui.zoomInButton.disabled = !hasImage || state.zoom >= 4;
+  ui.zoomOutButton.disabled = !hasImage || state.zoom <= 0.03;
+  ui.actualSizeButton.disabled = !hasImage;
   ui.fitButton.disabled = !hasImage;
   ui.zoomLabel.textContent = state.zoomMode === "fit" ? "Fit" : `${Math.round(state.zoom * 100)}%`;
+  ui.zoomLabel.value = ui.zoomLabel.textContent;
 }
 
 function getSelectedAnnotation() {
@@ -1363,7 +1388,21 @@ function fitCanvas(options = {}) {
   }
 }
 
-function adjustZoom(multiplier) {
+function setActualSize(options = {}) {
+  if (!state.image) {
+    return;
+  }
+
+  state.zoom = 1;
+  state.zoomMode = "custom";
+  applyZoom();
+
+  if (options.announce !== false) {
+    showStatus(`Actual pixels at 100%. Export remains ${ui.canvas.width}×${ui.canvas.height}px.`, "success");
+  }
+}
+
+function adjustZoom(multiplier, options = {}) {
   if (!state.image) {
     return;
   }
@@ -1371,6 +1410,10 @@ function adjustZoom(multiplier) {
   state.zoomMode = "custom";
   state.zoom = Math.max(0.03, Math.min(4, state.zoom * multiplier));
   applyZoom();
+
+  if (options.announce) {
+    showStatus(`Zoomed to ${Math.round(state.zoom * 100)}%. Export remains ${ui.canvas.width}×${ui.canvas.height}px.`);
+  }
 }
 
 function applyZoom() {
@@ -1404,7 +1447,31 @@ function handleKeyboardShortcut(event) {
 
   if (modifier && key === "s") {
     event.preventDefault();
-    exportAnnotatedPng();
+    event.shiftKey ? exportAnnotatedPdf() : exportAnnotatedPng();
+    return;
+  }
+
+  if (modifier && ["=", "+"].includes(event.key)) {
+    event.preventDefault();
+    adjustZoom(1.25, { announce: true });
+    return;
+  }
+
+  if (modifier && event.key === "-") {
+    event.preventDefault();
+    adjustZoom(0.8, { announce: true });
+    return;
+  }
+
+  if (modifier && event.key === "0") {
+    event.preventDefault();
+    fitCanvas();
+    return;
+  }
+
+  if (modifier && event.key === "1") {
+    event.preventDefault();
+    setActualSize();
     return;
   }
 
@@ -1512,27 +1579,16 @@ async function exportAnnotatedPng() {
   try {
     const blob = await getRenderedAnnotationBlob();
     const metadata = getAnnotationExportMetadata();
-    const objectUrl = URL.createObjectURL(blob);
-    let downloadId = null;
-
-    if (globalThis.chrome?.downloads?.download) {
-      downloadId = await chrome.downloads.download({
-        url: objectUrl,
-        filename: `Lumen/${metadata.filename}`,
-        saveAs: true
-      });
-    } else {
-      const link = document.createElement("a");
-      link.href = objectUrl;
-      link.download = metadata.filename;
-      link.click();
-    }
-
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    const downloadId = await downloadBlob(blob, metadata.filename, { folder: "Lumen" });
     window.dispatchEvent(new CustomEvent("lumen:annotation-exported", {
-      detail: { blob, metadata, downloadId }
+      detail: { blob, metadata, downloadId, format: "png" }
     }));
-    showStatus("Annotated PNG is ready.", "success");
+    showStatus(
+      metadata.sourceScaled
+        ? `PNG ready at the ${metadata.width}×${metadata.height}px editor-source resolution; the recorded original is ${metadata.sourceWidth}×${metadata.sourceHeight}px.`
+        : `Full-resolution PNG ready at ${metadata.width}×${metadata.height}px.`,
+      "success"
+    );
 
     return {
       blob,
@@ -1541,6 +1597,62 @@ async function exportAnnotatedPng() {
     };
   } catch (error) {
     showStatus(error.message || "The annotated PNG could not be exported.", "error");
+    throw error;
+  } finally {
+    state.exporting = false;
+    updateControls();
+  }
+}
+
+async function exportAnnotatedPdf() {
+  if (!state.image || state.exporting) {
+    return null;
+  }
+
+  commitPropertyPreview();
+  state.exporting = true;
+  updateControls();
+  showStatus("Paginating the annotated capture for PDF…");
+
+  try {
+    let pdf;
+
+    // The working canvas already owns the decoded full-size source. Re-render it
+    // without selection chrome while the page slices are encoded, then restore
+    // the interactive view instead of allocating a second near-limit canvas.
+    renderComposite(ui.canvas, state.history.present, { includeSelection: false });
+
+    try {
+      pdf = await createCanvasPdfBlob(ui.canvas);
+    } finally {
+      renderEditor();
+    }
+
+    const metadata = getAnnotationExportMetadata();
+    const filename = metadata.filename.replace(/\.png$/i, ".pdf");
+    const downloadId = await downloadBlob(pdf.blob, filename, { folder: "Lumen" });
+    const pdfMetadata = {
+      ...metadata,
+      filename,
+      format: "pdf",
+      pageCount: pdf.pageCount,
+      rasterWidth: pdf.rasterWidth
+    };
+    window.dispatchEvent(new CustomEvent("lumen:annotation-exported", {
+      detail: { blob: pdf.blob, metadata: pdfMetadata, downloadId, format: "pdf" }
+    }));
+    showStatus(
+      `Annotated PDF ready — ${pdf.pageCount} ${pdf.pageCount === 1 ? "page" : "pages"}. Export PNG keeps the ${metadata.width}×${metadata.height}px raster.`,
+      "success"
+    );
+
+    return {
+      blob: pdf.blob,
+      metadata: pdfMetadata,
+      downloadId
+    };
+  } catch (error) {
+    showStatus(error.message || "The annotated PDF could not be exported.", "error");
     throw error;
   } finally {
     state.exporting = false;

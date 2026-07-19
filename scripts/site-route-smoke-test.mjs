@@ -12,8 +12,19 @@ const publicMirrors = [
   "privacy.html",
   "script.js",
   "styles.css",
+  "review.html",
+  "review.css",
+  "review.js",
+  "review-actions.js",
+  "visual-diff-engine.js",
+  "library-store.js",
+  "config.js",
+  "entitlements.js",
+  "export-utils.js",
   "assets/hero-before.png",
-  "assets/hero-after.png"
+  "assets/hero-after.png",
+  "assets/lumen-product-demo-poster.png",
+  "assets/lumen-product-demo.webm"
 ];
 const siteRoots = [
   {
@@ -58,12 +69,18 @@ try {
     results.push(await runRouteChecks(target));
   }
 
+  const liveReviewChecks = [];
+  for (const target of siteRoots) {
+    liveReviewChecks.push(await runLiveReviewCheck(target));
+  }
+
   const browserChecks = await runBrowserChecks(repoRoot);
 
   console.log(JSON.stringify({
     ok: true,
     mirrors,
     results,
+    liveReviewChecks,
     browserChecks
   }, null, 2));
 } catch (error) {
@@ -128,6 +145,19 @@ async function runRouteChecks(target) {
     assert(root.body.includes('data-tour-tab="compare"') && root.body.includes('data-tour-tab="monitor"'), `Expected ${target.name} landing page to include the product workflow tour.`, {
       sample: root.body.slice(0, 240)
     });
+    assert(root.body.includes('id="actual-app"') && root.body.includes("The extension is the actual app."), `Expected ${target.name} landing page to explain where the Lumen app lives.`, {
+      sample: root.body.slice(0, 240)
+    });
+    assert(root.body.includes('href="review.html?demo=1"'), `Expected ${target.name} landing page to link to the live review app demo.`, {
+      sample: root.body.slice(0, 240)
+    });
+    assert(
+      root.body.includes('poster="assets/lumen-product-demo-poster.png"') &&
+        root.body.includes('src="assets/lumen-product-demo.webm"') &&
+        root.body.includes("Product tour"),
+      `Expected ${target.name} landing page to embed the recorded extension tour.`,
+      { sample: root.body.slice(0, 240) }
+    );
 
     const privacy = await fetchText(`${fixture.origin}/privacy.html`);
     assert(privacy.status === 200, `Expected ${target.name} privacy route to load.`, privacy);
@@ -136,6 +166,12 @@ async function runRouteChecks(target) {
     });
     assert(privacy.body.includes("Limited Use requirements"), `Expected ${target.name} privacy route to include Limited Use disclosure.`, {
       sample: privacy.body.slice(0, 240)
+    });
+
+    const liveAppDemo = await fetchText(`${fixture.origin}/review.html?demo=1`);
+    assert(liveAppDemo.status === 200, `Expected ${target.name} live app demo route to load.`, liveAppDemo);
+    assert(liveAppDemo.body.includes("Lumen Visual Change Review"), `Expected ${target.name} live app route to serve the real review workspace.`, {
+      sample: liveAppDemo.body.slice(0, 240)
     });
 
     const legacyDocs = await fetchText(`${fixture.origin}/docs/`);
@@ -152,6 +188,7 @@ async function runRouteChecks(target) {
       assert(legacyDocs.body.includes('id="hero-title"') && legacyDocs.body.includes("Lumen shows what changed."), "Expected repository-root docs route to serve the rebuilt landing page.", {
         sample: legacyDocs.body.slice(0, 240)
       });
+
     }
 
     const notFound = await fetchText(`${fixture.origin}/missing-route`);
@@ -166,6 +203,11 @@ async function runRouteChecks(target) {
     const socialCard = await fetchBytes(`${fixture.origin}${target.assetPath}`);
     assert(socialCard.status === 200, `Expected ${target.name} social image asset to load.`, socialCard);
     assert(socialCard.bytes > 1024, `Expected ${target.name} social image asset to contain data.`, socialCard);
+
+    const demoPoster = await fetchBytes(`${fixture.origin}/assets/lumen-product-demo-poster.png`);
+    const demoVideo = await fetchBytes(`${fixture.origin}/assets/lumen-product-demo.webm`);
+    assert(demoPoster.status === 200 && demoPoster.bytes > 100_000, `Expected ${target.name} product-tour poster to load.`, demoPoster);
+    assert(demoVideo.status === 200 && demoVideo.bytes > 1_000_000, `Expected ${target.name} product-tour video to load.`, demoVideo);
 
     for (const storeAssetPath of target.storeAssetPaths) {
       const storeAsset = await fetchBytes(`${fixture.origin}${storeAssetPath}`);
@@ -185,14 +227,79 @@ async function runRouteChecks(target) {
       checks: [
         "/",
         "/privacy.html",
+        "/review.html?demo=1",
         "/docs/",
         "/missing-route",
         "/..%2fpackage.json",
         target.assetPath,
+        "/assets/lumen-product-demo-poster.png",
+        "/assets/lumen-product-demo.webm",
         ...target.storeAssetPaths
       ]
     };
   } finally {
+    await new Promise((resolve) => fixture.server.close(resolve));
+  }
+}
+
+async function runLiveReviewCheck(target) {
+  const fixture = await startStaticServer(target.root);
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({ acceptDownloads: true });
+  const page = await context.newPage();
+  const runtimeErrors = [];
+
+  page.on("pageerror", (error) => runtimeErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      runtimeErrors.push(message.text());
+    }
+  });
+
+  try {
+    await page.goto(`${fixture.origin}/review.html?demo=1`, { waitUntil: "networkidle" });
+    await page.locator("#reviewContent:not(.is-hidden)").waitFor();
+    await page.locator("#regionList .region-button").first().waitFor();
+
+    const navigation = await page.locator('a[href="index.html#actual-app"]').count();
+    assert(navigation >= 3, `${target.name} public demo left extension-only navigation routes in place.`, { navigation });
+
+    const editorButton = page.getByRole("button", { name: "Editor in extension" });
+    assert(await editorButton.isDisabled(), `${target.name} public demo exposed a broken in-memory editor route.`);
+
+    await page.locator("#revealSlider").fill("68");
+    assert(await page.locator("#revealOutput").textContent() === "68% after", `${target.name} reveal slider did not update.`);
+    await page.locator("#regionList .region-button").first().click();
+
+    const pngDownload = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "Export PNG" }).click()
+    ]).then(([download]) => download);
+    assert(pngDownload.suggestedFilename().endsWith(".png"), `${target.name} public demo did not export PNG.`);
+
+    const pdfDownload = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "Export PDF" }).click()
+    ]).then(([download]) => download);
+    assert(pdfDownload.suggestedFilename().endsWith(".pdf"), `${target.name} public demo did not export PDF.`);
+
+    await page.getByRole("button", { name: "Mark reviewed" }).click();
+    assert(await page.getByRole("button", { name: "Reviewed" }).isVisible(), `${target.name} review action did not complete.`);
+    assert(runtimeErrors.length === 0, `${target.name} live review demo emitted runtime errors.`, runtimeErrors);
+
+    return {
+      name: target.name,
+      route: "/review.html?demo=1",
+      navigationRewritten: true,
+      slider: true,
+      regionJump: true,
+      pngExport: pngDownload.suggestedFilename(),
+      pdfExport: pdfDownload.suggestedFilename(),
+      reviewed: true
+    };
+  } finally {
+    await context.close();
+    await browser.close();
     await new Promise((resolve) => fixture.server.close(resolve));
   }
 }
@@ -231,6 +338,7 @@ async function runBrowserChecks(siteRoot) {
         const label = document.querySelector('label[for="heroReveal"]');
         const activeTourImage = document.querySelector('[data-tour-panel="capture"] img');
         const reliabilityImage = document.querySelector(".reliability-visual img");
+        const productTour = document.querySelector(".app-demo-frame video");
 
         return {
           clientWidth: document.documentElement.clientWidth,
@@ -247,6 +355,10 @@ async function runBrowserChecks(siteRoot) {
             ? [reliabilityImage.loading, reliabilityImage.complete, reliabilityImage.naturalWidth, reliabilityImage.naturalHeight]
             : null,
           changeRegions: document.querySelectorAll(".change-box").length,
+          liveAppLinks: document.querySelectorAll('a[href="review.html?demo=1"]').length,
+          productTour: productTour
+            ? [productTour.controls, productTour.preload, productTour.getAttribute("poster"), productTour.querySelector("source")?.getAttribute("src")]
+            : null,
           shortcutPaths: document.querySelectorAll("[data-capture-path]").length,
           bodyText: document.body.innerText
         };
@@ -258,6 +370,12 @@ async function runBrowserChecks(siteRoot) {
       assert(initial.divider === "48%" && initial.sliderValue === "48", `Expected ${viewport.width}px comparison divider to match its slider thumb.`, initial);
       assert(initial.sliderLabel === "Move the divider to compare captures", `Expected ${viewport.width}px comparison slider to have a visible associated label.`, initial);
       assert(initial.changeRegions === 6, `Expected ${viewport.width}px demo to draw all six reported changed regions.`, initial);
+      assert(initial.liveAppLinks >= 2, `Expected ${viewport.width}px page to offer the live app demo from the hero and app section.`, initial);
+      assert(
+        JSON.stringify(initial.productTour) === JSON.stringify([true, "metadata", "assets/lumen-product-demo-poster.png", "assets/lumen-product-demo.webm"]),
+        `Expected ${viewport.width}px page to expose a user-controlled, bandwidth-conscious product tour.`,
+        initial
+      );
       assert(initial.shortcutPaths === 2, `Expected ${viewport.width}px page to present distinct shortcut and Lumen paths.`, initial);
       assert(initial.bodyText.includes("Open Lumen") && initial.bodyText.includes("Chrome’s toolbar"), `Expected ${viewport.width}px page to explain the toolbar entry point.`, initial);
       assert(initial.bodyText.includes("GoFullPage") && initial.bodyText.includes("FireShot"), `Expected ${viewport.width}px page to include competitor positioning.`, initial);

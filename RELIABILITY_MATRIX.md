@@ -1,6 +1,6 @@
 # Lumen Reliability Matrix
 
-Last full live run: July 16, 2026 America/Chicago (artifacts timestamped July 17 UTC).
+Last full live run: July 18, 2026 America/Chicago (artifacts timestamped July 19 UTC).
 
 This matrix separates reproducible CI evidence from live-site evidence. Live pages are valuable release checks, but third-party availability, login state, experiments, and markup can change, so they are not used as a blocking CI gate.
 
@@ -31,8 +31,8 @@ npm run smoke:real-sites
 
 | Target | Page class | Segments | Output images | Captured height | Result |
 | --- | --- | ---: | ---: | ---: | --- |
-| `captainfredric.github.io/lumen-extension/docs/` | Product landing page | 12 | 2 tiled images | 20,118 px | Pass |
-| `github.com/CaptainFredric/lumen-extension` | Dynamic repository application | 13 | 2 tiled images | 22,324 px | Pass |
+| `captainfredric.github.io/lumen-extension/` | Product landing page | 9 | 1 image | 15,368 px | Pass |
+| `github.com/CaptainFredric/lumen-extension` | Dynamic repository application | 16 | 3 tiled images | 27,028 px | Pass |
 | `developer.chrome.com/.../activeTab` | Documentation page | 4 | 1 image | 7,010 px | Pass |
 | `developer.mozilla.org/.../Intersection_Observer_API` | Very long documentation page | 23 | 4 tiled images | 41,184 px | Pass |
 

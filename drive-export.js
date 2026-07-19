@@ -1,3 +1,5 @@
+import { isLocalOnlyMode } from "./settings-store.js";
+
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const DRIVE_API_ORIGIN = "https://www.googleapis.com/*";
 const DRIVE_CONTENT_API_ORIGIN = "https://content.googleapis.com/*";
@@ -47,6 +49,18 @@ export async function getDriveExportStatus(options = {}) {
     };
   }
 
+  if (await isLocalOnlyMode({ chromeApi })) {
+    return {
+      ok: true,
+      configured: true,
+      connected: false,
+      permissionGranted: false,
+      originGranted: false,
+      localOnly: true,
+      reason: "local-only-mode"
+    };
+  }
+
   const [permissionGranted, originGranted] = await Promise.all([
     containsPermission(chromeApi, { permissions: ["identity"] }),
     containsPermission(chromeApi, { origins: DRIVE_API_ORIGINS })
@@ -88,6 +102,13 @@ export async function getDriveExportStatus(options = {}) {
 export async function connectGoogleDrive(options = {}) {
   const chromeApi = options.chromeApi || globalThis.chrome;
   const configuration = readDriveOAuthConfiguration(options.manifest || readRuntimeManifest(chromeApi));
+
+  if (await isLocalOnlyMode({ chromeApi })) {
+    throw createDriveError(
+      "local-only-mode",
+      "Google Drive export is blocked by Local-only mode. Turn it off in Lumen Settings before connecting."
+    );
+  }
 
   if (!configuration.configured) {
     throw createDriveError(
@@ -138,6 +159,13 @@ export async function uploadReviewedImageToDrive(input = {}, options = {}) {
   }
 
   const status = await getDriveExportStatus({ chromeApi, manifest: options.manifest });
+
+  if (status.localOnly) {
+    throw createDriveError(
+      "local-only-mode",
+      "Google Drive export is blocked by Local-only mode. Turn it off in Lumen Settings before exporting."
+    );
+  }
 
   if (!status.configured) {
     throw createDriveError(
@@ -208,15 +236,28 @@ export async function disconnectGoogleDrive(options = {}) {
     await removeCachedToken(chromeApi, token);
   }
 
-  const removed = await removePermission(chromeApi, {
-    permissions: ["identity"],
+  // Revoke each permission class independently. Chrome can retain one half of a
+  // combined request when only the identity permission or the API origins are
+  // currently granted, which makes a combined revoke look successful while
+  // leaving Drive access behind.
+  const identityRemoved = await removePermission(chromeApi, {
+    permissions: ["identity"]
+  });
+  const originsRemoved = await removePermission(chromeApi, {
     origins: DRIVE_API_ORIGINS
   });
+  const [permissionGranted, originGranted] = await Promise.all([
+    containsPermission(chromeApi, { permissions: ["identity"] }),
+    containsPermission(chromeApi, { origins: DRIVE_API_ORIGINS })
+  ]);
 
   return {
     ok: true,
     connected: false,
-    permissionRemoved: removed
+    permissionRemoved: identityRemoved || originsRemoved,
+    complete: !permissionGranted && !originGranted,
+    permissionGranted,
+    originGranted
   };
 }
 
@@ -377,7 +418,10 @@ function removePermission(chromeApi, permissions) {
       return;
     }
 
-    chromeApi.permissions.remove(permissions, (removed) => resolve(Boolean(removed)));
+    chromeApi.permissions.remove(permissions, (removed) => {
+      const runtimeError = chromeApi.runtime?.lastError;
+      resolve(!runtimeError && Boolean(removed));
+    });
   });
 }
 

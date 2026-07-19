@@ -53,8 +53,17 @@ jobs:
       - name: Test area-monitor schedules
         run: npm run smoke:watch
 
+      - name: Test Settings and Privacy Shield
+        run: xvfb-run --auto-servernum npm run smoke:settings
+
       - name: Test annotation editing
         run: npm run smoke:editor
+
+      - name: Test image, PDF, and zoom export
+        run: npm run smoke:export
+
+      - name: Test export source integrity and PDF cache pruning
+        run: npm run smoke:export-integrity
 
       - name: Test visual diff engine
         run: npm run smoke:diff
@@ -85,9 +94,6 @@ jobs:
 
       - name: Test loaded extension
         run: xvfb-run --auto-servernum npm run smoke:extension
-
-      - name: Test optional site-access revocation
-        run: xvfb-run --auto-servernum npm run smoke:permissions
 
       - name: Test end-to-end capture
         run: xvfb-run --auto-servernum npm run smoke:e2e

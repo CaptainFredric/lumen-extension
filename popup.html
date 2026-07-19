@@ -18,7 +18,10 @@
             <p class="eyebrow">Lumen</p>
             <p class="sub-eyebrow">Capture workspace</p>
           </div>
-          <span class="pill">MV3</span>
+          <button id="openSettingsButton" class="settings-button" type="button" aria-label="Open Lumen settings">
+            <span aria-hidden="true"></span>
+            Settings
+          </button>
         </div>
 
         <h1>Clean captures from busy pages.</h1>
@@ -140,6 +143,10 @@
           <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="annotate">
             <i class="action-icon action-icon-callout" aria-hidden="true"></i>
             <span><strong>Mark callout</strong><small>Draw one capture note</small></span>
+          </button>
+          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="review">
+            <i class="action-icon action-icon-review" aria-hidden="true"></i>
+            <span><strong>Review capture</strong><small>Preview output before saving</small></span>
           </button>
           <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="analyze">
             <i class="action-icon action-icon-signals" aria-hidden="true"></i>

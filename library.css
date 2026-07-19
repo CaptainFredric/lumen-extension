@@ -164,11 +164,15 @@ select:focus-visible,
 }
 
 .quiet-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 38px;
   padding: 8px 13px;
   border-radius: 11px;
   font-size: 0.78rem;
   font-weight: 760;
+  text-decoration: none;
 }
 
 .quiet-button:hover:not(:disabled),

@@ -29,6 +29,8 @@ const [editorHtml, editorJavaScript, editorCss, editorDriveJavaScript] = await P
 ]);
 
 assert.match(editorHtml, /id="exportButton"[^>]*>\s*Export PNG/, "editor should expose a visible PNG export action");
+assert.match(editorHtml, /id="exportPdfButton"[^>]*>[\s\S]*?Export PDF/, "editor should expose a visible paginated PDF action");
+assert.match(editorHtml, /id="actualSizeButton"[^>]*>[\s\S]*?100%/, "editor should expose a true actual-pixel zoom action");
 assert.match(editorHtml, /data-lumen-export-actions/, "editor should expose an optional destination toolbar slot");
 assert.match(editorHtml, /<script type="module" src="editor\.js"><\/script>/, "editor should use a CSP-safe external module");
 assert.doesNotMatch(editorHtml, /<script(?![^>]*\bsrc=)[^>]*>/i, "editor should not use inline JavaScript");
@@ -39,6 +41,8 @@ for (const tool of ["select", "arrow", "rectangle", "text", "blur", "pixelate"])
 }
 
 assert.match(editorJavaScript, /export async function getRenderedAnnotationBlob/, "Drive and local integrations should be able to request the rendered Blob");
+assert.match(editorJavaScript, /createCanvasPdfBlob/, "annotated PDF exports should use the shared real PDF renderer");
+assert.match(editorJavaScript, /function setActualSize/, "editor should support an exact 100% zoom mode");
 assert.match(editorJavaScript, /getAnnotationCount/, "editor integrations should be able to read the annotation count");
 assert.match(editorJavaScript, /parameters\.get\("demo"\) === "1"/, "editor should support its generated browser-QA demo route");
 assert.match(editorJavaScript, /includeEditorSource: true/, "library launches should prefer the stored whole-image editor source");

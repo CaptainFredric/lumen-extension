@@ -276,6 +276,10 @@ canvas:focus-visible,
   color: var(--muted);
 }
 
+.pdf-export-button {
+  white-space: nowrap;
+}
+
 .primary-button {
   border-color: rgba(127, 241, 197, 0.35);
   color: #03120d;
@@ -840,7 +844,8 @@ textarea {
   }
 
   .header-actions .file-button,
-  .header-actions .primary-button {
+  .header-actions .primary-button,
+  .header-actions .pdf-export-button {
     flex: 1;
   }
 
@@ -888,12 +893,39 @@ textarea {
 @media (max-width: 430px) {
   .header-actions {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 38px 38px minmax(0, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .header-actions .file-button {
+    grid-column: 1 / 3;
+    grid-row: 1;
+  }
+
+  #undoButton {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  #redoButton {
+    grid-column: 4;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  #exportButton {
+    grid-column: 1 / 3;
+    grid-row: 2;
+  }
+
+  #exportPdfButton {
+    grid-column: 3 / 5;
+    grid-row: 2;
   }
 
   .external-export-actions:not(:empty) {
     grid-column: 1 / -1;
-    grid-row: 2;
+    grid-row: 3;
   }
 
   .external-export-actions .toolbar-button {
@@ -910,11 +942,12 @@ textarea {
   }
 
   .workspace-footer {
+    gap: 5px;
     padding-left: 10px;
   }
 
   .status-message {
-    max-width: 42vw;
+    max-width: calc(100% - 210px);
   }
 }
 

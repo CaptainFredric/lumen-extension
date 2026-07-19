@@ -15,6 +15,7 @@ const requiredRuntimeFiles = [
   "manifest.json",
   "background.js",
   "annotation-engine.js",
+  "export-utils.js",
   "content.js",
   "config.js",
   "entitlements.js",
@@ -37,6 +38,10 @@ const requiredRuntimeFiles = [
   "review.html",
   "review.js",
   "review-actions.js",
+  "settings-store.js",
+  "settings.css",
+  "settings.html",
+  "settings.js",
   "visual-diff-engine.js"
 ];
 

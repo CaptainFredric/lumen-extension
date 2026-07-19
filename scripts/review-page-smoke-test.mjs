@@ -32,7 +32,9 @@ try {
   assert.ok(await page.locator("#regionList .region-button").count() >= 2);
   assert.equal(await page.locator("#beforeSelect option").count(), 5);
   assert.equal(await page.locator("#afterSelect option").count(), 5);
-  assert.equal(await page.locator("#reviewActions button").count(), 2);
+  assert.equal(await page.locator("#reviewActions button").count(), 4);
+  assert.equal(await page.locator("#reviewActions button", { hasText: "Export PNG" }).isEnabled(), true);
+  assert.equal(await page.locator("#reviewActions button", { hasText: "Export PDF" }).isEnabled(), true);
   assert.equal(await page.locator("body").getAttribute("data-selected-capture-id"), "demo-after");
   const hookResult = await page.evaluate(() => {
     let eventCaptureId = "";

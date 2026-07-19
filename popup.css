@@ -129,6 +129,58 @@ body {
   letter-spacing: 0.08em;
 }
 
+.settings-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid rgba(134, 221, 255, 0.2);
+  border-radius: 999px;
+  color: var(--accent);
+  background: rgba(134, 221, 255, 0.07);
+  font-size: 0.68rem;
+  font-weight: 780;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.settings-button:hover {
+  border-color: rgba(134, 221, 255, 0.4);
+  background: rgba(134, 221, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.settings-button > span {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+}
+
+.settings-button > span::after {
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.action-icon-review::before {
+  inset: 5px 2px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+}
+
+.action-icon-review::after {
+  top: 10px;
+  left: 9px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
 .eyebrow,
 .sub-eyebrow,
 .section-label,

@@ -62,11 +62,12 @@
         <p class="eyebrow">Privacy policy</p>
         <h1>Local-first capture, clear limits.</h1>
         <p class="privacy-lede">
-          Lumen captures webpages for review work. This policy describes what the extension stores
-          locally, how gallery and editor images differ from downloaded originals, how timed selected-area
-          plans work, and what would be required before any connected feature transfers data.
+          The Chrome extension is Lumen's capture app; this website is its installation and demo front door.
+          This policy describes what the extension stores locally, how gallery, editor, and PDF-cache assets
+          differ from downloaded originals, how timed selected-area plans work, and what happens when a user
+          explicitly chooses a connected export.
         </p>
-        <p class="privacy-date">Effective date: July 16, 2026</p>
+        <p class="privacy-date">Effective date: July 16, 2026 · Updated July 18, 2026</p>
       </section>
 
       <section class="privacy-grid" aria-label="Privacy summary">
@@ -74,7 +75,9 @@
           <h2>Default behavior</h2>
           <p>
             The extension stores settings, marked regions, schedules, history, compact gallery previews,
-            and bounded whole-capture editor images on the device. Full-resolution screenshots and supporting metadata save through Chrome Downloads.
+            bounded whole-capture editor images, and capture-time raster PDF caches on the device.
+            Full-resolution screenshots, user-exported PNGs and PDFs, and optional supporting metadata
+            save through Chrome Downloads.
           </p>
         </article>
 
@@ -107,6 +110,7 @@
             <li>Extracted page signals such as colors, fonts, navigation labels, headline text, CTA text, and layout counts.</li>
             <li>Local capture history, file names, Chrome download IDs, and supporting capture metadata.</li>
             <li>Compact gallery previews and bounded whole-capture editor images stored for the local photo library. Safe-size captures can keep a lossless editor image; very large or tiled captures use a scaled whole-page proxy. These local copies do not replace downloaded originals.</li>
+            <li>A capture-time paginated raster PDF cache when generation succeeds. It is built from the original rendered capture output or tiles, capped at 3200 raster pixels per page, and stored locally for review export. It is not a full-resolution or searchable-text copy.</li>
             <li>Optional timer-plan details, including the selected page and area, delay or repeat cadence, continuous-run cap, status, and run history.</li>
             <li>Optional capture notes that you choose to add to an export.</li>
             <li>Optional annotation and visual-review details, including the comparison pair, change percentage, highlighted region count, and reviewed/exported status.</li>
@@ -124,7 +128,7 @@
             <li>Build a JSON metadata file that keeps capture context attached to the image outputs.</li>
             <li>Show real local previews, search, filters, favorites, history, and original-file actions in the photo library.</li>
             <li>Help you check redactions and focused crop resolution before export.</li>
-            <li>Edit arrows, text, rectangles, blur, and pixelation, then export a reviewed PNG.</li>
+            <li>Edit arrows, text, rectangles, blur, and pixelation, use Fit, 100%, or keyboard zoom on the local working image, then export a reviewed PNG or paginated raster PDF.</li>
             <li>Compare local whole-capture working images with a before/after slider, highlighted changes, statistics, and monitor timeline.</li>
           </ul>
         </article>
@@ -134,20 +138,22 @@
           <p>
             Lumen stores capture history, page signals, saved regions, schedules, and capture-note
             drafts in local Chrome extension storage. Gallery previews, bounded whole-capture editor images,
-            and their metadata are stored in extension-owned IndexedDB on the same device. Harmless capture
-            preferences can use Chrome Sync; note text, screenshot images, saved regions, schedules,
-            and capture history are not placed in Chrome Sync. Full-resolution images and JSON metadata
-            files save through Chrome Downloads into folders named by capture date.
+            capture-time raster PDF caches, and their metadata are stored in extension-owned IndexedDB on
+            the same device. Harmless capture preferences can use Chrome Sync; note text, screenshot images,
+            saved regions, schedules, capture history, and cached PDFs are not placed in Chrome Sync.
+            Full-resolution images and any enabled JSON metadata files save through Chrome Downloads into
+            folders named by capture date.
           </p>
           <p>
             Gallery cleanup defaults to 50 MB or 500 preview-bearing captures. Whole-capture editor
-            sources use a separate 250 MB or 75-capture budget. Lumen removes the oldest non-favorite
-            assets in each category first while keeping capture metadata and downloaded originals.
-            Favorite assets are preserved. Removing a library item or clearing the library removes its
-            local gallery and editor images; it does not delete Downloads files.
+            sources use a separate 250 MB or 75-capture budget. Capture-time review PDFs use another
+            separate 250 MB or 75-capture budget. Lumen removes the oldest non-favorite assets in each
+            category first while keeping capture metadata and downloaded originals. Favorite assets are
+            preserved. Removing a library item or clearing the library removes its local gallery image,
+            editor source, and cached PDF; it does not delete Downloads files.
           </p>
           <p>
-            Annotation edits remain in the editor tab until PNG export or tab closure. The library stores
+            Annotation edits remain in the editor tab until PNG or PDF export or tab closure. The library stores
             compact review status and comparison statistics, not the editable annotation document. Editing
             and visual-change analysis use the local whole-capture working image when available.
           </p>
@@ -161,12 +167,17 @@
         <article>
           <h2>Sharing and transfer</h2>
           <p>
-            The Chrome Web Store build contains no Lumen-owned production sync endpoint. Screenshot
-            content, photo-library images, page text, capture history, redaction details, timer-plan
-            details, and page signals stay on the device and in downloaded files. Developers can explicitly
-            run the repository's loopback demo backend to test session and metadata contracts on their own
-            computer; it is not cloud storage or a production sync service. Team sharing, background cloud
-            backup, full-Drive synchronization, and remote monitoring are not part of the local beta.
+            This public website is an installation and demo front door, not the extension capture runtime,
+            and it cannot capture arbitrary browser tabs. The Chrome Web Store build contains no Lumen-owned
+            production sync endpoint. Screenshot content, photo-library images, page text, capture history,
+            redaction details, timer-plan details, and page signals stay on the device and in downloaded
+            files. Developers can explicitly run the repository's loopback demo backend to test session
+            and metadata contracts on their own computer; it is not cloud storage or a production sync
+            service. In that development path, signing in does not enable content synchronization:
+            capture and monitor reads or writes require the separate cloud-sync control, and outbound
+            records remove URL fragments and common sensitive query parameters while the complete
+            scheduled target stays on-device. Team sharing, background cloud backup, full-Drive
+            synchronization, and remote monitoring are not part of the local beta.
           </p>
           <p>
             Google Drive export is optional and user initiated. Pressing <strong>Export to Drive</strong>
@@ -206,9 +217,12 @@
           <h2>Your controls</h2>
           <ul>
             <li>You choose when to capture a page or explicitly save a delayed, repeating, or capped continuous selected-area plan.</li>
-            <li>You can disable cleanup, lazy-load forcing, redaction, notes, and metadata export in the popup settings.</li>
+            <li>A dedicated Settings screen controls fast capture, review-before-save, cleanup, lazy-load forcing, redaction, notes, metadata, exports, permissions, and local data.</li>
+            <li>On a fresh install, one-click capture starts with local-only mode and automatic redaction on, while capture-details JSON and review-before-save start off.</li>
+            <li>Privacy Shield is a separate stronger choice that locks review-before-save, automatic redaction, metadata minimization, and local-only behavior together and pauses unattended monitor alarms. Turning it off restores your explicit individual choices and resumes active monitors.</li>
+            <li>Local-only mode blocks optional connected export while leaving local PNG and raster PDF downloads available.</li>
             <li>One-shot responsive site access is removed after capture when no timed capture still needs it.</li>
-            <li>You can remove one library item, clear the photo library and its gallery/editor images, or clear local history, page signals, saved regions, note drafts, timed captures, and optional site permissions.</li>
+            <li>You can remove one library item, clear the photo library and its gallery/editor images and cached PDFs, or clear local history, page signals, saved regions, note drafts, timed captures, and optional site permissions.</li>
             <li>Removing local library images does not remove originals. You can delete downloaded images and metadata files separately from your Downloads folder.</li>
             <li>You can clear extension storage through Chrome extension site data controls or by removing the extension.</li>
             <li>You can disconnect Drive to remove Lumen's cached token and optional permissions. Previously exported Drive files remain under your control.</li>

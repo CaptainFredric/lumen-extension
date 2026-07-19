@@ -1,5 +1,37 @@
 # Lumen Release Notes
 
+## 0.4.0 — July 18, 2026
+
+This release makes the Chrome extension—not the marketing website—the clearer center of Lumen and turns the local capture-to-review path into a faster, more deliberate workflow.
+
+### New
+
+1. Added a dedicated Settings app for capture defaults, privacy, exports, optional permissions, Google Drive disconnect, and local-workspace deletion.
+2. Added reversible Privacy Shield. While enabled, it centrally enforces local-only mode, review-before-save, automatic redaction, and metadata minimization and pauses unattended monitor alarms; disabling it restores the user's prior choices and resumes active monitors.
+3. Added fresh-install one-click defaults: local-only mode and automatic redaction start on, capture-details JSON and review-before-save start off, and the stronger Privacy Shield remains an explicit choice.
+4. Added local PNG and paginated raster PDF export from review and Annotation Studio, with Fit, 100%, and keyboard zoom for the local working image.
+5. Added a capture-time PDF cache generated from the original rendered capture output or tiles at up to 3200 raster pixels per page. It remains available for review export even when a large capture's bounded editor proxy is later pruned, until its own cache limit is reached.
+6. Rebuilt the public landing page as the installation, explanation, and demo front door while keeping the Chrome extension's popup, library, editor, comparison workspace, and Settings as the actual app.
+
+### Reliability and privacy
+
+1. Privacy Shield is enforced in the shared settings and background capture paths rather than only represented by a UI toggle.
+2. Signing in no longer implies content synchronization: capture and monitor reads or writes require the separate cloud-sync control to be explicitly enabled. Outbound capture and monitor URLs remove fragments and sensitive token, authorization, session, secret, and key parameters while the complete scheduled target remains on-device.
+3. Local deletion and permission-revoke results now report what Chrome actually removed; downloaded originals and already-exported Drive files remain under the user's control.
+4. Gallery previews retain their 50 MB or 500-capture cleanup limit. Whole-capture editor sources and cached review PDFs each have separate 250 MB or 75-capture limits, preserving favorites while removing the oldest eligible local assets first.
+5. Export integrity coverage verifies PNG source requirements, cached-PDF provenance, PDF pagination and raster limits, cache pruning, and Blob-download URL cleanup.
+6. The 0.4.0 verification pass completed Settings, export, export-integrity, annotation, change-review, difficult-site, release-ZIP, loaded-extension, and end-to-end capture tests.
+7. Live reliability capture completed on four different sites: the public Lumen site, the GitHub repository, Chrome's `activeTab` documentation, and MDN's Intersection Observer documentation. This live matrix remains separate from CI because third-party pages can change.
+
+### Known limits
+
+1. Fit, 100%, and keyboard zoom apply to the local working image. Very large or tiled captures can use a scaled whole-page editor proxy; full-resolution original images remain in Chrome Downloads.
+2. PDF output is a paginated raster document, not a searchable text PDF. Capture-time review PDFs use the original rendered output or tiles as input but cap each page at 3200 raster pixels wide.
+3. Chrome can defer local timed captures while the browser or device is asleep or closed.
+4. Cross-origin iframe content, closed shadow roots, canvas-rendered secrets, and image-only sensitive data require manual review.
+5. Google Drive export requires publisher-owned Chrome Web Store and Google Cloud OAuth configuration. It remains a user-started export of one reviewed image, not background backup or full-Drive synchronization.
+6. Chrome Web Store privacy attestations, final permission testing in stock Chrome, distribution settings, and submission remain publisher actions.
+
 ## 0.3.0 — July 16, 2026
 
 This release turns Lumen from a full-page capture utility into a local review workspace.

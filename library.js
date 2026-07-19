@@ -130,10 +130,10 @@ function renderLibrary() {
     return;
   }
 
-  for (const capture of captures) {
+  for (const [index, capture] of captures.entries()) {
     const card = buildCaptureCard(capture);
     ui.captureGrid.append(card);
-    loadCardPreview(card, capture, renderVersion).catch(() => {});
+    loadCardPreview(card, capture, renderVersion, { eager: index < 12 }).catch(() => {});
   }
 }
 
@@ -237,7 +237,7 @@ async function openCaptureTool(captureId, tool) {
   }
 }
 
-async function loadCardPreview(card, capture, renderVersion) {
+async function loadCardPreview(card, capture, renderVersion, { eager = false } = {}) {
   const asset = await getLibraryPreviewAsset(capture.id);
 
   if (!asset?.blob || renderVersion !== state.renderVersion || !card.isConnected) {
@@ -256,6 +256,7 @@ async function loadCardPreview(card, capture, renderVersion) {
   const objectUrl = URL.createObjectURL(asset.blob);
 
   state.cardObjectUrls.add(objectUrl);
+  image.loading = eager ? "eager" : "lazy";
   image.alt = `Preview of ${capture.title || capture.host || "saved capture"}`;
   image.addEventListener("load", () => {
     if (renderVersion === state.renderVersion) {
@@ -470,7 +471,11 @@ async function refreshStorageEstimate() {
 
 function renderStorageEstimate(estimate) {
   ui.captureMetric.textContent = String(estimate.captureCount || 0);
-  ui.previewMetric.textContent = formatBytes((estimate.previewBytes || 0) + (estimate.editorBytes || 0));
+  ui.previewMetric.textContent = formatBytes(
+    (estimate.previewBytes || 0) +
+    (estimate.editorBytes || 0) +
+    (estimate.pdfBytes || 0)
+  );
   ui.storageMetric.textContent = estimate.quota
     ? `${formatBytes(estimate.usage || 0)} of ${formatBytes(estimate.quota)}`
     : formatBytes(estimate.usage || 0);

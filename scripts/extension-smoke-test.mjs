@@ -287,18 +287,24 @@ try {
     await changeForeignAsset("delete");
     database.close();
     const ownCapture = await store.getLibraryCapture(captureId, { includePreview: true });
+    const crossPurpose = await store.getLibraryCapture(captureId, {
+      includePreview: true,
+      assetId: ownCapture?.editorAssetId || ""
+    });
 
     return {
       crossCapturePreviewRejected: crossCapture?.preview === null,
+      crossPurposePreviewRejected: crossPurpose?.preview === null,
       ownCapturePreviewAvailable: Boolean(ownCapture?.preview?.blob),
       previewMetadataAvailable: store.hasLibraryPreview(ownCapture)
     };
   }, seededCaptureId);
   assert(
     libraryIntegrity.crossCapturePreviewRejected &&
+      libraryIntegrity.crossPurposePreviewRejected &&
       libraryIntegrity.ownCapturePreviewAvailable &&
       libraryIntegrity.previewMetadataAvailable,
-    "The local library did not enforce capture-to-preview asset integrity.",
+    "The local library did not enforce capture and purpose integrity for preview assets.",
     libraryIntegrity
   );
 
@@ -393,7 +399,7 @@ try {
   await editorPage.waitForSelector("#canvasFrame:not(.is-hidden)", { timeout: 10000 });
   const loadedEditor = await editorPage.evaluate(() => ({
     metadata: globalThis.LumenAnnotationEditor?.getMetadata?.(),
-    toolNames: [...document.querySelectorAll("[data-tool]")].map((button) => button.getAttribute("aria-label")),
+    toolNames: [...document.querySelectorAll("button[data-tool]")].map((button) => button.getAttribute("aria-label")),
     driveActionCount: document.querySelectorAll("[data-lumen-export-actions] button").length
   }));
   assert(
@@ -532,7 +538,7 @@ try {
   assert(popupState.analyzeButton === "Analyze page", "Analyze action did not render.", popupState);
   assert(!popupState.analyzeDisabled, "Analyze action should be enabled for a capturable target tab.", popupState);
   assert(popupState.holdMenuHidden === "true", "Hold menu should start closed.", popupState);
-  assert(popupState.holdActionCount === 7, "Hold menu actions did not render.", popupState);
+  assert(popupState.holdActionCount === 8, "Hold menu actions did not render.", popupState);
   assert(popupState.statusHidden, "Popup status panel should start hidden.", popupState);
   assert(popupState.manualCount === "0 boxes", "Manual redaction counter did not initialize.", popupState);
   assert(!popupState.autoRedactDisabled, "Local beta should make auto-redaction immediately usable.", popupState);
@@ -718,7 +724,10 @@ try {
 
   const storageState = await worker.evaluate(async () => ({
     sync: await chrome.storage.sync.get("lumen.capture.settings"),
-    local: await chrome.storage.local.get("lumen.capture.privateSettings")
+    local: await chrome.storage.local.get([
+      "lumen.capture.privateSettings",
+      "lumen.app.settings"
+    ])
   }));
 
   assert(
@@ -735,6 +744,12 @@ try {
     typeof storageState.local["lumen.capture.privateSettings"]?.annotationText === "string",
     "Private capture-note settings were not initialized in local storage.",
     storageState
+  );
+  assert(
+    storageState.local["lumen.app.settings"]?.localOnlyMode === true &&
+      storageState.local["lumen.app.settings"]?.reviewBeforeSave === false,
+    "New installs did not initialize safe local-only and one-click capture defaults.",
+    storageState.local
   );
 
   console.log(JSON.stringify({
