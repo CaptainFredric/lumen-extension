@@ -21,26 +21,35 @@ const publicMirrors = [
   "config.js",
   "entitlements.js",
   "export-utils.js",
-  "assets/hero-before.png",
+  "brandmark.svg",
+  "assets/brandmark-512.png",
+  "assets/lumen-social-card.png",
   "assets/hero-after.png",
-  "assets/lumen-product-demo-poster.png",
-  "assets/lumen-product-demo.webm"
+  "assets/store-control-surface.png"
 ];
+const PRIMARY_CTA_URL = "https://github.com/CaptainFredric/lumen-extension#load-the-extension-locally";
+const REMOVED_LANDING_MARKUP = [
+  "data-hero-comparison",
+  "data-hero-slider",
+  "data-tour",
+  "data-tour-tab",
+  "data-tour-panel",
+  "workflow-tabs",
+  "change-box",
+  "product-video",
+  "lumen-product-demo.webm",
+  "review.html?demo=1"
+];
+const REMOVED_LANDING_WORDS = /\b(?:dashboard|timeline|statistics|regions)\b/i;
 const siteRoots = [
   {
     name: "docs artifact root",
     root: path.join(repoRoot, "docs"),
     legacyDocsMode: "redirect",
     assetPath: "/assets/lumen-social-card.png",
-    storeAssetPaths: [
-      "/assets/store-control-surface.png",
-      "/assets/store-annotation-studio.png",
-      "/assets/store-visual-change-review.png",
-      "/assets/store-responsive-set.png",
-      "/assets/store-review-actions.png",
-      "/assets/store-library-monitor.png",
-      "/assets/hero-before.png",
-      "/assets/hero-after.png"
+    landingAssetPaths: [
+      "/assets/hero-after.png",
+      "/assets/store-control-surface.png"
     ]
   },
   {
@@ -48,15 +57,9 @@ const siteRoots = [
     root: repoRoot,
     legacyDocsMode: "landing",
     assetPath: "/assets/lumen-social-card.png",
-    storeAssetPaths: [
-      "/assets/store-control-surface.png",
-      "/assets/store-annotation-studio.png",
-      "/assets/store-visual-change-review.png",
-      "/assets/store-responsive-set.png",
-      "/assets/store-review-actions.png",
-      "/assets/store-library-monitor.png",
-      "/assets/hero-before.png",
-      "/assets/hero-after.png"
+    landingAssetPaths: [
+      "/assets/hero-after.png",
+      "/assets/store-control-surface.png"
     ]
   }
 ];
@@ -126,47 +129,38 @@ async function runRouteChecks(target) {
     assert(root.status === 200, `Expected ${target.name} root route to load.`, root);
     assert(
       root.body.includes('id="hero-title"') &&
-        root.body.includes("Capture the whole page.") &&
-        root.body.includes("See what changed."),
-      `Expected ${target.name} root route to serve the concise Lumen landing page.`, {
-      sample: root.body.slice(0, 240)
-      }
-    );
-    assert(root.body.includes("data-hero-comparison") && root.body.includes('id="heroReveal"'), `Expected ${target.name} landing page to include the interactive capture comparison.`, {
-      sample: root.body.slice(0, 240)
-    });
-    assert(root.body.includes('src="assets/hero-before.png"') && root.body.includes('src="assets/hero-after.png"'), `Expected ${target.name} landing page to use the aligned demo pair.`, {
-      sample: root.body.slice(0, 240)
-    });
-    assert(
-      !root.body.includes("data-shortcut-comparison") &&
-        !root.body.includes("GoFullPage") &&
-        !root.body.includes("FireShot"),
-      `Expected ${target.name} landing page to omit the removed tutorial and competitor table.`, {
-      sample: root.body.slice(0, 240)
+        root.body.includes("Capture any webpage, all the way down.") &&
+        root.body.includes('id="features"') &&
+        root.body.includes('id="actual-app"') &&
+        root.body.includes('id="privacy"'),
+      `Expected ${target.name} root route to serve the feature-only Lumen landing page.`, {
+        sample: root.body.slice(0, 240)
       }
     );
     assert(
-      root.body.includes('data-tour-tab="capture"') &&
-        root.body.includes('data-tour-tab="annotate"') &&
-        root.body.includes('data-tour-tab="compare"') &&
-        root.body.includes('data-tour-tab="monitor"'),
-      `Expected ${target.name} landing page to include the clickable product tour.`, {
-      sample: root.body.slice(0, 240)
+      countMatches(root.body, /class="feature-card"/g) === 6,
+      `Expected ${target.name} landing page to present exactly six product features.`, {
+        featureCards: countMatches(root.body, /class="feature-card"/g)
       }
     );
-    assert(root.body.includes('href="#workflow"') && root.body.includes("See Lumen in action"), `Expected ${target.name} landing page to lead directly to the product UI.`, {
-      sample: root.body.slice(0, 240)
-    });
-    assert(root.body.includes('href="review.html?demo=1"'), `Expected ${target.name} landing page to link to the live review app demo.`, {
-      sample: root.body.slice(0, 240)
-    });
     assert(
-      root.body.includes('poster="assets/lumen-product-demo-poster.png"') &&
-        root.body.includes('src="assets/lumen-product-demo.webm"') &&
-        root.body.includes("Recorded from the actual extension."),
-      `Expected ${target.name} landing page to embed the recorded extension tour.`,
-      { sample: root.body.slice(0, 240) }
+      root.body.includes(`href="${PRIMARY_CTA_URL}"`) &&
+        root.body.includes('src="assets/hero-after.png"') &&
+        root.body.includes('src="assets/store-control-surface.png"') &&
+        root.body.includes('href="privacy.html"'),
+      `Expected ${target.name} landing page to expose its install action, real UI images, and privacy route.`, {
+        sample: root.body.slice(0, 240)
+      }
+    );
+    assert(
+      REMOVED_LANDING_MARKUP.every((marker) => !root.body.includes(marker)) &&
+        !/<video\b/i.test(root.body) &&
+        !REMOVED_LANDING_WORDS.test(stripMarkup(root.body)),
+      `Expected ${target.name} landing page to omit the removed showcase, review, and dashboard UI.`, {
+        presentMarkers: REMOVED_LANDING_MARKUP.filter((marker) => root.body.includes(marker)),
+        hasVideo: /<video\b/i.test(root.body),
+        forbiddenWords: stripMarkup(root.body).match(REMOVED_LANDING_WORDS)?.[0] || ""
+      }
     );
 
     const privacy = await fetchText(`${fixture.origin}/privacy.html`);
@@ -195,7 +189,7 @@ async function runRouteChecks(target) {
         sample: legacyDocs.body.slice(0, 240)
       });
     } else {
-      assert(legacyDocs.body.includes('id="hero-title"') && legacyDocs.body.includes("Capture the whole page."), "Expected repository-root docs route to serve the concise landing page.", {
+      assert(legacyDocs.body.includes('id="hero-title"') && legacyDocs.body.includes("Capture any webpage, all the way down."), "Expected repository-root docs route to serve the feature-only landing page.", {
         sample: legacyDocs.body.slice(0, 240)
       });
 
@@ -214,21 +208,15 @@ async function runRouteChecks(target) {
     assert(socialCard.status === 200, `Expected ${target.name} social image asset to load.`, socialCard);
     assert(socialCard.bytes > 1024, `Expected ${target.name} social image asset to contain data.`, socialCard);
 
-    const demoPoster = await fetchBytes(`${fixture.origin}/assets/lumen-product-demo-poster.png`);
-    const demoVideo = await fetchBytes(`${fixture.origin}/assets/lumen-product-demo.webm`);
-    assert(demoPoster.status === 200 && demoPoster.bytes > 100_000, `Expected ${target.name} product-tour poster to load.`, demoPoster);
-    assert(demoVideo.status === 200 && demoVideo.bytes > 1_000_000, `Expected ${target.name} product-tour video to load.`, demoVideo);
-    assert(demoVideo.contentType === "video/webm", `Expected ${target.name} product-tour video to use a playable content type.`, demoVideo);
-
-    for (const storeAssetPath of target.storeAssetPaths) {
-      const storeAsset = await fetchBytes(`${fixture.origin}${storeAssetPath}`);
-      assert(storeAsset.status === 200, `Expected ${target.name} store screenshot asset to load.`, {
-        storeAssetPath,
-        ...storeAsset
+    for (const landingAssetPath of target.landingAssetPaths) {
+      const landingAsset = await fetchBytes(`${fixture.origin}${landingAssetPath}`);
+      assert(landingAsset.status === 200, `Expected ${target.name} landing image to load.`, {
+        landingAssetPath,
+        ...landingAsset
       });
-      assert(storeAsset.bytes > 1024, `Expected ${target.name} store screenshot asset to contain data.`, {
-        storeAssetPath,
-        ...storeAsset
+      assert(landingAsset.bytes > 1024 && landingAsset.contentType === "image/png", `Expected ${target.name} landing image to contain PNG data.`, {
+        landingAssetPath,
+        ...landingAsset
       });
     }
 
@@ -243,9 +231,7 @@ async function runRouteChecks(target) {
         "/missing-route",
         "/..%2fpackage.json",
         target.assetPath,
-        "/assets/lumen-product-demo-poster.png",
-        "/assets/lumen-product-demo.webm",
-        ...target.storeAssetPaths
+        ...target.landingAssetPaths
       ]
     };
   } finally {
@@ -342,123 +328,135 @@ async function runBrowserChecks(siteRoot) {
       await page.goto(`${fixture.origin}/`, { waitUntil: "networkidle" });
 
       const initial = await page.evaluate(() => {
-        const before = document.querySelector('img[src="assets/hero-before.png"]');
-        const after = document.querySelector('img[src="assets/hero-after.png"]');
-        const stage = document.querySelector("[data-hero-comparison-stage]");
-        const slider = document.querySelector("#heroReveal");
-        const label = document.querySelector('label[for="heroReveal"]');
-        const activeTourImage = document.querySelector('[data-tour-panel="capture"] img');
-        const reliabilityImage = document.querySelector(".reliability-visual img");
-        const productTour = document.querySelector(".product-video video");
-        const actionLink = document.querySelector('.hero-actions a[href="#workflow"]');
+        const heroImage = document.querySelector('img[src="assets/hero-after.png"]');
+        const extensionImage = document.querySelector('img[src="assets/store-control-surface.png"]');
+        const primaryCta = document.querySelector(".hero-actions .button-primary");
+        const featureCards = [...document.querySelectorAll(".feature-card")];
+        const hashLinks = [...document.querySelectorAll('a[href^="#"]')];
+        const removedSelector = [
+          "[data-hero-comparison]",
+          "[data-hero-slider]",
+          "[data-tour]",
+          "[data-tour-tab]",
+          "[data-tour-panel]",
+          ".comparison-demo",
+          ".workflow-shell",
+          ".workflow-tabs",
+          ".change-box",
+          ".product-video",
+          "video",
+          ".dashboard",
+          ".statistics",
+          ".regions",
+          ".timeline"
+        ].join(",");
+        const forbiddenWord = document.body.innerText.match(/\b(?:dashboard|timeline|statistics|regions)\b/i)?.[0] || "";
 
         return {
           clientWidth: document.documentElement.clientWidth,
           scrollWidth: document.documentElement.scrollWidth,
-          before: before ? [before.complete, before.naturalWidth, before.naturalHeight] : null,
-          after: after ? [after.complete, after.naturalWidth, after.naturalHeight] : null,
-          divider: stage ? getComputedStyle(stage).getPropertyValue("--divider").trim() : null,
-          sliderValue: slider?.value || null,
-          sliderLabel: label?.textContent?.trim() || null,
-          activeTourImage: activeTourImage
-            ? [activeTourImage.loading, activeTourImage.complete, activeTourImage.naturalWidth, activeTourImage.naturalHeight]
+          heroTitleCount: document.querySelectorAll("h1#hero-title").length,
+          heroImage: heroImage
+            ? [heroImage.complete, heroImage.naturalWidth, heroImage.naturalHeight, heroImage.getAttribute("alt")]
             : null,
-          reliabilityImage: reliabilityImage
-            ? [reliabilityImage.loading, reliabilityImage.complete, reliabilityImage.naturalWidth, reliabilityImage.naturalHeight]
+          extensionImageLoading: extensionImage?.loading || "",
+          extensionImageAlt: extensionImage?.getAttribute("alt") || "",
+          featureCards: featureCards.map((card) => ({
+            heading: card.querySelector("h3")?.textContent?.trim() || "",
+            copy: card.querySelector("p")?.textContent?.trim() || ""
+          })),
+          primaryCta: primaryCta
+            ? {
+                href: primaryCta.getAttribute("href"),
+                target: primaryCta.getAttribute("target"),
+                rel: primaryCta.getAttribute("rel")
+              }
             : null,
-          changeRegions: document.querySelectorAll(".change-box").length,
-          liveAppLinks: document.querySelectorAll('a[href="review.html?demo=1"]').length,
-          productTour: productTour
-            ? [productTour.controls, productTour.preload, productTour.getAttribute("poster"), productTour.querySelector("source")?.getAttribute("src")]
-            : null,
-          actionLink: actionLink?.textContent?.trim() || null,
-          legacyTutorials: document.querySelectorAll("[data-capture-path], [data-shortcut-comparison], .difference-table").length,
-          bodyText: document.body.innerText
+          privacyPolicyLinks: document.querySelectorAll('a[href="privacy.html"]').length,
+          hasActualAppAnchor: Boolean(document.querySelector("#actual-app")),
+          brokenHashTargets: hashLinks
+            .map((link) => link.getAttribute("href"))
+            .filter((href) => href && href !== "#" && !document.getElementById(href.slice(1))),
+          reviewLinks: document.querySelectorAll('a[href*="review.html"]').length,
+          removedSelectorCount: document.querySelectorAll(removedSelector).length,
+          forbiddenWord
         };
       });
 
       assert(initial.scrollWidth === initial.clientWidth, `Expected ${viewport.width}px landing page to avoid horizontal overflow.`, initial);
-      assert(JSON.stringify(initial.before) === JSON.stringify([true, 1136, 710]), `Expected ${viewport.width}px before image to decode at its aligned dimensions.`, initial);
-      assert(JSON.stringify(initial.after) === JSON.stringify([true, 1136, 710]), `Expected ${viewport.width}px after image to decode at its aligned dimensions.`, initial);
-      assert(initial.divider === "48%" && initial.sliderValue === "48", `Expected ${viewport.width}px comparison divider to match its slider thumb.`, initial);
-      assert(initial.sliderLabel === "Move the divider to compare captures", `Expected ${viewport.width}px comparison slider to have a visible associated label.`, initial);
-      assert(initial.changeRegions === 6, `Expected ${viewport.width}px demo to draw all six reported changed regions.`, initial);
-      assert(initial.liveAppLinks >= 2, `Expected ${viewport.width}px page to offer the interactive review from the feature and closing sections.`, initial);
       assert(
-        JSON.stringify(initial.productTour) === JSON.stringify([true, "metadata", "assets/lumen-product-demo-poster.png", "assets/lumen-product-demo.webm"]),
-        `Expected ${viewport.width}px page to expose a user-controlled, bandwidth-conscious product tour.`,
+        initial.heroTitleCount === 1 &&
+          initial.heroImage?.[0] === true &&
+          initial.heroImage?.[1] === 1136 &&
+          initial.heroImage?.[2] === 710 &&
+          Boolean(initial.heroImage?.[3]),
+        `Expected ${viewport.width}px page to render one accessible heading and the complete hero image.`,
         initial
       );
-      assert(initial.actionLink === "See Lumen in action", `Expected ${viewport.width}px hero to lead to the real product UI.`, initial);
-      assert(initial.legacyTutorials === 0, `Expected ${viewport.width}px page to stay free of the removed tutorial and comparison table.`, initial);
-      assert(!initial.bodyText.includes("GoFullPage") && !initial.bodyText.includes("FireShot"), `Expected ${viewport.width}px page to avoid competitor-centered copy.`, initial);
-      assert(initial.activeTourImage?.[0] === "lazy", `Expected ${viewport.width}px tour image to preserve initial-load bandwidth.`, initial);
-      assert(initial.reliabilityImage?.[0] === "lazy", `Expected ${viewport.width}px reliability image to preserve initial-load bandwidth.`, initial);
+      assert(initial.featureCards.length === 6, `Expected ${viewport.width}px page to render all six feature cards.`, initial);
+      assert(
+        initial.featureCards.every((card) => card.heading && card.copy),
+        `Expected ${viewport.width}px feature cards to include a heading and plain-language description.`,
+        initial.featureCards
+      );
+      assert(
+        initial.primaryCta?.href === PRIMARY_CTA_URL &&
+          initial.primaryCta.target === "_blank" &&
+          initial.primaryCta.rel?.split(/\s+/).includes("noreferrer"),
+        `Expected ${viewport.width}px primary action to point to the Chrome beta installation instructions.`,
+        initial.primaryCta
+      );
+      assert(initial.privacyPolicyLinks >= 1, `Expected ${viewport.width}px page to link to the valid privacy route.`, initial);
+      assert(initial.hasActualAppAnchor, `Expected ${viewport.width}px page to preserve the public review return anchor.`, initial);
+      assert(initial.brokenHashTargets.length === 0, `Expected ${viewport.width}px page hash links to resolve to real sections.`, initial.brokenHashTargets);
+      assert(
+        initial.reviewLinks === 0 &&
+          initial.removedSelectorCount === 0 &&
+          !initial.forbiddenWord,
+        `Expected ${viewport.width}px landing page to contain only the feature-focused presentation.`,
+        initial
+      );
+      assert(
+        initial.extensionImageLoading === "lazy" && Boolean(initial.extensionImageAlt),
+        `Expected ${viewport.width}px extension image to be accessible and bandwidth-conscious.`,
+        initial
+      );
 
-      const slider = page.locator("#heroReveal");
-      const output = page.locator("[data-hero-output]");
-      const stage = page.locator("[data-hero-comparison-stage]");
-
-      await slider.fill("0");
-      assert(await output.textContent() === "0% before · 100% after", `Expected ${viewport.width}px comparison output to update at the left edge.`);
-      assert(await stage.evaluate((element) => getComputedStyle(element).getPropertyValue("--divider").trim()) === "0%", `Expected ${viewport.width}px comparison divider to meet the slider at the left edge.`);
-
-      await slider.fill("100");
-      assert(await output.textContent() === "100% before · 0% after", `Expected ${viewport.width}px comparison output to update at the right edge.`);
-      assert(await stage.evaluate((element) => getComputedStyle(element).getPropertyValue("--divider").trim()) === "100%", `Expected ${viewport.width}px comparison divider to meet the slider at the right edge.`);
-
-      await slider.focus();
-      await slider.press("Home");
-      assert(await slider.getAttribute("aria-valuetext") === "0% before, 100% after", `Expected ${viewport.width}px Home key to move the divider left.`);
-      await slider.press("End");
-      assert(await slider.getAttribute("aria-valuetext") === "100% before, 0% after", `Expected ${viewport.width}px End key to move the divider right.`);
-      await slider.fill("48");
-
-      const activeTourProof = page.locator('[data-tour-panel="capture"] img');
-      await activeTourProof.scrollIntoViewIfNeeded();
+      const extensionImage = page.locator('img[src="assets/store-control-surface.png"]');
+      await extensionImage.scrollIntoViewIfNeeded();
       await page.waitForFunction(() => {
-        const image = document.querySelector('[data-tour-panel="capture"] img');
-        return Boolean(image?.complete && image.naturalWidth > 1000);
+        const image = document.querySelector('img[src="assets/store-control-surface.png"]');
+        return Boolean(image?.complete && image.naturalWidth === 1280 && image.naturalHeight === 800);
       });
-
-      const reliabilityProof = page.locator(".reliability-visual img");
-      await reliabilityProof.scrollIntoViewIfNeeded();
-      await page.waitForFunction(() => {
-        const image = document.querySelector(".reliability-visual img");
-        return Boolean(image?.complete && image.naturalWidth > 1000);
-      });
-
-      if (viewport.width <= 390) {
-        const boundedControls = await page.evaluate(() => {
-          const selectors = ["#heroReveal", "[data-hero-output]", ".workflow-tabs"];
-          return selectors.map((selector) => {
-            const rect = document.querySelector(selector)?.getBoundingClientRect();
-            return rect ? { selector, left: rect.left, right: rect.right } : null;
-          });
-        });
-
-        assert(boundedControls.every((control) => control && control.left >= 0 && control.right <= viewport.width), `Expected ${viewport.width}px comparison and product controls to remain inside the viewport.`, boundedControls);
-      }
+      const extensionImageState = await extensionImage.evaluate((image) => [
+        image.complete,
+        image.naturalWidth,
+        image.naturalHeight
+      ]);
+      assert(
+        JSON.stringify(extensionImageState) === JSON.stringify([true, 1280, 800]),
+        `Expected ${viewport.width}px page to decode the actual extension image at its source dimensions.`,
+        extensionImageState
+      );
+      assert(
+        await page.evaluate(() => document.documentElement.scrollWidth === document.documentElement.clientWidth),
+        `Expected ${viewport.width}px landing page to stay overflow-free after lazy images load.`
+      );
 
       if (viewport.width === 1440) {
-        const actionLink = page.getByRole("link", { name: "See Lumen in action" });
-        await actionLink.click();
-        assert(new URL(page.url()).hash === "#workflow", "Expected the hero action to open the real product tour.");
-
-        const compareTab = page.locator('[data-tour-tab="compare"]');
-        await compareTab.click();
-        assert(await compareTab.getAttribute("aria-selected") === "true", "Expected comparison tour tab to activate by click.");
-        assert(await page.locator('[data-tour-panel="compare"]').isVisible(), "Expected comparison tour panel to become visible.");
-        await compareTab.press("ArrowRight");
-        assert(await page.locator('[data-tour-tab="monitor"]').getAttribute("aria-selected") === "true", "Expected tour arrow-key navigation to activate Monitor.");
+        const featuresLink = page.locator('.site-nav a[href="#features"]');
+        await featuresLink.click();
+        assert(new URL(page.url()).hash === "#features", "Expected the Features navigation action to target the feature grid.");
       }
 
       assert(runtimeErrors.length === 0, `Expected ${viewport.width}px landing page to avoid console and runtime errors.`, runtimeErrors);
       checks.push({
         viewport: `${viewport.width}x${viewport.height}`,
         noOverflow: true,
-        alignedDemoPair: true,
-        keyboardComparison: true,
+        featureCards: initial.featureCards.length,
+        primaryCta: true,
+        heroImage: true,
+        extensionImage: true,
         runtimeErrors: runtimeErrors.length
       });
 
@@ -591,6 +589,19 @@ function findFirstDifference(left, right) {
   }
 
   return left.byteLength === right.byteLength ? -1 : limit;
+}
+
+function countMatches(value, pattern) {
+  return (String(value).match(pattern) || []).length;
+}
+
+function stripMarkup(value) {
+  return String(value)
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function assert(condition, message, details = null) {
