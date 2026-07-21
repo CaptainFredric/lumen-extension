@@ -35,6 +35,7 @@ const ui = {
   launchStatusTitle: document.querySelector("#launchStatusTitle"),
   launchStatusDetail: document.querySelector("#launchStatusDetail"),
   captureButton: document.querySelector("#captureButton"),
+  captureOptionsButton: document.querySelector("#captureOptionsButton"),
   analyzeButton: document.querySelector("#analyzeButton"),
   holdMenu: document.querySelector("#holdMenu"),
   holdMenuActions: [...document.querySelectorAll("[data-quick-action]")],
@@ -183,6 +184,7 @@ let annotationRegionRecord = {
 let statusEvents = [];
 let holdTimer = null;
 let suppressNextCaptureClick = false;
+let holdMenuTrigger = null;
 let launchActionsBlocked = false;
 let launchTargetTab = null;
 let latestHistoryItems = [];
@@ -368,6 +370,8 @@ function bindEvents() {
   ui.captureButton.addEventListener("pointercancel", handleCapturePointerCancel);
   ui.captureButton.addEventListener("keydown", handleCaptureKeyDown);
   ui.captureButton.addEventListener("click", handleCaptureButtonClick);
+  ui.captureOptionsButton.addEventListener("click", handleCaptureOptionsClick);
+  ui.captureOptionsButton.addEventListener("keydown", handleCaptureOptionsKeyDown);
   ui.analyzeButton.addEventListener("click", handleAnalyzeClick);
   ui.holdMenu.addEventListener("click", handleQuickActionClick);
   ui.holdMenu.addEventListener("keydown", handleHoldMenuKeyDown);
@@ -857,7 +861,33 @@ function handleCapturePointerCancel(event) {
 function handleCaptureKeyDown(event) {
   if ((event.key === "ArrowDown" || event.key === "Menu") && !actionBusy) {
     event.preventDefault();
-    openHoldMenu("keyboard");
+    openHoldMenu("keyboard", ui.captureButton);
+  }
+
+  if (event.key === "Escape") {
+    closeHoldMenu();
+  }
+}
+
+function handleCaptureOptionsClick() {
+  if (actionBusy || ui.captureOptionsButton.disabled) {
+    return;
+  }
+
+  if (isHoldMenuOpen()) {
+    closeHoldMenu();
+    return;
+  }
+
+  openHoldMenu("options", ui.captureOptionsButton);
+}
+
+function handleCaptureOptionsKeyDown(event) {
+  if ((event.key === "ArrowDown" || event.key === "ArrowUp") && !actionBusy) {
+    event.preventDefault();
+    openHoldMenu("keyboard", ui.captureOptionsButton, {
+      focusLast: event.key === "ArrowUp"
+    });
   }
 
   if (event.key === "Escape") {
@@ -877,7 +907,15 @@ function handleDocumentKeyDown(event) {
 }
 
 function handleOutsidePointerDown(event) {
-  if (!ui.launchPanel.contains(event.target)) {
+  if (!isHoldMenuOpen()) {
+    return;
+  }
+
+  const targetIsMenuControl = ui.holdMenu.contains(event.target) ||
+    ui.captureButton.contains(event.target) ||
+    ui.captureOptionsButton.contains(event.target);
+
+  if (!targetIsMenuControl) {
     closeHoldMenu();
   }
 }
@@ -964,40 +1002,44 @@ async function runQuickAction(action) {
   }
 }
 
-function openHoldMenu(source = "hold") {
+function openHoldMenu(source = "hold", trigger = ui.captureButton, { focusLast = false } = {}) {
   if (launchActionsBlocked) {
     return;
   }
 
   clearHoldTimer();
   ui.captureButton.classList.remove("is-holding");
+  holdMenuTrigger = trigger;
   ui.launchPanel.classList.add("is-menu-open");
   ui.holdMenu.setAttribute("aria-hidden", "false");
   ui.holdMenu.inert = false;
-  ui.captureButton.setAttribute("aria-expanded", "true");
-  renderLaunchStatus({
-    state: "ready",
-    title: source === "keyboard" ? "Quick actions open" : "Hold menu ready",
-    detail: "Choose a capture action from the main control."
-  });
+  ui.captureOptionsButton.setAttribute("aria-expanded", "true");
 
-  if (source === "keyboard") {
-    ui.holdMenuActions.find((button) => !button.disabled)?.focus();
+  if (source === "keyboard" || source === "options") {
+    const actions = ui.holdMenuActions.filter((button) => !button.disabled);
+    const focusTarget = focusLast ? actions.at(-1) : actions[0];
+    focusTarget?.focus();
   }
 }
 
-function closeHoldMenu() {
+function closeHoldMenu({ restoreFocus = true } = {}) {
   const restoreCaptureFocus = ui.holdMenu.contains(document.activeElement);
+  const focusTarget = holdMenuTrigger || ui.captureOptionsButton;
   clearHoldTimer();
   ui.captureButton.classList.remove("is-holding");
   ui.launchPanel.classList.remove("is-menu-open");
   ui.holdMenu.setAttribute("aria-hidden", "true");
   ui.holdMenu.inert = true;
-  ui.captureButton.setAttribute("aria-expanded", "false");
+  ui.captureOptionsButton.setAttribute("aria-expanded", "false");
+  holdMenuTrigger = null;
 
-  if (restoreCaptureFocus) {
-    ui.captureButton.focus();
+  if (restoreFocus && restoreCaptureFocus && !focusTarget.disabled) {
+    focusTarget.focus();
   }
+}
+
+function isHoldMenuOpen() {
+  return ui.launchPanel.classList.contains("is-menu-open");
 }
 
 function clearHoldTimer() {
@@ -4015,7 +4057,7 @@ async function refreshLaunchStatus() {
     renderLaunchStatus({
       state: "ready",
       title: `${formatTabHost(tab.url)} ready`,
-      detail: "Click to capture. Hold the main button for quick actions.",
+      detail: "Ready for a full-page capture.",
       actionsBlocked: false
     });
   } catch (error) {
@@ -4204,7 +4246,11 @@ function setActionBusy(isBusy) {
 
 function updateActionDisabledState() {
   const disabled = actionBusy || launchActionsBlocked;
+  if (disabled && isHoldMenuOpen()) {
+    closeHoldMenu({ restoreFocus: false });
+  }
   ui.captureButton.disabled = disabled;
+  ui.captureOptionsButton.disabled = disabled;
   ui.analyzeButton.disabled = disabled;
   ui.previewRedactionsButton.disabled = disabled;
   ui.startRedactionPickerButton.disabled = disabled;

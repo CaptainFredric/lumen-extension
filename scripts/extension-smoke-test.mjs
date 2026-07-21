@@ -463,6 +463,9 @@ try {
     captureButton: document.querySelector("#captureButton strong")?.textContent?.trim() || "",
     captureHint: document.querySelector("#captureButton small")?.textContent?.trim() || "",
     captureDisabled: document.querySelector("#captureButton")?.disabled || false,
+    captureOptionsLabel: document.querySelector("#captureOptionsButton")?.getAttribute("aria-label") || "",
+    captureOptionsExpanded: document.querySelector("#captureOptionsButton")?.getAttribute("aria-expanded") || "",
+    captureOptionsDisabled: document.querySelector("#captureOptionsButton")?.disabled || false,
     analyzeButton: document.querySelector("#analyzeButton .action-label")?.textContent?.trim() || "",
     analyzeDisabled: document.querySelector("#analyzeButton")?.disabled || false,
     holdMenuHidden: document.querySelector("#holdMenu")?.getAttribute("aria-hidden") || "",
@@ -533,8 +536,11 @@ try {
   assert(popupState.launchStatusTitle === "lumen-smoke.test ready", "Launch status title did not render the target host.", popupState);
   assert(!popupState.launchBlocked, "Launch panel should not block a capturable target tab.", popupState);
   assert(popupState.captureButton === "Capture page", "Capture action did not render.", popupState);
-  assert(popupState.captureHint === "Capture now. Hold for tools.", "Capture hold hint did not render.", popupState);
+  assert(popupState.captureHint === "Click once", "One-click capture hint did not render.", popupState);
   assert(!popupState.captureDisabled, "Capture action should be enabled for a capturable target tab.", popupState);
+  assert(popupState.captureOptionsLabel === "Capture options", "Capture options control needs an accessible label.", popupState);
+  assert(popupState.captureOptionsExpanded === "false", "Capture options control should start collapsed.", popupState);
+  assert(!popupState.captureOptionsDisabled, "Capture options should be available for a capturable target tab.", popupState);
   assert(popupState.analyzeButton === "Analyze page", "Analyze action did not render.", popupState);
   assert(!popupState.analyzeDisabled, "Analyze action should be enabled for a capturable target tab.", popupState);
   assert(popupState.holdMenuHidden === "true", "Hold menu should start closed.", popupState);
@@ -658,6 +664,49 @@ try {
     filteredArtifactState
   );
 
+  await popup.click("#captureOptionsButton");
+
+  const clickMenuState = await popup.evaluate(async () => {
+    const stored = await chrome.storage.local.get("lumen.capture.history");
+    return {
+      menuOpen: document.querySelector("#launchPanel")?.classList.contains("is-menu-open") || false,
+      ariaHidden: document.querySelector("#holdMenu")?.getAttribute("aria-hidden") || "",
+      optionsExpanded: document.querySelector("#captureOptionsButton")?.getAttribute("aria-expanded") || "",
+      focusedAction: document.activeElement?.getAttribute("data-quick-action") || "",
+      captureHistoryCount: stored["lumen.capture.history"]?.length || 0
+    };
+  });
+
+  assert(clickMenuState.menuOpen, "Clicking capture options did not open the real action menu.", clickMenuState);
+  assert(clickMenuState.ariaHidden === "false", "Capture options aria state did not open.", clickMenuState);
+  assert(clickMenuState.optionsExpanded === "true", "Capture options did not expose its expanded state.", clickMenuState);
+  assert(clickMenuState.focusedAction === "responsive", "Capture options did not focus the first available action.", clickMenuState);
+  assert(clickMenuState.captureHistoryCount === 1, "Opening capture options accidentally started a capture.", clickMenuState);
+
+  await popup.keyboard.press("Escape");
+  const escapedMenuState = await popup.evaluate(() => ({
+    menuOpen: document.querySelector("#launchPanel")?.classList.contains("is-menu-open") || false,
+    ariaHidden: document.querySelector("#holdMenu")?.getAttribute("aria-hidden") || "",
+    optionsExpanded: document.querySelector("#captureOptionsButton")?.getAttribute("aria-expanded") || "",
+    focusId: document.activeElement?.id || ""
+  }));
+
+  assert(!escapedMenuState.menuOpen && escapedMenuState.ariaHidden === "true", "Escape did not close capture options.", escapedMenuState);
+  assert(escapedMenuState.optionsExpanded === "false", "Escape did not collapse the options control.", escapedMenuState);
+  assert(escapedMenuState.focusId === "captureOptionsButton", "Escape did not return focus to capture options.", escapedMenuState);
+
+  await popup.click("#captureOptionsButton");
+  await popup.dispatchEvent("#launchStatus", "pointerdown", {
+    button: 0,
+    pointerId: 2,
+    pointerType: "mouse"
+  });
+  const outsideCloseState = await popup.evaluate(() => ({
+    menuOpen: document.querySelector("#launchPanel")?.classList.contains("is-menu-open") || false,
+    optionsExpanded: document.querySelector("#captureOptionsButton")?.getAttribute("aria-expanded") || ""
+  }));
+  assert(!outsideCloseState.menuOpen && outsideCloseState.optionsExpanded === "false", "Clicking outside the menu did not close it.", outsideCloseState);
+
   await popup.dispatchEvent("#captureButton", "pointerdown", {
     button: 0,
     pointerId: 1,
@@ -668,14 +717,14 @@ try {
   const holdState = await popup.evaluate(() => ({
     menuOpen: document.querySelector("#launchPanel")?.classList.contains("is-menu-open") || false,
     ariaHidden: document.querySelector("#holdMenu")?.getAttribute("aria-hidden") || "",
-    expanded: document.querySelector("#captureButton")?.getAttribute("aria-expanded") || "",
+    optionsExpanded: document.querySelector("#captureOptionsButton")?.getAttribute("aria-expanded") || "",
     statusTitle: document.querySelector("#launchStatusTitle")?.textContent?.trim() || ""
   }));
 
   assert(holdState.menuOpen, "Holding capture did not open the quick action menu.", holdState);
   assert(holdState.ariaHidden === "false", "Hold menu aria state did not open.", holdState);
-  assert(holdState.expanded === "true", "Capture button aria state did not expand.", holdState);
-  assert(holdState.statusTitle === "Hold menu ready", "Launch status did not reflect hold menu state.", holdState);
+  assert(holdState.optionsExpanded === "true", "Long press did not expand the capture options control.", holdState);
+  assert(holdState.statusTitle === "lumen-smoke.test ready", "Opening capture options should not replace the page readiness status.", holdState);
 
   await popup.dispatchEvent("#captureButton", "pointerup", {
     button: 0,
@@ -712,6 +761,7 @@ try {
     launchStatusTitle: document.querySelector("#launchStatusTitle")?.textContent?.trim() || "",
     launchBlocked: document.querySelector("#launchPanel")?.classList.contains("is-blocked") || false,
     captureDisabled: document.querySelector("#captureButton")?.disabled || false,
+    captureOptionsDisabled: document.querySelector("#captureOptionsButton")?.disabled || false,
     analyzeDisabled: document.querySelector("#analyzeButton")?.disabled || false,
     quickActionsDisabled: [...document.querySelectorAll("[data-quick-action]")].every((button) => button.disabled)
   }));
@@ -719,6 +769,7 @@ try {
   assert(blockedState.launchStatusState === "blocked", "Launch status should block restricted or missing target tabs.", blockedState);
   assert(blockedState.launchBlocked, "Launch panel should mark blocked target state.", blockedState);
   assert(blockedState.captureDisabled, "Capture should be disabled without a capturable target tab.", blockedState);
+  assert(blockedState.captureOptionsDisabled, "Capture options should be disabled without a capturable target tab.", blockedState);
   assert(blockedState.analyzeDisabled, "Analyze should be disabled without a capturable target tab.", blockedState);
   assert(blockedState.quickActionsDisabled, "Quick actions should be disabled without a capturable target tab.", blockedState);
 

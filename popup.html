@@ -82,23 +82,34 @@
         </div>
 
         <div class="launch-grid">
-          <button
-            id="captureButton"
-            class="capture-button"
-            type="button"
-            aria-haspopup="menu"
-            aria-expanded="false"
-            aria-controls="holdMenu"
-          >
-            <span class="action-copy">
-              <span class="action-icon action-icon-capture" aria-hidden="true"></span>
-              <span>
-                <strong>Capture page</strong>
-                <small>Capture now. Hold for tools.</small>
+          <div class="capture-action-group">
+            <button
+              id="captureButton"
+              class="capture-button"
+              type="button"
+            >
+              <span class="action-copy">
+                <span class="action-icon action-icon-capture" aria-hidden="true"></span>
+                <span>
+                  <strong>Capture page</strong>
+                  <small>Click once</small>
+                </span>
               </span>
-            </span>
-            <span id="holdProgress" class="hold-progress" aria-hidden="true"></span>
-          </button>
+            </button>
+
+            <button
+              id="captureOptionsButton"
+              class="capture-options-button"
+              type="button"
+              aria-label="Capture options"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              aria-controls="holdMenu"
+              title="Capture options"
+            >
+              <span class="capture-options-chevron" aria-hidden="true"></span>
+            </button>
+          </div>
 
           <button id="analyzeButton" class="secondary-action" type="button">
             <span class="action-copy">
@@ -111,47 +122,47 @@
           </button>
         </div>
 
+        <div id="holdMenu" class="hold-menu" role="menu" aria-label="Capture options" aria-hidden="true" inert>
+          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="responsive">
+            <i class="action-icon action-icon-responsive" aria-hidden="true"></i>
+            <span><strong>Responsive sizes</strong><small>Capture desktop, tablet, and mobile</small></span>
+          </button>
+          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="redact">
+            <i class="action-icon action-icon-redact" aria-hidden="true"></i>
+            <span><strong>Find sensitive info</strong><small>Preview automatic redactions</small></span>
+          </button>
+          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="mark">
+            <i class="action-icon action-icon-box" aria-hidden="true"></i>
+            <span><strong>Hide page areas</strong><small>Draw boxes to remove</small></span>
+          </button>
+          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="cutaway">
+            <i class="action-icon action-icon-cutaway" aria-hidden="true"></i>
+            <span><strong>Select an area</strong><small>Capture a reusable rectangle</small></span>
+          </button>
+          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="lasso">
+            <i class="action-icon action-icon-lasso" aria-hidden="true"></i>
+            <span><strong>Lasso an area</strong><small>Draw a freeform selection</small></span>
+          </button>
+          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="annotate">
+            <i class="action-icon action-icon-callout" aria-hidden="true"></i>
+            <span><strong>Add a note</strong><small>Place a callout on the page</small></span>
+          </button>
+          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="review">
+            <i class="action-icon action-icon-review" aria-hidden="true"></i>
+            <span><strong>Review capture</strong><small>Check before saving</small></span>
+          </button>
+          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="analyze">
+            <i class="action-icon action-icon-signals" aria-hidden="true"></i>
+            <span><strong>Analyze page</strong><small>Colors, type, and layout</small></span>
+          </button>
+        </div>
+
         <div class="capture-pipeline" aria-label="Capture pipeline">
           <span><i class="pipeline-icon pipeline-icon-clean" aria-hidden="true"></i>Clean</span>
           <span><i class="pipeline-icon pipeline-icon-scan" aria-hidden="true"></i>Scan</span>
           <span><i class="pipeline-icon pipeline-icon-stitch" aria-hidden="true"></i>Stitch</span>
           <span><i class="pipeline-icon pipeline-icon-save" aria-hidden="true"></i>Save</span>
           <span><i class="pipeline-icon pipeline-icon-route" aria-hidden="true"></i>Route</span>
-        </div>
-
-        <div id="holdMenu" class="hold-menu" role="menu" aria-label="Quick capture actions" aria-hidden="true" inert>
-          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="responsive">
-            <i class="action-icon action-icon-responsive" aria-hidden="true"></i>
-            <span><strong>Responsive set</strong><small>Desktop, tablet, and mobile</small></span>
-          </button>
-          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="redact">
-            <i class="action-icon action-icon-redact" aria-hidden="true"></i>
-            <span><strong>Scan redactions</strong><small>Preview sensitive regions</small></span>
-          </button>
-          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="mark">
-            <i class="action-icon action-icon-box" aria-hidden="true"></i>
-            <span><strong>Mark boxes</strong><small>Open manual picker</small></span>
-          </button>
-          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="cutaway">
-            <i class="action-icon action-icon-cutaway" aria-hidden="true"></i>
-            <span><strong>Mark cutaway</strong><small>Save a reusable region</small></span>
-          </button>
-          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="lasso">
-            <i class="action-icon action-icon-lasso" aria-hidden="true"></i>
-            <span><strong>Lasso area</strong><small>Draw an irregular region</small></span>
-          </button>
-          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="annotate">
-            <i class="action-icon action-icon-callout" aria-hidden="true"></i>
-            <span><strong>Mark callout</strong><small>Draw one capture note</small></span>
-          </button>
-          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="review">
-            <i class="action-icon action-icon-review" aria-hidden="true"></i>
-            <span><strong>Review capture</strong><small>Preview output before saving</small></span>
-          </button>
-          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="analyze">
-            <i class="action-icon action-icon-signals" aria-hidden="true"></i>
-            <span><strong>Extract signals</strong><small>Palette, type, layout</small></span>
-          </button>
         </div>
       </section>
 

@@ -103,36 +103,71 @@ try {
   await popup.locator("#captureButton").waitFor();
   await popup.locator('#launchStatus[data-state="ready"]').waitFor({ timeout: 15_000 });
 
-  milestone("Recording privacy controls and the capture review");
-  await setScene(recordedPage, {
-    chapter: "01 / Capture",
-    title: "Privacy you can see before save.",
-    copy: "Choose what Lumen cleans and redacts, then review the exact output before anything is written.",
-    mode: "split"
-  });
-  await popup.locator(".controls-panel").scrollIntoViewIfNeeded();
-  await pause(0.8);
-  await toggleWithCursor(recordedPage, popup, "#autoRedact", ".toggle-row:has(#autoRedact) .toggle-shell", false);
-  await pause(0.45);
-  await toggleWithCursor(recordedPage, popup, "#autoRedact", ".toggle-row:has(#autoRedact) .toggle-shell", true);
-  await pause(0.75);
-  await saveStill(recordedPage, "01-privacy-controls.png");
-
+  milestone("Recording the main click and press-and-hold controls");
   await popup.locator("#launchPanel").scrollIntoViewIfNeeded();
   await setScene(recordedPage, {
-    chapter: "01 / Capture",
-    title: "Click once. Keep the whole page.",
-    copy: "The current site stays visible while Lumen prepares a clean, full-page local capture.",
+    chapter: "01 / Start",
+    title: "Capture now, or open more options.",
+    copy: "Click Capture page for the fast path. Use the arrow—or press and hold—to open responsive, privacy, area, review, and analysis tools.",
     mode: "split"
   });
+  await moveCursor(recordedPage, popup, "#captureButton");
+  await pause(0.8);
+  await saveStill(recordedPage, "01-capture-ready.png");
+
+  await pressAndHoldWithCursor(recordedPage, popup, "#captureButton");
+  await waitForHoldMenuState(popup, true);
+  await moveCursor(recordedPage, popup, '[data-quick-action="lasso"]');
+  await pause(1.1);
+  await saveStill(recordedPage, "02-hold-for-tools.png");
+  await popup.locator("#captureButton").press("Escape");
+  await waitForHoldMenuState(popup, false);
+
+  await setScene(recordedPage, {
+    chapter: "01 / Options",
+    title: "The arrow opens every capture tool.",
+    copy: "The same menu is always one normal click away, so advanced capture never depends on remembering a gesture.",
+    mode: "split"
+  });
+  await clickWithCursor(recordedPage, popup, "#captureOptionsButton");
+  await waitForHoldMenuState(popup, true);
+  await moveCursor(recordedPage, popup, '[data-quick-action="review"]');
+  await pause(1.05);
+  await saveStill(recordedPage, "03-click-for-options.png");
+  await popup.locator("#captureButton").press("Escape");
+  await waitForHoldMenuState(popup, false);
+
+  await setScene(recordedPage, {
+    chapter: "02 / Capture",
+    title: "One click captures the whole page.",
+    copy: "Lumen cleans the current tab, scans private details, stitches the page, and shows the exact save plan.",
+    mode: "split"
+  });
+  await moveCursor(recordedPage, popup, "#captureButton");
   await pause(0.65);
 
   if (!skipCapture) {
     await clickWithCursor(recordedPage, popup, "#captureButton");
-    await popup.locator("#exportReviewPanel:not(.is-hidden)").waitFor({ timeout: captureTimeoutMs });
+    try {
+      await popup.locator("#exportReviewPanel:not(.is-hidden)").waitFor({ timeout: captureTimeoutMs });
+    } catch (error) {
+      const launchDiagnostics = await popup.evaluate(() => ({
+        launchState: document.querySelector("#launchStatus")?.dataset.state || "",
+        launchTitle: document.querySelector("#launchStatusTitle")?.textContent?.trim() || "",
+        launchDetail: document.querySelector("#launchStatusDetail")?.textContent?.trim() || "",
+        captureDisabled: Boolean(document.querySelector("#captureButton")?.disabled),
+        captureExpanded: document.querySelector("#captureButton")?.getAttribute("aria-expanded") || "",
+        menuHidden: document.querySelector("#holdMenu")?.getAttribute("aria-hidden") || "",
+        panelClasses: document.querySelector("#launchPanel")?.className || ""
+      }));
+      throw new Error(
+        `The one-click capture did not open its save review within ${captureTimeoutMs}ms. ${JSON.stringify(launchDiagnostics)}`,
+        { cause: error }
+      );
+    }
     await popup.locator("#exportReviewPanel").scrollIntoViewIfNeeded();
     await pause(1.1);
-    await saveStill(recordedPage, "02-save-review.png");
+    await saveStill(recordedPage, "04-review-before-save.png");
     await clickInBackgroundWithCursor(recordedPage, target, popup, "#exportReviewConfirmButton");
     try {
       await popup.waitForFunction(() => {
@@ -151,7 +186,7 @@ try {
     }
     await popup.locator("#statusPanel").scrollIntoViewIfNeeded();
     await pause(1.2);
-    await saveStill(recordedPage, "03-capture-complete.png");
+    await saveStill(recordedPage, "05-capture-complete.png");
     await seedDemoLibraryCaptures(popup, fixture.url, false);
     milestone("Real full-page capture completed");
   } else {
@@ -160,9 +195,9 @@ try {
   }
 
   await setScene(recordedPage, {
-    chapter: "02 / Library",
-    title: "Every useful capture stays findable.",
-    copy: "Preview locally, favorite it, reopen the original, annotate it, or compare it with a later run.",
+    chapter: "03 / Library",
+    title: "Your captures stay organized.",
+    copy: "Search local previews, favorite important work, reopen the original, annotate it, or compare it with another capture.",
     mode: "full"
   });
   const library = await navigateAppFrame(recordedPage, `chrome-extension://${extensionId}/library.html`);
@@ -173,17 +208,17 @@ try {
     warnings.push("The library card preview did not decode before its scene; capture details still verify the local image.");
   });
   await pause(1.05);
-  await saveStill(recordedPage, "04-capture-library.png");
+  await saveStill(recordedPage, "06-capture-library.png");
   await clickWithCursor(recordedPage, library, "#captureGrid .capture-card .preview-button");
   await library.locator("#captureDialog[open]").waitFor();
   await pause(0.9);
-  await saveStill(recordedPage, "05-library-detail.png");
+  await saveStill(recordedPage, "07-library-detail.png");
   milestone("Local capture library recorded");
 
   await setScene(recordedPage, {
-    chapter: "03 / Annotate + export",
-    title: "Zoom in. Mark it up. Export the result.",
-    copy: "Arrows, rectangles, text, blur, and pixelation remain editable until a new PNG or PDF is exported.",
+    chapter: "04 / Edit + export",
+    title: "Zoom, annotate, and export.",
+    copy: "Add arrows, rectangles, text, blur, or pixelation, then download a PNG or paginated PDF from the same workspace.",
     mode: "full"
   });
   const editor = await navigateAppFrame(recordedPage, `chrome-extension://${extensionId}/editor.html?demo=1`);
@@ -206,7 +241,24 @@ try {
   await pause(0.35);
   await clickWithCursor(recordedPage, editor, "#redoButton");
   await pause(0.8);
-  await saveStill(recordedPage, "06-annotation-editor.png");
+  await saveStill(recordedPage, "08-annotation-editor.png");
+
+  await clickWithCursor(recordedPage, editor, "#actualSizeButton");
+  await editor.locator("#zoomLabel").filter({ hasText: "100%" }).waitFor({ timeout: 5_000 });
+  await pause(0.75);
+  await saveStill(recordedPage, "09-actual-size-zoom.png");
+  await clickWithCursor(recordedPage, editor, "#fitButton");
+  await editor.locator("#zoomLabel").filter({ hasText: "Fit" }).waitFor({ timeout: 5_000 });
+
+  await clickWithCursor(recordedPage, editor, "#exportButton");
+  await editor.locator('#statusMessage[data-tone="success"]').filter({ hasText: "PNG ready" }).waitFor({ timeout: 20_000 });
+  await pause(0.75);
+  await saveStill(recordedPage, "10-png-export-ready.png");
+
+  await clickWithCursor(recordedPage, editor, "#exportPdfButton");
+  await editor.locator('#statusMessage[data-tone="success"]').filter({ hasText: "PDF ready" }).waitFor({ timeout: 20_000 });
+  await pause(0.75);
+  await saveStill(recordedPage, "11-pdf-export-ready.png");
 
   const pngExport = await renderEditorExport(editor, "png");
   const pngPath = path.join(outputDir, "lumen-demo-annotated.png");
@@ -224,9 +276,9 @@ try {
   }
 
   await setScene(recordedPage, {
-    chapter: "04 / Compare",
-    title: "See the change, not just another screenshot.",
-    copy: "Drag through before and after, jump to detected regions, and review the selected-area monitor timeline.",
+    chapter: "05 / Compare",
+    title: "See exactly what changed.",
+    copy: "Move the before-and-after slider, open a detected region, and follow every run in the monitor timeline.",
     mode: "full"
   });
   const review = await navigateAppFrame(recordedPage, `chrome-extension://${extensionId}/review.html?demo=1`);
@@ -244,9 +296,9 @@ try {
     await clickWithCursor(recordedPage, review, "#reviewActions .primary-review-action");
   }
   await pause(0.9);
-  await saveStill(recordedPage, "07-change-review.png");
+  await saveStill(recordedPage, "12-change-review.png");
   const posterPath = path.join(outputDir, "lumen-product-demo-poster.png");
-  await cp(path.join(outputDir, "07-change-review.png"), posterPath);
+  await cp(path.join(outputDir, "12-change-review.png"), posterPath);
   await assertFileHasBytes(posterPath, 20_000);
   stills.push(posterPath);
   milestone("Visual change review and poster recorded");
@@ -257,13 +309,13 @@ try {
     extensionDir
   });
   await pause(1.15);
-  await saveStill(recordedPage, "08-settings-privacy.png");
+  await saveStill(recordedPage, "13-settings-privacy.png");
   milestone("Settings privacy controls recorded");
 
   await setScene(recordedPage, {
     chapter: "Lumen",
-    title: "Capture once. Understand what changed.",
-    copy: "Full-page capture, local library, annotation, zoomable export, privacy controls, and visual monitoring in one workflow.",
+    title: "Capture, edit, compare, and export.",
+    copy: "Full-page capture, a local library, annotation, zoomable PNG and PDF export, privacy settings, and change monitoring.",
     mode: "end"
   });
   await pause(1.8);
@@ -486,9 +538,9 @@ async function seedDemoLibraryCaptures(extensionPage, fixtureUrl, includePrimary
 
 async function showSettingsScene({ recordedPage: page, extensionId, extensionDir: copiedExtensionDir }) {
   await setScene(page, {
-    chapter: "05 / Settings",
-    title: "Privacy is visible, local, and reversible.",
-    copy: "Turn protections on or off in Lumen settings. Nothing is silently uploaded, and reviewed exports remain your choice.",
+    chapter: "06 / Settings",
+    title: "Privacy controls live in Settings.",
+    copy: "Turn Privacy Shield on or off, keep work local, choose whether to review before saving, and disconnect optional exports.",
     mode: "settings"
   });
 
@@ -521,17 +573,21 @@ async function showSettingsScene({ recordedPage: page, extensionId, extensionDir
   }
 
   await privacyToggle.scrollIntoViewIfNeeded();
-  const visualToggle = privacyToggle.locator("xpath=following-sibling::*[contains(@class, 'toggle')][1]");
-  const visualSelector = await visualToggle.count() ? visualToggle : privacyToggle;
-  await moveCursorToLocator(page, visualSelector);
-  await privacyToggle.setChecked(false, { force: true });
-  await pause(0.55);
-  await moveCursorToLocator(page, visualSelector);
-  await privacyToggle.setChecked(true, { force: true });
+  const dedicatedTrack = settings.locator('label[for="privacyShieldToggle"] .switch-track').first();
+  const siblingTrack = privacyToggle.locator("xpath=following-sibling::*[contains(@class, 'track') or contains(@class, 'toggle')][1]");
+  const visualToggle = await dedicatedTrack.count()
+    ? dedicatedTrack
+    : await siblingTrack.count() ? siblingTrack : privacyToggle;
+
+  await setCheckboxWithCursor(page, settings, privacyToggle, visualToggle, true);
+  await pause(0.75);
+  await setCheckboxWithCursor(page, settings, privacyToggle, visualToggle, false);
+  await pause(0.75);
+  await setCheckboxWithCursor(page, settings, privacyToggle, visualToggle, true);
   const shieldCard = settings.locator(".shield-card").first();
   if (await shieldCard.count()) {
     await shieldCard.evaluate((element) => element.scrollIntoView({ block: "center", behavior: "instant" }));
-    await moveCursorToLocator(page, visualSelector);
+    await moveCursorToLocator(page, visualToggle);
   }
 }
 
@@ -615,6 +671,15 @@ async function setScene(page, { chapter, title, copy, mode }) {
   await pause(0.45);
 }
 
+async function waitForHoldMenuState(frame, open) {
+  await frame.waitForFunction((expectedOpen) => {
+    const menu = document.querySelector("#holdMenu");
+    const panel = document.querySelector("#launchPanel");
+    return menu?.getAttribute("aria-hidden") === String(!expectedOpen) &&
+      panel?.classList.contains("is-menu-open") === expectedOpen;
+  }, open, { timeout: 5_000 });
+}
+
 async function clickWithCursor(page, frame, selector) {
   const target = frame.locator(selector).first();
   await target.scrollIntoViewIfNeeded();
@@ -627,6 +692,44 @@ async function clickWithCursor(page, frame, selector) {
     cursor.classList.add("is-clicking");
   });
   await pause(0.42);
+}
+
+async function pressAndHoldWithCursor(page, frame, selector, holdMs = 760) {
+  const target = frame.locator(selector).first();
+  await target.scrollIntoViewIfNeeded();
+  await moveCursorToLocator(page, target);
+  await pause(0.2);
+
+  if (!await target.boundingBox()) {
+    throw new Error(`The recorded press target is not visible: ${selector}`);
+  }
+
+  // Drive the same pointer handlers as a physical press without letting the
+  // synthetic release become an accidental capture click in a background tab.
+  await target.dispatchEvent("pointerdown", {
+    button: 0,
+    buttons: 1,
+    pointerId: 81,
+    pointerType: "mouse",
+    isPrimary: true
+  });
+  await new Promise((resolve) => setTimeout(resolve, holdMs));
+  await target.dispatchEvent("pointercancel", {
+    button: 0,
+    buttons: 0,
+    pointerId: 81,
+    pointerType: "mouse",
+    isPrimary: true
+  });
+  // A completed hold deliberately suppresses the next click. Consume that
+  // guard here so the later, visibly recorded one-click capture stays genuine.
+  await target.dispatchEvent("click", { button: 0, detail: 1 });
+  await page.locator("#demoCursor").evaluate((cursor) => {
+    cursor.classList.remove("is-clicking");
+    void cursor.offsetWidth;
+    cursor.classList.add("is-clicking");
+  });
+  await pause(0.35);
 }
 
 async function clickInBackgroundWithCursor(page, foregroundPage, frame, selector) {
@@ -665,18 +768,31 @@ function formatCaptureDiagnostics(diagnostics = {}) {
   ].filter(Boolean).join(" · ");
 }
 
-async function toggleWithCursor(page, frame, inputSelector, visualSelector, checked) {
-  const input = frame.locator(inputSelector);
-  const visual = frame.locator(visualSelector).first();
-  await visual.scrollIntoViewIfNeeded();
+async function setCheckboxWithCursor(page, frame, input, visual, checked) {
+  if (await input.isChecked() === checked) {
+    return;
+  }
+
+  await input.waitFor({ state: "attached" });
+  await input.evaluate((element) => {
+    element.scrollIntoView({ block: "center", behavior: "instant" });
+  });
   await moveCursorToLocator(page, visual);
-  await pause(0.18);
-  await input.setChecked(checked, { force: true });
+  await pause(0.2);
+  await input.click({ force: true });
   await page.locator("#demoCursor").evaluate((cursor) => {
     cursor.classList.remove("is-clicking");
     void cursor.offsetWidth;
     cursor.classList.add("is-clicking");
   });
+
+  const handle = await input.elementHandle();
+  await frame.waitForFunction(
+    ([element, expected]) => element.checked === expected && !element.disabled,
+    [handle, checked],
+    { timeout: 10_000 }
+  );
+  await pause(0.35);
 }
 
 async function moveCursor(page, frame, selector) {

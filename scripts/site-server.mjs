@@ -16,6 +16,7 @@ const MIME_TYPES = {
   ".json": "application/json; charset=utf-8",
   ".png": "image/png",
   ".svg": "image/svg+xml",
+  ".webm": "video/webm",
   ".webmanifest": "application/manifest+json; charset=utf-8",
 };
 

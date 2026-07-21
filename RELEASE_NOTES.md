@@ -23,6 +23,14 @@ This release makes the Chrome extension—not the marketing website—the cleare
 6. The 0.4.0 verification pass completed Settings, export, export-integrity, annotation, change-review, difficult-site, release-ZIP, loaded-extension, and end-to-end capture tests.
 7. Live reliability capture completed on four different sites: the public Lumen site, the GitHub repository, Chrome's `activeTab` documentation, and MDN's Intersection Observer documentation. This live matrix remains separate from CI because third-party pages can change.
 
+### July 20 interface refresh
+
+1. Rebuilt the public landing page into five concise sections with ordinary product language, a direct “See Lumen in action” path, clickable Capture, Annotate, Compare, and Monitor screens, and the real extension recording in the hero.
+2. Removed the long screenshot-shortcut tutorial, competitor table, faux proof labels, numbered markers, and repeated calls to action from the landing page.
+3. Added a visible capture-options arrow beside the one-click Capture page button. The arrow and press-and-hold gesture now open the same eight actions without accidentally starting a capture.
+4. Added menu keyboard navigation, Escape and outside-click closure, focus restoration, and synchronized accessibility state for the new capture control.
+5. Re-recorded the unpacked extension performing a real capture, save review, library flow, annotation and undo/redo, 100% zoom, PNG and PDF exports, change review, and reversible Privacy Shield changes. Refreshed all affected Chrome Web Store screenshots from the current build.
+
 ### Known limits
 
 1. Fit, 100%, and keyboard zoom apply to the local working image. Very large or tiled captures can use a scaled whole-page editor proxy; full-resolution original images remain in Chrome Downloads.

@@ -124,28 +124,38 @@ async function runRouteChecks(target) {
   try {
     const root = await fetchText(`${fixture.origin}/`);
     assert(root.status === 200, `Expected ${target.name} root route to load.`, root);
-    assert(root.body.includes('id="hero-title"') && root.body.includes("Lumen shows what changed."), `Expected ${target.name} root route to serve the rebuilt Lumen landing page.`, {
+    assert(
+      root.body.includes('id="hero-title"') &&
+        root.body.includes("Capture the whole page.") &&
+        root.body.includes("See what changed."),
+      `Expected ${target.name} root route to serve the concise Lumen landing page.`, {
       sample: root.body.slice(0, 240)
-    });
-    assert(root.body.includes("data-hero-comparison") && root.body.includes('id="heroReveal"'), `Expected ${target.name} landing page to include the interactive hero comparison.`, {
+      }
+    );
+    assert(root.body.includes("data-hero-comparison") && root.body.includes('id="heroReveal"'), `Expected ${target.name} landing page to include the interactive capture comparison.`, {
       sample: root.body.slice(0, 240)
     });
     assert(root.body.includes('src="assets/hero-before.png"') && root.body.includes('src="assets/hero-after.png"'), `Expected ${target.name} landing page to use the aligned demo pair.`, {
       sample: root.body.slice(0, 240)
     });
-    assert(root.body.includes("data-shortcut-comparison") && root.body.includes('data-capture-path="shortcut"') && root.body.includes('data-capture-path="lumen"'), `Expected ${target.name} landing page to explain shortcut and Lumen use cases.`, {
+    assert(
+      !root.body.includes("data-shortcut-comparison") &&
+        !root.body.includes("GoFullPage") &&
+        !root.body.includes("FireShot"),
+      `Expected ${target.name} landing page to omit the removed tutorial and competitor table.`, {
       sample: root.body.slice(0, 240)
-    });
-    assert(root.body.includes("Open Lumen") && root.body.includes("Chrome’s toolbar"), `Expected ${target.name} landing page to describe the real toolbar entry point.`, {
+      }
+    );
+    assert(
+      root.body.includes('data-tour-tab="capture"') &&
+        root.body.includes('data-tour-tab="annotate"') &&
+        root.body.includes('data-tour-tab="compare"') &&
+        root.body.includes('data-tour-tab="monitor"'),
+      `Expected ${target.name} landing page to include the clickable product tour.`, {
       sample: root.body.slice(0, 240)
-    });
-    assert(root.body.includes("GoFullPage") && root.body.includes("FireShot"), `Expected ${target.name} landing page to include honest competitor positioning.`, {
-      sample: root.body.slice(0, 240)
-    });
-    assert(root.body.includes('data-tour-tab="compare"') && root.body.includes('data-tour-tab="monitor"'), `Expected ${target.name} landing page to include the product workflow tour.`, {
-      sample: root.body.slice(0, 240)
-    });
-    assert(root.body.includes('id="actual-app"') && root.body.includes("The extension is the actual app."), `Expected ${target.name} landing page to explain where the Lumen app lives.`, {
+      }
+    );
+    assert(root.body.includes('href="#workflow"') && root.body.includes("See Lumen in action"), `Expected ${target.name} landing page to lead directly to the product UI.`, {
       sample: root.body.slice(0, 240)
     });
     assert(root.body.includes('href="review.html?demo=1"'), `Expected ${target.name} landing page to link to the live review app demo.`, {
@@ -154,7 +164,7 @@ async function runRouteChecks(target) {
     assert(
       root.body.includes('poster="assets/lumen-product-demo-poster.png"') &&
         root.body.includes('src="assets/lumen-product-demo.webm"') &&
-        root.body.includes("Product tour"),
+        root.body.includes("Recorded from the actual extension."),
       `Expected ${target.name} landing page to embed the recorded extension tour.`,
       { sample: root.body.slice(0, 240) }
     );
@@ -185,7 +195,7 @@ async function runRouteChecks(target) {
         sample: legacyDocs.body.slice(0, 240)
       });
     } else {
-      assert(legacyDocs.body.includes('id="hero-title"') && legacyDocs.body.includes("Lumen shows what changed."), "Expected repository-root docs route to serve the rebuilt landing page.", {
+      assert(legacyDocs.body.includes('id="hero-title"') && legacyDocs.body.includes("Capture the whole page."), "Expected repository-root docs route to serve the concise landing page.", {
         sample: legacyDocs.body.slice(0, 240)
       });
 
@@ -208,6 +218,7 @@ async function runRouteChecks(target) {
     const demoVideo = await fetchBytes(`${fixture.origin}/assets/lumen-product-demo.webm`);
     assert(demoPoster.status === 200 && demoPoster.bytes > 100_000, `Expected ${target.name} product-tour poster to load.`, demoPoster);
     assert(demoVideo.status === 200 && demoVideo.bytes > 1_000_000, `Expected ${target.name} product-tour video to load.`, demoVideo);
+    assert(demoVideo.contentType === "video/webm", `Expected ${target.name} product-tour video to use a playable content type.`, demoVideo);
 
     for (const storeAssetPath of target.storeAssetPaths) {
       const storeAsset = await fetchBytes(`${fixture.origin}${storeAssetPath}`);
@@ -338,7 +349,8 @@ async function runBrowserChecks(siteRoot) {
         const label = document.querySelector('label[for="heroReveal"]');
         const activeTourImage = document.querySelector('[data-tour-panel="capture"] img');
         const reliabilityImage = document.querySelector(".reliability-visual img");
-        const productTour = document.querySelector(".app-demo-frame video");
+        const productTour = document.querySelector(".product-video video");
+        const actionLink = document.querySelector('.hero-actions a[href="#workflow"]');
 
         return {
           clientWidth: document.documentElement.clientWidth,
@@ -359,7 +371,8 @@ async function runBrowserChecks(siteRoot) {
           productTour: productTour
             ? [productTour.controls, productTour.preload, productTour.getAttribute("poster"), productTour.querySelector("source")?.getAttribute("src")]
             : null,
-          shortcutPaths: document.querySelectorAll("[data-capture-path]").length,
+          actionLink: actionLink?.textContent?.trim() || null,
+          legacyTutorials: document.querySelectorAll("[data-capture-path], [data-shortcut-comparison], .difference-table").length,
           bodyText: document.body.innerText
         };
       });
@@ -370,17 +383,17 @@ async function runBrowserChecks(siteRoot) {
       assert(initial.divider === "48%" && initial.sliderValue === "48", `Expected ${viewport.width}px comparison divider to match its slider thumb.`, initial);
       assert(initial.sliderLabel === "Move the divider to compare captures", `Expected ${viewport.width}px comparison slider to have a visible associated label.`, initial);
       assert(initial.changeRegions === 6, `Expected ${viewport.width}px demo to draw all six reported changed regions.`, initial);
-      assert(initial.liveAppLinks >= 2, `Expected ${viewport.width}px page to offer the live app demo from the hero and app section.`, initial);
+      assert(initial.liveAppLinks >= 2, `Expected ${viewport.width}px page to offer the interactive review from the feature and closing sections.`, initial);
       assert(
         JSON.stringify(initial.productTour) === JSON.stringify([true, "metadata", "assets/lumen-product-demo-poster.png", "assets/lumen-product-demo.webm"]),
         `Expected ${viewport.width}px page to expose a user-controlled, bandwidth-conscious product tour.`,
         initial
       );
-      assert(initial.shortcutPaths === 2, `Expected ${viewport.width}px page to present distinct shortcut and Lumen paths.`, initial);
-      assert(initial.bodyText.includes("Open Lumen") && initial.bodyText.includes("Chrome’s toolbar"), `Expected ${viewport.width}px page to explain the toolbar entry point.`, initial);
-      assert(initial.bodyText.includes("GoFullPage") && initial.bodyText.includes("FireShot"), `Expected ${viewport.width}px page to include competitor positioning.`, initial);
-      assert(initial.activeTourImage?.[0] === "lazy", `Expected ${viewport.width}px tour proof to preserve initial-load bandwidth.`, initial);
-      assert(initial.reliabilityImage?.[0] === "lazy", `Expected ${viewport.width}px reliability proof to preserve initial-load bandwidth.`, initial);
+      assert(initial.actionLink === "See Lumen in action", `Expected ${viewport.width}px hero to lead to the real product UI.`, initial);
+      assert(initial.legacyTutorials === 0, `Expected ${viewport.width}px page to stay free of the removed tutorial and comparison table.`, initial);
+      assert(!initial.bodyText.includes("GoFullPage") && !initial.bodyText.includes("FireShot"), `Expected ${viewport.width}px page to avoid competitor-centered copy.`, initial);
+      assert(initial.activeTourImage?.[0] === "lazy", `Expected ${viewport.width}px tour image to preserve initial-load bandwidth.`, initial);
+      assert(initial.reliabilityImage?.[0] === "lazy", `Expected ${viewport.width}px reliability image to preserve initial-load bandwidth.`, initial);
 
       const slider = page.locator("#heroReveal");
       const output = page.locator("[data-hero-output]");
@@ -417,17 +430,21 @@ async function runBrowserChecks(siteRoot) {
 
       if (viewport.width <= 390) {
         const boundedControls = await page.evaluate(() => {
-          const selectors = ["#heroReveal", "[data-hero-output]", ".key-groups"];
+          const selectors = ["#heroReveal", "[data-hero-output]", ".workflow-tabs"];
           return selectors.map((selector) => {
             const rect = document.querySelector(selector)?.getBoundingClientRect();
             return rect ? { selector, left: rect.left, right: rect.right } : null;
           });
         });
 
-        assert(boundedControls.every((control) => control && control.left >= 0 && control.right <= viewport.width), `Expected ${viewport.width}px comparison and shortcut controls to remain inside the viewport.`, boundedControls);
+        assert(boundedControls.every((control) => control && control.left >= 0 && control.right <= viewport.width), `Expected ${viewport.width}px comparison and product controls to remain inside the viewport.`, boundedControls);
       }
 
       if (viewport.width === 1440) {
+        const actionLink = page.getByRole("link", { name: "See Lumen in action" });
+        await actionLink.click();
+        assert(new URL(page.url()).hash === "#workflow", "Expected the hero action to open the real product tour.");
+
         const compareTab = page.locator('[data-tour-tab="compare"]');
         await compareTab.click();
         assert(await compareTab.getAttribute("aria-selected") === "true", "Expected comparison tour tab to activate by click.");
@@ -520,6 +537,7 @@ async function fetchBytes(url) {
 
   return {
     status: response.status,
+    contentType: response.headers.get("content-type"),
     bytes: (await response.arrayBuffer()).byteLength
   };
 }
@@ -549,6 +567,10 @@ function getContentType(filePath) {
 
   if (ext === ".json") {
     return "application/json; charset=utf-8";
+  }
+
+  if (ext === ".webm") {
+    return "video/webm";
   }
 
   return "application/octet-stream";

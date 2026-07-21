@@ -535,6 +535,13 @@ h3 {
   gap: 10px;
 }
 
+.capture-action-group {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 6px;
+  min-width: 0;
+}
+
 .toggle-row {
   justify-content: space-between;
   gap: 12px;
@@ -1231,6 +1238,7 @@ h3 {
 
 .segment,
 .capture-button,
+.capture-options-button,
 .secondary-action,
 .mini-action,
 .feature-chip,
@@ -1283,6 +1291,59 @@ h3 {
   background: linear-gradient(180deg, rgba(134, 221, 255, 0.94), rgba(57, 184, 255, 0.9));
   color: #04101a;
   box-shadow: 0 14px 32px rgba(57, 184, 255, 0.22);
+}
+
+.capture-action-group .capture-button {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  border-radius: 14px 10px 10px 14px;
+}
+
+.capture-options-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  min-width: 42px;
+  min-height: 58px;
+  padding: 0;
+  border: 1px solid rgba(134, 221, 255, 0.24);
+  border-radius: 10px 14px 14px 10px;
+  background:
+    linear-gradient(180deg, rgba(134, 221, 255, 0.14), rgba(57, 184, 255, 0.07)),
+    rgba(255, 255, 255, 0.04);
+  color: var(--accent);
+}
+
+.capture-options-button:hover:not(:disabled) {
+  border-color: rgba(134, 221, 255, 0.46);
+  background:
+    linear-gradient(180deg, rgba(134, 221, 255, 0.2), rgba(57, 184, 255, 0.1)),
+    rgba(255, 255, 255, 0.055);
+}
+
+.capture-options-chevron {
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 180ms var(--ease-out), margin 180ms var(--ease-out);
+}
+
+.launch-panel.is-menu-open .capture-options-button {
+  border-color: rgba(134, 221, 255, 0.5);
+  background:
+    linear-gradient(180deg, rgba(134, 221, 255, 0.24), rgba(57, 184, 255, 0.12)),
+    rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 1px rgba(134, 221, 255, 0.08) inset;
+}
+
+.launch-panel.is-menu-open .capture-options-chevron {
+  margin-top: 5px;
+  transform: rotate(225deg);
 }
 
 .capture-button::before {
@@ -1350,19 +1411,6 @@ h3 {
 .capture-button.is-holding::after {
   opacity: 1;
   animation: lumenHoldFill 520ms linear forwards;
-}
-
-.hold-progress {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  background: rgba(4, 16, 26, 0.1);
-  border: 1px solid rgba(4, 16, 26, 0.18);
 }
 
 .action-copy {
@@ -1576,41 +1624,8 @@ h3 {
   transform: translateX(5px) rotate(45deg);
 }
 
-.hold-progress::before,
-.hold-progress::after {
-  content: "";
-  border-radius: inherit;
-}
-
-.hold-progress::before {
-  width: 10px;
-  height: 10px;
-  background: #04101a;
-  opacity: 0.72;
-  transition: transform 180ms var(--ease-standard), opacity 180ms var(--ease-standard);
-}
-
-.hold-progress::after {
-  position: absolute;
-  inset: 6px;
-  border: 1px solid rgba(4, 16, 26, 0.26);
-  opacity: 0;
-  transform: scale(0.74);
-  transition: transform 180ms var(--ease-standard), opacity 180ms var(--ease-standard);
-}
-
-.capture-button.is-holding .hold-progress::before {
-  opacity: 1;
-  transform: scale(0.72);
-}
-
-.capture-button.is-holding .hold-progress::after {
-  opacity: 1;
-  transform: scale(1);
-}
-
 .secondary-action {
-  flex: 0.82;
+  flex: 0 0 116px;
   justify-content: center;
   text-align: left;
   background: rgba(255, 255, 255, 0.06);
@@ -1683,6 +1698,7 @@ h3 {
 }
 
 .launch-panel.is-blocked .capture-button,
+.launch-panel.is-blocked .capture-options-button,
 .launch-panel.is-blocked .secondary-action {
   box-shadow: none;
 }
@@ -1746,6 +1762,7 @@ h3 {
 }
 
 .capture-button:disabled,
+.capture-options-button:disabled,
 .secondary-action:disabled,
 .mini-action:disabled,
 .hold-menu-action:disabled,
@@ -2868,6 +2885,7 @@ h3 {
 
 .segment:hover,
 .capture-button:hover,
+.capture-options-button:hover,
 .secondary-action:hover,
 .mini-action:hover,
 .feature-chip:hover,
@@ -2879,6 +2897,7 @@ h3 {
 
 .segment:focus-visible,
 .capture-button:focus-visible,
+.capture-options-button:focus-visible,
 .secondary-action:focus-visible,
 .mini-action:focus-visible,
 .feature-chip:focus-visible,
@@ -2964,6 +2983,10 @@ h3 {
 
   .capture-button,
   .secondary-action {
+    width: 100%;
+  }
+
+  .capture-action-group {
     width: 100%;
   }
 
