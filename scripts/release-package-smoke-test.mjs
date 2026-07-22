@@ -37,6 +37,12 @@ try {
     source: sourceManifest.version,
     packaged: packagedManifest.version
   });
+  assert(
+    packagedManifest.commands?.["capture-page"]?.suggested_key?.default === "Alt+Shift+L" &&
+      packagedManifest.commands?.["capture-visible-area"]?.suggested_key?.default === "Alt+Shift+V",
+    "Release package lost Lumen keyboard shortcuts.",
+    packagedManifest.commands
+  );
   assert(!packagedManifest.host_permissions?.length, "Release package unexpectedly contains always-on host permissions.", packagedManifest);
   assert(packagedManifest.optional_host_permissions?.length === 2, "Release package lost its optional site-permission declarations.", packagedManifest);
   assert(!packagedFiles.some((file) => /^(scripts|backend|docs|\.github|node_modules)\//.test(file)), "Release ZIP contains development-only files.", packagedFiles);

@@ -465,6 +465,30 @@ try {
   assert(monitorState.timedFiles === 1 && !monitorState.timedManifest && monitorState.timedSourceType === "timed", "Expected timed history to contain only its selected-area PNG and no manifest download.", monitorState);
   assert(!monitorState.alarmExists, "Expected the completed continuous monitor alarm to be cleared.", monitorState);
 
+  await target.bringToFront();
+  const visibleResponse = await popup.evaluate((captureOptions) =>
+    chrome.runtime.sendMessage({
+      type: "LUMEN_START_CAPTURE",
+      payload: {
+        options: captureOptions
+      }
+    }), {
+      removeStickyHeaders: true,
+      forceLazyLoad: false,
+      autoRedact: false,
+      exportManifest: false,
+      captureMode: "visible",
+      devicePreset: "desktop",
+      exportPreset: "raw"
+    });
+
+  assert(visibleResponse?.ok, "Visible-area capture failed.", visibleResponse);
+  assert(visibleResponse.segmentCount === 1, "Visible-area capture should save exactly one viewport segment.", visibleResponse);
+  assert(visibleResponse.variantCount === 1, "Visible-area capture should stay on the active desktop viewport.", visibleResponse);
+  assert(!visibleResponse.manifestFile, "Visible-area quick capture should honor details-file off.", visibleResponse);
+  assert(visibleResponse.dimensions?.height > 0 && visibleResponse.dimensions.height < 2600, "Visible-area capture should not stitch the whole page height.", visibleResponse.dimensions);
+  assert(visibleResponse.files?.length === 1 && visibleResponse.downloads?.length === 1, "Visible-area capture should save one PNG.", visibleResponse);
+
   assert(!popupConsoleErrors.length, "Popup emitted console errors.", popupConsoleErrors);
 
   console.log(JSON.stringify({

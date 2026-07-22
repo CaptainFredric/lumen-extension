@@ -1606,6 +1606,22 @@ h3 {
   background: rgba(5, 11, 20, 0.6);
 }
 
+.action-icon-visible::before {
+  width: 16px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 3px rgba(127, 241, 197, 0.16);
+}
+
+.action-icon-visible::after {
+  width: 10px;
+  height: 5px;
+  border-top: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  opacity: 0.76;
+}
+
 .action-icon-redact::before {
   width: 15px;
   height: 7px;
@@ -1938,6 +1954,23 @@ h3 {
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.capture-job-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.danger-mini-action {
+  border-color: rgba(255, 154, 154, 0.24);
+  color: #ffc4c4;
+  background: rgba(255, 154, 154, 0.08);
+}
+
+.danger-mini-action:hover {
+  border-color: rgba(255, 154, 154, 0.4);
+  background: rgba(255, 154, 154, 0.13);
 }
 
 .capture-timeline {

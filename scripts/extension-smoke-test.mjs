@@ -470,6 +470,7 @@ try {
     analyzeDisabled: document.querySelector("#analyzeButton")?.disabled || false,
     holdMenuHidden: document.querySelector("#holdMenu")?.getAttribute("aria-hidden") || "",
     holdActionCount: document.querySelectorAll("[data-quick-action]").length,
+    holdActions: [...document.querySelectorAll("[data-quick-action]")].map((button) => button.dataset.quickAction),
     captureReceiptHidden: document.querySelector("#captureReceipt")?.classList.contains("is-hidden") ?? false,
     captureReceiptCaptureId: document.querySelector("#captureReceipt")?.dataset.captureId || "",
     receiptActions: [...document.querySelectorAll("#captureReceipt [data-receipt-action]")].map((button) => ({
@@ -504,6 +505,10 @@ try {
     disabledPosterModes: [...document.querySelectorAll("[data-export]:disabled")].map((button) => button.dataset.export),
     exportReviewHidden: document.querySelector("#exportReviewPanel")?.classList.contains("is-hidden") ?? false,
     exportReviewConfirm: document.querySelector("#exportReviewConfirmButton")?.textContent?.trim() || "",
+    activeJobActionsHidden: document.querySelector("#captureJobActions")?.classList.contains("is-hidden") ?? false,
+    cancelCaptureDisabled: document.querySelector("#cancelCaptureButton")?.disabled || false,
+    reopenCaptureDisabled: document.querySelector("#reopenCaptureButton")?.disabled || false,
+    runModeSummary: document.querySelector("#runModeSummary")?.textContent?.trim() || "",
     timelineStepCount: document.querySelectorAll("[data-stage-step]").length,
     statusLogText: document.querySelector("#statusLog")?.textContent?.trim() || "",
     historyCount: document.querySelector("#historyCount")?.textContent?.trim() || "",
@@ -550,7 +555,8 @@ try {
   assert(popupState.analyzeButton === "Analyze page", "Analyze action did not render.", popupState);
   assert(!popupState.analyzeDisabled, "Analyze action should be enabled for a capturable target tab.", popupState);
   assert(popupState.holdMenuHidden === "true", "Hold menu should start closed.", popupState);
-  assert(popupState.holdActionCount === 8, "Hold menu actions did not render.", popupState);
+  assert(popupState.holdActionCount === 9, "Hold menu actions did not render.", popupState);
+  assert(popupState.holdActions.includes("visible"), "Hold menu should expose visible-area capture.", popupState);
   assert(popupState.captureReceiptHidden, "Capture receipt should stay hidden until a real capture succeeds.", popupState);
   assert(!popupState.captureReceiptCaptureId, "Hidden capture receipt should not retain a capture id.", popupState);
   assert(
@@ -597,6 +603,9 @@ try {
   );
   assert(popupState.exportReviewHidden, "Export review screen should start hidden.", popupState);
   assert(popupState.exportReviewConfirm === "Save capture", "Export review confirmation action did not render.", popupState);
+  assert(popupState.activeJobActionsHidden, "Active capture controls should stay hidden until a run is in flight.", popupState);
+  assert(popupState.cancelCaptureDisabled && popupState.reopenCaptureDisabled, "Active capture controls should start disabled.", popupState);
+  assert(popupState.runModeSummary === "Full page", "Capture mode summary should default to full page.", popupState);
   assert(popupState.timelineStepCount === 6, "Capture timeline did not render.", popupState);
   assert(popupState.statusLogText === "Run status appears here.", "Status log did not initialize.", popupState);
   assert(popupState.historyCount === "1 item", "Seeded history count did not render.", popupState);

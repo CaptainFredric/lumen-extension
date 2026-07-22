@@ -353,6 +353,12 @@ async function buildRenderModel(session) {
     firstImage.naturalWidth / browserViewportWidth || session.page.devicePixelRatio || 1;
   const canvasWidth = Math.max(1, Math.round(session.page.viewportWidth * effectiveScale));
   const canvasHeight = Math.max(1, Math.round(session.page.pageHeight * effectiveScale));
+  const visibleOffset = session.page.captureMode === "visible"
+    ? {
+        left: Math.max(0, Number(session.page.scrollLeft) || 0),
+        top: Math.max(0, Number(session.page.scrollTop) || 0)
+      }
+    : { left: 0, top: 0 };
   const annotation = buildCaptureAnnotation({
     canvasWidth,
     canvasHeight,
@@ -365,15 +371,18 @@ async function buildRenderModel(session) {
     canvasHeight,
     effectiveScale,
     annotation,
-    annotationRegion: scaleAnnotationRegion(session.annotationRegion, effectiveScale, canvasWidth, canvasHeight),
-    cutawayRegion: scaleCutawayRegion(session.cutawayRegion, effectiveScale, canvasWidth, canvasHeight),
-    redactions: (session.redactions || []).map((region) => ({
-      ...region,
-      left: Math.max(0, Math.round(region.left * effectiveScale)),
-      top: Math.max(0, Math.round(region.top * effectiveScale)),
-      width: Math.max(1, Math.round(region.width * effectiveScale)),
-      height: Math.max(1, Math.round(region.height * effectiveScale))
-    })),
+    annotationRegion: scaleAnnotationRegion(offsetRegionForCaptureMode(session.annotationRegion, visibleOffset), effectiveScale, canvasWidth, canvasHeight),
+    cutawayRegion: scaleCutawayRegion(offsetRegionForCaptureMode(session.cutawayRegion, visibleOffset), effectiveScale, canvasWidth, canvasHeight),
+    redactions: (session.redactions || [])
+      .map((region) => offsetRegionForCaptureMode(region, visibleOffset))
+      .filter(Boolean)
+      .map((region) => ({
+        ...region,
+        left: Math.max(0, Math.round(region.left * effectiveScale)),
+        top: Math.max(0, Math.round(region.top * effectiveScale)),
+        width: Math.max(1, Math.round(region.width * effectiveScale)),
+        height: Math.max(1, Math.round(region.height * effectiveScale))
+      })),
     segments: hydratedSegments.map((segment) => {
       const captureRect = normalizeCaptureRect(
         segment.captureRect || session.page.captureRect,
@@ -396,6 +405,34 @@ async function buildRenderModel(session) {
         drawBottom: drawTopPixels + sourceHeight
       };
     })
+  };
+}
+
+function offsetRegionForCaptureMode(region, offset) {
+  if (!region || typeof region !== "object") {
+    return null;
+  }
+
+  const left = Number(region.left) - offset.left;
+  const top = Number(region.top) - offset.top;
+  const width = Number(region.width);
+  const height = Number(region.height);
+
+  if (!Number.isFinite(left) || !Number.isFinite(top) || !Number.isFinite(width) || !Number.isFinite(height)) {
+    return null;
+  }
+
+  return {
+    ...region,
+    left,
+    top,
+    points: Array.isArray(region.points)
+      ? region.points.map((point) => ({
+          ...point,
+          x: Number(point.x) - offset.left,
+          y: Number(point.y) - offset.top
+        }))
+      : region.points
   };
 }
 

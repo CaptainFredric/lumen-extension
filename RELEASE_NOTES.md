@@ -40,6 +40,13 @@ This release makes the Chrome extension—not the marketing website—the cleare
 5. Tightened the public site to four concise feature cards, truthful GitHub-beta install labels, concrete privacy and reliability copy, and no unsupported visible-area claim.
 6. Refreshed the Web Store control-surface image from the current extension and added loaded-extension coverage for the compact first run and the real post-capture editor/library handoff.
 
+### July 22 product-gap pass
+
+1. Added first-class visible-area capture from the popup quick-action menu and the background capture path. It saves one current viewport instead of scrolling the page.
+2. Added Chrome keyboard commands for full-page capture and visible-area capture.
+3. Added active-run state in the background worker so a reopened popup can show a running capture, cancel it at the next safe step, or return to the source tab.
+4. Added release and loaded-extension smoke coverage for shortcuts, visible-area UI, active-run controls, and a real one-segment visible-area capture.
+
 ### Known limits
 
 1. Fit, 100%, and keyboard zoom apply to the local working image. Very large or tiled captures can use a scaled whole-page editor proxy; full-resolution original images remain in Chrome Downloads.

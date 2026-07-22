@@ -67,6 +67,7 @@ export const LUMEN_CONFIG = {
     annotationEnabled: false,
     annotationText: "",
     annotationPosition: "top-right",
+    captureMode: "fullPage",
     devicePreset: "desktop",
     exportPreset: "raw",
     longPageMode: "auto"
@@ -118,6 +119,7 @@ export const STORAGE_KEYS = {
   manualRedactions: "lumen.capture.manualRedactions",
   cutawayRegions: "lumen.capture.cutawayRegions",
   annotationRegions: "lumen.capture.annotationRegions",
+  activeCaptureJob: "lumen.capture.activeJob",
   privateSettings: "lumen.capture.privateSettings",
   onboarding: "lumen.onboarding",
   appSettings: "lumen.app.settings"

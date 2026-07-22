@@ -3725,6 +3725,8 @@
       browserViewportWidth: Math.round(window.innerWidth),
       browserViewportHeight: Math.round(window.innerHeight),
       captureRect,
+      scrollTop: Math.round(getScrollTop()),
+      scrollLeft: Math.round(getScrollLeft()),
       pageHeight: Math.round(pageHeight),
       devicePixelRatio: window.devicePixelRatio || 1,
       scrollMode: context.isDocument ? "document" : "container",

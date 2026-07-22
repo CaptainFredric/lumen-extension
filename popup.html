@@ -80,6 +80,10 @@
             <i class="action-icon action-icon-responsive" aria-hidden="true"></i>
             <span><strong>Responsive sizes</strong><small>Capture desktop, tablet, and mobile</small></span>
           </button>
+          <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="visible">
+            <i class="action-icon action-icon-visible" aria-hidden="true"></i>
+            <span><strong>Visible area</strong><small>Save only what is on screen</small></span>
+          </button>
           <button class="hold-menu-action" type="button" role="menuitem" data-quick-action="redact">
             <i class="action-icon action-icon-redact" aria-hidden="true"></i>
             <span><strong>Find sensitive info</strong><small>Preview automatic redactions</small></span>
@@ -443,6 +447,10 @@
 
         <div class="run-summary-grid" aria-label="Current capture settings">
           <div class="run-summary-item">
+            <span>Mode</span>
+            <strong id="runModeSummary">Full page</strong>
+          </div>
+          <div class="run-summary-item">
             <span>Views</span>
             <strong id="runViewSummary">Desktop</strong>
           </div>
@@ -458,6 +466,11 @@
             <span>Details</span>
             <strong id="runManifestSummary">Capture details</strong>
           </div>
+        </div>
+
+        <div id="captureJobActions" class="capture-job-actions is-hidden" aria-label="Active capture actions">
+          <button id="cancelCaptureButton" class="mini-action danger-mini-action" type="button">Cancel capture</button>
+          <button id="reopenCaptureButton" class="mini-action ghost-mini-action" type="button">Reopen page</button>
         </div>
 
         <div id="captureTimeline" class="capture-timeline" aria-label="Capture progress timeline">

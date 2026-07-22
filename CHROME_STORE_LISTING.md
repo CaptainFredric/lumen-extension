@@ -19,25 +19,28 @@ The Chrome extension is the capture app: its toolbar popup, local library, Annot
 Lumen supports:
 
 1. Full-page capture after page cleanup.
-2. Desktop, tablet, and mobile capture sets.
-3. Redaction checks for visible sensitive text and filled fields.
-4. Manual redaction boxes for custom areas.
-5. Focused rectangles and freeform lasso captures with transparent pixels outside the selected lasso path.
-6. Page signals such as title, URL, colors, typography, headline, CTA text, and navigation labels.
-7. One-time delayed selected-area capture after 5, 10, or 30 seconds.
-8. Scheduled repeat capture from every 15 minutes through daily.
-9. Capped continuous selected-area monitoring every 1, 5, or 15 minutes, stopping after 10, 25, or 50 runs.
-10. Pause, resume, run-now, and delete controls for local timed plans.
-11. An on-device photo library with actual previews, search, manual/timed filters, favorites, and sorting.
-12. Full-resolution originals retained in Chrome Downloads, with Open and Show actions from the library.
-13. Capture details JSON that keeps page context beside the images.
-14. A full annotation studio with arrows, rectangles, text, blur, pixelation, selection, undo, and redo.
-15. Local before/after review with a reveal slider, highlighted change regions, difference statistics, and a monitor timeline.
-16. Optional reviewed-image export to Google Drive after explicit user consent, using access limited to files Lumen creates or the user explicitly opens with Lumen.
-17. Local PNG and paginated raster PDF export with Fit, 100%, and keyboard zoom controls for the local working image.
-18. Dedicated Settings with fast capture, review-before-save, reversible Privacy Shield that pauses unattended monitors while active, permission revocation, Drive disconnect, and local-workspace deletion.
-19. Fresh-install one-click defaults that keep capture local, enable automatic redaction, omit capture-details JSON, and skip the extra review screen unless the user turns it on.
-20. A capture-time review PDF cache generated from the original rendered output or tiles at up to 3200 raster pixels per page, with a separate 250 MB or 75-capture local limit.
+2. Visible-area capture for the current viewport.
+3. Desktop, tablet, and mobile capture sets.
+4. Redaction checks for visible sensitive text and filled fields.
+5. Manual redaction boxes for custom areas.
+6. Focused rectangles and freeform lasso captures with transparent pixels outside the selected lasso path.
+7. Page signals such as title, URL, colors, typography, headline, CTA text, and navigation labels.
+8. One-time delayed selected-area capture after 5, 10, or 30 seconds.
+9. Scheduled repeat capture from every 15 minutes through daily.
+10. Capped continuous selected-area monitoring every 1, 5, or 15 minutes, stopping after 10, 25, or 50 runs.
+11. Pause, resume, run-now, and delete controls for local timed plans.
+12. Keyboard shortcuts for full-page and visible-area capture.
+13. Active-run controls to cancel a long capture or return to its source tab.
+14. An on-device photo library with actual previews, search, manual/timed filters, favorites, and sorting.
+15. Full-resolution originals retained in Chrome Downloads, with Open and Show actions from the library.
+16. Capture details JSON that keeps page context beside the images.
+17. A full annotation studio with arrows, rectangles, text, blur, pixelation, selection, undo, and redo.
+18. Local before/after review with a reveal slider, highlighted change regions, difference statistics, and a monitor timeline.
+19. Optional reviewed-image export to Google Drive after explicit user consent, using access limited to files Lumen creates or the user explicitly opens with Lumen.
+20. Local PNG and paginated raster PDF export with Fit, 100%, and keyboard zoom controls for the local working image.
+21. Dedicated Settings with fast capture, review-before-save, reversible Privacy Shield that pauses unattended monitors while active, permission revocation, Drive disconnect, and local-workspace deletion.
+22. Fresh-install one-click defaults that keep capture local, enable automatic redaction, omit capture-details JSON, and skip the extra review screen unless the user turns it on.
+23. A capture-time review PDF cache generated from the original rendered output or tiles at up to 3200 raster pixels per page, with a separate 250 MB or 75-capture local limit.
 
 Redaction checks are a safety aid. Check each capture before sharing it outside your workspace.
 

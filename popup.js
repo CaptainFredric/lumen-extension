@@ -93,10 +93,14 @@ const ui = {
   statusDetail: document.querySelector("#statusDetail"),
   statusBadge: document.querySelector("#statusBadge"),
   progressFill: document.querySelector("#progressFill"),
+  runModeSummary: document.querySelector("#runModeSummary"),
   runViewSummary: document.querySelector("#runViewSummary"),
   runExportSummary: document.querySelector("#runExportSummary"),
   runSafetySummary: document.querySelector("#runSafetySummary"),
   runManifestSummary: document.querySelector("#runManifestSummary"),
+  captureJobActions: document.querySelector("#captureJobActions"),
+  cancelCaptureButton: document.querySelector("#cancelCaptureButton"),
+  reopenCaptureButton: document.querySelector("#reopenCaptureButton"),
   exportReviewPanel: document.querySelector("#exportReviewPanel"),
   exportReviewBadge: document.querySelector("#exportReviewBadge"),
   exportReviewSummary: document.querySelector("#exportReviewSummary"),
@@ -201,6 +205,7 @@ let onboardingState = {
 };
 let latestCaptureReceipt = null;
 let oneShotPermissionOrigin = "";
+let activeCaptureJob = null;
 let photoLibraryObjectUrls = new Set();
 let photoLibraryRenderVersion = 0;
 
@@ -290,6 +295,7 @@ async function bootstrap() {
   await refreshPhotoLibrary();
   applyPlanGates();
   await launchStatusPromise;
+  await refreshActiveCaptureJob();
 }
 
 function bindEvents() {
@@ -380,6 +386,8 @@ function bindEvents() {
   ui.holdMenu.addEventListener("click", handleQuickActionClick);
   ui.holdMenu.addEventListener("keydown", handleHoldMenuKeyDown);
   ui.captureReceipt.addEventListener("click", handleCaptureReceiptAction);
+  ui.cancelCaptureButton.addEventListener("click", handleCancelCaptureClick);
+  ui.reopenCaptureButton.addEventListener("click", handleReopenCaptureClick);
   ui.exportReviewCancelButton.addEventListener("click", () => settleExportReview(false));
   ui.exportReviewConfirmButton.addEventListener("click", () => settleExportReview(true));
   document.addEventListener("keydown", handleDocumentKeyDown);
@@ -1067,9 +1075,21 @@ async function runQuickAction(action) {
 
   if (action === "responsive") {
     currentSettings.devicePreset = "responsive";
+    currentSettings.captureMode = "fullPage";
     updateDeviceButtons();
     await persistCurrentSettings();
     await handleCaptureClick();
+    return;
+  }
+
+  if (action === "visible") {
+    await handleCaptureClick({
+      overrideSettings: {
+        captureMode: "visible",
+        devicePreset: "desktop",
+        longPageMode: "auto"
+      }
+    });
     return;
   }
 
@@ -1157,13 +1177,23 @@ function clearHoldTimer() {
   holdTimer = null;
 }
 
-async function handleCaptureClick({ forceReview = false } = {}) {
+async function handleCaptureClick({ forceReview = false, overrideSettings = null } = {}) {
   if (actionBusy) {
     return;
   }
 
   if (!(await ensureActionTargetReady("capture the page"))) {
     return;
+  }
+
+  const previousSettings = { ...currentSettings };
+
+  if (overrideSettings && typeof overrideSettings === "object") {
+    currentSettings = {
+      ...currentSettings,
+      ...overrideSettings
+    };
+    renderRunSummary(currentSettings);
   }
 
   await persistCurrentSettings();
@@ -1202,6 +1232,13 @@ async function handleCaptureClick({ forceReview = false } = {}) {
       progress: 0.12
     });
     setActionBusy(false);
+  } finally {
+    if (overrideSettings) {
+      currentSettings = previousSettings;
+      updateDeviceButtons();
+      updateLongPageButtons();
+      renderRunSummary(currentSettings);
+    }
   }
 }
 
@@ -1262,7 +1299,111 @@ async function runApprovedCapture() {
     });
   } finally {
     oneShotPermissionOrigin = "";
+    activeCaptureJob = null;
+    renderCaptureJobActions(null);
     setActionBusy(false);
+  }
+}
+
+async function refreshActiveCaptureJob() {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "LUMEN_GET_CAPTURE_JOB" });
+
+    if (!response?.ok || !response.job?.active) {
+      activeCaptureJob = null;
+      renderCaptureJobActions(null);
+      return;
+    }
+
+    activeCaptureJob = response.job;
+    renderCaptureJobActions(activeCaptureJob);
+    setActionBusy(true);
+    showStatus({
+      tone: "neutral",
+      stage: activeCaptureJob.stage || "capture",
+      eyebrow: "Capture",
+      title: activeCaptureJob.title || "Capture still running",
+      detail: activeCaptureJob.detail || "Lumen is finishing this save in the background.",
+      badge: activeCaptureJob.cancelRequested ? "Stopping" : "Running",
+      progress: activeCaptureJob.progress || 0.12
+    });
+  } catch {
+    activeCaptureJob = null;
+    renderCaptureJobActions(null);
+  }
+}
+
+function renderCaptureJobActions(job = activeCaptureJob) {
+  const active = Boolean(job?.active);
+  ui.captureJobActions.classList.toggle("is-hidden", !active);
+  ui.cancelCaptureButton.disabled = !active || Boolean(job?.cancelRequested);
+  ui.reopenCaptureButton.disabled = !active || !Number.isInteger(job?.tabId);
+}
+
+async function handleCancelCaptureClick() {
+  if (!activeCaptureJob?.active) {
+    return;
+  }
+
+  ui.cancelCaptureButton.disabled = true;
+  ui.cancelCaptureButton.textContent = "Cancelling...";
+
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "LUMEN_CANCEL_CAPTURE" });
+
+    if (!response?.ok) {
+      throw new Error(response?.error?.description || "Cancel failed.");
+    }
+
+    activeCaptureJob = {
+      ...activeCaptureJob,
+      cancelRequested: true
+    };
+    renderCaptureJobActions(activeCaptureJob);
+    showStatus({
+      tone: "neutral",
+      stage: "capture",
+      eyebrow: "Capture",
+      title: "Stopping capture",
+      detail: "Lumen will stop at the next safe capture step and restore the page.",
+      badge: "Stopping",
+      progress: activeCaptureJob.progress || 0.4
+    });
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      stage: "error",
+      eyebrow: "Capture",
+      title: "Cancel failed",
+      detail: error.message,
+      badge: "Check",
+      progress: 0.12
+    });
+  } finally {
+    ui.cancelCaptureButton.textContent = "Cancel capture";
+  }
+}
+
+async function handleReopenCaptureClick() {
+  if (!Number.isInteger(activeCaptureJob?.tabId)) {
+    return;
+  }
+
+  try {
+    await chrome.tabs.update(activeCaptureJob.tabId, { active: true });
+    if (Number.isInteger(activeCaptureJob.windowId)) {
+      await chrome.windows.update(activeCaptureJob.windowId, { focused: true });
+    }
+  } catch (error) {
+    showStatus({
+      tone: "error",
+      stage: "error",
+      eyebrow: "Capture",
+      title: "Page could not reopen",
+      detail: error.message,
+      badge: "Check",
+      progress: 0.12
+    });
   }
 }
 
@@ -4245,6 +4386,7 @@ function showStatus({ tone, stage, eyebrow, title, detail, badge, progress }) {
 
 function renderRunSummary(settings = currentSettings) {
   const variants = getCaptureVariants(settings.devicePreset);
+  const captureMode = settings.captureMode === "visible" ? "Visible area" : "Full page";
   const viewLabel = variants.length > 1
     ? variants.map((variant) => variant.label).join(", ")
     : variants[0]?.label || "Desktop";
@@ -4258,6 +4400,7 @@ function renderRunSummary(settings = currentSettings) {
     annotationRegionRecord.region ? "Callout" : ""
   ].filter(Boolean);
 
+  ui.runModeSummary.textContent = captureMode;
   ui.runViewSummary.textContent = viewLabel;
   ui.runExportSummary.textContent = exportLabel;
   ui.runSafetySummary.textContent = safetyParts.length ? safetyParts.join(", ") : "Basic";

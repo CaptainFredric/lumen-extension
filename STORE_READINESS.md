@@ -36,6 +36,8 @@ This file tracks what Lumen needs before a serious Chrome Web Store submission.
 30. Fresh installs default to one-click local capture with automatic redaction enabled, capture-details JSON disabled, review-before-save disabled, and Privacy Shield available as an explicit stronger mode.
 31. Capture-time review PDFs are generated from the original rendered output or tiles at up to 3200 raster pixels per page and stored under their own bounded local cache.
 32. The clean-install popup keeps Capture page above the fold, does not force review when the saved default is off, and shows direct open, edit/export, reveal, and library actions after success.
+33. Visible-area capture is available from the popup quick-action menu and as a keyboard command, saving one current viewport without a scroll pass.
+34. Long capture runs publish active state so the popup can be reopened to cancel at a safe point or return to the source tab.
 
 ## Public URLs
 

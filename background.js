@@ -58,6 +58,8 @@ const MAX_CAPTURE_REDACTIONS = 800;
 let captureInFlight = false;
 let analyzeInFlight = false;
 let offscreenCreationPromise = null;
+let activeCaptureJob = null;
+let captureCancelRequested = false;
 
 async function restrictLocalStorageAccess() {
   if (typeof chrome.storage?.local?.setAccessLevel !== "function") {
@@ -299,6 +301,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     captureInFlight = true;
+    captureCancelRequested = false;
 
     const captureOptions = message.payload?.options || getDefaultSettings();
 
@@ -307,9 +310,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }))
       .finally(async () => {
         captureInFlight = false;
+        captureCancelRequested = false;
+        await clearActiveCaptureJob();
         await releaseCapturePermissionLease(captureOptions.permissionLeaseOrigin);
       });
 
+    return true;
+  }
+
+  if (message?.type === "LUMEN_GET_CAPTURE_JOB") {
+    sendResponse({ ok: true, job: activeCaptureJob || { active: false } });
+    return;
+  }
+
+  if (message?.type === "LUMEN_CANCEL_CAPTURE") {
+    captureCancelRequested = true;
+    updateActiveCaptureJob({
+      cancelRequested: true,
+      title: "Stopping capture",
+      detail: "Lumen will stop at the next safe point and restore the page."
+    }).then(() => sendResponse({ ok: true, job: activeCaptureJob || { active: false } }));
     return true;
   }
 
@@ -745,6 +765,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 });
 
+if (chrome.commands?.onCommand) {
+  chrome.commands.onCommand.addListener((command) => {
+    handleCommand(command).catch((error) => {
+      broadcastProgress({
+        stage: "error",
+        title: "Shortcut capture failed",
+        detail: error?.description || error?.message || "Lumen could not start from the keyboard shortcut.",
+        progress: 0.12
+      });
+    });
+  });
+}
+
 async function openCaptureToolPage(pageName, captureId = "") {
   const normalizedCaptureId = typeof captureId === "string" ? captureId.trim().slice(0, 160) : "";
 
@@ -971,6 +1004,7 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
   const sourceTab = context.sourceTab || await getCurrentTab();
   const capturedAt = new Date().toISOString();
   const captureId = createLocalId();
+  const captureMode = options.captureMode === "visible" ? "visible" : "fullPage";
 
   if (!sourceTab?.id || !sourceTab.url) {
     throw createFriendlyError(
@@ -988,8 +1022,12 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
 
   const variants = getCaptureVariants(options.devicePreset);
   const manualRedactions = context.manualRedactionsOverride || await getManualRedactionsForTab(sourceTab);
-  const cutawayRegion = context.cutawayRegionOverride || await getCutawayRegionForTab(sourceTab);
-  const annotationRegion = context.annotationRegionOverride || await getAnnotationRegionForTab(sourceTab);
+  const cutawayRegion = captureMode === "visible"
+    ? normalizeCutawayRecord({}, sourceTab.url)
+    : context.cutawayRegionOverride || await getCutawayRegionForTab(sourceTab);
+  const annotationRegion = captureMode === "visible"
+    ? normalizeAnnotationRecord({}, sourceTab.url)
+    : context.annotationRegionOverride || await getAnnotationRegionForTab(sourceTab);
   const runContext = buildCaptureRunContext({
     title: sourceTab.title,
     url: sourceTab.url,
@@ -999,7 +1037,21 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
   const focusedOnly = Boolean(context.focusedOnly);
   let blueprint = null;
 
+  await startActiveCaptureJob({
+    id: captureId,
+    tabId: sourceTab.id,
+    windowId: sourceTab.windowId,
+    title: captureMode === "visible" ? "Visible area capture running" : "Page capture running",
+    detail: sourceTab.title || new URL(sourceTab.url).host,
+    stage: "prepare",
+    progress: 0.05,
+    captureMode,
+    sourceType: context.captureOrigin === "timed" ? "timed" : "manual",
+    startedAt: capturedAt
+  });
+
   for (let index = 0; index < variants.length; index += 1) {
+    checkCaptureCancelled();
     const result = await captureVariant({
       sourceTab,
       variant: variants[index],
@@ -1011,6 +1063,7 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
       extractBlueprint: index === 0,
       cacheReviewPdf: index === 0,
       focusedOnly,
+      visibleOnly: captureMode === "visible",
       changeBaselineHash: context.changeBaselineHash || "",
       saveOnlyWhenChanged: Boolean(context.saveOnlyWhenChanged)
     });
@@ -1232,7 +1285,7 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
 
   broadcastProgress({
     stage: "done",
-    title: focusedOnly ? "Selected area ready" : variants.length > 1 ? "Responsive set ready" : "Capture ready",
+    title: captureMode === "visible" ? "Visible area ready" : focusedOnly ? "Selected area ready" : variants.length > 1 ? "Responsive set ready" : "Capture ready",
     detail: buildCaptureCompletionDetail({
       segmentCount,
       fileCount: downloadedFiles.length,
@@ -2648,6 +2701,7 @@ async function captureVariant({
   extractBlueprint,
   cacheReviewPdf = false,
   focusedOnly = false,
+  visibleOnly = false,
   changeBaselineHash = "",
   saveOnlyWhenChanged = false
 }) {
@@ -2679,6 +2733,10 @@ async function captureVariant({
     }
 
     const page = prepareResult.page;
+    if (visibleOnly) {
+      page.pageHeight = page.viewportHeight;
+      page.captureMode = "visible";
+    }
     const sessionId = createLocalId();
     let redactionScan = {
       count: 0,
@@ -2756,10 +2814,13 @@ async function captureVariant({
     });
     await sleep(120);
     await hidePageUsageHud(target.tab.id);
-    const segmentCount = await capturePageSegments(target, page, sessionId, variant, {
-      autoRedact: Boolean(options.autoRedact),
-      redactionState
-    });
+    checkCaptureCancelled();
+    const segmentCount = visibleOnly
+      ? await captureVisibleAreaSegment(target, page, sessionId, variant)
+      : await capturePageSegments(target, page, sessionId, variant, {
+          autoRedact: Boolean(options.autoRedact),
+          redactionState
+        });
     const finalRedactions = mergeCaptureRedactionRegions([
       ...redactionState.autoRegions,
       ...redactionState.manualRegions
@@ -2922,6 +2983,7 @@ async function capturePageSegments(target, page, sessionId, variant, { autoRedac
   let stallRetries = 0;
 
   while (segmentCount < maxSegments) {
+    checkCaptureCancelled();
     const scrollResult = await chrome.tabs.sendMessage(target.tab.id, {
       type: "LUMEN_SCROLL_TO",
       top: requestedTop
@@ -3064,6 +3126,47 @@ async function capturePageSegments(target, page, sessionId, variant, { autoRedac
     "Page Too Long",
     `This page exceeded the current ${maxSegments} slice safety limit. Raise the cap or switch to a tiled export for extremely long pages.`
   );
+}
+
+async function captureVisibleAreaSegment(target, page, sessionId, variant) {
+  await updateStitchSessionPage({
+    sessionId,
+    page: {
+      ...page,
+      pageHeight: page.viewportHeight
+    }
+  });
+
+  await showPageUsageHud(target.tab.id, {
+    stage: "capture",
+    title: "Capturing visible area",
+    detail: "Saving the current viewport without scrolling the page.",
+    progress: 0.74
+  });
+  await sleep(LUMEN_CONFIG.capture.segmentSettleMs);
+  checkCaptureCancelled();
+  const dataUrl = await captureTargetVisibleTab(target);
+
+  await appendCaptureSegment({
+    sessionId,
+    segment: {
+      index: 0,
+      topCss: 0,
+      cropTopCss: 0,
+      cropBottomCss: 0,
+      captureRect: page.captureRect || null,
+      dataUrl
+    }
+  });
+
+  broadcastProgress({
+    stage: "capture",
+    title: `Captured ${variant.label.toLowerCase()} visible area`,
+    detail: "One clean viewport was saved without a scroll pass.",
+    progress: 0.9
+  });
+
+  return 1;
 }
 
 function mergeCaptureRedactionRegions(regions = []) {
@@ -3902,10 +4005,93 @@ function normalizeCaptureError(error) {
 }
 
 function broadcastProgress(payload) {
+  updateActiveCaptureJob(payload).catch(() => {});
   chrome.runtime.sendMessage({
     type: CAPTURE_PROGRESS_EVENT,
     payload
   }).catch(() => {});
+}
+
+async function startActiveCaptureJob(job) {
+  activeCaptureJob = {
+    active: true,
+    cancelRequested: false,
+    ...job
+  };
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.activeCaptureJob]: activeCaptureJob
+  });
+}
+
+async function updateActiveCaptureJob(payload = {}) {
+  if (!activeCaptureJob?.active) {
+    return;
+  }
+
+  activeCaptureJob = {
+    ...activeCaptureJob,
+    stage: payload.stage || activeCaptureJob.stage,
+    title: payload.title || activeCaptureJob.title,
+    detail: payload.detail || activeCaptureJob.detail,
+    progress: Number.isFinite(payload.progress) ? payload.progress : activeCaptureJob.progress,
+    cancelRequested: captureCancelRequested || Boolean(payload.cancelRequested) || Boolean(activeCaptureJob.cancelRequested),
+    updatedAt: new Date().toISOString()
+  };
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.activeCaptureJob]: activeCaptureJob
+  });
+}
+
+async function clearActiveCaptureJob() {
+  activeCaptureJob = null;
+  await chrome.storage.local.remove(STORAGE_KEYS.activeCaptureJob);
+}
+
+function checkCaptureCancelled() {
+  if (!captureCancelRequested) {
+    return;
+  }
+
+  throw createFriendlyError(
+    "Capture Cancelled",
+    "Lumen stopped the capture and restored the page before saving more files."
+  );
+}
+
+async function handleCommand(command) {
+  if (!["capture-page", "capture-visible-area"].includes(command)) {
+    return;
+  }
+
+  if (captureInFlight || analyzeInFlight) {
+    broadcastProgress({
+      stage: "error",
+      title: "Lumen is busy",
+      detail: "Wait for the current run to finish before using the shortcut again.",
+      progress: 0.12
+    });
+    return;
+  }
+
+  captureInFlight = true;
+  captureCancelRequested = false;
+
+  try {
+    const appSettings = await readAppSettings();
+    const stored = await chrome.storage.sync.get(STORAGE_KEYS.settings);
+    const settings = applyPrivacyShieldToCaptureSettings({
+      ...getDefaultSettings(),
+      ...(stored[STORAGE_KEYS.settings] || {}),
+      captureMode: command === "capture-visible-area" ? "visible" : "fullPage",
+      devicePreset: "desktop"
+    }, appSettings);
+
+    await runCaptureFlow(settings);
+  } finally {
+    captureInFlight = false;
+    captureCancelRequested = false;
+    await clearActiveCaptureJob();
+  }
 }
 
 function broadcastSession(session) {

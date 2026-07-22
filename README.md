@@ -5,7 +5,7 @@ Lumen is a Manifest V3 Chrome extension for clean webpage capture, annotation, v
 Lumen focuses on:
 
 1. clean the page before capture
-2. capture desktop, tablet, and mobile views together
+2. capture full pages, visible viewports, or desktop, tablet, and mobile views together
 3. crop rectangles or true transparent lasso shapes
 4. delay, repeat, or continuously monitor a selected area with explicit limits
 5. keep real on-device previews in a local photo library while originals stay in Downloads
@@ -25,7 +25,7 @@ The extension includes:
 3. tail remeasurement and stalled-scroll retries for late-growing pages
 4. a last-reachable-viewport fallback for app-shell pages that stop scrolling after repeated tail rechecks
 5. full-page stitching with offscreen composition
-6. desktop, tablet, mobile, and responsive-set capture modes
+6. full-page, visible-area, desktop, tablet, mobile, and responsive-set capture modes
 7. export-time redaction for emails, phone numbers, token-like strings, and filled inputs, rescanned before every screenshot slice
 8. redaction preview from the popup before export
 9. anchored manual redaction boxes for areas the scanner cannot infer, with projection into responsive captures when the source element still resolves
@@ -67,6 +67,7 @@ The extension includes:
 45. local PNG and paginated raster PDF export, plus Fit, 100%, and keyboard zoom for the local working image in Annotation Studio
 46. a capture-time review PDF cache generated from the original rendered capture output or tiles at up to 3200 raster pixels per page; it has its own 250 MB or 75-capture local budget
 47. an immediate saved-capture receipt with actions to annotate and export, open the original, reveal it in its folder, or jump to the matching local-library item
+48. keyboard shortcuts for full-page capture and visible-area capture, plus active-run controls to cancel a long capture or reopen its source tab from the popup
 
 ## Current Limits
 
@@ -186,7 +187,7 @@ The public landing page will be available at `http://127.0.0.1:3000/`.
 2. Open the Lumen popup
 3. Check the launch indicator to confirm the current tab is capture-ready
 4. Click `Capture page` for the fresh-install one-click full-page run. It stays local, enables automatic redaction, and omits capture-details JSON by default; enable review-before-save in Settings when you want a confirmation screen before each save
-5. Hold `Capture page` to open quick actions for responsive capture, redaction scan, manual boxes, cutaway, lasso, callout, or signal extraction
+5. Hold `Capture page` to open quick actions for responsive capture, visible-area capture, redaction scan, manual boxes, cutaway, lasso, callout, review, or signal extraction
 6. Change capture device, export mode, cleanup, lazy-load forcing, auto-redaction, notes, or capture-detail settings when needed
 7. Use `Scan` to preview detected redaction regions before export
 8. Use `Mark boxes` if you need manual redactions before capture
@@ -299,7 +300,7 @@ To package the production allowlist and boot that exact ZIP in a clean profile:
 npm run smoke:release
 ```
 
-This starts a local fixture page, loads a temporary copy of the extension with explicit test-only capture access, seeds one anchored focused-crop region, runs a responsive desktop, tablet, and mobile capture through the MV3 background worker, waits for Chrome downloads to finish, validates the full-page PNGs, focused-crop PNGs, and capture detail files, checks that local history stores the run, then removes the temporary profile and download folder. The checked-in extension manifest is not widened by this test.
+This starts a local fixture page, loads a temporary copy of the extension with explicit test-only capture access, seeds one anchored focused-crop region, runs a responsive desktop, tablet, and mobile capture through the MV3 background worker, waits for Chrome downloads to finish, validates the full-page PNGs, focused-crop PNGs, capture detail files, local history, selected-area monitoring, and a one-segment visible-area capture, then removes the temporary profile and download folder. The checked-in extension manifest is not widened by this test.
 
 If a browser run is interrupted, remove leftover Lumen test screenshots, temporary profiles, and capture downloads with:
 
