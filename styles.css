@@ -324,13 +324,13 @@ ul {
 
 .feature-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 
 .feature-card {
-  min-height: 224px;
-  padding: 30px;
+  min-height: 210px;
+  padding: 28px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.8);
@@ -341,7 +341,7 @@ ul {
   display: grid;
   width: 42px;
   height: 42px;
-  margin-bottom: 40px;
+  margin-bottom: 32px;
   place-items: center;
   border-radius: 13px;
   background: var(--mint-soft);
@@ -350,12 +350,12 @@ ul {
   font-weight: 850;
 }
 
-.feature-card:nth-child(3n + 2) .feature-icon {
+.feature-card:nth-child(even) .feature-icon {
   background: #e8eefb;
   color: #3a62a4;
 }
 
-.feature-card:nth-child(3n) .feature-icon {
+.feature-card:nth-child(4n + 3) .feature-icon {
   background: #fbefdd;
   color: #9a6624;
 }
@@ -448,7 +448,7 @@ ul {
 
 .trust-card {
   display: flex;
-  min-height: 390px;
+  min-height: 340px;
   flex-direction: column;
   align-items: flex-start;
   padding: clamp(34px, 5vw, 54px);
@@ -631,7 +631,7 @@ ul {
   }
 
   .trust-card {
-    min-height: 340px;
+    min-height: 0;
   }
 
   .site-footer {
@@ -722,7 +722,7 @@ ul {
   }
 
   .trust-card {
-    min-height: 330px;
+    min-height: 0;
     padding: 32px 26px;
     border-radius: 24px;
   }

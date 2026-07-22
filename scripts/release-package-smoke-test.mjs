@@ -108,9 +108,14 @@ assert(
 
   const firstRun = await popup.evaluate(async () => ({
     title: document.querySelector("#onboardingTitle")?.textContent?.trim() || "",
-    startLabel: document.querySelector("#onboardingStartButton")?.textContent?.trim() || "",
-    startDisabled: document.querySelector("#onboardingStartButton")?.disabled || false,
+    pageStatus: document.querySelector("#onboardingPageStatus")?.textContent?.trim() || "",
+    hasDismissButton: Boolean(document.querySelector("#onboardingDismissButton")),
+    hasStartButton: Boolean(document.querySelector("#onboardingStartButton")),
+    hasSettingsButton: Boolean(document.querySelector("#onboardingSettingsButton")),
     stepCount: document.querySelectorAll("[data-onboarding-step]").length,
+    launchFollowsHeader: document.querySelector("header")?.nextElementSibling?.id === "launchPanel",
+    captureButtonBottom: Math.round(document.querySelector("#captureButton")?.getBoundingClientRect().bottom || 0),
+    captureDisabled: document.querySelector("#captureButton")?.disabled || false,
     launchState: document.querySelector("#launchStatus")?.dataset.state || "",
     permissions: await chrome.permissions.getAll(),
     sync: await chrome.storage.sync.get("lumen.capture.settings"),
@@ -122,14 +127,25 @@ assert(
     ])
   }));
 
-  assert(/three steps/i.test(firstRun.title), "Clean install did not show the focused first-run guide.", firstRun);
-  assert(firstRun.startLabel === "Review first capture", "First-run primary action is unclear.", firstRun);
-  assert(firstRun.stepCount === 3, "First-run guide should have exactly three steps.", firstRun);
+  assert(firstRun.title === "Capture your first page", "Clean install did not show the compact first-run guide.", firstRun);
+  assert(firstRun.pageStatus, "First-run guide did not explain the current page state.", firstRun);
+  assert(firstRun.hasDismissButton, "First-run guide lost its dismiss action.", firstRun);
+  assert(
+    !firstRun.hasStartButton && !firstRun.hasSettingsButton && firstRun.stepCount === 0,
+    "First-run guide reintroduced a forced-review CTA or instructional steps.",
+    firstRun
+  );
+  assert(firstRun.launchFollowsHeader, "Capture launch must appear directly after the compact popup header.", firstRun);
+  assert(
+    firstRun.captureButtonBottom > 0 && firstRun.captureButtonBottom <= 600,
+    "Clean-install Capture page action must remain inside a 600px popup viewport.",
+    firstRun
+  );
   // A popup opened as a normal browser tab does not receive Chrome's toolbar
   // activeTab grant. The production ZIP must fail safely in that state while
   // still explaining the first-run path; toolbar-driven capture is covered by
   // the loaded-extension and end-to-end suites.
-  assert(firstRun.launchState === "blocked" && firstRun.startDisabled, "Clean package did not fail safely without an activeTab grant.", firstRun);
+  assert(firstRun.launchState === "blocked" && firstRun.captureDisabled, "Clean package did not fail safely without an activeTab grant.", firstRun);
   assert(!(firstRun.permissions.origins || []).length, "Clean install started with granted site origins.", firstRun.permissions);
   assert(!Object.hasOwn(firstRun.sync["lumen.capture.settings"] || {}, "annotationText"), "Release package synced private note text.", firstRun.sync);
   assert(typeof firstRun.local["lumen.capture.privateSettings"]?.annotationText === "string", "Release package did not initialize private settings locally.", firstRun.local);

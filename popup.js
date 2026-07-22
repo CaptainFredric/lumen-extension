@@ -14,6 +14,7 @@ import {
 } from "./config.js";
 import {
   countLibraryCaptures,
+  getLibraryCapture,
   getLibraryPreviewAsset,
   listLibraryCaptures
 } from "./library-store.js";
@@ -24,11 +25,8 @@ import {
 
 const ui = {
   onboardingPanel: document.querySelector("#onboardingPanel"),
-  onboardingStartButton: document.querySelector("#onboardingStartButton"),
-  onboardingSettingsButton: document.querySelector("#onboardingSettingsButton"),
   onboardingDismissButton: document.querySelector("#onboardingDismissButton"),
   onboardingPageStatus: document.querySelector("#onboardingPageStatus"),
-  onboardingSteps: [...document.querySelectorAll("[data-onboarding-step]")],
   openSettingsButton: document.querySelector("#openSettingsButton"),
   launchPanel: document.querySelector("#launchPanel"),
   launchStatus: document.querySelector("#launchStatus"),
@@ -39,6 +37,11 @@ const ui = {
   analyzeButton: document.querySelector("#analyzeButton"),
   holdMenu: document.querySelector("#holdMenu"),
   holdMenuActions: [...document.querySelectorAll("[data-quick-action]")],
+  captureReceipt: document.querySelector("#captureReceipt"),
+  captureReceiptTitle: document.querySelector("#captureReceiptTitle"),
+  captureReceiptDetail: document.querySelector("#captureReceiptDetail"),
+  captureReceiptStatus: document.querySelector("#captureReceiptStatus"),
+  captureReceiptActions: [...document.querySelectorAll("[data-receipt-action]")],
   removeStickyHeaders: document.querySelector("#removeStickyHeaders"),
   forceLazyLoad: document.querySelector("#forceLazyLoad"),
   autoRedact: document.querySelector("#autoRedact"),
@@ -196,6 +199,7 @@ let onboardingState = {
   completedAt: "",
   dismissedAt: ""
 };
+let latestCaptureReceipt = null;
 let oneShotPermissionOrigin = "";
 let photoLibraryObjectUrls = new Set();
 let photoLibraryRenderVersion = 0;
@@ -246,7 +250,9 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 
   if (message?.type === "LUMEN_HISTORY_UPDATED") {
-    renderHistory(message.payload || []);
+    const captureHistory = message.payload || [];
+    renderHistory(captureHistory);
+    renderCaptureReceiptFromHistory(captureHistory[0]).catch(() => {});
   }
 
   if (message?.type === "LUMEN_WATCH_PLANS_UPDATED") {
@@ -287,8 +293,6 @@ async function bootstrap() {
 }
 
 function bindEvents() {
-  ui.onboardingStartButton.addEventListener("click", () => handleCaptureClick({ forceReview: true }));
-  ui.onboardingSettingsButton.addEventListener("click", handleOnboardingSettings);
   ui.onboardingDismissButton.addEventListener("click", dismissOnboarding);
   ui.openSettingsButton.addEventListener("click", openSettingsPage);
   ui.removeStickyHeaders.addEventListener("change", persistCurrentSettings);
@@ -375,6 +379,7 @@ function bindEvents() {
   ui.analyzeButton.addEventListener("click", handleAnalyzeClick);
   ui.holdMenu.addEventListener("click", handleQuickActionClick);
   ui.holdMenu.addEventListener("keydown", handleHoldMenuKeyDown);
+  ui.captureReceipt.addEventListener("click", handleCaptureReceiptAction);
   ui.exportReviewCancelButton.addEventListener("click", () => settleExportReview(false));
   ui.exportReviewConfirmButton.addEventListener("click", () => settleExportReview(true));
   document.addEventListener("keydown", handleDocumentKeyDown);
@@ -467,17 +472,8 @@ function renderOnboarding() {
 
   const pageReady = !launchActionsBlocked && Boolean(launchTargetTab?.url);
   ui.onboardingPageStatus.textContent = pageReady
-    ? `${formatTabHost(launchTargetTab.url)} is ready for review.`
-    : "Open a normal web page to begin.";
-  ui.onboardingStartButton.disabled = !pageReady || actionBusy;
-
-  for (const step of ui.onboardingSteps) {
-    step.classList.toggle("is-ready", step.dataset.onboardingStep === "review" || (step.dataset.onboardingStep === "page" && pageReady));
-  }
-}
-
-function handleOnboardingSettings() {
-  openSettingsPage();
+    ? `${formatTabHost(launchTargetTab.url)} is ready. Click Capture page for the full page.`
+    : "Open a normal webpage, then click Capture page.";
 }
 
 async function openSettingsPage() {
@@ -519,6 +515,116 @@ async function completeOnboarding() {
     [STORAGE_KEYS.onboarding]: onboardingState
   });
   renderOnboarding();
+}
+
+function hideCaptureReceipt() {
+  latestCaptureReceipt = null;
+  ui.captureReceipt.dataset.captureId = "";
+  ui.captureReceipt.classList.add("is-hidden");
+}
+
+function renderCaptureReceipt(result = {}) {
+  const captureId = typeof result.captureId === "string" ? result.captureId : "";
+  const files = Array.isArray(result.files) ? result.files : [];
+  const downloads = Array.isArray(result.downloads) ? result.downloads : [];
+  const librarySaved = Boolean(result.librarySaved);
+  const fileCount = files.length || downloads.length;
+
+  if (!captureId) {
+    hideCaptureReceipt();
+    return;
+  }
+
+  latestCaptureReceipt = {
+    captureId,
+    librarySaved,
+    hasDownload: downloads.length > 0 || files.length > 0
+  };
+  ui.captureReceipt.dataset.captureId = captureId;
+  ui.captureReceiptTitle.textContent = result.variantCount > 1
+    ? "Capture set ready"
+    : "Capture ready";
+  ui.captureReceiptDetail.textContent = `${fileCount || 1} file${fileCount === 1 ? "" : "s"} saved${result.archiveFolder ? ` to ${result.archiveFolder}` : ""}.`;
+  ui.captureReceiptStatus.textContent = librarySaved
+    ? "Saved locally. Ready to open, edit, or export."
+    : "The original is saved. Local editing is unavailable for this capture.";
+
+  for (const button of ui.captureReceiptActions) {
+    const action = button.dataset.receiptAction;
+    button.disabled = action === "annotate"
+      ? !librarySaved
+      : (action === "open" || action === "show") && !latestCaptureReceipt.hasDownload;
+  }
+
+  ui.captureReceipt.classList.remove("is-hidden");
+}
+
+async function renderCaptureReceiptFromHistory(capture = null) {
+  if (!capture?.id || capture.sourceType === "timed") {
+    return;
+  }
+
+  const libraryCapture = await getLibraryCapture(capture.id);
+  renderCaptureReceipt({
+    captureId: capture.id,
+    files: capture.files || [],
+    downloads: capture.downloads || [],
+    archiveFolder: capture.archiveFolder || "",
+    variantCount: capture.variants?.length || 1,
+    librarySaved: Boolean(libraryCapture)
+  });
+}
+
+async function handleCaptureReceiptAction(event) {
+  const button = event.target.closest("[data-receipt-action]");
+
+  if (!button || button.disabled || !latestCaptureReceipt?.captureId) {
+    return;
+  }
+
+  const action = button.dataset.receiptAction;
+  const captureId = latestCaptureReceipt.captureId;
+  const messageType = action === "annotate"
+    ? "LUMEN_OPEN_ANNOTATION_EDITOR"
+    : action === "open"
+      ? "LUMEN_OPEN_CAPTURE_DOWNLOAD"
+      : action === "show"
+        ? "LUMEN_SHOW_CAPTURE_DOWNLOAD"
+        : "LUMEN_OPEN_PHOTO_LIBRARY";
+
+  button.disabled = true;
+  ui.captureReceiptStatus.textContent = action === "annotate"
+    ? "Opening Annotation Studio…"
+    : action === "library"
+      ? "Opening your library…"
+      : action === "open"
+        ? "Opening the original…"
+        : "Showing the saved file…";
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: messageType,
+      payload: { captureId }
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error?.description || "That capture action could not be completed.");
+    }
+
+    ui.captureReceiptStatus.textContent = action === "annotate"
+      ? "Annotation Studio opened."
+      : action === "library"
+        ? "Photo library opened."
+        : action === "open"
+          ? "Original opened."
+          : "Original shown in its folder.";
+  } catch (error) {
+    ui.captureReceiptStatus.textContent = error?.message || "That capture action could not be completed.";
+  } finally {
+    button.disabled = action === "annotate"
+      ? !latestCaptureReceipt.librarySaved
+      : (action === "open" || action === "show") && !latestCaptureReceipt.hasDownload;
+  }
 }
 
 async function restoreAppState() {
@@ -1102,6 +1208,7 @@ async function handleCaptureClick({ forceReview = false } = {}) {
 async function runApprovedCapture() {
   setActionBusy(true);
   hideExportReview();
+  hideCaptureReceipt();
   statusEvents = [];
   renderRunSummary(currentSettings);
   renderTimeline("prepare");
@@ -1141,6 +1248,7 @@ async function runApprovedCapture() {
       badge: "Ready",
       progress: 1
     });
+    renderCaptureReceipt(response);
     await completeOnboarding();
   } catch (error) {
     showStatus({
@@ -2406,6 +2514,7 @@ async function handleDeleteBackendData() {
   renderManualRedactions({ regions: [] });
   renderCutawayRegion({ region: null, regions: [] });
   renderAnnotationRegion({ region: null, regions: [] });
+  hideCaptureReceipt();
   await refreshPhotoLibrary();
   currentSettings.annotationText = "";
   ui.annotationText.value = "";

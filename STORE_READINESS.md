@@ -10,7 +10,7 @@ This file tracks what Lumen needs before a serious Chrome Web Store submission.
 4. Local-first history and region storage.
 5. Clear blocked-page handling for Chrome, Web Store, extension, and internal browser pages.
 6. Manifest description shortened to 131 characters.
-7. The landing page identifies the Chrome extension as the actual capture app and limits the website to installation guidance, product explanation, and demo surfaces.
+7. The landing page identifies the Chrome extension as the actual capture app and limits the website to truthful installation guidance and a concise feature overview.
 8. Store package script builds a narrow upload ZIP and validates manifest fields, icons, permissions, and blocked development files.
 9. Production manifest no longer requests the broad `tabs` permission.
 10. Public privacy policy exists at `https://captainfredric.github.io/lumen-extension/privacy.html`.
@@ -35,6 +35,7 @@ This file tracks what Lumen needs before a serious Chrome Web Store submission.
 29. Local exports include PNG and paginated raster PDF, with Fit, 100%, and keyboard zoom controls for the local working image; connected export remains separately consented.
 30. Fresh installs default to one-click local capture with automatic redaction enabled, capture-details JSON disabled, review-before-save disabled, and Privacy Shield available as an explicit stronger mode.
 31. Capture-time review PDFs are generated from the original rendered output or tiles at up to 3200 raster pixels per page and stored under their own bounded local cache.
+32. The clean-install popup keeps Capture page above the fold, does not force review when the saved default is off, and shows direct open, edit/export, reveal, and library actions after success.
 
 ## Public URLs
 
@@ -66,7 +67,7 @@ These are needed for tablet, mobile, and responsive captures that open temporary
 
 ## Submission Risks To Resolve
 
-1. Recheck the deployed `privacy.html` in a signed-out browser after this release reaches GitHub Pages; all three source copies now describe reviewed-image Drive export.
+1. Recheck the deployed `privacy.html` in a signed-out browser before dashboard submission; all source copies now describe reviewed-image Drive export.
 2. Complete the field-by-field draft in `CHROME_WEB_STORE_PRIVACY_FORM.md` in the publisher dashboard and personally make the Limited Use attestations.
 3. Manually verify one-time, repeating, pause/resume, run-cap completion, missed-alarm behavior, and last-plan permission revocation in stock Chrome.
 4. Keep continuous monitoring local, selected-area-only, and capped; do not imply an always-on remote service when Chrome is closed.

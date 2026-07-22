@@ -11,7 +11,7 @@ This release makes the Chrome extension—not the marketing website—the cleare
 3. Added fresh-install one-click defaults: local-only mode and automatic redaction start on, capture-details JSON and review-before-save start off, and the stronger Privacy Shield remains an explicit choice.
 4. Added local PNG and paginated raster PDF export from review and Annotation Studio, with Fit, 100%, and keyboard zoom for the local working image.
 5. Added a capture-time PDF cache generated from the original rendered capture output or tiles at up to 3200 raster pixels per page. It remains available for review export even when a large capture's bounded editor proxy is later pruned, until its own cache limit is reached.
-6. Rebuilt the public landing page as the installation, explanation, and demo front door while keeping the Chrome extension's popup, library, editor, comparison workspace, and Settings as the actual app.
+6. Rebuilt the public landing page as the installation and concise feature front door while keeping the Chrome extension's popup, library, editor, comparison workspace, and Settings as the actual app.
 
 ### Reliability and privacy
 
@@ -25,11 +25,20 @@ This release makes the Chrome extension—not the marketing website—the cleare
 
 ### July 20 interface refresh
 
-1. Rebuilt the public landing page into five concise sections with ordinary product language, a direct “See Lumen in action” path, clickable Capture, Annotate, Compare, and Monitor screens, and the real extension recording in the hero.
+1. Rebuilt the public landing page into five concise, feature-focused sections with ordinary product language and static images of real capture output and the extension interface.
 2. Removed the long screenshot-shortcut tutorial, competitor table, faux proof labels, numbered markers, and repeated calls to action from the landing page.
 3. Added a visible capture-options arrow beside the one-click Capture page button. The arrow and press-and-hold gesture now open the same eight actions without accidentally starting a capture.
 4. Added menu keyboard navigation, Escape and outside-click closure, focus restoration, and synchronized accessibility state for the new capture control.
 5. Re-recorded the unpacked extension performing a real capture, save review, library flow, annotation and undo/redo, 100% zoom, PNG and PDF exports, change review, and reversible Privacy Shield changes. Refreshed all affected Chrome Web Store screenshots from the current build.
+
+### July 22 first-click refinement
+
+1. Moved the Capture page action directly under a compact toolbar header so it remains visible inside a 600-pixel popup on a clean install.
+2. Replaced the forced three-step first-run review flow with one dismissible page-readiness tip. Fresh installs now honor the one-click `reviewBeforeSave: false` default.
+3. Added an immediate saved-capture receipt with **Annotate & export**, **Open original**, **Show in folder**, and **Library** actions linked to the exact completed capture.
+4. Collapsed optional capture controls and page analysis by default while keeping area, lasso, responsive, redaction, timer, output, and monitoring tools available on demand.
+5. Tightened the public site to four concise feature cards, truthful GitHub-beta install labels, concrete privacy and reliability copy, and no unsupported visible-area claim.
+6. Refreshed the Web Store control-surface image from the current extension and added loaded-extension coverage for the compact first run and the real post-capture editor/library handoff.
 
 ### Known limits
 

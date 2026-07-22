@@ -90,7 +90,7 @@ The extension saves compact gallery previews, bounded whole-capture editor image
 Generated assets live in `store-assets/screenshots/` and can be refreshed with `npm run store:screenshots`.
 For submission, use the `lumen-store-screenshots-<commit>` artifact produced by the release commit's GitHub Actions run so every image comes from the exact pushed runtime. The checked-in annotation image is a review preview and must be replaced by that generated artifact.
 
-1. Extension control surface and dedicated Privacy Shield Settings on a capturable page.
+1. One-click capture with the immediate open/edit/library receipt beside dedicated Privacy Shield Settings.
 2. Annotation studio with arrows, text, shapes, blur, pixelation, undo, redo, Fit/100% working-image zoom, PNG/raster-PDF export, and optional reviewed-image Drive export.
 3. Before/after visual change review with highlighted regions and monitor timeline.
 4. Responsive desktop, tablet, and mobile outputs with redaction and focused-area context.

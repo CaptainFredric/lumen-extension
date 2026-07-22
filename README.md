@@ -1,6 +1,6 @@
 # Lumen
 
-Lumen is a Manifest V3 Chrome extension for clean webpage capture, annotation, visual comparison, and local monitoring. The Chrome extension is the actual app: its toolbar popup, local library, Annotation Studio, Change Review, and Settings screen perform the work. The GitHub Pages website is the public front door for installation guidance, product explanation, and the interactive demo; a normal website cannot capture arbitrary browser tabs with extension privileges.
+Lumen is a Manifest V3 Chrome extension for clean webpage capture, annotation, visual comparison, and local monitoring. The Chrome extension is the actual app: its toolbar popup, local library, Annotation Studio, Change Review, and Settings screen perform the work. The GitHub Pages website is the public front door for installation guidance and a concise feature overview; a normal website cannot capture arbitrary browser tabs with extension privileges.
 
 Lumen focuses on:
 
@@ -53,7 +53,7 @@ The extension includes:
 31. automatic sensitive-data rescans before every screenshot slice, with a fail-closed truncation limit
 32. opaque redaction rendering so covered pixels are not recoverable from the saved image
 33. exact responsive CSS-width calibration with requested and actual viewport evidence in capture details
-34. a three-step first-run guide that disappears after the first successful capture or dismissal
+34. a compact first-capture tip that keeps the Capture page action above the fold and disappears after success or dismissal
 35. one-shot site-permission leases that are removed after responsive capture unless a timed capture still needs them
 36. an always-available local workspace clear for history, previews, page signals, regions, note drafts, schedules, and optional site access
 37. a clean-profile smoke test that installs and boots the exact release ZIP
@@ -66,6 +66,7 @@ The extension includes:
 44. a reversible Privacy Shield that enforces local-only mode, review-before-save, automatic redaction, and metadata minimization together, pauses unattended monitors while active, then restores the user's choices and monitor alarms when turned off
 45. local PNG and paginated raster PDF export, plus Fit, 100%, and keyboard zoom for the local working image in Annotation Studio
 46. a capture-time review PDF cache generated from the original rendered capture output or tiles at up to 3200 raster pixels per page; it has its own 250 MB or 75-capture local budget
+47. an immediate saved-capture receipt with actions to annotate and export, open the original, reveal it in its folder, or jump to the matching local-library item
 
 ## Current Limits
 

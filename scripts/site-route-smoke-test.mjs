@@ -24,7 +24,7 @@ const publicMirrors = [
   "brandmark.svg",
   "assets/brandmark-512.png",
   "assets/lumen-social-card.png",
-  "assets/hero-after.png",
+  "assets/capture-run-desktop.png",
   "assets/store-control-surface.png"
 ];
 const PRIMARY_CTA_URL = "https://github.com/CaptainFredric/lumen-extension#load-the-extension-locally";
@@ -48,7 +48,7 @@ const siteRoots = [
     legacyDocsMode: "redirect",
     assetPath: "/assets/lumen-social-card.png",
     landingAssetPaths: [
-      "/assets/hero-after.png",
+      "/assets/capture-run-desktop.png",
       "/assets/store-control-surface.png"
     ]
   },
@@ -58,7 +58,7 @@ const siteRoots = [
     legacyDocsMode: "landing",
     assetPath: "/assets/lumen-social-card.png",
     landingAssetPaths: [
-      "/assets/hero-after.png",
+      "/assets/capture-run-desktop.png",
       "/assets/store-control-surface.png"
     ]
   }
@@ -138,14 +138,14 @@ async function runRouteChecks(target) {
       }
     );
     assert(
-      countMatches(root.body, /class="feature-card"/g) === 6,
-      `Expected ${target.name} landing page to present exactly six product features.`, {
+      countMatches(root.body, /class="feature-card"/g) === 4,
+      `Expected ${target.name} landing page to present exactly four concise product features.`, {
         featureCards: countMatches(root.body, /class="feature-card"/g)
       }
     );
     assert(
       root.body.includes(`href="${PRIMARY_CTA_URL}"`) &&
-        root.body.includes('src="assets/hero-after.png"') &&
+        root.body.includes('src="assets/capture-run-desktop.png"') &&
         root.body.includes('src="assets/store-control-surface.png"') &&
         root.body.includes('href="privacy.html"'),
       `Expected ${target.name} landing page to expose its install action, real UI images, and privacy route.`, {
@@ -328,7 +328,7 @@ async function runBrowserChecks(siteRoot) {
       await page.goto(`${fixture.origin}/`, { waitUntil: "networkidle" });
 
       const initial = await page.evaluate(() => {
-        const heroImage = document.querySelector('img[src="assets/hero-after.png"]');
+        const heroImage = document.querySelector('img[src="assets/capture-run-desktop.png"]');
         const extensionImage = document.querySelector('img[src="assets/store-control-surface.png"]');
         const primaryCta = document.querySelector(".hero-actions .button-primary");
         const featureCards = [...document.querySelectorAll(".feature-card")];
@@ -387,13 +387,13 @@ async function runBrowserChecks(siteRoot) {
       assert(
         initial.heroTitleCount === 1 &&
           initial.heroImage?.[0] === true &&
-          initial.heroImage?.[1] === 1136 &&
-          initial.heroImage?.[2] === 710 &&
+          initial.heroImage?.[1] === 1280 &&
+          initial.heroImage?.[2] === 860 &&
           Boolean(initial.heroImage?.[3]),
         `Expected ${viewport.width}px page to render one accessible heading and the complete hero image.`,
         initial
       );
-      assert(initial.featureCards.length === 6, `Expected ${viewport.width}px page to render all six feature cards.`, initial);
+      assert(initial.featureCards.length === 4, `Expected ${viewport.width}px page to render all four concise feature cards.`, initial);
       assert(
         initial.featureCards.every((card) => card.heading && card.copy),
         `Expected ${viewport.width}px feature cards to include a heading and plain-language description.`,

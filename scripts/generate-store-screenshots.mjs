@@ -113,10 +113,30 @@ async function captureExtensionProductShots() {
   await popup.waitForFunction(() => document.querySelector("#launchStatus")?.dataset.state === "ready", null, {
     timeout: 10000
   });
+  await popup.evaluate(() => {
+    document.querySelector("#onboardingPanel")?.classList.add("is-hidden");
+    const receipt = document.querySelector("#captureReceipt");
+    if (receipt) {
+      receipt.dataset.captureId = "store-shot-capture";
+      receipt.classList.remove("is-hidden");
+    }
+    const title = document.querySelector("#captureReceiptTitle");
+    const detail = document.querySelector("#captureReceiptDetail");
+    const status = document.querySelector("#captureReceiptStatus");
+    if (title) title.textContent = "Capture set ready";
+    if (detail) detail.textContent = "4 files saved to Lumen/2026-05-12/store-shot.";
+    if (status) status.textContent = "Saved locally. Ready to open, edit, or export.";
+    for (const button of document.querySelectorAll("[data-receipt-action]")) {
+      button.disabled = false;
+    }
+  });
   const defaultShot = await popup.screenshot({ type: "png" });
 
   await seedStoreMonitorState(worker);
   await popup.reload({ waitUntil: "load" });
+  await popup.locator(".options-workspace").evaluate((details) => {
+    details.open = true;
+  });
   await popup.waitForSelector("#watchPlanCard:not(.is-hidden)", { timeout: 10000 });
   const onboardingDismissButton = popup.locator("#onboardingDismissButton");
   if (await onboardingDismissButton.isVisible().catch(() => false)) {
@@ -308,9 +328,9 @@ function buildControlSurfaceShot(popupImage, settingsImage) {
     <section class="control-shot">
       <div class="copy">
         <p class="eyebrow">Lumen capture workflow</p>
-        <h1>Capture fast. Control what leaves.</h1>
-        <p class="lede">One-click capture, focused actions, and a dedicated Privacy Shield stay one step from the page.</p>
-        <div class="cta-row"><span>Full page</span><span>Privacy Shield</span><span>Local-only</span></div>
+        <h1>Capture. Then choose what happens next.</h1>
+        <p class="lede">Open the original, annotate and export, reveal the file, or return to your library right after saving.</p>
+        <div class="cta-row"><span>Full page</span><span>PNG + PDF</span><span>Local library</span></div>
       </div>
       <div class="popup-pair">
         <div class="phone-frame mini"><img src="${popupImage}" alt="Lumen extension popup" /></div>

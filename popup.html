@@ -11,66 +11,19 @@
       <div class="ambient ambient-one"></div>
       <div class="ambient ambient-two"></div>
 
-      <header class="hero">
+      <header class="hero app-header">
         <div class="brand-row">
           <div class="brand-mark">L</div>
           <div class="brand-copy">
             <p class="eyebrow">Lumen</p>
-            <p class="sub-eyebrow">Capture workspace</p>
+            <p class="sub-eyebrow">Web capture</p>
           </div>
           <button id="openSettingsButton" class="settings-button" type="button" aria-label="Open Lumen settings">
             <span aria-hidden="true"></span>
             Settings
           </button>
         </div>
-
-        <h1>Clean captures from busy pages.</h1>
-        <p class="hero-copy">
-          Page cleanup, redaction, responsive views, area monitoring, and a local photo
-          library for design, QA, and product review.
-        </p>
-
-        <div class="hero-ribbon">
-          <span>Sticky cleanup</span>
-          <span>Area monitor</span>
-          <span>Tail remeasure</span>
-          <span>Retina stitch</span>
-          <span>Responsive set</span>
-          <span>Capture details</span>
-          <span>Page signals</span>
-          <span>Photo library</span>
-        </div>
       </header>
-
-      <section id="onboardingPanel" class="panel onboarding-panel is-hidden" aria-labelledby="onboardingTitle">
-        <div class="onboarding-head">
-          <div>
-            <p class="section-label">First capture</p>
-            <h2 id="onboardingTitle">Evidence you can trust in three steps.</h2>
-          </div>
-          <button id="onboardingDismissButton" class="onboarding-dismiss" type="button" aria-label="Dismiss first-capture guide">Not now</button>
-        </div>
-
-        <ol class="onboarding-steps">
-          <li data-onboarding-step="page">
-            <span>1</span>
-            <div><strong>Choose the page</strong><small id="onboardingPageStatus">Checking the current tab.</small></div>
-          </li>
-          <li data-onboarding-step="review">
-            <span>2</span>
-            <div><strong>Review before saving</strong><small>Lumen shows redactions, crops, and the exact output plan.</small></div>
-          </li>
-          <li data-onboarding-step="save">
-            <span>3</span>
-            <div><strong>Save verified evidence</strong><small>Capture health and local download records prove the run completed.</small></div>
-          </li>
-        </ol>
-
-        <div class="onboarding-actions">
-          <button id="onboardingStartButton" class="mini-action" type="button">Review first capture</button>
-          <button id="onboardingSettingsButton" class="mini-action ghost-mini-action" type="button">Check settings</button>
-        </div>
-      </section>
 
       <section id="launchPanel" class="panel launch-panel" aria-label="Launch capture">
         <div id="launchStatus" class="launch-status" data-state="checking">
@@ -157,23 +110,42 @@
           </button>
         </div>
 
-        <div class="capture-pipeline" aria-label="Capture pipeline">
-          <span><i class="pipeline-icon pipeline-icon-clean" aria-hidden="true"></i>Clean</span>
-          <span><i class="pipeline-icon pipeline-icon-scan" aria-hidden="true"></i>Scan</span>
-          <span><i class="pipeline-icon pipeline-icon-stitch" aria-hidden="true"></i>Stitch</span>
-          <span><i class="pipeline-icon pipeline-icon-save" aria-hidden="true"></i>Save</span>
-          <span><i class="pipeline-icon pipeline-icon-route" aria-hidden="true"></i>Route</span>
-        </div>
       </section>
 
-      <section class="panel controls-panel">
-        <div class="panel-head">
-          <div>
-            <p class="section-label">Capture Settings</p>
-            <h2>Capture setup</h2>
-          </div>
-          <span class="tiny-note">Downloads to Lumen/</span>
+      <section id="onboardingPanel" class="onboarding-panel is-hidden" aria-labelledby="onboardingTitle">
+        <div class="onboarding-copy">
+          <strong id="onboardingTitle">Capture your first page</strong>
+          <small id="onboardingPageStatus">Checking the current tab.</small>
         </div>
+        <button id="onboardingDismissButton" class="onboarding-dismiss" type="button" aria-label="Dismiss first-capture tip">Got it</button>
+      </section>
+
+      <section id="captureReceipt" class="panel capture-receipt is-hidden" aria-live="polite" data-capture-id="">
+        <div class="capture-receipt-head">
+          <span class="capture-receipt-check" aria-hidden="true">✓</span>
+          <div>
+            <p class="section-label">Saved</p>
+            <h2 id="captureReceiptTitle">Capture ready</h2>
+          </div>
+        </div>
+        <p id="captureReceiptDetail" class="capture-receipt-detail">Your full-page image is ready.</p>
+        <div class="capture-receipt-actions" aria-label="Saved capture actions">
+          <button class="mini-action capture-receipt-primary" type="button" data-receipt-action="annotate">Annotate &amp; export</button>
+          <button class="mini-action ghost-mini-action" type="button" data-receipt-action="open">Open original</button>
+          <button class="mini-action ghost-mini-action" type="button" data-receipt-action="show">Show in folder</button>
+          <button class="mini-action ghost-mini-action" type="button" data-receipt-action="library">Library</button>
+        </div>
+        <small id="captureReceiptStatus" class="capture-receipt-status">Saved locally on this device.</small>
+      </section>
+
+      <details class="panel controls-panel options-workspace">
+        <summary class="panel-head options-workspace-summary">
+          <div>
+            <p class="section-label">Optional</p>
+            <h2>Capture options</h2>
+          </div>
+          <span class="tiny-note">More</span>
+        </summary>
 
         <label class="toggle-row">
           <span>
@@ -410,7 +382,7 @@
             <button type="button" class="segment" data-long-page="print">Print sheet</button>
           </div>
         </div>
-      </section>
+      </details>
 
       <section id="exportReviewPanel" class="panel export-review-panel is-hidden" aria-live="polite">
         <div class="panel-head compact">
@@ -532,14 +504,14 @@
         </div>
       </section>
 
-      <section class="panel inspector-panel">
-        <div class="panel-head">
+      <details class="panel inspector-panel inspector-workspace">
+        <summary class="panel-head inspector-workspace-summary">
           <div>
-            <p class="section-label">Inspector</p>
-            <h2>Latest page signals</h2>
+            <p class="section-label">After capture</p>
+            <h2>Page details</h2>
           </div>
           <span id="blueprintTimestamp" class="tiny-note">Awaiting analysis</span>
-        </div>
+        </summary>
 
         <div id="blueprintEmpty" class="empty-state">
           Analyze or capture a page to see palette, fonts, layout, headline, CTA,
@@ -610,7 +582,7 @@
             <div id="fontStrip" class="font-strip"></div>
           </div>
         </div>
-      </section>
+      </details>
 
       <details class="panel studio-panel advanced-workspace" hidden>
         <summary class="panel-head advanced-workspace-summary">

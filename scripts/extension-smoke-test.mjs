@@ -470,6 +470,12 @@ try {
     analyzeDisabled: document.querySelector("#analyzeButton")?.disabled || false,
     holdMenuHidden: document.querySelector("#holdMenu")?.getAttribute("aria-hidden") || "",
     holdActionCount: document.querySelectorAll("[data-quick-action]").length,
+    captureReceiptHidden: document.querySelector("#captureReceipt")?.classList.contains("is-hidden") ?? false,
+    captureReceiptCaptureId: document.querySelector("#captureReceipt")?.dataset.captureId || "",
+    receiptActions: [...document.querySelectorAll("#captureReceipt [data-receipt-action]")].map((button) => ({
+      action: button.dataset.receiptAction,
+      label: button.textContent?.trim() || ""
+    })),
     statusHidden: document.querySelector("#statusPanel")?.classList.contains("is-hidden") ?? false,
     manualCount: document.querySelector("#manualRedactionCount")?.textContent?.trim() || "",
     autoRedactDisabled: document.querySelector("#autoRedact")?.disabled || false,
@@ -545,6 +551,18 @@ try {
   assert(!popupState.analyzeDisabled, "Analyze action should be enabled for a capturable target tab.", popupState);
   assert(popupState.holdMenuHidden === "true", "Hold menu should start closed.", popupState);
   assert(popupState.holdActionCount === 8, "Hold menu actions did not render.", popupState);
+  assert(popupState.captureReceiptHidden, "Capture receipt should stay hidden until a real capture succeeds.", popupState);
+  assert(!popupState.captureReceiptCaptureId, "Hidden capture receipt should not retain a capture id.", popupState);
+  assert(
+    JSON.stringify(popupState.receiptActions) === JSON.stringify([
+      { action: "annotate", label: "Annotate & export" },
+      { action: "open", label: "Open original" },
+      { action: "show", label: "Show in folder" },
+      { action: "library", label: "Library" }
+    ]),
+    "Capture receipt actions or labels drifted from the post-capture handoff.",
+    popupState
+  );
   assert(popupState.statusHidden, "Popup status panel should start hidden.", popupState);
   assert(popupState.manualCount === "0 boxes", "Manual redaction counter did not initialize.", popupState);
   assert(!popupState.autoRedactDisabled, "Local beta should make auto-redaction immediately usable.", popupState);

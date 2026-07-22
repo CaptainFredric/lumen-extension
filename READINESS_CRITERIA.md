@@ -33,7 +33,7 @@ Current positives:
 6. Capture health blocks incomplete slice coverage and records verification per responsive view.
 7. Offset nested scrollers have a pixel-level crop and stitch regression.
 8. Redaction rescans each slice, uses opaque output, and fails closed when its review limit is exceeded.
-9. A focused three-step first-run guide now leads directly into export review.
+9. A compact first-run tip keeps one-click capture above the fold, and a saved-capture receipt links directly to the original, Annotation Studio, its folder, and the local library.
 10. Rectangle and freeform lasso selections survive layout projection; lasso exports retain transparent pixels outside the path.
 11. The local photo library stores gallery previews and bounded whole-capture editor images, supports search/filter/favorite workflows, and keeps full-resolution originals in Downloads.
 12. Local selected-area automation now distinguishes a delayed one-time run, scheduled repeat, and capped continuous monitoring.

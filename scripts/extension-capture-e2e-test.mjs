@@ -129,6 +129,43 @@ try {
   assert(response.downloads.every((item) => item.bytesReceived > 0), "Expected completed downloads with bytes.", response.downloads);
   assert(response.librarySaved, "Expected the completed capture to create a local photo-library record.", response);
 
+  await popup.waitForSelector("#captureReceipt:not(.is-hidden)", { timeout: 10000 });
+  const receiptState = await popup.evaluate(() => ({
+    captureId: document.querySelector("#captureReceipt")?.dataset.captureId || "",
+    title: document.querySelector("#captureReceiptTitle")?.textContent?.trim() || "",
+    detail: document.querySelector("#captureReceiptDetail")?.textContent?.trim() || "",
+    actions: [...document.querySelectorAll("[data-receipt-action]")].map((button) => ({
+      action: button.dataset.receiptAction,
+      disabled: button.disabled,
+      label: button.textContent?.trim() || ""
+    }))
+  }));
+  assert(receiptState.captureId === response.captureId, "Expected the success receipt to reference the completed capture.", receiptState);
+  assert(receiptState.title === "Capture set ready" && /files saved/.test(receiptState.detail), "Expected the receipt to explain the saved responsive set.", receiptState);
+  assert(receiptState.actions.length === 4 && receiptState.actions.every((action) => !action.disabled), "Expected every post-capture action to be immediately available.", receiptState.actions);
+
+  const editorPagePromise = context.waitForEvent("page");
+  await popup.click('[data-receipt-action="annotate"]');
+  const editorPage = await editorPagePromise;
+  await editorPage.waitForLoadState("domcontentloaded");
+  assert(
+    editorPage.url().includes(`editor.html?capture=${encodeURIComponent(response.captureId)}`),
+    "Expected the receipt to open this capture in Annotation Studio.",
+    editorPage.url()
+  );
+  await editorPage.close();
+
+  const libraryPagePromise = context.waitForEvent("page");
+  await popup.click('[data-receipt-action="library"]');
+  const libraryPage = await libraryPagePromise;
+  await libraryPage.waitForLoadState("domcontentloaded");
+  assert(
+    libraryPage.url().includes(`library.html?capture=${encodeURIComponent(response.captureId)}`),
+    "Expected the receipt to open this capture in the local library.",
+    libraryPage.url()
+  );
+  await libraryPage.close();
+
   const libraryState = await popup.evaluate(async (captureId) => {
     const store = await import(chrome.runtime.getURL("library-store.js"));
     const capture = await store.getLibraryCapture(captureId, {

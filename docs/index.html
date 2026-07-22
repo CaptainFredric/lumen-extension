@@ -38,7 +38,7 @@
     <meta name="twitter:image:alt" content="Lumen, full-page screenshots for Chrome." />
     <link rel="icon" href="brandmark.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/brandmark-512.png" />
-    <link rel="stylesheet" href="styles.css?v=20260721" />
+    <link rel="stylesheet" href="styles.css?v=20260722" />
     <script>document.documentElement.classList.add("js");</script>
   </head>
   <body>
@@ -59,7 +59,7 @@
           href="https://github.com/CaptainFredric/lumen-extension#load-the-extension-locally"
           target="_blank"
           rel="noreferrer"
-        >Get Lumen</a>
+        >Install beta</a>
       </nav>
     </header>
 
@@ -69,8 +69,8 @@
           <p class="eyebrow">Chrome extension</p>
           <h1 id="hero-title">Capture any webpage, all the way down.</h1>
           <p class="hero-lede">
-            Save a full scrolling page or one selected area, then annotate it and export a sharp
-            PNG or PDF. Lumen keeps the whole workflow in Chrome.
+            Save a full scrolling page or one selected area, then annotate it and export a
+            high-resolution PNG or paginated PDF. Lumen keeps the whole workflow in Chrome.
           </p>
 
           <div class="hero-actions">
@@ -79,13 +79,11 @@
               href="https://github.com/CaptainFredric/lumen-extension#load-the-extension-locally"
               target="_blank"
               rel="noreferrer"
-            >Get the Chrome beta <span aria-hidden="true">↗</span></a>
+            >Install from GitHub <span aria-hidden="true">↗</span></a>
             <a
               class="button button-secondary"
-              href="https://github.com/CaptainFredric/lumen-extension"
-              target="_blank"
-              rel="noreferrer"
-            >View on GitHub</a>
+              href="#features"
+            >See features</a>
           </div>
 
           <p class="hero-note">No account required. Captures stay on your device by default.</p>
@@ -93,13 +91,13 @@
 
         <figure class="hero-image" data-reveal>
           <img
-            src="assets/hero-after.png"
-            alt="A complete webpage captured by Lumen"
-            width="1136"
-            height="710"
+            src="assets/capture-run-desktop.png"
+            alt="A long product page saved as one image by Lumen"
+            width="1280"
+            height="860"
             decoding="async"
           />
-          <figcaption>One clean capture, including everything below the viewport.</figcaption>
+          <figcaption>A complete scrolling page saved as one image.</figcaption>
         </figure>
       </section>
 
@@ -113,38 +111,26 @@
         <div class="feature-grid">
           <article class="feature-card" data-reveal>
             <span class="feature-icon" aria-hidden="true">↕</span>
-            <h3>Full-page capture</h3>
-            <p>Save a long scrolling page in one click instead of stitching screenshots by hand.</p>
-          </article>
-
-          <article class="feature-card" data-reveal>
-            <span class="feature-icon" aria-hidden="true">⌖</span>
-            <h3>Area and lasso</h3>
-            <p>Draw a rectangle or a freeform lasso when you only need part of the page.</p>
+            <h3>Full page or selected area</h3>
+            <p>Save the whole scrolling page in one click, or use a rectangle or freeform lasso for one part.</p>
           </article>
 
           <article class="feature-card" data-reveal>
             <span class="feature-icon" aria-hidden="true">◷</span>
-            <h3>Timed captures</h3>
-            <p>Run a delayed shot, repeat on a schedule, or capture continuously for a set time.</p>
+            <h3>Timed and continuous capture</h3>
+            <p>Take one delayed shot, repeat on a schedule, or watch a selected area for a limited number of runs.</p>
           </article>
 
           <article class="feature-card" data-reveal>
             <span class="feature-icon" aria-hidden="true">✎</span>
-            <h3>Annotation tools</h3>
-            <p>Add arrows, text, rectangles, blur, or pixelation with undo and redo.</p>
+            <h3>Annotate and protect</h3>
+            <p>Add arrows, text, rectangles, blur, or pixelation, and hide sensitive details before export.</p>
           </article>
 
           <article class="feature-card" data-reveal>
             <span class="feature-icon" aria-hidden="true">↓</span>
-            <h3>PNG and PDF</h3>
-            <p>Export a detailed image or a readable, paginated PDF that stays sharp when zoomed.</p>
-          </article>
-
-          <article class="feature-card" data-reveal>
-            <span class="feature-icon" aria-hidden="true">▣</span>
-            <h3>Local photo library</h3>
-            <p>Keep captures organized and searchable without sending them to a Lumen account.</p>
+            <h3>Save, find, and export</h3>
+            <p>Keep captures in a searchable local library, then export a high-resolution PNG or paginated PDF.</p>
           </article>
         </div>
       </section>
@@ -153,14 +139,11 @@
         <div class="extension-copy" data-reveal>
           <p class="eyebrow">The extension</p>
           <h2 id="extension-title">Open Lumen and capture.</h2>
-          <p>
-            The main button saves the full page immediately. The arrow—or a press and hold—opens
-            the additional capture choices when you need them.
-          </p>
+          <p>One click captures the whole page. More options are ready when you need them.</p>
           <ul class="plain-list">
-            <li>Full page, visible area, rectangle, or lasso</li>
-            <li>Desktop, tablet, and mobile captures in one run</li>
-            <li>Review, annotate, save, or export from the same extension</li>
+            <li>Rectangle, lasso, responsive, and timed options</li>
+            <li>A clear saved-capture receipt with open and edit actions</li>
+            <li>A local library for review, annotation, and export</li>
           </ul>
         </div>
 
@@ -184,8 +167,8 @@
           <p class="eyebrow eyebrow-light">Privacy</p>
           <h2 id="privacy-title">Your screenshots stay yours.</h2>
           <p>
-            Lumen works locally by default and does not require an account. Privacy Shield can
-            review sensitive captures before they are saved or exported.
+            Lumen works locally by default and does not require an account. Privacy Shield turns
+            on automatic redaction, review before save, and metadata minimization together.
           </p>
           <a class="text-link text-link-light" href="privacy.html">Read the privacy policy <span aria-hidden="true">→</span></a>
         </div>
@@ -195,7 +178,7 @@
           <h2>Made for real webpages.</h2>
           <p>
             Lumen handles long pages, sticky navigation, lazy-loaded content, and responsive
-            layouts—the places where basic screenshot shortcuts fall short.
+            layouts. Its live test matrix includes GitHub and MDN pages up to 41,184 pixels tall.
           </p>
           <a
             class="text-link"
@@ -217,7 +200,7 @@
             href="https://github.com/CaptainFredric/lumen-extension#load-the-extension-locally"
             target="_blank"
             rel="noreferrer"
-          >Get the Chrome beta <span aria-hidden="true">↗</span></a>
+          >Install from GitHub <span aria-hidden="true">↗</span></a>
           <a
             class="button button-ghost"
             href="https://github.com/CaptainFredric/lumen-extension"
@@ -241,6 +224,6 @@
       </nav>
     </footer>
 
-    <script src="script.js?v=20260721" defer></script>
+    <script src="script.js?v=20260722" defer></script>
   </body>
 </html>
