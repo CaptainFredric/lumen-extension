@@ -559,7 +559,7 @@ function renderCaptureReceipt(result = {}) {
 
   for (const button of ui.captureReceiptActions) {
     const action = button.dataset.receiptAction;
-    button.disabled = action === "annotate"
+    button.disabled = action === "annotate" || action === "result"
       ? !librarySaved
       : (action === "open" || action === "show") && !latestCaptureReceipt.hasDownload;
   }
@@ -592,8 +592,10 @@ async function handleCaptureReceiptAction(event) {
 
   const action = button.dataset.receiptAction;
   const captureId = latestCaptureReceipt.captureId;
-  const messageType = action === "annotate"
-    ? "LUMEN_OPEN_ANNOTATION_EDITOR"
+  const messageType = action === "result"
+    ? "LUMEN_OPEN_CAPTURE_RESULT"
+    : action === "annotate"
+      ? "LUMEN_OPEN_ANNOTATION_EDITOR"
     : action === "open"
       ? "LUMEN_OPEN_CAPTURE_DOWNLOAD"
       : action === "show"
@@ -601,8 +603,10 @@ async function handleCaptureReceiptAction(event) {
         : "LUMEN_OPEN_PHOTO_LIBRARY";
 
   button.disabled = true;
-  ui.captureReceiptStatus.textContent = action === "annotate"
-    ? "Opening Annotation Studio…"
+  ui.captureReceiptStatus.textContent = action === "result"
+    ? "Opening your result…"
+    : action === "annotate"
+      ? "Opening Annotation Studio…"
     : action === "library"
       ? "Opening your library…"
       : action === "open"
@@ -619,8 +623,10 @@ async function handleCaptureReceiptAction(event) {
       throw new Error(response?.error?.description || "That capture action could not be completed.");
     }
 
-    ui.captureReceiptStatus.textContent = action === "annotate"
-      ? "Annotation Studio opened."
+    ui.captureReceiptStatus.textContent = action === "result"
+      ? "Result workspace opened."
+      : action === "annotate"
+        ? "Annotation Studio opened."
       : action === "library"
         ? "Photo library opened."
         : action === "open"
@@ -629,7 +635,7 @@ async function handleCaptureReceiptAction(event) {
   } catch (error) {
     ui.captureReceiptStatus.textContent = error?.message || "That capture action could not be completed.";
   } finally {
-    button.disabled = action === "annotate"
+    button.disabled = action === "annotate" || action === "result"
       ? !latestCaptureReceipt.librarySaved
       : (action === "open" || action === "show") && !latestCaptureReceipt.hasDownload;
   }
@@ -1702,7 +1708,7 @@ async function handleStartCutawayPicker() {
     tone: "neutral",
     eyebrow: "Cutaway",
     title: "Opening region picker",
-    detail: "Choose the page area you want to reuse, then save it from the page overlay.",
+    detail: "Draw on the page, then choose Capture now for a one-off crop or Save to remember the area.",
     badge: "Picker",
     progress: 0.08
   });
@@ -1722,12 +1728,12 @@ async function handleStartCutawayPicker() {
     renderCutawayRegion(response.record);
 
     showStatus({
-      tone: "success",
+      tone: "neutral",
       eyebrow: "Cutaway",
-      title: "Cutaway picker ready",
-      detail: "The selected region is stored for this URL and can be used for timed captures.",
-      badge: "Ready",
-      progress: 1
+      title: "Picker open on the page",
+      detail: "Nothing is remembered until you choose Save. Capture now makes a one-off crop.",
+      badge: "Open",
+      progress: 0.35
     });
   } catch (error) {
     showStatus({
@@ -1758,7 +1764,7 @@ async function handleStartLassoPicker() {
     tone: "neutral",
     eyebrow: "Lasso",
     title: "Opening lasso picker",
-    detail: "Draw around the page area you want to reuse. Lumen saves the lasso and a clean crop around it.",
+    detail: "Draw around the page area, then choose Capture now for a one-off crop or Save to remember it.",
     badge: "Picker",
     progress: 0.08
   });
@@ -1778,12 +1784,12 @@ async function handleStartLassoPicker() {
     renderCutawayRegion(response.record);
 
     showStatus({
-      tone: "success",
+      tone: "neutral",
       eyebrow: "Lasso",
-      title: "Lasso region stored",
-      detail: "The lasso is saved for this URL. PNG exports keep the drawn shape and leave the outside transparent.",
-      badge: "Ready",
-      progress: 1
+      title: "Lasso picker open",
+      detail: "Nothing is remembered until you choose Save. Capture now keeps transparent pixels outside the lasso.",
+      badge: "Open",
+      progress: 0.35
     });
   } catch (error) {
     showStatus({

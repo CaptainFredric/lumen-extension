@@ -13,6 +13,7 @@ The product can become ambitious without changing the first wedge. The screensho
 5. Keep local history and portable capture details.
 6. Annotate and compare saved captures before they leave the browser.
 7. Monitor one selected area on an explicit local schedule.
+8. Move every manual capture directly into a simple local result and export flow.
 
 ## Implemented Now
 
@@ -23,19 +24,22 @@ The product can become ambitious without changing the first wedge. The screensho
 5. One anchored capture note rendered into the export.
 6. Page-signal extraction for palette, typography, headline, CTA, navigation, and layout counts.
 7. Local history with run details, artifacts, copyable summaries, and file actions.
-8. Cutaway region picker that stores one reusable page area per URL and exports focused crops when the region resolves during capture.
+8. Rectangle and freeform lasso picker with immediate one-viewport capture or explicit reusable-region storage for monitoring.
 9. Pre-export review that checks auto-redaction, manual projection, and cutaway resolution across the requested view set.
 10. Local photo library with real previews, favorites, review state, and original-file actions.
 11. Annotation Studio with arrows, rectangles, text, blur, pixelation, selection, undo, redo, and reviewed PNG export.
 12. Local visual-change review with a before/after reveal, highlighted change regions, metrics, and monitor timeline.
 13. One-time, repeating, and capped continuous selected-area monitoring with pause, resume, run-now, and delete controls.
 14. Optional review-first Google Drive export using narrow `drive.file` access.
+15. Automatic Capture Result workspace for successful manual captures with zoom, Copy image, PNG, paginated PDF, optional Drive, Annotate, original-file, and library actions.
+16. Full-page, visible-area, and area-picker commands, plus exact packaged-extension registration and `activeTab` boundary testing.
+17. CI handoff of the exact tested Web Store ZIP as a commit-addressed artifact.
 
 ## Near-Term Product Bets
 
 ### Cutaway Artifact Review
 
-The user can now draw a rectangular cutaway region and export that area beside the full-page capture. This is useful for pricing tables, hero sections, checkout modules, dashboards, and bug reproduction areas where a full-page capture is noisy.
+The user can draw a rectangle or freeform lasso and capture that current-viewport area immediately, or save it for local monitoring. This is useful for pricing tables, hero sections, checkout modules, dashboards, and bug reproduction areas where a full-page capture is noisy.
 
 Implemented review layer:
 
@@ -86,6 +90,7 @@ The current extension should stay usable with `activeTab`, optional host access 
 ## Next Engineering Milestones
 
 1. Complete publisher-owned Web Store fields, OAuth setup, signed-ID testing, and submission.
-2. Keep the four-site live matrix and deterministic difficult-page suite green for releases.
-3. Keep privacy disclosure aligned as new destinations or remote automation are added.
-4. Tighten the backend from demo session state into a real account path.
+2. Use the commit-addressed CI ZIP for submission and keep the exact-package, four-site live, and deterministic difficult-page checks green for releases.
+3. Complete the short stock-Chrome boundary for physical toolbar use, all three shortcuts, area drawing, permissions, and revocation.
+4. Keep privacy disclosure aligned as new destinations or remote automation are added.
+5. Tighten the backend from demo session state into a real account path.

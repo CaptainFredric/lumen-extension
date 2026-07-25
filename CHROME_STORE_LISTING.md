@@ -14,7 +14,7 @@ Lumen turns a busy webpage into a cleaner capture.
 
 Use it when a normal screenshot carries too much noise: sticky headers, cookie banners, chat launchers, floating ads, unfinished lazy media, or missing layout context. Start from the Chrome toolbar, clean the page, capture the view you need, check sensitive regions, and save the result with useful capture details attached.
 
-The Chrome extension is the capture app: its toolbar popup, local library, Annotation Studio, Change Review, and Settings perform the work. The homepage is the installation, product-information, and demo front door.
+The Chrome extension is the capture app: its toolbar popup, Capture Result workspace, local library, Annotation Studio, Change Review, and Settings perform the work. The homepage is the installation, product-information, and demo front door.
 
 Lumen supports:
 
@@ -23,24 +23,25 @@ Lumen supports:
 3. Desktop, tablet, and mobile capture sets.
 4. Redaction checks for visible sensitive text and filled fields.
 5. Manual redaction boxes for custom areas.
-6. Focused rectangles and freeform lasso captures with transparent pixels outside the selected lasso path.
+6. Instant one-viewport rectangle and freeform lasso capture, with an optional Save action for monitoring and transparent pixels outside the selected lasso path.
 7. Page signals such as title, URL, colors, typography, headline, CTA text, and navigation labels.
 8. One-time delayed selected-area capture after 5, 10, or 30 seconds.
 9. Scheduled repeat capture from every 15 minutes through daily.
 10. Capped continuous selected-area monitoring every 1, 5, or 15 minutes, stopping after 10, 25, or 50 runs.
 11. Pause, resume, run-now, and delete controls for local timed plans.
-12. Keyboard shortcuts for full-page and visible-area capture.
+12. Keyboard shortcuts for full-page capture, visible-area capture, and opening the area picker.
 13. Active-run controls to cancel a long capture or return to its source tab.
-14. An on-device photo library with actual previews, search, manual/timed filters, favorites, and sorting.
-15. Full-resolution originals retained in Chrome Downloads, with Open and Show actions from the library.
-16. Capture details JSON that keeps page context beside the images.
-17. A full annotation studio with arrows, rectangles, text, blur, pixelation, selection, undo, and redo.
-18. Local before/after review with a reveal slider, highlighted change regions, difference statistics, and a monitor timeline.
-19. Optional reviewed-image export to Google Drive after explicit user consent, using access limited to files Lumen creates or the user explicitly opens with Lumen.
-20. Local PNG and paginated raster PDF export with Fit, 100%, and keyboard zoom controls for the local working image.
-21. Dedicated Settings with fast capture, review-before-save, reversible Privacy Shield that pauses unattended monitors while active, permission revocation, Drive disconnect, and local-workspace deletion.
-22. Fresh-install one-click defaults that keep capture local, enable automatic redaction, omit capture-details JSON, and skip the extra review screen unless the user turns it on.
-23. A capture-time review PDF cache generated from the original rendered output or tiles at up to 3200 raster pixels per page, with a separate 250 MB or 75-capture local limit.
+14. A clean Capture Result workspace that opens after successful manual captures with a zoomable preview, Copy image, PNG, paginated PDF, optional Drive, Annotate, original-file, and library actions.
+15. An on-device photo library with actual previews, search, manual/timed filters, favorites, and sorting.
+16. Full-resolution originals retained in Chrome Downloads, with Open and Show actions from the library.
+17. Capture details JSON that keeps page context beside the images.
+18. A full annotation studio with arrows, rectangles, text, blur, pixelation, selection, undo, and redo.
+19. Local before/after review with a reveal slider, highlighted change regions, difference statistics, and a monitor timeline.
+20. Optional reviewed-image export to Google Drive after explicit user consent, using access limited to files Lumen creates or the user explicitly opens with Lumen.
+21. Local PNG and paginated raster PDF export with Fit, 100%, and keyboard zoom controls for the local working image.
+22. Dedicated Settings with fast capture, review-before-save, reversible Privacy Shield that pauses unattended monitors while active, permission revocation, Drive disconnect, and local-workspace deletion.
+23. Fresh-install one-click defaults that keep capture local, enable automatic redaction, omit capture-details JSON, and skip the extra review screen unless the user turns it on.
+24. A capture-time review PDF cache generated from the original rendered output or tiles at up to 3200 raster pixels per page, with a separate 250 MB or 75-capture local limit.
 
 Redaction checks are a safety aid. Check each capture before sharing it outside your workspace.
 
@@ -60,7 +61,7 @@ https://captainfredric.github.io/lumen-extension/
 
 ## Permission Justification
 
-1. `activeTab`: lets Lumen read and capture the current page after the user starts an action.
+1. `activeTab`: lets Lumen read and capture the current page after the user clicks the toolbar action, uses a declared shortcut, or confirms Capture now in the on-page area picker.
 2. `alarms`: runs explicitly saved one-time, repeating, or capped continuous selected-area captures while Chrome is available.
 3. `downloads`: saves full-resolution capture images, focused crops, local PNG and raster PDF exports, and capture details JSON to the user's Downloads folder.
 4. `offscreen`: composes stitched screenshots in an offscreen canvas document.
@@ -92,8 +93,9 @@ The extension saves compact gallery previews, bounded whole-capture editor image
 
 Generated assets live in `store-assets/screenshots/` and can be refreshed with `npm run store:screenshots`.
 For submission, use the `lumen-store-screenshots-<commit>` artifact produced by the release commit's GitHub Actions run so every image comes from the exact pushed runtime. The checked-in annotation image is a review preview and must be replaced by that generated artifact.
+Use the matching `lumen-extension-<commit>` artifact for the upload ZIP; it is the same package exercised by the clean-profile release job.
 
-1. One-click capture with the immediate open/edit/library receipt beside dedicated Privacy Shield Settings.
+1. One-click capture opening the clean Capture Result workspace with Copy image, PNG, PDF, Annotate, original-file, and library actions beside dedicated Privacy Shield Settings.
 2. Annotation studio with arrows, text, shapes, blur, pixelation, undo, redo, Fit/100% working-image zoom, PNG/raster-PDF export, and optional reviewed-image Drive export.
 3. Before/after visual change review with highlighted regions and monitor timeline.
 4. Responsive desktop, tablet, and mobile outputs with redaction and focused-area context.
@@ -101,10 +103,12 @@ For submission, use the `lumen-store-screenshots-<commit>` artifact produced by 
 
 ## Reviewer Test Instructions
 
-1. Open a normal `https://` page, open Lumen from the toolbar, and run a default capture.
-2. Open the local library, choose a saved capture, and launch annotation or visual-change review.
-3. Create an arrow, rectangle, text label, blur, and pixelated region; use undo and redo; test Fit, 100%, and keyboard zoom on the local working image; export a reviewed PNG and raster PDF.
-4. Create a selected-area timer and delete it. Confirm Chrome removes saved access when it is the final plan for that origin.
-5. Google Drive export is disabled unless the release ZIP was packaged with the publisher OAuth client. In a configured build, press Export to Drive from the reviewed image, approve the narrow consent, verify one file appears, then press Disconnect Drive.
-6. Open Settings, confirm the fresh-install local-only, automatic-redaction, metadata-off, fast-capture defaults; turn Privacy Shield on and off; confirm its coordinated protections lock and restore the individual controls; then test site-access revoke and local-workspace clear.
-7. No feature requires or downloads remote executable code.
+1. Open a normal `https://` page, open Lumen from the toolbar, and run a default capture. Confirm Capture Result opens automatically.
+2. In Capture Result, zoom the image, use Copy image, download PNG and PDF, and open Annotation Studio. Then return to the local library and launch visual-change review.
+3. Open `Select an area` and `Lasso an area`; draw each shape and use **Capture now**. Open the picker again and use **Save** to create a reusable monitoring region.
+4. Physically test full-page (`Alt+Shift+L`), visible-area (`Alt+Shift+V`), and area-picker (`Alt+Shift+A`) shortcuts in stock Chrome. Linux CI requires all three exact-ZIP command paths, including a Playwright-drawn immediate area capture; the physical pass remains the final browser sign-off.
+5. Create an arrow, rectangle, text label, blur, and pixelated region; use undo and redo; test Fit, 100%, and keyboard zoom on the local working image; export a reviewed PNG and raster PDF.
+6. Create a selected-area timer and delete it. Confirm Chrome removes saved access when it is the final plan for that origin.
+7. Google Drive export is disabled unless the release ZIP was packaged with the publisher OAuth client. In a configured build, press Export to Drive from the reviewed image, approve the narrow consent, verify one file appears, then press Disconnect Drive.
+8. Open Settings, confirm the fresh-install local-only, automatic-redaction, metadata-off, fast-capture defaults; turn Privacy Shield on and off; confirm its coordinated protections lock and restore the individual controls; then test site-access revoke and local-workspace clear.
+9. No feature requires or downloads remote executable code.

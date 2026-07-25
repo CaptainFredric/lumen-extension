@@ -18,6 +18,8 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      LUMEN_GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.LUMEN_GOOGLE_DRIVE_CLIENT_ID }}
 
     steps:
       - name: Check out repository
@@ -97,6 +99,13 @@ jobs:
 
       - name: Test end-to-end capture
         run: xvfb-run --auto-servernum npm run smoke:e2e
+
+      - name: Upload exact tested extension package
+        uses: actions/upload-artifact@v4
+        with:
+          name: lumen-extension-${{ github.sha }}
+          path: dist/lumen-extension-*.zip
+          if-no-files-found: error
 
       - name: Clean temporary browser artifacts
         if: always()

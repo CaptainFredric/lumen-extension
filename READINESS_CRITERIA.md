@@ -33,7 +33,7 @@ Current positives:
 6. Capture health blocks incomplete slice coverage and records verification per responsive view.
 7. Offset nested scrollers have a pixel-level crop and stitch regression.
 8. Redaction rescans each slice, uses opaque output, and fails closed when its review limit is exceeded.
-9. A compact first-run tip keeps one-click capture above the fold, and a saved-capture receipt links directly to the original, Annotation Studio, its folder, and the local library.
+9. A compact first-run tip keeps one-click capture above the fold, and successful manual captures open the matching Capture Result workspace without another popup step.
 10. Rectangle and freeform lasso selections survive layout projection; lasso exports retain transparent pixels outside the path.
 11. The local photo library stores gallery previews and bounded whole-capture editor images, supports search/filter/favorite workflows, and keeps full-resolution originals in Downloads.
 12. Local selected-area automation now distinguishes a delayed one-time run, scheduled repeat, and capped continuous monitoring.
@@ -41,6 +41,8 @@ Current positives:
 14. The annotation studio supports arrows, rectangles, text, blur, pixelation, selection, undo, redo, and local reviewed-image export.
 15. Visual-change review provides a before/after reveal, highlighted change regions, local difference statistics, and a monitor timeline.
 16. Difficult-site fixtures now cover long pages, nested scrollers, late-growing tails, transforms, lazy media, fixed overlays, canvas, sandboxed iframes, and open and closed shadow-root behavior.
+17. Rectangle and lasso pickers can capture the selected current-viewport area immediately without waiting for a second popup action; Save still creates a reusable monitoring region.
+18. Successful manual captures open a clean local result workspace with zoom, Copy image, PNG, paginated PDF, optional Drive, Annotate, original-file, and library actions.
 
 Remaining gaps:
 
@@ -66,12 +68,15 @@ Current positives:
 12. Loaded-extension coverage proves optional site-access grant, last-plan permission revocation, alarm cleanup, and full local-workspace permission cleanup.
 13. A field-by-field privacy-form draft, release notes, and publisher-only launch checklist are checked in.
 14. Optional reviewed-image Drive export uses `identity` only after user action and the narrow `drive.file` scope rather than broad Drive access.
+15. The production package declares full-page, visible-area, and area-picker shortcuts, and the clean-profile test verifies all three registrations.
+16. Exact-package automation proves capture is rejected specifically at the missing-`activeTab` boundary, retains no site origins, and requires packaged full-page, visible-area, and drawn-area shortcut flows to complete through their result-workspace handoff on Linux CI.
+17. GitHub Actions publishes the exact tested Web Store ZIP as `lumen-extension-<commit>`.
 
 Remaining gaps:
 
 1. The updated public privacy policy must deploy successfully and be checked in a signed-out browser before the dashboard form is submitted.
 2. Chrome Web Store privacy fields and Limited Use attestations still need final publisher completion in the dashboard.
-3. Permission denial, uninstall cleanup, and Drive consent/revocation copy still need one final manual toolbar-driven review in stock Chrome.
+3. Permission denial, uninstall cleanup, Drive consent/revocation, the physical toolbar action, all three shortcuts, and drawing through the area shortcut still need one final manual review in stock Chrome. Automated checks cannot claim gestures that Chrome rejects from a virtual display.
 4. The final screenshot pack has been reviewed at full resolution; confirm the uploaded Web Store previews remain legible after dashboard processing.
 5. One-time, repeating, run-cap completion, browser-sleep deferral, and last-plan permission revocation still need a final stock-Chrome manual pass.
 6. The final published extension ID must be connected to a publisher-owned Google OAuth client and checked with a non-publisher account.
@@ -109,8 +114,9 @@ To move Web Store beta above 85 percent:
 1. Verify the deployed public privacy policy includes Drive export, then complete the manual Chrome Web Store privacy fields.
 2. Confirm the uploaded Web Store screenshot previews remain legible after dashboard processing.
 3. Manually review allow, deny, one-shot revoke, timed-capture revoke, and uninstall behavior in stock Chrome.
-4. Verify the final Drive OAuth consent and disconnect flow with a non-publisher account.
-5. Review annotation, visual-change, local library, delayed run, scheduled repeat, capped continuous, and Drive states in the final store screenshot set.
+4. Physically verify the toolbar action and full-page, visible-area, and area-picker shortcuts, including drawing and capturing an area.
+5. Verify the final Drive OAuth consent and disconnect flow with a non-publisher account.
+6. Review Capture Result, annotation, visual-change, local library, delayed run, scheduled repeat, capped continuous, and Drive states in the final store screenshot set.
 
 To move paid product above 50 percent:
 

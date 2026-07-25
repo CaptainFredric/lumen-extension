@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Lumen Capture Result</title>
+    <link rel="stylesheet" href="result.css" />
+  </head>
+  <body data-state="loading" aria-busy="true">
+    <a class="skip-link" href="#resultViewport">Skip to capture</a>
+
+    <header class="topbar">
+      <a class="brand" href="library.html" aria-label="Open the Lumen capture library">
+        <span class="brand-mark" aria-hidden="true">L</span>
+        <span>
+          <strong>Lumen</strong>
+          <small>Capture result</small>
+        </span>
+      </a>
+
+      <div class="topbar-actions">
+        <button id="annotateButton" class="quiet-button" type="button">Annotate</button>
+        <button id="openLibraryButton" class="quiet-button" type="button">Library</button>
+      </div>
+    </header>
+
+    <main class="result-shell">
+      <section class="viewer-card" aria-labelledby="resultTitle">
+        <div class="viewer-head">
+          <div class="viewer-title">
+            <p id="resultHost" class="eyebrow">Loading local capture</p>
+            <h1 id="resultTitle">Preparing your result…</h1>
+          </div>
+
+          <div class="zoom-controls" aria-label="Image zoom controls">
+            <button id="zoomOutButton" type="button" aria-label="Zoom out" title="Zoom out (−)" disabled>−</button>
+            <span id="zoomLabel" aria-live="polite">Fit</span>
+            <button id="zoomInButton" type="button" aria-label="Zoom in" title="Zoom in (+)" disabled>+</button>
+            <button id="actualSizeButton" type="button" title="Show actual pixels (1)" aria-pressed="false" disabled>100%</button>
+            <button id="fitButton" type="button" title="Fit capture width (0)" aria-pressed="false" disabled>Fit</button>
+          </div>
+        </div>
+
+        <div id="resultViewport" class="result-viewport" tabindex="0" aria-label="Captured webpage image">
+          <div id="loadingState" class="loading-state" role="status">
+            <span class="loading-orb" aria-hidden="true"></span>
+            <strong>Loading the private local image…</strong>
+          </div>
+          <img id="resultImage" alt="" hidden />
+          <div id="emptyState" class="empty-state" hidden>
+            <strong id="emptyStateTitle">This local preview is unavailable.</strong>
+            <p id="emptyStateDescription">Lumen is checking which saved formats are still available.</p>
+          </div>
+        </div>
+      </section>
+
+      <aside class="action-card" aria-label="Capture actions">
+        <div>
+          <p class="eyebrow">Ready to use</p>
+          <h2>What do you want to do?</h2>
+          <p id="resultSource" class="result-source">Lumen is checking the best local source.</p>
+        </div>
+
+        <div class="primary-actions">
+          <button id="copyImageButton" class="primary-action" type="button" disabled>
+            <span>Copy image</span>
+            <small>Paste into chat, docs, or design tools</small>
+          </button>
+          <div class="export-row">
+            <button id="downloadPngButton" type="button" disabled>Download PNG</button>
+            <button id="exportPdfButton" type="button" disabled>Export PDF</button>
+          </div>
+          <button id="driveButton" class="drive-action" type="button" hidden disabled>Export to Google Drive</button>
+        </div>
+
+        <dl class="capture-meta" aria-label="Capture details">
+          <div><dt>Captured</dt><dd id="capturedAtValue">—</dd></div>
+          <div><dt>Image</dt><dd id="dimensionsValue">—</dd></div>
+          <div><dt>Files</dt><dd id="filesValue">—</dd></div>
+          <div><dt>Privacy</dt><dd id="privacyValue">On this device</dd></div>
+        </dl>
+
+        <div class="file-actions" aria-label="Saved file actions">
+          <button id="openOriginalButton" type="button" disabled>Open saved file</button>
+          <button id="showOriginalButton" type="button" disabled>Show in folder</button>
+        </div>
+
+        <div id="resultStatus" class="result-status" role="status" aria-live="polite">
+          Loading your capture…
+        </div>
+
+        <p id="privacyNote" class="privacy-note">
+          Lumen keeps its working copy in this browser. Files you save are stored separately in Chrome Downloads.
+        </p>
+      </aside>
+    </main>
+
+    <script type="module" src="result.js"></script>
+  </body>
+</html>

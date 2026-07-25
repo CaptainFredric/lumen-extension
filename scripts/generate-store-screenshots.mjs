@@ -16,6 +16,7 @@ const shotSize = {
   width: 1280,
   height: 800
 };
+const screenshotNow = Date.parse("2026-07-22T18:30:00.000Z");
 
 const captureAssets = {
   desktop: await imageDataUrl("docs/assets/capture-run-desktop.png"),
@@ -45,10 +46,11 @@ try {
   renderBrowser = await chromium.launch();
   const page = await renderBrowser.newPage({
     viewport: shotSize,
-    deviceScaleFactor: 1
+    deviceScaleFactor: 1,
+    reducedMotion: "reduce"
   });
 
-  await renderStoreShot(page, "01-extension-control-surface.png", buildControlSurfaceShot(productShots.default, productShots.settings));
+  await renderStoreShot(page, "01-extension-control-surface.png", buildResultWorkspaceShot(productShots.result, productShots.settings));
   await writeStoreScreenshot("02-annotation-studio.png", productShots.editor);
   await writeStoreScreenshot("03-visual-change-review.png", productShots.review);
   await renderStoreShot(page, "04-responsive-capture-set.png", buildResponsiveSetShot());
@@ -80,6 +82,7 @@ async function captureExtensionProductShots() {
 
   extensionContext = await chromium.launchPersistentContext(profileDir, {
     headless: false,
+    reducedMotion: "reduce",
     viewport: {
       width: 430,
       height: 780
@@ -113,24 +116,6 @@ async function captureExtensionProductShots() {
   await popup.waitForFunction(() => document.querySelector("#launchStatus")?.dataset.state === "ready", null, {
     timeout: 10000
   });
-  await popup.evaluate(() => {
-    document.querySelector("#onboardingPanel")?.classList.add("is-hidden");
-    const receipt = document.querySelector("#captureReceipt");
-    if (receipt) {
-      receipt.dataset.captureId = "store-shot-capture";
-      receipt.classList.remove("is-hidden");
-    }
-    const title = document.querySelector("#captureReceiptTitle");
-    const detail = document.querySelector("#captureReceiptDetail");
-    const status = document.querySelector("#captureReceiptStatus");
-    if (title) title.textContent = "Capture set ready";
-    if (detail) detail.textContent = "4 files saved to Lumen/2026-05-12/store-shot.";
-    if (status) status.textContent = "Saved locally. Ready to open, edit, or export.";
-    for (const button of document.querySelectorAll("[data-receipt-action]")) {
-      button.disabled = false;
-    }
-  });
-  const defaultShot = await popup.screenshot({ type: "png" });
 
   await seedStoreMonitorState(worker);
   await popup.reload({ waitUntil: "load" });
@@ -185,19 +170,96 @@ async function captureExtensionProductShots() {
       await page.locator(".shield-card").scrollIntoViewIfNeeded();
     }
   });
+  const resultShot = await captureResultShot(extensionId);
   const libraryShot = await captureLibraryShot(extensionId);
 
   await popup.close();
   await target.close();
 
   return {
-    default: bufferToDataUrl(defaultShot),
     watch: bufferToDataUrl(watchShot),
     editor: editorShot,
     review: reviewShot,
+    result: bufferToDataUrl(resultShot),
     settings: bufferToDataUrl(settingsShot),
     library: bufferToDataUrl(libraryShot)
   };
+}
+
+async function captureResultShot(extensionId) {
+  const page = await extensionContext.newPage();
+  const captureId = "store-result-workspace";
+
+  try {
+    await page.setViewportSize({ width: 1120, height: 720 });
+    await page.goto(`chrome-extension://${extensionId}/library.html`, { waitUntil: "load" });
+    await page.evaluate(async ({ captureId: id, imageDataUrl, capturedAt }) => {
+      const { putLibraryCapture } = await import(chrome.runtime.getURL("library-store.js"));
+      const downloadId = await chrome.downloads.download({
+        url: imageDataUrl,
+        filename: "Lumen/store-shot/launch-page.png",
+        saveAs: false
+      });
+      let download = null;
+
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        [download] = await chrome.downloads.search({ id: downloadId });
+
+        if (download?.state === "complete") {
+          break;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+
+      if (!download || download.state !== "complete") {
+        throw new Error("The store result screenshot could not seed its completed original.");
+      }
+
+      await putLibraryCapture({
+        id,
+        title: "Launch page review",
+        host: "lumen-store.test",
+        url: "https://lumen-store.test/",
+        capturedAt,
+        sourceType: "manual",
+        dimensions: { width: 1280, height: 860 },
+        fileCount: 1,
+        downloads: [{
+          downloadId,
+          filename: "Lumen/2026-05-12/store-shot/launch-page.png",
+          bytesReceived: download.bytesReceived,
+          complete: true,
+          kind: "image",
+          role: "full-page",
+          variantId: "desktop",
+          width: 1280,
+          height: 860
+        }],
+        editorSource: {
+          dataUrl: imageDataUrl,
+          width: 1280,
+          height: 860,
+          originalWidth: 1280,
+          originalHeight: 860,
+          scaled: false,
+          kind: "lossless-full-output",
+          role: "full-page",
+          variantId: "desktop"
+        }
+      });
+    }, {
+      captureId,
+      imageDataUrl: captureAssets.desktop,
+      capturedAt: new Date(screenshotNow).toISOString()
+    });
+    await page.goto(`chrome-extension://${extensionId}/result.html?capture=${captureId}`, { waitUntil: "load" });
+    await page.waitForSelector('body[data-state="ready"] #resultImage:not([hidden])', { timeout: 10000 });
+    await page.waitForTimeout(350);
+    return await page.screenshot({ type: "png", fullPage: false });
+  } finally {
+    await page.close();
+  }
 }
 
 async function captureExtensionPageShot({ extensionId, route, ready, viewport = shotSize }) {
@@ -220,10 +282,9 @@ async function captureLibraryShot(extensionId) {
   try {
     await page.setViewportSize({ width: 1120, height: 720 });
     await page.goto(`chrome-extension://${extensionId}/library.html`, { waitUntil: "load" });
-    const seededLibrary = await page.evaluate(async ({ desktop, tablet }) => {
+    const seededLibrary = await page.evaluate(async ({ desktop, tablet, now }) => {
       const { getLibraryCapture, putLibraryCapture } = await import(chrome.runtime.getURL("library-store.js"));
       const toBlob = async (dataUrl) => (await fetch(dataUrl)).blob();
-      const now = Date.now();
       const records = [
         {
           id: "store-library-manual",
@@ -265,7 +326,7 @@ async function captureLibraryShot(extensionId) {
           previewBytes: capture?.preview?.blob?.size || 0
         };
       }));
-    }, { desktop: captureAssets.desktop, tablet: captureAssets.tablet });
+    }, { desktop: captureAssets.desktop, tablet: captureAssets.tablet, now: screenshotNow });
     if (!seededLibrary.every((capture) => capture.previewReady)) {
       throw new Error(`Store screenshot library previews were not seeded: ${JSON.stringify(seededLibrary)}`);
     }
@@ -323,18 +384,19 @@ async function renderStoreShot(page, filename, bodyHtml) {
   screenshots.push(filePath);
 }
 
-function buildControlSurfaceShot(popupImage, settingsImage) {
+function buildResultWorkspaceShot(resultImage, settingsImage) {
   return `
-    <section class="control-shot">
-      <div class="copy">
-        <p class="eyebrow">Lumen capture workflow</p>
-        <h1>Capture. Then choose what happens next.</h1>
-        <p class="lede">Open the original, annotate and export, reveal the file, or return to your library right after saving.</p>
-        <div class="cta-row"><span>Full page</span><span>PNG + PDF</span><span>Local library</span></div>
+    <section class="workspace-shot">
+      <div class="shot-head">
+        <div>
+          <p class="eyebrow">Capture result</p>
+          <h2>Capture once. Use it immediately.</h2>
+        </div>
+        <p>Copy the image, download PNG or PDF, annotate it, or return to the saved original from one clean workspace.</p>
       </div>
-      <div class="popup-pair">
-        <div class="phone-frame mini"><img src="${popupImage}" alt="Lumen extension popup" /></div>
-        <div class="phone-frame mini raised"><img src="${settingsImage}" alt="Lumen Privacy Shield settings" /></div>
+      <div class="workspace-pair">
+        <figure class="browser-card library-card"><img src="${resultImage}" alt="Lumen Capture Result workspace" /><figcaption>Copy, zoom, edit, and export</figcaption></figure>
+        <div class="phone-frame workspace-phone"><img src="${settingsImage}" alt="Lumen Privacy Shield settings" /></div>
       </div>
     </section>
   `;
@@ -839,7 +901,7 @@ async function copyPublicStoreAssets() {
 }
 
 async function seedStoreMonitorState(worker) {
-  const now = Date.now();
+  const now = screenshotNow;
   const planId = "store-monitor-plan";
 
   await worker.evaluate(({ now, planId }) => chrome.storage.local.set({
@@ -914,7 +976,7 @@ async function seedExtensionState(worker) {
     }
   }));
 
-  await worker.evaluate(() => chrome.storage.local.set({
+  await worker.evaluate((now) => chrome.storage.local.set({
     "lumen.capture.privateSettings": {
       annotationText: "Check pricing module before sharing"
     },
@@ -926,7 +988,7 @@ async function seedExtensionState(worker) {
         url: "https://lumen-store.test/",
         devicePreset: "responsive",
         exportPreset: "browser",
-        capturedAt: new Date().toISOString(),
+        capturedAt: new Date(now).toISOString(),
         archiveFolder: "Lumen/2026-05-12/store-shot",
         files: [
           "Lumen/2026-05-12/store-shot/desktop-browser.png",
@@ -962,7 +1024,7 @@ async function seedExtensionState(worker) {
       "https://lumen-store.test/": {
         url: "https://lumen-store.test/",
         host: "lumen-store.test",
-        updatedAt: new Date().toISOString(),
+        updatedAt: new Date(now).toISOString(),
         regions: [
           { id: "manual-store-1", kind: "manual", left: 300, top: 460, width: 420, height: 110 }
         ]
@@ -972,11 +1034,11 @@ async function seedExtensionState(worker) {
       "https://lumen-store.test/": {
         url: "https://lumen-store.test/",
         host: "lumen-store.test",
-        updatedAt: new Date().toISOString(),
+        updatedAt: new Date(now).toISOString(),
         region: { id: "annotation-store-1", kind: "annotation", left: 260, top: 430, width: 520, height: 220 }
       }
     }
-  }));
+  }), screenshotNow);
 }
 
 async function prepareExtensionCopy() {

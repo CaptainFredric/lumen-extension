@@ -14,6 +14,7 @@
   const PAGE_READY_TIMEOUT_MS = 2200;
   const OVERLAY_SETTLE_MS = 140;
   const MANUAL_REDACTION_LIMIT = 24;
+  const MAX_CUTAWAY_LASSO_POINTS = 120;
   const SENSITIVE_TEXT_PATTERNS = [
     {
       kind: "email",
@@ -203,7 +204,12 @@
     primeLazyMedia(document);
     releaseScrollLocks();
 
-    if (options.forceLazyLoad) {
+    if (options.captureMode === "visible") {
+      // Visible and selected-area captures must preserve the viewport the user
+      // is looking at. A lazy-load sweep (or resetting to the top) would move
+      // the freshly drawn region away from the pixels being captured.
+      await settleFrames(2);
+    } else if (options.forceLazyLoad) {
       renderUsageHud({
         stage: "load",
         title: "Loading lazy content",
@@ -503,32 +509,56 @@
     const count = document.createElement("span");
     const clearButton = document.createElement("button");
     const doneButton = document.createElement("button");
+    const captureButton = document.createElement("button");
     const cancelButton = document.createElement("button");
+    const pickerId = createLocalId();
+    const normalizedRegion = normalizeCutawayRegion(region);
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     overlay.id = "lumen-cutaway-picker";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-labelledby", `${pickerId}-title`);
+    overlay.setAttribute("aria-describedby", `${pickerId}-hint`);
     surface.className = "lumen-cutaway-surface";
+    surface.tabIndex = 0;
+    surface.setAttribute("role", "group");
+    surface.setAttribute(
+      "aria-label",
+      normalizedSelectionMode === "lasso"
+        ? "Freeform page-area selection canvas. Draw with a pointer, then choose Capture now or Save."
+        : "Page-area selection canvas. Drag to draw, or press Enter to create a keyboard rectangle. Use arrows to move it and Shift plus arrows to resize it."
+    );
     toolbar.className = "lumen-cutaway-toolbar lumen-picker-toolbar";
+    toolbar.setAttribute("aria-label", "Area capture controls");
     copyWrap.className = "lumen-picker-copy";
     actionsWrap.className = "lumen-picker-actions";
     title.className = "lumen-picker-title";
+    title.id = `${pickerId}-title`;
     hint.className = "lumen-picker-hint";
+    hint.id = `${pickerId}-hint`;
+    hint.setAttribute("aria-live", "polite");
     title.textContent = normalizedSelectionMode === "lasso" ? "Lasso capture" : "Focused crop";
     hint.textContent = normalizedSelectionMode === "lasso"
-      ? "Saved as an irregular capture region for exports and timed runs."
-      : "Saved as a reusable capture region for exports and timed runs.";
+      ? "Draw a freeform area, then capture it now or remember it for monitoring."
+      : "Drag an area, or press Enter for a keyboard rectangle. Capture it now or save it for monitoring.";
     count.className = "lumen-cutaway-count lumen-picker-count";
+    count.setAttribute("role", "status");
+    count.setAttribute("aria-live", "polite");
     clearButton.textContent = "Clear";
     doneButton.textContent = "Save";
+    captureButton.textContent = "Capture now";
     cancelButton.textContent = "Close";
 
-    for (const button of [clearButton, doneButton, cancelButton]) {
+    for (const button of [clearButton, doneButton, captureButton, cancelButton]) {
       button.type = "button";
       button.className = "lumen-picker-button";
     }
 
     doneButton.classList.add("lumen-picker-primary");
+    captureButton.classList.add("lumen-picker-capture-now");
     copyWrap.append(title, hint);
-    actionsWrap.append(count, clearButton, doneButton, cancelButton);
+    actionsWrap.append(count, clearButton, doneButton, captureButton, cancelButton);
     toolbar.append(copyWrap, actionsWrap);
     overlay.append(surface, toolbar);
     document.documentElement.appendChild(overlay);
@@ -537,8 +567,19 @@
       overlay,
       surface,
       count,
+      hint,
+      clearButton,
+      doneButton,
+      captureButton,
+      cancelButton,
       selectionMode: normalizedSelectionMode,
-      region: normalizeCutawayRegion(region),
+      region: normalizedRegion,
+      originalRegion: normalizedRegion,
+      capturePending: false,
+      savePending: false,
+      regionInViewport: false,
+      previousFocus,
+      scrollRenderFrame: 0,
       draft: null,
       draftPath: null,
       points: [],
@@ -554,21 +595,28 @@
     surface.addEventListener("pointermove", handleCutawayPickerPointerMove);
     surface.addEventListener("pointerup", handleCutawayPickerPointerUp);
     surface.addEventListener("pointercancel", handleCutawayPickerPointerCancel);
+    surface.addEventListener("keydown", handleCutawaySurfaceKeydown);
 
     clearButton.addEventListener("click", () => {
       picker.region = null;
+      picker.hint.textContent = picker.originalRegion
+        ? "Selection cleared. Choose Save to remove the remembered area, or Close to keep it."
+        : "Selection cleared. Draw another area or Close the picker.";
       renderCutawayRegionBox();
-      persistCutawayRegion();
     });
-    doneButton.addEventListener("click", () => {
-      persistCutawayRegion();
-      teardownCutawayRegionPicker(false);
-    });
-    cancelButton.addEventListener("click", () => teardownCutawayRegionPicker(false));
+    doneButton.addEventListener("click", saveCutawayRegion);
+    captureButton.addEventListener("click", captureCutawayRegionNow);
+    cancelButton.addEventListener("click", () => teardownCutawayRegionPicker());
 
     window.addEventListener("keydown", handleCutawayPickerKeydown, true);
+    window.addEventListener("scroll", handleCutawayPickerScroll, true);
 
-    persistCutawayRegion();
+    try {
+      surface.focus({ preventScroll: true });
+    } catch {
+      surface.focus();
+    }
+
     return buildCutawayPickerPayload();
   }
 
@@ -707,20 +755,31 @@
     captureState.annotationPicker = null;
   }
 
-  function teardownCutawayRegionPicker(persist = true) {
+  function teardownCutawayRegionPicker(restoreFocus = true) {
     const picker = captureState.cutawayPicker;
 
     if (!picker) {
       return;
     }
 
-    if (persist) {
-      persistCutawayRegion();
+    window.removeEventListener("keydown", handleCutawayPickerKeydown, true);
+    window.removeEventListener("scroll", handleCutawayPickerScroll, true);
+    picker.surface.removeEventListener("keydown", handleCutawaySurfaceKeydown);
+
+    if (picker.scrollRenderFrame) {
+      cancelAnimationFrame(picker.scrollRenderFrame);
     }
 
-    window.removeEventListener("keydown", handleCutawayPickerKeydown, true);
     picker.overlay.remove();
     captureState.cutawayPicker = null;
+
+    if (restoreFocus && picker.previousFocus?.isConnected && typeof picker.previousFocus.focus === "function") {
+      try {
+        picker.previousFocus.focus({ preventScroll: true });
+      } catch {
+        picker.previousFocus.focus();
+      }
+    }
   }
 
   function handleManualPickerPointerDown(event) {
@@ -802,7 +861,7 @@
   function handleCutawayPickerPointerDown(event) {
     const picker = captureState.cutawayPicker;
 
-    if (!picker || event.button !== 0) {
+    if (!picker || isCutawayPickerBusy(picker) || event.button !== 0) {
       return;
     }
 
@@ -831,7 +890,7 @@
   function handleCutawayPickerPointerMove(event) {
     const picker = captureState.cutawayPicker;
 
-    if (!picker?.start || event.pointerId !== picker.start.pointerId) {
+    if (!picker?.start || isCutawayPickerBusy(picker) || event.pointerId !== picker.start.pointerId) {
       return;
     }
 
@@ -853,7 +912,7 @@
   function handleCutawayPickerPointerUp(event) {
     const picker = captureState.cutawayPicker;
 
-    if (!picker?.start || event.pointerId !== picker.start.pointerId) {
+    if (!picker?.start || isCutawayPickerBusy(picker) || event.pointerId !== picker.start.pointerId) {
       return;
     }
 
@@ -879,7 +938,6 @@
       if (region) {
         picker.region = region;
         renderCutawayRegionBox();
-        persistCutawayRegion();
       }
 
       picker.points = [];
@@ -902,7 +960,6 @@
     if (region) {
       picker.region = region;
       renderCutawayRegionBox();
-      persistCutawayRegion();
     }
 
     picker.moved = false;
@@ -922,6 +979,112 @@
     picker.points = [];
     picker.start = null;
     picker.moved = false;
+  }
+
+  async function saveCutawayRegion() {
+    const picker = captureState.cutawayPicker;
+
+    if (!picker || isCutawayPickerBusy(picker) || (!picker.region && !picker.originalRegion)) {
+      return;
+    }
+
+    const removingRegion = !picker.region;
+    picker.savePending = true;
+    picker.doneButton.textContent = "Saving…";
+    picker.hint.textContent = removingRegion
+      ? "Removing the remembered area from this page."
+      : "Saving this area locally for timers and monitoring.";
+    renderCutawayRegionBox();
+
+    try {
+      await persistCutawayRegion(picker);
+      teardownCutawayRegionPicker();
+      renderUsageHud({
+        stage: "save",
+        title: removingRegion ? "Remembered area removed" : "Area saved",
+        detail: removingRegion
+          ? "Closing the picker kept no reusable area for this page."
+          : "This area is ready for delayed, repeating, or continuous captures.",
+        progress: 1
+      });
+      window.setTimeout(hideUsageHud, 3600);
+    } catch (error) {
+      if (captureState.cutawayPicker !== picker || !picker.overlay.isConnected) {
+        return;
+      }
+
+      picker.savePending = false;
+      picker.doneButton.textContent = "Save";
+      picker.hint.textContent = error?.message || "Lumen could not save this area. Try again.";
+      renderCutawayRegionBox();
+
+      try {
+        picker.doneButton.focus({ preventScroll: true });
+      } catch {
+        picker.doneButton.focus();
+      }
+    }
+  }
+
+  async function captureCutawayRegionNow() {
+    const picker = captureState.cutawayPicker;
+
+    if (!picker?.region || isCutawayPickerBusy(picker)) {
+      return;
+    }
+
+    if (!isCutawayRegionInViewport(picker.region)) {
+      picker.hint.textContent = "Scroll until the complete selected area is visible before capturing it now.";
+      renderCutawayRegionBox();
+      return;
+    }
+
+    const payload = buildCutawayPickerPayload();
+    picker.capturePending = true;
+    picker.captureButton.textContent = "Starting…";
+    picker.hint.textContent = "Starting a private, one-viewport capture of this selection.";
+    renderCutawayRegionBox();
+
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: "LUMEN_CAPTURE_SELECTED_AREA",
+        payload: {
+          ...payload,
+          selectionMode: picker.selectionMode
+        }
+      });
+
+      if (!response?.ok) {
+        throw new Error(response?.error?.description || response?.error || "Lumen could not capture this area.");
+      }
+
+      renderUsageHud({
+        stage: "save",
+        title: response.librarySaved === false ? "Selected area downloaded" : "Selected area ready",
+        detail: response.librarySaved === false
+          ? "The image is in Chrome Downloads, but Lumen could not add it to the local library. Clear some local captures before trying again if you need workspace actions."
+          : response.captureId
+            ? "Saved to Lumen. The result workspace is ready for copy, edit, or export."
+            : "The selected area was captured.",
+        progress: 1
+      });
+      window.setTimeout(hideUsageHud, 3600);
+    } catch (error) {
+      if (captureState.cutawayPicker === picker && picker.overlay.isConnected) {
+        picker.capturePending = false;
+        picker.captureButton.textContent = "Capture now";
+        picker.hint.textContent = error?.message || "Lumen could not capture this area. Try again.";
+        renderCutawayRegionBox();
+      } else {
+        renderUsageHud({
+          stage: "error",
+          title: "Area capture failed",
+          detail: error?.message || "Lumen could not capture this area. Try again.",
+          progress: 0.12
+        });
+        window.setTimeout(hideUsageHud, 6000);
+      }
+    }
   }
 
   function handleAnnotationPickerPointerDown(event) {
@@ -1035,25 +1198,185 @@
       return;
     }
 
+    if (event.key === "Tab") {
+      trapCutawayPickerFocus(event, picker);
+      return;
+    }
+
     if (event.key === "Escape") {
       event.preventDefault();
-      teardownCutawayRegionPicker(false);
+
+      if (!isCutawayPickerBusy(picker)) {
+        teardownCutawayRegionPicker();
+      }
+
       return;
     }
 
     if (event.key === "Enter") {
+      if (event.target instanceof HTMLButtonElement || event.target === picker.surface) {
+        return;
+      }
+
       event.preventDefault();
-      persistCutawayRegion();
-      teardownCutawayRegionPicker(false);
+      saveCutawayRegion();
       return;
     }
 
-    if ((event.key === "Backspace" || event.key === "Delete") && picker.region) {
+    if (
+      (event.key === "Backspace" || event.key === "Delete") &&
+      picker.region &&
+      !isCutawayPickerBusy(picker)
+    ) {
       event.preventDefault();
       picker.region = null;
+      picker.hint.textContent = picker.originalRegion
+        ? "Selection cleared. Choose Save to remove the remembered area, or Close to keep it."
+        : "Selection cleared. Draw another area or Close the picker.";
       renderCutawayRegionBox();
-      persistCutawayRegion();
     }
+  }
+
+  function handleCutawaySurfaceKeydown(event) {
+    const picker = captureState.cutawayPicker;
+
+    if (!picker || event.currentTarget !== picker.surface || isCutawayPickerBusy(picker)) {
+      return;
+    }
+
+    if (picker.selectionMode !== "rect") {
+      return;
+    }
+
+    if (event.key === "Enter" && picker.region) {
+      event.preventDefault();
+      saveCutawayRegion();
+      return;
+    }
+
+    if ((event.key === "Enter" || event.key === " ") && !picker.region) {
+      event.preventDefault();
+      const region = buildCutawayRegion(buildDefaultKeyboardCutawayRect());
+
+      if (region) {
+        picker.region = region;
+        picker.hint.textContent = "Keyboard area ready. Arrows move it; Shift plus arrows resize it.";
+        renderCutawayRegionBox();
+      }
+
+      return;
+    }
+
+    if (!picker.region || picker.region.shape === "lasso" || !event.key.startsWith("Arrow")) {
+      return;
+    }
+
+    event.preventDefault();
+    const context = detectScrollContext();
+    const viewportRect = fromScrollCoordinates(picker.region, context);
+
+    if (!viewportRect) {
+      return;
+    }
+
+    const bounds = getCaptureViewportRect(context);
+    const step = event.altKey ? 1 : 10;
+    const nextRect = moveOrResizeKeyboardCutawayRect(viewportRect, bounds, event.key, event.shiftKey, step);
+    const region = buildCutawayRegion(nextRect);
+
+    if (region) {
+      picker.region = region;
+      picker.hint.textContent = event.shiftKey
+        ? "Keyboard area resized. Arrows move it; Shift plus arrows resize it."
+        : "Keyboard area moved. Arrows move it; Shift plus arrows resize it.";
+      renderCutawayRegionBox();
+    }
+  }
+
+  function trapCutawayPickerFocus(event, picker) {
+    const focusable = [
+      picker.surface,
+      picker.clearButton,
+      picker.doneButton,
+      picker.captureButton,
+      picker.cancelButton
+    ].filter((node) => node?.isConnected && !node.disabled);
+
+    if (!focusable.length) {
+      return;
+    }
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement;
+
+    if (event.shiftKey && (active === first || !picker.overlay.contains(active))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && (active === last || !picker.overlay.contains(active))) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  function buildDefaultKeyboardCutawayRect() {
+    const bounds = getCaptureViewportRect(detectScrollContext());
+    const horizontalMargin = Math.min(24, Math.max(8, bounds.width * 0.08));
+    const verticalMargin = Math.min(24, Math.max(8, bounds.height * 0.08));
+    const width = Math.max(8, Math.min(480, bounds.width * 0.58, bounds.width - horizontalMargin * 2));
+    const height = Math.max(8, Math.min(320, bounds.height * 0.42, bounds.height - verticalMargin * 2));
+
+    return {
+      left: bounds.left + Math.max(0, (bounds.width - width) / 2),
+      top: bounds.top + Math.max(0, (bounds.height - height) / 2),
+      width,
+      height
+    };
+  }
+
+  function moveOrResizeKeyboardCutawayRect(rect, bounds, key, resize, step) {
+    const next = { ...rect };
+    const boundsRight = bounds.left + bounds.width;
+    const boundsBottom = bounds.top + bounds.height;
+
+    if (resize) {
+      if (key === "ArrowRight") {
+        next.width = Math.min(boundsRight - next.left, next.width + step);
+      } else if (key === "ArrowLeft") {
+        next.width = Math.max(8, next.width - step);
+      } else if (key === "ArrowDown") {
+        next.height = Math.min(boundsBottom - next.top, next.height + step);
+      } else if (key === "ArrowUp") {
+        next.height = Math.max(8, next.height - step);
+      }
+    } else if (key === "ArrowRight") {
+      next.left = Math.min(boundsRight - next.width, next.left + step);
+    } else if (key === "ArrowLeft") {
+      next.left = Math.max(bounds.left, next.left - step);
+    } else if (key === "ArrowDown") {
+      next.top = Math.min(boundsBottom - next.height, next.top + step);
+    } else if (key === "ArrowUp") {
+      next.top = Math.max(bounds.top, next.top - step);
+    }
+
+    return next;
+  }
+
+  function handleCutawayPickerScroll() {
+    const picker = captureState.cutawayPicker;
+
+    if (!picker || picker.scrollRenderFrame) {
+      return;
+    }
+
+    picker.scrollRenderFrame = requestAnimationFrame(() => {
+      if (captureState.cutawayPicker !== picker) {
+        return;
+      }
+
+      picker.scrollRenderFrame = 0;
+      renderCutawayRegionBox();
+    });
   }
 
   function handleAnnotationPickerKeydown(event) {
@@ -1131,15 +1454,14 @@
 
     const points = viewportPoints
       .map((point) => toScrollPoint(point, context))
-      .filter(Boolean)
-      .slice(0, 120);
+      .filter(Boolean);
     const anchor = buildManualRedactionAnchor(bounds, region, context);
 
     return {
       ...region,
       id: createLocalId(),
       shape: "lasso",
-      points,
+      points: simplifyRegionPoints(points),
       sourceViewport: getManualRedactionSourceViewport(context),
       ...(anchor ? { anchor } : {})
     };
@@ -1218,13 +1540,71 @@
   }
 
   function normalizeRegionPoints(points) {
-    return (Array.isArray(points) ? points : [])
+    const normalized = (Array.isArray(points) ? points : [])
       .map((point) => ({
-        x: Math.max(0, Math.round(Number(point?.x) || 0)),
-        y: Math.max(0, Math.round(Number(point?.y) || 0))
+        x: Number(point?.x),
+        y: Number(point?.y)
       }))
       .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
-      .slice(0, 120);
+      .map((point) => ({
+        x: Math.max(0, Math.round(point.x)),
+        y: Math.max(0, Math.round(point.y))
+      }));
+
+    return simplifyRegionPoints(normalized);
+  }
+
+  function simplifyRegionPoints(points, limit = MAX_CUTAWAY_LASSO_POINTS) {
+    const source = Array.isArray(points) ? points.filter(Boolean) : [];
+    const maximum = Math.max(3, Math.round(Number(limit) || MAX_CUTAWAY_LASSO_POINTS));
+
+    if (source.length <= maximum) {
+      return source.map((point) => ({ ...point }));
+    }
+
+    const distances = [0];
+    let totalDistance = 0;
+
+    for (let index = 1; index < source.length; index += 1) {
+      totalDistance += Math.hypot(
+        Number(source[index].x) - Number(source[index - 1].x),
+        Number(source[index].y) - Number(source[index - 1].y)
+      );
+      distances.push(totalDistance);
+    }
+
+    if (!Number.isFinite(totalDistance) || totalDistance <= 0) {
+      return Array.from({ length: maximum }, (_, sampleIndex) => ({
+        ...source[Math.round((source.length - 1) * sampleIndex / (maximum - 1))]
+      }));
+    }
+
+    const simplified = [{ ...source[0] }];
+    let segmentIndex = 1;
+
+    for (let sampleIndex = 1; sampleIndex < maximum - 1; sampleIndex += 1) {
+      const targetDistance = totalDistance * sampleIndex / (maximum - 1);
+
+      while (segmentIndex < distances.length - 1 && distances[segmentIndex] < targetDistance) {
+        segmentIndex += 1;
+      }
+
+      const previousIndex = Math.max(0, segmentIndex - 1);
+      const segmentStart = distances[previousIndex];
+      const segmentEnd = distances[segmentIndex];
+      const segmentLength = Math.max(1, segmentEnd - segmentStart);
+      const ratio = Math.max(0, Math.min(1, (targetDistance - segmentStart) / segmentLength));
+      const previous = source[previousIndex];
+      const next = source[segmentIndex];
+
+      simplified.push({
+        x: Math.round(Number(previous.x) + (Number(next.x) - Number(previous.x)) * ratio),
+        y: Math.round(Number(previous.y) + (Number(next.y) - Number(previous.y)) * ratio)
+      });
+    }
+
+    simplified.push({ ...source[source.length - 1] });
+    return simplified;
   }
 
   function resolveManualRedactions({ regions = [], context: recordContext = null } = {}) {
@@ -1857,10 +2237,14 @@
       .querySelectorAll(".lumen-cutaway-box:not(.lumen-cutaway-box-draft), .lumen-cutaway-lasso-saved")
       .forEach((node) => node.remove());
 
+    let regionInViewport = false;
+
     if (picker.region) {
-      const rect = fromScrollCoordinates(picker.region, detectScrollContext());
+      const context = detectScrollContext();
+      const rect = fromScrollCoordinates(picker.region, context);
 
       if (rect) {
+        regionInViewport = isViewportRectFullyVisible(rect, getCaptureViewportRect(context));
         const box = document.createElement("div");
         box.className = "lumen-cutaway-box";
         box.dataset.label = picker.region.shape === "lasso" ? "Lasso area" : "Capture area";
@@ -1868,7 +2252,6 @@
         picker.surface.appendChild(box);
 
         if (picker.region.shape === "lasso" && picker.region.points?.length) {
-          const context = detectScrollContext();
           const viewportPoints = picker.region.points
             .map((point) => fromPointScrollCoordinates(point, context))
             .filter(Boolean);
@@ -1879,9 +2262,47 @@
       }
     }
 
+    picker.regionInViewport = regionInViewport;
+    picker.overlay.setAttribute("aria-busy", String(isCutawayPickerBusy(picker)));
     picker.count.textContent = picker.region
-      ? picker.region.shape === "lasso" ? "Lasso selected" : "Region selected"
+      ? regionInViewport
+        ? picker.region.shape === "lasso" ? "Lasso selected" : "Region selected"
+        : "Area outside view"
       : "Choose region";
+    picker.count.title = picker.region && !regionInViewport
+      ? "Scroll until the full selected area is visible to use Capture now."
+      : "";
+    const busy = isCutawayPickerBusy(picker);
+    picker.clearButton.disabled = busy || !picker.region;
+    picker.doneButton.disabled = busy || (!picker.region && !picker.originalRegion);
+    picker.captureButton.disabled = busy || !picker.region || !regionInViewport;
+    picker.cancelButton.disabled = busy;
+  }
+
+  function isCutawayPickerBusy(picker = captureState.cutawayPicker) {
+    return Boolean(picker?.capturePending || picker?.savePending);
+  }
+
+  function isCutawayRegionInViewport(region) {
+    if (!region) {
+      return false;
+    }
+
+    const context = detectScrollContext();
+    const rect = fromScrollCoordinates(region, context);
+    return Boolean(rect && isViewportRectFullyVisible(rect, getCaptureViewportRect(context)));
+  }
+
+  function isViewportRectFullyVisible(rect, bounds) {
+    if (!rect || !bounds) {
+      return false;
+    }
+
+    const tolerance = 1;
+    return rect.left >= bounds.left - tolerance &&
+      rect.top >= bounds.top - tolerance &&
+      rect.left + rect.width <= bounds.left + bounds.width + tolerance &&
+      rect.top + rect.height <= bounds.top + bounds.height + tolerance;
   }
 
   function renderAnnotationRegionBox() {
@@ -2023,21 +2444,30 @@
     };
   }
 
-  function persistCutawayRegion() {
-    const picker = captureState.cutawayPicker;
+  async function persistCutawayRegion(picker = captureState.cutawayPicker) {
 
     if (!picker) {
-      return;
+      throw new Error("The area picker closed before Lumen could save it.");
     }
 
-    chrome.runtime.sendMessage({
+    const response = await chrome.runtime.sendMessage({
       type: "LUMEN_CUTAWAY_REGION_UPDATED",
-      payload: buildCutawayPickerPayload()
-    }).catch(() => {});
+      payload: buildCutawayPickerPayload(picker)
+    });
+
+    if (!response?.ok) {
+      throw new Error(
+        response?.error?.description ||
+        response?.error?.message ||
+        response?.error ||
+        "Lumen could not save this area. Try again."
+      );
+    }
+
+    return response;
   }
 
-  function buildCutawayPickerPayload() {
-    const picker = captureState.cutawayPicker;
+  function buildCutawayPickerPayload(picker = captureState.cutawayPicker) {
 
     return {
       region: picker ? picker.region : null,
@@ -2302,6 +2732,11 @@
         background: rgba(2, 8, 16, 0.3) !important;
       }
 
+      #lumen-cutaway-picker .lumen-cutaway-surface:focus-visible {
+        outline: 3px solid rgba(120, 216, 250, 0.78) !important;
+        outline-offset: -5px !important;
+      }
+
       #lumen-cutaway-picker .lumen-cutaway-toolbar {
         position: absolute !important;
         left: 18px !important;
@@ -2386,11 +2821,32 @@
         background: rgba(127, 241, 197, 0.1) !important;
       }
 
+      #lumen-cutaway-picker button:focus-visible {
+        outline: 3px solid rgba(120, 216, 250, 0.72) !important;
+        outline-offset: 2px !important;
+      }
+
+      #lumen-cutaway-picker button:disabled {
+        border-color: rgba(255, 255, 255, 0.08) !important;
+        background: rgba(255, 255, 255, 0.035) !important;
+        color: rgba(238, 246, 255, 0.38) !important;
+        cursor: not-allowed !important;
+        opacity: 0.7 !important;
+      }
+
       #lumen-cutaway-picker .lumen-picker-primary {
         border-color: rgba(127, 241, 197, 0.36) !important;
         background: linear-gradient(135deg, rgba(127, 241, 197, 0.24), rgba(86, 202, 255, 0.16)) !important;
         color: #f4fbff !important;
         font-weight: 800 !important;
+      }
+
+      #lumen-cutaway-picker .lumen-picker-capture-now {
+        border-color: rgba(127, 241, 197, 0.62) !important;
+        background: linear-gradient(135deg, #73e8bc, #6bd3f7) !important;
+        color: #04111a !important;
+        font-weight: 850 !important;
+        box-shadow: 0 8px 24px rgba(93, 224, 190, 0.2) !important;
       }
 
       #lumen-cutaway-picker button:last-child {

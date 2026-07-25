@@ -39,7 +39,33 @@ async function buildPatchedContentScript() {
     window.chrome.runtime.onMessage = window.chrome.runtime.onMessage || { addListener() {} };
     window.chrome.runtime.sendMessage = async (message) => {
       window.__LUMEN_LAST_RUNTIME_MESSAGE__ = message;
-      return { ok: true };
+      window.__LUMEN_RUNTIME_MESSAGES__ = [...(window.__LUMEN_RUNTIME_MESSAGES__ || []), message];
+
+      if (message?.type === "LUMEN_CUTAWAY_REGION_UPDATED") {
+        const delay = Math.max(0, Number(window.__LUMEN_CUTAWAY_SAVE_DELAY_MS__) || 0);
+
+        if (delay) {
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+
+        if (window.__LUMEN_FAIL_NEXT_CUTAWAY_SAVE__) {
+          window.__LUMEN_FAIL_NEXT_CUTAWAY_SAVE__ = false;
+          return {
+            ok: false,
+            error: { description: "Simulated area save failure." }
+          };
+        }
+      }
+
+      return message?.type === "LUMEN_CAPTURE_SELECTED_AREA"
+        ? {
+            ok: true,
+            captureId: "instant-area-smoke",
+            captureKind: "area",
+            selectionMode: message.payload?.selectionMode || "rect",
+            librarySaved: window.__LUMEN_AREA_LIBRARY_SAVED__ !== false
+          }
+        : { ok: true };
     };
     ${source.replace(
       /\}\)\(\);\s*$/,
@@ -57,6 +83,7 @@ async function buildPatchedContentScript() {
         startCutawayRegionPicker,
         resolveCutawayRegion,
         clearCutawayRegionPicker,
+        simplifyRegionPoints,
         startAnnotationRegionPicker,
         resolveAnnotationRegion,
         clearAnnotationRegionPicker
@@ -606,6 +633,7 @@ async function runCutawayRegionSmoke(browser, contentScript) {
       </head>
       <body>
         <main>
+          <button id="focus-return" type="button">Open area picker</button>
           <h1>Cutaway fixture</h1>
           <section id="pricing-card">
             <h2>Launch plan</h2>
@@ -625,30 +653,118 @@ async function runCutawayRegionSmoke(browser, contentScript) {
     const targetBox = await page.locator("#pricing-card").boundingBox();
     assert(targetBox, "Cutaway fixture target is missing");
 
+    const rectangleUpdatesBefore = await countRuntimeMessages(page, "LUMEN_CUTAWAY_REGION_UPDATED");
+    await page.locator("#focus-return").focus();
+    await page.evaluate(() => window.__LUMEN_TEST_API__.startCutawayRegionPicker());
+
+    const dialogUi = await page.evaluate(() => {
+      const overlay = document.querySelector("#lumen-cutaway-picker");
+      const surface = overlay?.querySelector(".lumen-cutaway-surface");
+      const labelledBy = overlay?.getAttribute("aria-labelledby") || "";
+      const describedBy = overlay?.getAttribute("aria-describedby") || "";
+
+      return {
+        role: overlay?.getAttribute("role") || "",
+        modal: overlay?.getAttribute("aria-modal") || "",
+        surfaceFocused: document.activeElement === surface,
+        surfaceTabIndex: surface?.getAttribute("tabindex") || "",
+        labelled: Boolean(labelledBy && document.getElementById(labelledBy)),
+        described: Boolean(describedBy && document.getElementById(describedBy))
+      };
+    });
+    await page.keyboard.press("Enter");
+    const keyboardRegionBefore = await page.locator("#lumen-cutaway-picker .lumen-cutaway-box").boundingBox();
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("Shift+ArrowDown");
+    const keyboardRegionAfter = await page.locator("#lumen-cutaway-picker .lumen-cutaway-box").boundingBox();
+    const keyboardPickerUi = await page.evaluate(() => ({
+      count: document.querySelector("#lumen-cutaway-picker .lumen-picker-count")?.textContent?.trim() || "",
+      captureDisabled: document.querySelector("#lumen-cutaway-picker .lumen-picker-capture-now")?.disabled ?? true
+    }));
+    await page.getByRole("button", { name: "Close" }).click();
+    const keyboardUpdatesAfterClose = await countRuntimeMessages(page, "LUMEN_CUTAWAY_REGION_UPDATED");
+    const focusRestored = await page.evaluate(() => document.activeElement?.id === "focus-return");
+
+    assert(
+      dialogUi.role === "dialog" &&
+        dialogUi.modal === "true" &&
+        dialogUi.surfaceFocused &&
+        dialogUi.surfaceTabIndex === "0" &&
+        dialogUi.labelled &&
+        dialogUi.described,
+      "Cutaway picker did not expose dialog semantics and transfer focus to its drawing surface.",
+      dialogUi
+    );
+    assert(keyboardRegionBefore && keyboardRegionAfter, "Keyboard rectangle creation did not render a region.");
+    assert(
+      Math.abs(keyboardRegionAfter.x - keyboardRegionBefore.x - 10) <= 1 &&
+        Math.abs(keyboardRegionAfter.height - keyboardRegionBefore.height - 10) <= 1 &&
+        keyboardPickerUi.count === "Region selected" &&
+        !keyboardPickerUi.captureDisabled,
+      "Keyboard rectangle movement or resizing did not update the selection.",
+      { keyboardRegionBefore, keyboardRegionAfter, keyboardPickerUi }
+    );
+    assert(
+      keyboardUpdatesAfterClose === rectangleUpdatesBefore && focusRestored,
+      "Closing a keyboard-created draft should not persist it and should restore prior focus.",
+      { rectangleUpdatesBefore, keyboardUpdatesAfterClose, focusRestored }
+    );
+
     await page.evaluate(() => window.__LUMEN_TEST_API__.startCutawayRegionPicker());
     await page.mouse.move(targetBox.x + 20, targetBox.y + 22);
     await page.mouse.down();
     await page.mouse.move(targetBox.x + targetBox.width - 28, targetBox.y + 156, { steps: 8 });
     await page.mouse.up();
 
-    const message = await page.evaluate(() => window.__LUMEN_LAST_RUNTIME_MESSAGE__);
-    const region = message?.payload?.region;
+    const rectangleUpdatesAfterDraw = await countRuntimeMessages(page, "LUMEN_CUTAWAY_REGION_UPDATED");
     const cutawayPickerUi = await page.evaluate(() => ({
       title: document.querySelector("#lumen-cutaway-picker .lumen-picker-title")?.textContent?.trim() || "",
       count: document.querySelector("#lumen-cutaway-picker .lumen-picker-count")?.textContent?.trim() || "",
       primary: document.querySelector("#lumen-cutaway-picker .lumen-picker-primary")?.textContent?.trim() || "",
+      captureNow: document.querySelector("#lumen-cutaway-picker .lumen-picker-capture-now")?.textContent?.trim() || "",
+      captureNowDisabled: document.querySelector("#lumen-cutaway-picker .lumen-picker-capture-now")?.disabled ?? true,
       label: document.querySelector("#lumen-cutaway-picker .lumen-cutaway-box")?.dataset.label || ""
     }));
+    await page.evaluate(() => {
+      window.__LUMEN_CUTAWAY_SAVE_DELAY_MS__ = 240;
+    });
     await page.getByRole("button", { name: "Save" }).click();
+    await page.waitForFunction(() =>
+      document.querySelector("#lumen-cutaway-picker .lumen-picker-primary")?.textContent?.trim() === "Saving…"
+    );
+    const pendingSaveUi = await page.evaluate(() => ({
+      busy: document.querySelector("#lumen-cutaway-picker")?.getAttribute("aria-busy") || "",
+      saveDisabled: document.querySelector("#lumen-cutaway-picker .lumen-picker-primary")?.disabled ?? false,
+      closeDisabled: [...document.querySelectorAll("#lumen-cutaway-picker button")]
+        .find((button) => button.textContent?.trim() === "Close")?.disabled ?? false
+    }));
+    await page.waitForSelector("#lumen-cutaway-picker", { state: "detached" });
+    await page.evaluate(() => {
+      window.__LUMEN_CUTAWAY_SAVE_DELAY_MS__ = 0;
+    });
+    const completedSaveUi = await page.evaluate(() => ({
+      hudTitle: document.querySelector("#lumen-usage-hud [data-lumen-hud-title]")?.textContent?.trim() || ""
+    }));
+    const message = await readLastRuntimeMessage(page, "LUMEN_CUTAWAY_REGION_UPDATED");
+    const region = message?.payload?.region;
 
+    assert(rectangleUpdatesAfterDraw === rectangleUpdatesBefore, "Drawing a rectangle should not remember it until Save is chosen.");
     assert(message?.type === "LUMEN_CUTAWAY_REGION_UPDATED", "Cutaway picker did not publish its region.", message);
     assert(region?.kind === "cutaway", "Cutaway picker did not store a cutaway region kind.", region);
     assert(region.width > 240 && region.height > 120, "Cutaway region geometry is too small.", region);
     assert(region.anchor?.selector === "#pricing-card", "Cutaway region did not store a stable DOM anchor.", region);
     assert(
+      pendingSaveUi.busy === "true" && pendingSaveUi.saveDisabled && pendingSaveUi.closeDisabled,
+      "Saving a remembered area did not expose a locked, accessible pending state.",
+      pendingSaveUi
+    );
+    assert(completedSaveUi.hudTitle === "Area saved", "Successful persistence was not surfaced to the user.", completedSaveUi);
+    assert(
       cutawayPickerUi.title === "Focused crop" &&
         cutawayPickerUi.count === "Region selected" &&
         cutawayPickerUi.primary === "Save" &&
+        cutawayPickerUi.captureNow === "Capture now" &&
+        !cutawayPickerUi.captureNowDisabled &&
         cutawayPickerUi.label === "Capture area",
       "Cutaway picker UI did not render the polished controls.",
       cutawayPickerUi
@@ -660,6 +776,190 @@ async function runCutawayRegionSmoke(browser, contentScript) {
       height: region.height
     });
 
+    const clearUpdatesBefore = await countRuntimeMessages(page, "LUMEN_CUTAWAY_REGION_UPDATED");
+    await page.evaluate((selectedRegion) =>
+      window.__LUMEN_TEST_API__.startCutawayRegionPicker({ region: selectedRegion }), region);
+    await page.getByRole("button", { name: "Clear" }).click();
+    const clearedDraftUi = await page.evaluate(() => ({
+      hint: document.querySelector("#lumen-cutaway-picker .lumen-picker-hint")?.textContent?.trim() || "",
+      hasRegion: Boolean(document.querySelector("#lumen-cutaway-picker .lumen-cutaway-box")),
+      saveDisabled: document.querySelector("#lumen-cutaway-picker .lumen-picker-primary")?.disabled ?? true
+    }));
+    await page.getByRole("button", { name: "Close" }).click();
+    const clearUpdatesAfterClose = await countRuntimeMessages(page, "LUMEN_CUTAWAY_REGION_UPDATED");
+    assert(
+      clearUpdatesAfterClose === clearUpdatesBefore &&
+        !clearedDraftUi.hasRegion &&
+        !clearedDraftUi.saveDisabled &&
+        clearedDraftUi.hint.includes("Choose Save to remove"),
+      "Clear should remain a reversible draft until Save is chosen.",
+      { clearUpdatesBefore, clearUpdatesAfterClose, clearedDraftUi }
+    );
+
+    const deleteUpdatesBefore = await countRuntimeMessages(page, "LUMEN_CUTAWAY_REGION_UPDATED");
+    await page.evaluate((selectedRegion) =>
+      window.__LUMEN_TEST_API__.startCutawayRegionPicker({ region: selectedRegion }), region);
+    await page.locator("#lumen-cutaway-picker .lumen-cutaway-surface").focus();
+    await page.keyboard.press("Delete");
+    const deletedDraftUi = await page.evaluate(() => ({
+      hint: document.querySelector("#lumen-cutaway-picker .lumen-picker-hint")?.textContent?.trim() || "",
+      hasRegion: Boolean(document.querySelector("#lumen-cutaway-picker .lumen-cutaway-box"))
+    }));
+    await page.getByRole("button", { name: "Close" }).click();
+    const deleteUpdatesAfterClose = await countRuntimeMessages(page, "LUMEN_CUTAWAY_REGION_UPDATED");
+    assert(
+      deleteUpdatesAfterClose === deleteUpdatesBefore &&
+        !deletedDraftUi.hasRegion &&
+        deletedDraftUi.hint.includes("Choose Save to remove"),
+      "Delete should remain a reversible draft until Save is chosen.",
+      { deleteUpdatesBefore, deleteUpdatesAfterClose, deletedDraftUi }
+    );
+
+    const failedSaveUpdatesBefore = await countRuntimeMessages(page, "LUMEN_CUTAWAY_REGION_UPDATED");
+    await page.evaluate((selectedRegion) => {
+      window.__LUMEN_FAIL_NEXT_CUTAWAY_SAVE__ = true;
+      window.__LUMEN_TEST_API__.startCutawayRegionPicker({ region: selectedRegion });
+    }, region);
+    await page.locator("#lumen-cutaway-picker .lumen-cutaway-surface").focus();
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() =>
+      document.querySelector("#lumen-cutaway-picker .lumen-picker-hint")?.textContent?.includes("Simulated area save failure")
+    );
+    const failedSaveUi = await page.evaluate(() => ({
+      pickerOpen: Boolean(document.querySelector("#lumen-cutaway-picker")),
+      busy: document.querySelector("#lumen-cutaway-picker")?.getAttribute("aria-busy") || "",
+      saveLabel: document.querySelector("#lumen-cutaway-picker .lumen-picker-primary")?.textContent?.trim() || "",
+      saveDisabled: document.querySelector("#lumen-cutaway-picker .lumen-picker-primary")?.disabled ?? true,
+      saveFocused: document.activeElement === document.querySelector("#lumen-cutaway-picker .lumen-picker-primary")
+    }));
+    const failedSaveUpdatesAfterAttempt = await countRuntimeMessages(page, "LUMEN_CUTAWAY_REGION_UPDATED");
+    await page.getByRole("button", { name: "Close" }).click();
+    const failedSaveUpdatesAfterClose = await countRuntimeMessages(page, "LUMEN_CUTAWAY_REGION_UPDATED");
+    assert(
+      failedSaveUi.pickerOpen &&
+        failedSaveUi.busy === "false" &&
+        failedSaveUi.saveLabel === "Save" &&
+        !failedSaveUi.saveDisabled &&
+        failedSaveUi.saveFocused &&
+        failedSaveUpdatesAfterAttempt === failedSaveUpdatesBefore + 1 &&
+        failedSaveUpdatesAfterClose === failedSaveUpdatesAfterAttempt,
+      "A failed save should stay open, explain the error, and remain retryable without persisting on Close.",
+      { failedSaveUi, failedSaveUpdatesBefore, failedSaveUpdatesAfterAttempt, failedSaveUpdatesAfterClose }
+    );
+
+    const instantRectUpdatesBefore = await countRuntimeMessages(page, "LUMEN_CUTAWAY_REGION_UPDATED");
+    await page.evaluate((selectedRegion) =>
+      window.__LUMEN_TEST_API__.startCutawayRegionPicker({
+        region: selectedRegion,
+        selectionMode: "rect"
+      }), region);
+    const scrollGeometryBefore = await page.locator("#lumen-cutaway-picker .lumen-cutaway-box").boundingBox();
+    const scrollDelta = await page.evaluate(() => {
+      const previous = window.scrollY;
+      window.scrollBy(0, 40);
+      return window.scrollY - previous;
+    });
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const scrollGeometryAfter = await page.locator("#lumen-cutaway-picker .lumen-cutaway-box").boundingBox();
+    assert(scrollGeometryBefore && scrollGeometryAfter && scrollDelta > 0, "Scroll geometry fixture did not move.");
+    assert(
+      Math.abs(scrollGeometryAfter.y - (scrollGeometryBefore.y - scrollDelta)) <= 2,
+      "Saved selection geometry drifted after the page scrolled.",
+      { scrollGeometryBefore, scrollGeometryAfter, scrollDelta }
+    );
+    await page.evaluate(() => {
+      window.scrollTo(0, 0);
+      return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    });
+    await page.locator("#lumen-cutaway-picker .lumen-picker-capture-now").focus();
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => window.__LUMEN_LAST_RUNTIME_MESSAGE__?.type === "LUMEN_CAPTURE_SELECTED_AREA");
+    const instantRectCapture = await page.evaluate(() => ({
+      message: window.__LUMEN_LAST_RUNTIME_MESSAGE__,
+      buttonLabel: document.querySelector("#lumen-cutaway-picker .lumen-picker-capture-now")?.textContent?.trim() || "",
+      buttonDisabled: document.querySelector("#lumen-cutaway-picker .lumen-picker-capture-now")?.disabled ?? false,
+      hudTitle: document.querySelector("#lumen-usage-hud [data-lumen-hud-title]")?.textContent?.trim() || ""
+    }));
+    const instantRectUpdatesAfter = await countRuntimeMessages(page, "LUMEN_CUTAWAY_REGION_UPDATED");
+    assert(
+      instantRectCapture.message?.payload?.selectionMode === "rect" &&
+        instantRectCapture.message?.payload?.region?.kind === "cutaway" &&
+        instantRectCapture.message?.payload?.region?.anchor?.selector === "#pricing-card" &&
+        Boolean(instantRectCapture.message?.payload?.context),
+      "Capture now did not dispatch the selected rectangle and page context.",
+      instantRectCapture
+    );
+    assert(
+      instantRectCapture.buttonLabel === "Starting…" &&
+        instantRectCapture.buttonDisabled &&
+        instantRectCapture.hudTitle === "Selected area ready",
+      "Capture now did not expose an accessible in-flight and completion state.",
+      instantRectCapture
+    );
+    assert(
+      instantRectUpdatesAfter === instantRectUpdatesBefore,
+      "Capture now should not remember a one-off rectangle.",
+      { instantRectUpdatesBefore, instantRectUpdatesAfter }
+    );
+
+    record("instant rectangle Capture now dispatch", {
+      captureId: "instant-area-smoke",
+      selectionMode: instantRectCapture.message.payload.selectionMode,
+      selector: instantRectCapture.message.payload.region.anchor.selector
+    });
+
+    await page.evaluate((selectedRegion) => {
+      window.__LUMEN_AREA_LIBRARY_SAVED__ = false;
+      window.__LUMEN_TEST_API__.startCutawayRegionPicker({
+        region: selectedRegion,
+        selectionMode: "rect"
+      });
+    }, region);
+    await page.locator("#lumen-cutaway-picker .lumen-picker-capture-now").click();
+    await page.waitForFunction(() =>
+      document.querySelector("#lumen-usage-hud [data-lumen-hud-title]")?.textContent?.trim() === "Selected area downloaded"
+    );
+    const downloadsOnlyFallback = await page.evaluate(() => ({
+      title: document.querySelector("#lumen-usage-hud [data-lumen-hud-title]")?.textContent?.trim() || "",
+      detail: document.querySelector("#lumen-usage-hud [data-lumen-hud-detail]")?.textContent?.trim() || ""
+    }));
+    await page.evaluate(() => {
+      window.__LUMEN_AREA_LIBRARY_SAVED__ = true;
+    });
+    assert(
+      downloadsOnlyFallback.title === "Selected area downloaded" &&
+        /Chrome Downloads/i.test(downloadsOnlyFallback.detail) &&
+        /could not add it to the local library/i.test(downloadsOnlyFallback.detail) &&
+        !/copy, edit, or export/i.test(downloadsOnlyFallback.detail),
+      "A Downloads-only area capture overstated local workspace availability.",
+      downloadsOnlyFallback
+    );
+    record("Downloads-only area capture fallback", downloadsOnlyFallback);
+
+    const lassoSimplification = await page.evaluate(() => {
+      const source = Array.from({ length: 320 }, (_, index) => ({
+        x: index,
+        y: Math.round(80 + Math.sin(index / 12) * 36)
+      }));
+      const points = window.__LUMEN_TEST_API__.simplifyRegionPoints(source, 120);
+
+      return {
+        length: points.length,
+        first: points[0],
+        last: points.at(-1),
+        sourceLast: source.at(-1)
+      };
+    });
+    assert(
+      lassoSimplification.length === 120 &&
+        lassoSimplification.first?.x === 0 &&
+        lassoSimplification.last?.x === lassoSimplification.sourceLast?.x &&
+        lassoSimplification.last?.y === lassoSimplification.sourceLast?.y,
+      "Lasso simplification did not sample the complete path or preserve both endpoints.",
+      lassoSimplification
+    );
+
+    const lassoUpdatesBefore = await countRuntimeMessages(page, "LUMEN_CUTAWAY_REGION_UPDATED");
     await page.evaluate(() => window.__LUMEN_TEST_API__.startCutawayRegionPicker({ selectionMode: "lasso" }));
     await page.mouse.move(targetBox.x + 34, targetBox.y + 34);
     await page.mouse.down();
@@ -669,20 +969,27 @@ async function runCutawayRegionSmoke(browser, contentScript) {
     await page.mouse.move(targetBox.x + 34, targetBox.y + 34, { steps: 6 });
     await page.mouse.up();
 
-    const lassoMessage = await page.evaluate(() => window.__LUMEN_LAST_RUNTIME_MESSAGE__);
-    const lassoRegion = lassoMessage?.payload?.region;
+    const lassoUpdatesAfterDraw = await countRuntimeMessages(page, "LUMEN_CUTAWAY_REGION_UPDATED");
     const lassoPickerUi = await page.evaluate(() => ({
       title: document.querySelector("#lumen-cutaway-picker .lumen-picker-title")?.textContent?.trim() || "",
       count: document.querySelector("#lumen-cutaway-picker .lumen-picker-count")?.textContent?.trim() || "",
       primary: document.querySelector("#lumen-cutaway-picker .lumen-picker-primary")?.textContent?.trim() || "",
+      captureNow: document.querySelector("#lumen-cutaway-picker .lumen-picker-capture-now")?.textContent?.trim() || "",
+      captureNowDisabled: document.querySelector("#lumen-cutaway-picker .lumen-picker-capture-now")?.disabled ?? true,
       label: document.querySelector("#lumen-cutaway-picker .lumen-cutaway-box")?.dataset.label || ""
     }));
     await page.getByRole("button", { name: "Save" }).click();
+    await page.waitForFunction((previousCount) =>
+      (window.__LUMEN_RUNTIME_MESSAGES__ || []).filter((message) => message?.type === "LUMEN_CUTAWAY_REGION_UPDATED").length > previousCount,
+    lassoUpdatesAfterDraw);
+    const lassoMessage = await readLastRuntimeMessage(page, "LUMEN_CUTAWAY_REGION_UPDATED");
+    const lassoRegion = lassoMessage?.payload?.region;
     const resolvedLasso = await page.evaluate((payload) => window.__LUMEN_TEST_API__.resolveCutawayRegion(payload), {
       region: lassoRegion,
       context: lassoMessage?.payload?.context
     });
 
+    assert(lassoUpdatesAfterDraw === lassoUpdatesBefore, "Drawing a lasso should not remember it until Save is chosen.");
     assert(lassoRegion?.shape === "lasso", "Lasso picker did not store lasso geometry.", lassoRegion);
     assert(lassoRegion.points?.length >= 4, "Lasso picker did not retain the drawn points.", lassoRegion);
     assert(resolvedLasso.region?.shape === "lasso", "Resolved lasso lost its shape metadata.", resolvedLasso);
@@ -691,6 +998,8 @@ async function runCutawayRegionSmoke(browser, contentScript) {
       lassoPickerUi.title === "Lasso capture" &&
         lassoPickerUi.count === "Lasso selected" &&
         lassoPickerUi.primary === "Save" &&
+        lassoPickerUi.captureNow === "Capture now" &&
+        !lassoPickerUi.captureNowDisabled &&
         lassoPickerUi.label === "Lasso area",
       "Lasso picker UI did not render the polished controls.",
       lassoPickerUi
@@ -699,6 +1008,38 @@ async function runCutawayRegionSmoke(browser, contentScript) {
     record("lasso region picker", {
       selector: lassoRegion.anchor.selector,
       pointCount: lassoRegion.points.length
+    });
+
+    const instantLassoUpdatesBefore = await countRuntimeMessages(page, "LUMEN_CUTAWAY_REGION_UPDATED");
+    await page.evaluate((selectedRegion) =>
+      window.__LUMEN_TEST_API__.startCutawayRegionPicker({
+        region: selectedRegion,
+        selectionMode: "lasso"
+      }), lassoRegion);
+    await page.locator("#lumen-cutaway-picker .lumen-picker-capture-now").click();
+    await page.waitForFunction(() =>
+      window.__LUMEN_LAST_RUNTIME_MESSAGE__?.type === "LUMEN_CAPTURE_SELECTED_AREA" &&
+      window.__LUMEN_LAST_RUNTIME_MESSAGE__?.payload?.selectionMode === "lasso"
+    );
+    const instantLassoCapture = await page.evaluate(() => window.__LUMEN_LAST_RUNTIME_MESSAGE__);
+    const instantLassoUpdatesAfter = await countRuntimeMessages(page, "LUMEN_CUTAWAY_REGION_UPDATED");
+    assert(
+      instantLassoCapture?.payload?.selectionMode === "lasso" &&
+        instantLassoCapture?.payload?.region?.shape === "lasso" &&
+        instantLassoCapture?.payload?.region?.points?.length >= 4,
+      "Capture now did not preserve lasso geometry in its capture dispatch.",
+      instantLassoCapture
+    );
+    assert(
+      instantLassoUpdatesAfter === instantLassoUpdatesBefore,
+      "Capture now should not remember a one-off lasso.",
+      { instantLassoUpdatesBefore, instantLassoUpdatesAfter }
+    );
+
+    record("instant lasso Capture now dispatch", {
+      captureId: "instant-area-smoke",
+      selectionMode: instantLassoCapture.payload.selectionMode,
+      pointCount: instantLassoCapture.payload.region.points.length
     });
 
     await page.evaluate(() => window.__LUMEN_TEST_API__.startAnnotationRegionPicker());
@@ -785,6 +1126,18 @@ async function runLassoMaskPixelSmoke(browser, offscreenScript) {
 
     record("transparent lasso export pixels", pixels);
   });
+}
+
+async function countRuntimeMessages(page, type) {
+  return page.evaluate((messageType) =>
+    (window.__LUMEN_RUNTIME_MESSAGES__ || []).filter((message) => message?.type === messageType).length,
+  type);
+}
+
+async function readLastRuntimeMessage(page, type) {
+  return page.evaluate((messageType) =>
+    (window.__LUMEN_RUNTIME_MESSAGES__ || []).findLast((message) => message?.type === messageType) || null,
+  type);
 }
 
 async function main() {

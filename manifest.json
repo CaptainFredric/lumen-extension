@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Lumen",
-  "version": "0.4.0",
-  "description": "Capture, annotate, compare, redact, and monitor webpages with a local library and reviewed Drive export.",
+  "version": "0.5.0",
+  "description": "Capture full pages or selected areas, then copy, annotate, compare, redact, and export from a private workspace.",
   "homepage_url": "https://captainfredric.github.io/lumen-extension/",
   "minimum_chrome_version": "109",
   "options_page": "settings.html",
@@ -54,6 +54,13 @@
         "mac": "Alt+Shift+V"
       },
       "description": "Capture the visible area with Lumen"
+    },
+    "capture-area": {
+      "suggested_key": {
+        "default": "Alt+Shift+A",
+        "mac": "Alt+Shift+A"
+      },
+      "description": "Select and capture an area with Lumen"
     }
   }
 }

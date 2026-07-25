@@ -422,19 +422,16 @@ ul {
 
 .extension-crop {
   position: relative;
-  aspect-ratio: 1.55 / 1;
+  aspect-ratio: 1.6 / 1;
   overflow: hidden;
   border-radius: 25px;
   background: #07121d;
 }
 
 .extension-crop img {
-  position: absolute;
-  top: -70px;
-  left: 57%;
-  width: 230%;
-  max-width: none;
-  transform: translateX(-57%);
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .trust {
@@ -708,17 +705,6 @@ ul {
 
   .feature-icon {
     margin-bottom: 30px;
-  }
-
-  .extension-crop {
-    aspect-ratio: 1.08 / 1;
-  }
-
-  .extension-crop img {
-    top: -38px;
-    left: 59%;
-    width: 270%;
-    transform: translateX(-59%);
   }
 
   .trust-card {

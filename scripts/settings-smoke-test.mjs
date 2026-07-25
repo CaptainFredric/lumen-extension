@@ -160,6 +160,22 @@ try {
       })
     ]);
   });
+  const shieldedShortcutGate = await runShortcutCommandProbe(worker, "capture-visible-area");
+  assert(
+    shieldedShortcutGate.result?.reviewRequired === true &&
+      shieldedShortcutGate.result?.captureStarted === false &&
+      shieldedShortcutGate.result?.reason === "privacy-shield" &&
+      shieldedShortcutGate.result?.captureMode === "visible" &&
+      shieldedShortcutGate.beforeHistoryCount === shieldedShortcutGate.afterHistoryCount &&
+      shieldedShortcutGate.beforeDownloadCount === shieldedShortcutGate.afterDownloadCount &&
+      !shieldedShortcutGate.activeCaptureJob &&
+      shieldedShortcutGate.badge === "!" &&
+      /Privacy Shield requires review/.test(shieldedShortcutGate.actionTitle) &&
+      /No visible area image was saved/.test(shieldedShortcutGate.result.detail) &&
+      /Save capture/.test(shieldedShortcutGate.result.detail),
+    "Privacy Shield keyboard capture did not stop before saving with a clear review action.",
+    shieldedShortcutGate
+  );
   const shieldedBackgroundCapture = await settings.evaluate(() => chrome.runtime.sendMessage({
     type: "LUMEN_START_CAPTURE",
     payload: {
@@ -191,6 +207,15 @@ try {
       shieldedRuntimePolicy.app.reviewBeforeSave === true,
     "The background capture path accepted unsafe options while Privacy Shield was enabled.",
     { shieldedBackgroundCapture, shieldedRuntimePolicy }
+  );
+  const clearedShieldShortcutNotice = await worker.evaluate(async (tabId) => ({
+    badge: await chrome.action.getBadgeText({ tabId }),
+    title: await chrome.action.getTitle({ tabId })
+  }), shieldedShortcutGate.tabId);
+  assert(
+    clearedShieldShortcutNotice.badge === "" && clearedShieldShortcutNotice.title === "Lumen",
+    "Starting an approved capture did not clear the previous shortcut review notice.",
+    clearedShieldShortcutNotice
   );
   await worker.evaluate(async () => {
     const [local, sync] = await Promise.all([
@@ -265,6 +290,23 @@ try {
     });
   });
   await target.bringToFront();
+  const reviewShortcutGate = await runShortcutCommandProbe(worker, "capture-page");
+  assert(
+    reviewShortcutGate.result?.reviewRequired === true &&
+      reviewShortcutGate.result?.captureStarted === false &&
+      reviewShortcutGate.result?.reason === "review-before-save" &&
+      reviewShortcutGate.result?.captureMode === "fullPage" &&
+      reviewShortcutGate.beforeHistoryCount === reviewShortcutGate.afterHistoryCount &&
+      reviewShortcutGate.beforeDownloadCount === reviewShortcutGate.afterDownloadCount &&
+      !reviewShortcutGate.activeCaptureJob &&
+      reviewShortcutGate.badge === "!" &&
+      /Review required before saving/.test(reviewShortcutGate.actionTitle) &&
+      /No full page image was saved/.test(reviewShortcutGate.result.detail) &&
+      /Open Lumen/.test(reviewShortcutGate.result.detail),
+    "Review-before-save keyboard capture did not stop before saving with a clear review action.",
+    reviewShortcutGate
+  );
+  await popup.waitForFunction(() => document.querySelector("#statusTitle")?.textContent?.trim() === "Review required before saving", null, { timeout: 10000 });
   await popup.reload({ waitUntil: "load" });
   await popup.waitForSelector("#captureButton:not(:disabled)", { timeout: 10000 });
   await popup.click("#captureButton");
@@ -354,6 +396,12 @@ try {
     shieldedBackgroundCapture: {
       redactionCount: shieldedBackgroundCapture.redactionCount,
       manifestSuppressed: shieldedBackgroundCapture.manifestFile === ""
+    },
+    keyboardReviewGate: {
+      privacyShield: shieldedShortcutGate.result.reason,
+      visibleMode: shieldedShortcutGate.result.captureMode,
+      reviewBeforeSave: reviewShortcutGate.result.reason,
+      fullPageMode: reviewShortcutGate.result.captureMode
     },
     driveBlockedLocally: true,
     fastCapture,
@@ -737,6 +785,48 @@ async function prepareExtensionCopy(originPattern) {
     scopes: ["https://www.googleapis.com/auth/drive.file"]
   };
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+  const backgroundPath = path.join(extensionDir, "background.js");
+  const backgroundSource = await readFile(backgroundPath, "utf8");
+  await writeFile(
+    backgroundPath,
+    `${backgroundSource.trimEnd()}\n\n// Test-only hook for exercising production command routing.\nglobalThis.__LUMEN_TEST_HANDLE_COMMAND__ = handleCommand;\n`
+  );
+}
+
+async function runShortcutCommandProbe(worker, command) {
+  return worker.evaluate(async (requestedCommand) => {
+    if (typeof globalThis.__LUMEN_TEST_HANDLE_COMMAND__ !== "function") {
+      throw new Error("The command-routing test hook was not installed.");
+    }
+
+    const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    const tabId = activeTab?.id;
+    const [beforeStorage, beforeDownloads] = await Promise.all([
+      chrome.storage.local.get("lumen.capture.history"),
+      chrome.downloads.search({})
+    ]);
+    const result = await globalThis.__LUMEN_TEST_HANDLE_COMMAND__(requestedCommand);
+    const [afterStorage, afterDownloads, activeJob, badge, actionTitle] = await Promise.all([
+      chrome.storage.local.get("lumen.capture.history"),
+      chrome.downloads.search({}),
+      chrome.storage.local.get("lumen.capture.activeJob"),
+      chrome.action.getBadgeText({ tabId }),
+      chrome.action.getTitle({ tabId })
+    ]);
+
+    return {
+      tabId,
+      result,
+      beforeHistoryCount: beforeStorage["lumen.capture.history"]?.length || 0,
+      afterHistoryCount: afterStorage["lumen.capture.history"]?.length || 0,
+      beforeDownloadCount: beforeDownloads.length,
+      afterDownloadCount: afterDownloads.length,
+      activeCaptureJob: activeJob["lumen.capture.activeJob"] || null,
+      badge,
+      actionTitle
+    };
+  }, command);
 }
 
 async function startFixtureServer() {

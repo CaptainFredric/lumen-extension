@@ -52,6 +52,7 @@ const LIBRARY_UPDATE_EVENT = "LUMEN_LIBRARY_UPDATED";
 const MANUAL_REDACTIONS_UPDATE_EVENT = "LUMEN_MANUAL_REDACTIONS_UPDATED";
 const CUTAWAY_REGION_UPDATE_EVENT = "LUMEN_CUTAWAY_REGION_UPDATED";
 const ANNOTATION_REGION_UPDATE_EVENT = "LUMEN_ANNOTATION_REGION_UPDATED";
+const SELECTED_AREA_CAPTURE_EVENT = "LUMEN_SELECTED_AREA_CAPTURED";
 const WATCH_ALARM_PREFIX = "lumen.watch.";
 const MAX_CAPTURE_REDACTIONS = 800;
 
@@ -318,6 +319,50 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "LUMEN_CAPTURE_SELECTED_AREA") {
+    if (captureInFlight || analyzeInFlight) {
+      sendResponse({
+        ok: false,
+        error: createFriendlyError(
+          "Lumen Is Busy",
+          "Wait for the current capture or analysis to finish, then choose Capture now again."
+        )
+      });
+      return;
+    }
+
+    captureInFlight = true;
+    captureCancelRequested = false;
+
+    runSelectedAreaCapture(message.payload || {}, sender.tab)
+      .then((result) => {
+        const payload = {
+          ...result,
+          captureKind: "area",
+          selectionMode: result.selectionMode || "rect"
+        };
+        broadcastSelectedAreaCapture(payload);
+        sendResponse({ ok: true, ...payload });
+      })
+      .catch((error) => {
+        const normalizedError = normalizeCaptureError(error);
+        broadcastProgress({
+          stage: "error",
+          title: normalizedError.title || "Area capture failed",
+          detail: normalizedError.description || "Lumen could not save the selected area.",
+          progress: 0.12
+        });
+        sendResponse({ ok: false, error: normalizedError });
+      })
+      .finally(async () => {
+        captureInFlight = false;
+        captureCancelRequested = false;
+        await clearActiveCaptureJob();
+      });
+
+    return true;
+  }
+
   if (message?.type === "LUMEN_GET_CAPTURE_JOB") {
     sendResponse({ ok: true, job: activeCaptureJob || { active: false } });
     return;
@@ -509,6 +554,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message?.type === "LUMEN_OPEN_ANNOTATION_EDITOR") {
     openCaptureToolPage("editor.html", message.payload?.captureId)
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
+  if (message?.type === "LUMEN_OPEN_CAPTURE_RESULT") {
+    openCaptureToolPage("result.html", message.payload?.captureId)
       .then((result) => sendResponse({ ok: true, ...result }))
       .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
 
@@ -789,9 +842,11 @@ async function openCaptureToolPage(pageName, captureId = "") {
   }
 
   const isEditor = pageName === "editor.html";
+  const isResult = pageName === "result.html";
   const capture = await getLibraryCapture(normalizedCaptureId, {
     includePreview: true,
-    includeEditorSource: true
+    includeEditorSource: true,
+    includePdfSource: isResult
   });
 
   if (!capture) {
@@ -808,11 +863,19 @@ async function openCaptureToolPage(pageName, captureId = "") {
     capture.editorSource?.captureId === capture.id &&
     capture.editorSource?.purpose === "editor-source" &&
     Boolean(capture.editorSource?.blob);
+  const pdfSourceAvailable = isResult &&
+    capture.pdfStatus === "ready" &&
+    capture.pdfSource?.captureId === capture.id &&
+    capture.pdfSource?.purpose === "pdf-source" &&
+    Boolean(capture.pdfSource?.blob);
+  const savedDownloadAvailable = isResult && await hasUsableDownloadHandle(capture.downloads);
 
-  if (!previewAvailable && !editorSourceAvailable) {
+  if (!previewAvailable && !editorSourceAvailable && !pdfSourceAvailable && !savedDownloadAvailable) {
     throw createFriendlyError(
-      isEditor ? "Annotation Unavailable" : "Comparison Unavailable",
-      "This capture no longer has a local image preview. Capture the page again to use this tool."
+      isEditor ? "Annotation Unavailable" : isResult ? "Result Unavailable" : "Comparison Unavailable",
+      isResult
+        ? "This capture no longer has a preview, cached PDF, or saved-file handle. Capture the page again to use this workspace."
+        : "This capture no longer has a local image preview. Capture the page again to use this tool."
     );
   }
 
@@ -824,6 +887,30 @@ async function openCaptureToolPage(pageName, captureId = "") {
     tabId: tab?.id || null,
     captureId: normalizedCaptureId
   };
+}
+
+async function hasUsableDownloadHandle(downloads = []) {
+  if (typeof chrome.downloads?.search !== "function") {
+    return false;
+  }
+
+  const candidates = (Array.isArray(downloads) ? downloads : []).filter((download) =>
+    Number.isInteger(download?.downloadId) && download.complete !== false
+  );
+
+  for (const candidate of candidates) {
+    try {
+      const [download] = await chrome.downloads.search({ id: candidate.downloadId });
+
+      if (download?.state === "complete" && download.exists !== false) {
+        return true;
+      }
+    } catch {
+      // A stale Chrome download-history handle is not a usable result source.
+    }
+  }
+
+  return false;
 }
 
 async function updateDataControlsWithPrivacyPolicy(patch = {}) {
@@ -989,6 +1076,94 @@ async function clearLocalWorkspaceData() {
   };
 }
 
+async function readStoredCaptureSettings(overrides = {}) {
+  const [stored, privateStored] = await Promise.all([
+    chrome.storage.sync.get(STORAGE_KEYS.settings),
+    chrome.storage.local.get(STORAGE_KEYS.privateSettings)
+  ]);
+
+  return {
+    ...getDefaultSettings(),
+    ...(stored[STORAGE_KEYS.settings] || {}),
+    ...(privateStored[STORAGE_KEYS.privateSettings] || {}),
+    ...overrides
+  };
+}
+
+async function runSelectedAreaCapture(payload = {}, sourceTab = null) {
+  if (!sourceTab?.id || !sourceTab.url) {
+    throw createFriendlyError(
+      "Selection Page Unavailable",
+      "The page that opened the area picker is no longer available. Open the picker again and redraw the area."
+    );
+  }
+
+  if (isRestrictedCaptureUrl(sourceTab.url)) {
+    throw createFriendlyError(
+      "This Page Cannot Be Captured",
+      "Chrome blocks area capture on internal pages and other protected surfaces."
+    );
+  }
+
+  const cutawayRegion = normalizeCutawayRecord({
+    url: sourceTab.url,
+    context: payload.context || null,
+    region: payload.region || payload.regions?.[0] || null
+  }, sourceTab.url);
+
+  if (
+    !cutawayRegion.region ||
+    cutawayRegion.region.width < 8 ||
+    cutawayRegion.region.height < 8 ||
+    (cutawayRegion.region.shape === "lasso" && cutawayRegion.region.points.length < 4)
+  ) {
+    throw createFriendlyError(
+      "Choose An Area First",
+      "Draw a rectangle or lasso at least eight pixels wide and high before choosing Capture now."
+    );
+  }
+
+  const selectionMode = cutawayRegion.region.shape === "lasso" ? "lasso" : "rect";
+  const directRegion = { ...cutawayRegion.region };
+  delete directRegion.anchor;
+  const instantCutawayRegion = {
+    ...cutawayRegion,
+    region: directRegion,
+    regions: [directRegion]
+  };
+  const appSettings = await readAppSettings();
+
+  if (appSettings.reviewBeforeSave) {
+    throw createFriendlyError(
+      appSettings.privacyShieldEnabled ? "Privacy Shield Is On" : "Review Before Save Is On",
+      appSettings.privacyShieldEnabled
+        ? "Privacy Shield prevents one-click saving. Turn it off in Lumen Settings, or choose Save to remember this area for reviewed and timed captures."
+        : "Review Before Save prevents one-click saving. Turn it off in Lumen Settings, or choose Save to remember this area for reviewed and timed captures."
+    );
+  }
+
+  const settings = await readStoredCaptureSettings({
+    captureMode: "visible",
+    devicePreset: "desktop",
+    forceLazyLoad: false
+  });
+  const result = await runCaptureFlow(settings, {
+    sourceTab,
+    // Capture now must preserve the exact same-viewport geometry the user
+    // drew. Anchors are retained only when Save explicitly creates a reusable
+    // region that may need projection into a later layout.
+    cutawayRegionOverride: instantCutawayRegion,
+    focusedOnly: true,
+    captureOrigin: "manual",
+    captureIntent: "selected-area"
+  });
+
+  return {
+    ...result,
+    selectionMode
+  };
+}
+
 async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
   const appSettings = await readAppSettings();
 
@@ -1006,10 +1181,17 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
   const captureId = createLocalId();
   const captureMode = options.captureMode === "visible" ? "visible" : "fullPage";
 
-  if (!sourceTab?.id || !sourceTab.url) {
+  if (!sourceTab?.id) {
     throw createFriendlyError(
       "No Active Page",
       "Open a normal browser tab, then trigger the capture again."
+    );
+  }
+
+  if (!sourceTab.url) {
+    throw createFriendlyError(
+      "Site Access Blocked",
+      "Chrome did not grant temporary access to the active page. Start the capture from Lumen's toolbar button or one of its keyboard shortcuts."
     );
   }
 
@@ -1020,11 +1202,13 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
     );
   }
 
+  await clearShortcutReviewNotice(sourceTab.id);
+
   const variants = getCaptureVariants(options.devicePreset);
   const manualRedactions = context.manualRedactionsOverride || await getManualRedactionsForTab(sourceTab);
-  const cutawayRegion = captureMode === "visible"
+  const cutawayRegion = context.cutawayRegionOverride || (captureMode === "visible"
     ? normalizeCutawayRecord({}, sourceTab.url)
-    : context.cutawayRegionOverride || await getCutawayRegionForTab(sourceTab);
+    : await getCutawayRegionForTab(sourceTab));
   const annotationRegion = captureMode === "visible"
     ? normalizeAnnotationRecord({}, sourceTab.url)
     : context.annotationRegionOverride || await getAnnotationRegionForTab(sourceTab);
@@ -1041,11 +1225,16 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
     id: captureId,
     tabId: sourceTab.id,
     windowId: sourceTab.windowId,
-    title: captureMode === "visible" ? "Visible area capture running" : "Page capture running",
+    title: focusedOnly
+      ? "Selected area capture running"
+      : captureMode === "visible"
+        ? "Visible area capture running"
+        : "Page capture running",
     detail: sourceTab.title || new URL(sourceTab.url).host,
     stage: "prepare",
     progress: 0.05,
     captureMode,
+    captureKind: focusedOnly ? "area" : captureMode,
     sourceType: context.captureOrigin === "timed" ? "timed" : "manual",
     startedAt: capturedAt
   });
@@ -1278,6 +1467,23 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
 
   broadcastHistory(captureHistory);
 
+  let resultWorkspace = {
+    opened: false,
+    tabId: null
+  };
+
+  if (librarySaved && context.captureOrigin !== "timed" && context.openResult !== false) {
+    try {
+      const opened = await openCaptureToolPage("result.html", captureId);
+      resultWorkspace = {
+        opened: true,
+        tabId: opened.tabId || null
+      };
+    } catch (error) {
+      console.debug("Lumen result workspace did not open:", error);
+    }
+  }
+
   // Backend hook:
   // POST metadata, page metrics, and the final asset reference to
   // `${LUMEN_CONFIG.api.baseUrl}${LUMEN_CONFIG.api.endpoints.captures}`
@@ -1285,7 +1491,7 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
 
   broadcastProgress({
     stage: "done",
-    title: captureMode === "visible" ? "Visible area ready" : focusedOnly ? "Selected area ready" : variants.length > 1 ? "Responsive set ready" : "Capture ready",
+    title: focusedOnly ? "Selected area ready" : captureMode === "visible" ? "Visible area ready" : variants.length > 1 ? "Responsive set ready" : "Capture ready",
     detail: buildCaptureCompletionDetail({
       segmentCount,
       fileCount: downloadedFiles.length,
@@ -1327,7 +1533,9 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
     dimensions: firstResult.dimensions,
     visualHash,
     changePercent,
-    librarySaved
+    librarySaved,
+    resultOpened: resultWorkspace.opened,
+    resultTabId: resultWorkspace.tabId
   };
 }
 
@@ -2898,6 +3106,15 @@ async function captureVariant({
       download: downloadRecords[index] || null
     }));
     const primaryRenderedOutput = renderedOutputs[0] || null;
+    const outputDimensions = focusedOnly && primaryRenderedOutput
+      ? {
+          width: Math.max(1, Math.round(Number(primaryRenderedOutput.width) || stitched.width || 1)),
+          height: Math.max(1, Math.round(Number(primaryRenderedOutput.height) || stitched.height || 1))
+        }
+      : {
+          width: stitched.width,
+          height: stitched.height
+        };
     const editorSource = unchanged
       ? null
       : focusedOnly && primaryRenderedOutput
@@ -2958,10 +3175,7 @@ async function captureVariant({
       captureHealth: stitched.captureHealth || null,
       viewport: viewportCalibration,
       exportPreset: stitched.appliedPreset,
-      dimensions: {
-        width: stitched.width,
-        height: stitched.height
-      }
+      dimensions: outputDimensions
     };
   } finally {
     await resetStitchSessionSilently();
@@ -4059,7 +4273,7 @@ function checkCaptureCancelled() {
 }
 
 async function handleCommand(command) {
-  if (!["capture-page", "capture-visible-area"].includes(command)) {
+  if (!["capture-page", "capture-visible-area", "capture-area"].includes(command)) {
     return;
   }
 
@@ -4073,25 +4287,108 @@ async function handleCommand(command) {
     return;
   }
 
+  if (command === "capture-area") {
+    await runCutawayRegionPicker({ selectionMode: "rect" });
+    return;
+  }
+
+  const appSettings = await readAppSettings();
+
+  if (appSettings.reviewBeforeSave || appSettings.privacyShieldEnabled) {
+    return presentShortcutReviewNotice({ command, appSettings });
+  }
+
   captureInFlight = true;
   captureCancelRequested = false;
 
   try {
-    const appSettings = await readAppSettings();
-    const stored = await chrome.storage.sync.get(STORAGE_KEYS.settings);
-    const settings = applyPrivacyShieldToCaptureSettings({
-      ...getDefaultSettings(),
-      ...(stored[STORAGE_KEYS.settings] || {}),
+    const settings = applyPrivacyShieldToCaptureSettings(await readStoredCaptureSettings({
       captureMode: command === "capture-visible-area" ? "visible" : "fullPage",
       devicePreset: "desktop"
-    }, appSettings);
+    }), appSettings);
 
-    await runCaptureFlow(settings);
+    return await runCaptureFlow(settings);
   } finally {
     captureInFlight = false;
     captureCancelRequested = false;
     await clearActiveCaptureJob();
   }
+}
+
+async function presentShortcutReviewNotice({ command, appSettings = {} } = {}) {
+  const captureMode = command === "capture-visible-area" ? "visible" : "fullPage";
+  const captureLabel = captureMode === "visible" ? "Visible area" : "Full page";
+  const privacyShieldEnabled = Boolean(appSettings.privacyShieldEnabled);
+  const reason = privacyShieldEnabled ? "privacy-shield" : "review-before-save";
+  const title = privacyShieldEnabled
+    ? "Privacy Shield requires review"
+    : "Review required before saving";
+  const detail = `No ${captureLabel.toLowerCase()} image was saved. Open Lumen, choose ${captureLabel}, review the save check, then choose Save capture.`;
+  const sourceTab = await getCurrentTab();
+  const actionTarget = Number.isInteger(sourceTab?.id) ? { tabId: sourceTab.id } : {};
+
+  if (chrome.action) {
+    await Promise.allSettled([
+      typeof chrome.action.setBadgeText === "function"
+        ? chrome.action.setBadgeText({ ...actionTarget, text: "!" })
+        : Promise.resolve(),
+      typeof chrome.action.setBadgeBackgroundColor === "function"
+        ? chrome.action.setBadgeBackgroundColor({ ...actionTarget, color: "#b45309" })
+        : Promise.resolve(),
+      typeof chrome.action.setTitle === "function"
+        ? chrome.action.setTitle({ ...actionTarget, title: `Lumen — ${title}. Click to review and save.` })
+        : Promise.resolve()
+    ]);
+  }
+
+  let popupOpened = false;
+
+  if (typeof chrome.action?.openPopup === "function") {
+    try {
+      await chrome.action.openPopup();
+      popupOpened = true;
+      await sleep(120);
+    } catch (error) {
+      console.debug("Lumen could not open its review popup from this shortcut:", error);
+    }
+  }
+
+  broadcastProgress({
+    stage: "inspect",
+    title,
+    detail,
+    progress: 0.18
+  });
+
+  return {
+    ok: false,
+    captureStarted: false,
+    reviewRequired: true,
+    reason,
+    command,
+    captureMode,
+    popupOpened,
+    title,
+    detail
+  };
+}
+
+async function clearShortcutReviewNotice(tabId = null) {
+  if (!chrome.action) {
+    return;
+  }
+
+  const actionTarget = Number.isInteger(tabId) ? { tabId } : {};
+  const defaultTitle = chrome.runtime.getManifest()?.action?.default_title || "Lumen";
+
+  await Promise.allSettled([
+    typeof chrome.action.setBadgeText === "function"
+      ? chrome.action.setBadgeText({ ...actionTarget, text: "" })
+      : Promise.resolve(),
+    typeof chrome.action.setTitle === "function"
+      ? chrome.action.setTitle({ ...actionTarget, title: defaultTitle })
+      : Promise.resolve()
+  ]);
 }
 
 function broadcastSession(session) {
@@ -4119,6 +4416,13 @@ function broadcastCutawayRegion(record) {
   chrome.runtime.sendMessage({
     type: CUTAWAY_REGION_UPDATE_EVENT,
     payload: record
+  }).catch(() => {});
+}
+
+function broadcastSelectedAreaCapture(result) {
+  chrome.runtime.sendMessage({
+    type: SELECTED_AREA_CAPTURE_EVENT,
+    payload: result
   }).catch(() => {});
 }
 

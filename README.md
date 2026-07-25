@@ -1,17 +1,17 @@
 # Lumen
 
-Lumen is a Manifest V3 Chrome extension for clean webpage capture, annotation, visual comparison, and local monitoring. The Chrome extension is the actual app: its toolbar popup, local library, Annotation Studio, Change Review, and Settings screen perform the work. The GitHub Pages website is the public front door for installation guidance and a concise feature overview; a normal website cannot capture arbitrary browser tabs with extension privileges.
+Lumen is a Manifest V3 Chrome extension for clean webpage capture, annotation, visual comparison, and local monitoring. The Chrome extension is the actual app: its toolbar popup, Capture Result workspace, local library, Annotation Studio, Change Review, and Settings screen perform the work. The GitHub Pages website is the public front door for installation guidance and a concise feature overview; a normal website cannot capture arbitrary browser tabs with extension privileges.
 
 Lumen focuses on:
 
 1. clean the page before capture
 2. capture full pages, visible viewports, or desktop, tablet, and mobile views together
-3. crop rectangles or true transparent lasso shapes
+3. capture a rectangle or transparent lasso immediately, or remember it for monitoring
 4. delay, repeat, or continuously monitor a selected area with explicit limits
 5. keep real on-device previews in a local photo library while originals stay in Downloads
 6. redact sensitive visible data during export
 7. attach useful page signals and capture details beside the image
-8. export a local PNG or raster PDF and inspect the local working image with Fit, 100%, and keyboard zoom
+8. open every completed manual capture in a clean, zoomable result workspace for Copy, PNG, PDF, Drive, or annotation
 9. keep privacy, permissions, export behavior, and local-data controls together in dedicated Settings
 
 The repo is aimed at design review, QA, and product work.
@@ -29,7 +29,7 @@ The extension includes:
 7. export-time redaction for emails, phone numbers, token-like strings, and filled inputs, rescanned before every screenshot slice
 8. redaction preview from the popup before export
 9. anchored manual redaction boxes for areas the scanner cannot infer, with projection into responsive captures when the source element still resolves
-10. a focused-region picker that stores one reusable rectangle or freeform lasso per URL, preserves lasso points through layout projection, and exports transparent pixels outside the lasso path
+10. a focused-region picker that captures the current rectangle or freeform lasso immediately, or stores it for monitoring; lasso exports keep transparent pixels outside the selected path
 11. a pre-export review screen that checks auto-redactions, manual projection, and cutaway resolution across the requested view set before saving
 12. an anchored callout picker that marks one page area and renders it into the exported image with the capture note
 13. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
@@ -66,8 +66,10 @@ The extension includes:
 44. a reversible Privacy Shield that enforces local-only mode, review-before-save, automatic redaction, and metadata minimization together, pauses unattended monitors while active, then restores the user's choices and monitor alarms when turned off
 45. local PNG and paginated raster PDF export, plus Fit, 100%, and keyboard zoom for the local working image in Annotation Studio
 46. a capture-time review PDF cache generated from the original rendered capture output or tiles at up to 3200 raster pixels per page; it has its own 250 MB or 75-capture local budget
-47. an immediate saved-capture receipt with actions to annotate and export, open the original, reveal it in its folder, or jump to the matching local-library item
-48. keyboard shortcuts for full-page capture and visible-area capture, plus active-run controls to cancel a long capture or reopen its source tab from the popup
+47. an automatic Capture Result workspace after successful manual captures, with a zoomable preview, Copy image, PNG, PDF, optional Drive, Annotate, original-file, and library actions
+48. keyboard shortcuts for full-page capture (`Alt+Shift+L`), visible-area capture (`Alt+Shift+V`), and the area picker (`Alt+Shift+A`), plus active-run controls to cancel a long capture or reopen its source tab
+49. exact packaged-extension testing for command registration, safe `activeTab` denial without a user gesture, CI-gated full-page, visible-area, and drawn-area shortcut flows, result-workspace handoff, and zero persistent host access
+50. a CI artifact containing the exact tested upload ZIP, named `lumen-extension-<commit>`
 
 ## Current Limits
 
@@ -100,6 +102,7 @@ The current capture flow is:
 8. if the page is too large for one safe canvas, the export falls back to tiled raw output and skips cutaway cropping for that view
 9. for the primary capture variant, offscreen composition can also generate a paginated raster PDF from the original rendered output canvases or tiles, limiting each PDF page to at most 3200 raster pixels wide
 10. background downloads the full-resolution image files, writes capture details and local history, and places gallery previews, a bounded whole-capture editor image, and the capture-time review PDF in the on-device photo library before restoring the page
+11. successful manual runs open Capture Result for the exact saved item; timed runs finish quietly in the local shelf
 
 ### Local Photo Library
 
@@ -115,9 +118,9 @@ The same library item can open in Change Review. Lumen pairs local captures, com
 
 ### Reviewed Google Drive Export
 
-Google Drive is an optional destination inside Annotation Studio. It is never background backup: Lumen requests the optional Chrome Identity and Google API permissions only after the user presses **Export to Drive**, then uploads that one rendered image with minimal review metadata. Disconnect removes the cached token and optional permissions; existing files remain in the user's Drive.
+Google Drive is an optional destination inside Capture Result and Annotation Studio. It is never background backup: Lumen requests the optional Chrome Identity and Google API permissions only after the user presses **Export to Drive**, then uploads that one rendered image with minimal review metadata. Disconnect removes the cached token and optional permissions; existing files remain in the user's Drive.
 
-The publisher must create a Chrome Extension OAuth client for the permanent extension ID and package with `LUMEN_GOOGLE_DRIVE_CLIENT_ID`. Without that value, Drive stays disabled while local editing and PNG export continue to work. See `GOOGLE_DRIVE_SETUP.md`.
+The publisher must create a Chrome Extension OAuth client for the permanent extension ID and provide it as `LUMEN_GOOGLE_DRIVE_CLIENT_ID`. Add the same name as a GitHub Actions repository secret so the commit-addressed CI ZIP is both Drive-configured and the exact package that passed verification. Without that value, Drive stays disabled while local editing, PNG, and PDF export continue to work. See `GOOGLE_DRIVE_SETUP.md`.
 
 ### Entitlements
 
@@ -187,21 +190,22 @@ The public landing page will be available at `http://127.0.0.1:3000/`.
 2. Open the Lumen popup
 3. Check the launch indicator to confirm the current tab is capture-ready
 4. Click `Capture page` for the fresh-install one-click full-page run. It stays local, enables automatic redaction, and omits capture-details JSON by default; enable review-before-save in Settings when you want a confirmation screen before each save
-5. Hold `Capture page` to open quick actions for responsive capture, visible-area capture, redaction scan, manual boxes, cutaway, lasso, callout, review, or signal extraction
+5. Hold `Capture page` to open quick actions for responsive capture, visible-area capture, redaction scan, manual boxes, area selection, lasso, callout, review, or signal extraction
 6. Change capture device, export mode, cleanup, lazy-load forcing, auto-redaction, notes, or capture-detail settings when needed
 7. Use `Scan` to preview detected redaction regions before export
 8. Use `Mark boxes` if you need manual redactions before capture
-9. Use `Mark cutaway` or `Lasso area` to store one reusable page region; rectangle captures save clean crops and lasso captures keep pixels outside the selected path transparent
-10. Choose `Once` for a 5, 10, or 30 second delayed area capture, `Repeat` for a 15-minute through daily schedule, or `Continuous` for a 1, 5, or 15 minute cadence capped at 10, 25, or 50 runs
-11. Use `Open library` to browse real local previews, search or filter them, mark favorites, and return to the originals in Downloads
-12. Choose `Annotate` to add arrows, rectangles, text, blur, or pixelation; use undo and redo; inspect the local working image with Fit, 100%, or keyboard zoom; then export a reviewed PNG or paginated raster PDF locally
-13. Choose `Compare` to pair captures, drag the before/after reveal, inspect highlighted changes, export the selected capture as PNG or PDF when a suitable local source remains, and mark the comparison reviewed
-14. In a publisher-configured build, choose `Export to Drive` only after reviewing the image; use `Disconnect Drive` to revoke the cached connection and optional permissions
-15. Use `Open` or `Show in folder` from recent captures to get back to the saved original
-16. When the pre-export review appears, check auto-redaction counts, manual projection status, focused-region status, and warnings, then click `Run export`
-17. Expand recent capture details to review views, artifacts, redactions, detail-file status, notes, and page signals
-18. Open `Settings` to change capture defaults, turn reversible Privacy Shield on or off, revoke optional permissions, disconnect Drive, or clear local data
-19. Copy a capture summary when you need to paste evidence into a review note or bug report
+9. Use `Select an area` or `Lasso an area`, draw the region, then choose `Capture now` for an immediate one-viewport crop or `Save` to remember it for monitoring
+10. After a successful manual capture, use the Capture Result workspace to zoom, copy the image, download PNG or PDF, export to configured Google Drive, open Annotation Studio, or return to the original and library
+11. Choose `Once` for a 5, 10, or 30 second delayed area capture, `Repeat` for a 15-minute through daily schedule, or `Continuous` for a 1, 5, or 15 minute cadence capped at 10, 25, or 50 runs
+12. Use `Open library` to browse real local previews, search or filter them, mark favorites, and return to the originals in Downloads
+13. Choose `Annotate` to add arrows, rectangles, text, blur, or pixelation; use undo and redo; inspect the local working image with Fit, 100%, or keyboard zoom; then export a reviewed PNG or paginated raster PDF locally
+14. Choose `Compare` to pair captures, drag the before/after reveal, inspect highlighted changes, export the selected capture as PNG or PDF when a suitable local source remains, and mark the comparison reviewed
+15. In a publisher-configured build, choose `Export to Drive` only after reviewing the image; use `Disconnect Drive` to revoke the cached connection and optional permissions
+16. Use `Open` or `Show in folder` from recent captures to get back to the saved original
+17. When the pre-export review appears, check auto-redaction counts, manual projection status, focused-region status, and warnings, then click `Run export`
+18. Expand recent capture details to review views, artifacts, redactions, detail-file status, notes, and page signals
+19. Open `Settings` to change capture defaults, turn reversible Privacy Shield on or off, revoke optional permissions, disconnect Drive, or clear local data
+20. Copy a capture summary when you need to paste evidence into a review note or bug report
 
 If the launch indicator says the page is blocked, switch to a normal `http://` or `https://` page. Chrome does not allow extension capture scripts on internal browser pages, Web Store pages, or other extension pages.
 
@@ -292,7 +296,7 @@ To verify the loaded extension can capture a real local page and produce finishe
 npm run smoke:e2e
 ```
 
-GitHub Actions runs syntax, backend, sync, capture, difficult-site, watch-schedule, Settings, annotation, export zoom, export integrity, visual-diff, review-page, Drive, site, package, clean-release, loaded-extension, and end-to-end capture checks on every pull request and push to `main`. The browser-backed checks run Chromium in a virtual display. Native optional-host allow/deny consent remains an explicit stock-Chrome release check because the prompt cannot be honestly approved by an unattended CI runner.
+GitHub Actions runs syntax, backend, sync, capture, difficult-site, watch-schedule, Settings, annotation, export zoom, export integrity, visual-diff, review-page, Drive, site, package, clean-release, loaded-extension, and end-to-end capture checks on every pull request and push to `main`. The browser-backed checks run Chromium in a virtual display, and CI uploads the exact ZIP that passed as `lumen-extension-<commit>`. Native optional-host consent and any shortcut gesture Chrome rejects from the virtual display remain explicit stock-Chrome release checks.
 
 To package the production allowlist and boot that exact ZIP in a clean profile:
 
@@ -300,7 +304,7 @@ To package the production allowlist and boot that exact ZIP in a clean profile:
 npm run smoke:release
 ```
 
-This starts a local fixture page, loads a temporary copy of the extension with explicit test-only capture access, seeds one anchored focused-crop region, runs a responsive desktop, tablet, and mobile capture through the MV3 background worker, waits for Chrome downloads to finish, validates the full-page PNGs, focused-crop PNGs, capture detail files, local history, selected-area monitoring, and a one-segment visible-area capture, then removes the temporary profile and download folder. The checked-in extension manifest is not widened by this test.
+This builds the production allowlist, loads that exact ZIP in a clean profile, confirms all three commands are registered, proves a capture request without a Chrome user gesture is rejected specifically at Chrome's site-access boundary, and checks that no persistent site access is retained. Linux CI must then run the packaged full-page and visible-area shortcuts through native virtual-display input, open the packaged area picker from its shortcut, draw and save an immediate crop, validate the files, and confirm each clean result handoff before the ZIP artifact is uploaded. Local hosts that block OS-level input report that boundary without pretending it passed. A physical toolbar click and all three shortcuts remain a short manual stock-Chrome release sign-off. The checked-in manifest is never widened for this test.
 
 If a browser run is interrupted, remove leftover Lumen test screenshots, temporary profiles, and capture downloads with:
 
@@ -350,7 +354,7 @@ Set `LUMEN_DEMO_OUTPUT_DIR=/absolute/path` to choose an output folder. `LUMEN_DE
 npm run package:extension
 ```
 
-This validates the Manifest V3 upload package, checks required runtime files, verifies declared PNG icon dimensions, rejects development folders, and writes `dist/lumen-extension-0.4.0.zip`. The ZIP contains only the runtime extension files, not docs, tests, backend code, node_modules, or sample capture assets.
+This validates the Manifest V3 upload package, checks required runtime files including Capture Result, verifies declared PNG icon dimensions, rejects development folders, and writes `dist/lumen-extension-0.5.0.zip`. The ZIP contains only runtime extension files—not docs, tests, backend code, `node_modules`, or sample capture assets. CI uploads the exact tested ZIP as `lumen-extension-<commit>` for release handoff.
 
 Release and store handoff documents:
 

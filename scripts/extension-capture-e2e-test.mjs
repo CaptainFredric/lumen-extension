@@ -18,6 +18,9 @@ const expectedCutawayCount = expectedVariantCount;
 
 let context;
 let server;
+let primaryResultState = null;
+let selectedAreaResult = null;
+let selectedAreaResultState = null;
 
 try {
   const fixture = await startFixtureServer();
@@ -128,6 +131,41 @@ try {
   assert(response.downloads.every((item) => Number.isInteger(item.downloadId)), "Expected Chrome download handles.", response.downloads);
   assert(response.downloads.every((item) => item.bytesReceived > 0), "Expected completed downloads with bytes.", response.downloads);
   assert(response.librarySaved, "Expected the completed capture to create a local photo-library record.", response);
+  assert(response.resultOpened && Number.isInteger(response.resultTabId), "Expected a successful manual capture to open its result workspace.", response);
+
+  const primaryResultPage = await waitForCaptureResultPage(context, extensionId, response.captureId);
+  primaryResultState = await readCaptureResultState(primaryResultPage, popupConsoleErrors);
+  assert(
+    primaryResultState.captureId === response.captureId &&
+      primaryResultState.bodyState !== "loading" &&
+      primaryResultState.imageVisible &&
+      primaryResultState.imageWidth > 0 &&
+      primaryResultState.imageHeight > 0,
+    "Expected the automatic result workspace to show the saved capture.",
+    primaryResultState
+  );
+  assert(
+    [
+      "copyImageButton",
+      "downloadPngButton",
+      "exportPdfButton",
+      "annotateButton",
+      "openLibraryButton",
+      "openOriginalButton",
+      "showOriginalButton"
+    ].every((id) => primaryResultState.actions.some((action) => action.id === id && !action.hidden && !action.disabled)) &&
+      [
+        "zoomOutButton",
+        "zoomInButton",
+        "actualSizeButton",
+        "fitButton"
+      ].every((id) => primaryResultState.actions.some((action) => action.id === id && !action.hidden)),
+    "Expected the clean result workspace to expose copy, export, edit, file, library, and zoom actions.",
+    primaryResultState.actions
+  );
+  assert(primaryResultState.driveHidden, "Local-only result workspace should keep Drive export hidden until configured.", primaryResultState);
+  assert(!primaryResultState.hasComparisonUi, "The clean result workspace reintroduced comparison or timeline UI.", primaryResultState);
+  await primaryResultPage.close();
 
   await popup.waitForSelector("#captureReceipt:not(.is-hidden)", { timeout: 10000 });
   const receiptState = await popup.evaluate(() => ({
@@ -142,7 +180,14 @@ try {
   }));
   assert(receiptState.captureId === response.captureId, "Expected the success receipt to reference the completed capture.", receiptState);
   assert(receiptState.title === "Capture set ready" && /files saved/.test(receiptState.detail), "Expected the receipt to explain the saved responsive set.", receiptState);
-  assert(receiptState.actions.length === 4 && receiptState.actions.every((action) => !action.disabled), "Expected every post-capture action to be immediately available.", receiptState.actions);
+  assert(
+    receiptState.actions.length === 5 &&
+      ["result", "annotate", "open", "show", "library"].every((action) =>
+        receiptState.actions.some((item) => item.action === action && !item.disabled)
+      ),
+    "Expected every post-capture action to be immediately available.",
+    receiptState.actions
+  );
 
   const editorPagePromise = context.waitForEvent("page");
   await popup.click('[data-receipt-action="annotate"]');
@@ -488,6 +533,165 @@ try {
   assert(!visibleResponse.manifestFile, "Visible-area quick capture should honor details-file off.", visibleResponse);
   assert(visibleResponse.dimensions?.height > 0 && visibleResponse.dimensions.height < 2600, "Visible-area capture should not stitch the whole page height.", visibleResponse.dimensions);
   assert(visibleResponse.files?.length === 1 && visibleResponse.downloads?.length === 1, "Visible-area capture should save one PNG.", visibleResponse);
+  assert(visibleResponse.resultOpened, "Visible-area manual capture should open the result workspace.", visibleResponse);
+
+  const visibleResultPage = await waitForCaptureResultPage(context, extensionId, visibleResponse.captureId);
+  await visibleResultPage.waitForFunction(() => ["ready", "limited"].includes(document.body.dataset.state), null, { timeout: 15000 });
+  await visibleResultPage.close();
+
+  await target.bringToFront();
+  const clearedCutaway = await popup.evaluate(() => chrome.runtime.sendMessage({
+    type: "LUMEN_CLEAR_CUTAWAY_REGION"
+  }));
+  assert(clearedCutaway?.ok && !clearedCutaway.record?.region, "Expected the instant-area test to start without a saved cutaway.", clearedCutaway);
+
+  const pickerStart = await popup.evaluate(() => chrome.runtime.sendMessage({
+    type: "LUMEN_START_CUTAWAY_PICKER",
+    payload: { selectionMode: "rect" }
+  }));
+  assert(pickerStart?.ok, "Expected the rectangle area picker to open on the active page.", pickerStart);
+  await target.waitForSelector("#lumen-cutaway-picker .lumen-cutaway-surface", { timeout: 10000 });
+
+  const pickerViewport = await target.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+  const pickerStartPoint = {
+    x: Math.max(80, Math.round(pickerViewport.width * 0.16)),
+    y: Math.max(120, Math.round(pickerViewport.height * 0.2))
+  };
+  const pickerEndPoint = {
+    x: Math.min(pickerViewport.width - 80, pickerStartPoint.x + 420),
+    y: Math.min(pickerViewport.height - 180, pickerStartPoint.y + 280)
+  };
+
+  await target.mouse.move(pickerStartPoint.x, pickerStartPoint.y);
+  await target.mouse.down();
+  await target.mouse.move(pickerEndPoint.x, pickerEndPoint.y, { steps: 8 });
+  await target.mouse.up();
+  await target.waitForFunction(() => {
+    const button = document.querySelector("#lumen-cutaway-picker .lumen-picker-capture-now");
+    return button && !button.disabled;
+  });
+
+  const selectedRegionUi = await target.evaluate(() => {
+    const region = document.querySelector("#lumen-cutaway-picker .lumen-cutaway-box:not(.lumen-cutaway-box-draft)");
+    const captureButton = document.querySelector("#lumen-cutaway-picker .lumen-picker-capture-now");
+    const count = document.querySelector("#lumen-cutaway-picker .lumen-cutaway-count");
+    const rect = region?.getBoundingClientRect();
+
+    return {
+      count: count?.textContent?.trim() || "",
+      captureLabel: captureButton?.textContent?.trim() || "",
+      captureDisabled: captureButton?.disabled ?? true,
+      width: Math.round(rect?.width || 0),
+      height: Math.round(rect?.height || 0)
+    };
+  });
+  assert(
+    selectedRegionUi.count === "Region selected" &&
+      selectedRegionUi.captureLabel === "Capture now" &&
+      !selectedRegionUi.captureDisabled &&
+      selectedRegionUi.width >= 300 &&
+      selectedRegionUi.height >= 180,
+    "Expected drawing an area to make one-click capture immediately available.",
+    selectedRegionUi
+  );
+
+  await popup.evaluate(() => {
+    globalThis.__lumenSelectedAreaResult = null;
+
+    if (!globalThis.__lumenSelectedAreaListenerInstalled) {
+      globalThis.__lumenSelectedAreaListenerInstalled = true;
+      chrome.runtime.onMessage.addListener((message) => {
+        if (message?.type === "LUMEN_SELECTED_AREA_CAPTURED") {
+          globalThis.__lumenSelectedAreaResult = message.payload || null;
+        }
+      });
+    }
+  });
+
+  await target.click("#lumen-cutaway-picker .lumen-picker-capture-now");
+  await popup.waitForFunction(() => Boolean(globalThis.__lumenSelectedAreaResult?.captureId), null, { timeout: 120000 });
+  selectedAreaResult = await popup.evaluate(() => globalThis.__lumenSelectedAreaResult);
+  const selectedAreaImage = selectedAreaResult.downloads?.find((download) => download.kind === "image" && download.role === "cutaway");
+
+  assert(
+    selectedAreaResult.captureKind === "area" &&
+      selectedAreaResult.selectionMode === "rect" &&
+      selectedAreaResult.segmentCount === 1 &&
+      selectedAreaResult.variantCount === 1 &&
+      selectedAreaResult.cutawayCount === 1 &&
+      selectedAreaResult.librarySaved &&
+      selectedAreaResult.resultOpened,
+    "Expected release-to-save area capture to finish as one local selected-area result.",
+    selectedAreaResult
+  );
+  const expectedAreaImage = {
+    width: Math.round(selectedRegionUi.width * visibleResponse.dimensions.width / pickerViewport.width),
+    height: Math.round(selectedRegionUi.height * visibleResponse.dimensions.height / pickerViewport.height)
+  };
+  assert(
+    selectedAreaImage?.width > 0 &&
+      selectedAreaImage?.height > 0 &&
+      selectedAreaImage.width < visibleResponse.dimensions.width &&
+      selectedAreaImage.height < visibleResponse.dimensions.height &&
+      Math.abs(selectedAreaImage.width - expectedAreaImage.width) <= 4 &&
+      Math.abs(selectedAreaImage.height - expectedAreaImage.height) <= 4,
+    "Expected instant area capture to preserve the exact drawn bounds at capture scale.",
+    { selectedAreaImage, expectedAreaImage, selectedRegionUi, visibleDimensions: visibleResponse.dimensions }
+  );
+  assert(
+    selectedAreaResult.dimensions?.width === selectedAreaImage.width &&
+      selectedAreaResult.dimensions?.height === selectedAreaImage.height,
+    "Selected-area response reported the full viewport instead of the exact cropped output dimensions.",
+    { reported: selectedAreaResult.dimensions, image: selectedAreaImage }
+  );
+
+  const selectedAreaStoredDimensions = await popup.evaluate(async (captureId) => {
+    const { getLibraryCapture } = await import(chrome.runtime.getURL("library-store.js"));
+    const [libraryCapture, local] = await Promise.all([
+      getLibraryCapture(captureId),
+      chrome.storage.local.get("lumen.capture.history")
+    ]);
+    const historyCapture = (local["lumen.capture.history"] || []).find((capture) => capture.id === captureId) || null;
+
+    return {
+      library: libraryCapture?.dimensions || null,
+      history: historyCapture?.dimensions || null,
+      historyVariant: historyCapture?.variants?.[0]?.dimensions || null
+    };
+  }, selectedAreaResult.captureId);
+  const hasExactSelectedAreaDimensions = (dimensions) =>
+    dimensions?.width === selectedAreaImage.width && dimensions?.height === selectedAreaImage.height;
+  assert(
+    hasExactSelectedAreaDimensions(selectedAreaStoredDimensions.library) &&
+      hasExactSelectedAreaDimensions(selectedAreaStoredDimensions.history) &&
+      hasExactSelectedAreaDimensions(selectedAreaStoredDimensions.historyVariant),
+    "Selected-area history or library metadata stored viewport dimensions instead of the exact crop.",
+    { stored: selectedAreaStoredDimensions, image: selectedAreaImage }
+  );
+
+  const storedCutawayAfterInstantCapture = await worker.evaluate(async (rawUrl) => {
+    const url = new URL(rawUrl);
+    const key = `${url.origin}${url.pathname}${url.search}`;
+    const stored = await chrome.storage.local.get("lumen.capture.cutawayRegions");
+    return stored["lumen.capture.cutawayRegions"]?.[key]?.region || null;
+  }, fixture.url);
+  assert(
+    !storedCutawayAfterInstantCapture,
+    "Capture now should not remember the selected area as a monitoring region; only Save should persist it.",
+    storedCutawayAfterInstantCapture
+  );
+
+  const selectedAreaResultPage = await waitForCaptureResultPage(context, extensionId, selectedAreaResult.captureId);
+  selectedAreaResultState = await readCaptureResultState(selectedAreaResultPage, popupConsoleErrors);
+  assert(
+    selectedAreaResultState.bodyState === "ready" &&
+      selectedAreaResultState.imageVisible &&
+      selectedAreaResultState.imageWidth === selectedAreaImage.width &&
+      selectedAreaResultState.imageHeight === selectedAreaImage.height,
+    "Expected instant area capture to land in the clean result workspace at crop resolution.",
+    { selectedAreaResultState, selectedAreaImage }
+  );
+  await selectedAreaResultPage.close();
 
   assert(!popupConsoleErrors.length, "Popup emitted console errors.", popupConsoleErrors);
 
@@ -516,6 +720,19 @@ try {
       latestTitle: latest.title,
       archiveFolder: latest.archiveFolder,
       variantCount: latest.variants.length
+    },
+    resultWorkspace: {
+      state: primaryResultState.bodyState,
+      actionCount: primaryResultState.actions.length,
+      image: `${primaryResultState.imageWidth}x${primaryResultState.imageHeight}`
+    },
+    selectedArea: {
+      captureId: selectedAreaResult.captureId,
+      selectionMode: selectedAreaResult.selectionMode,
+      segmentCount: selectedAreaResult.segmentCount,
+      image: `${selectedAreaResultState.imageWidth}x${selectedAreaResultState.imageHeight}`,
+      reportedDimensions: selectedAreaResult.dimensions,
+      persistedDimensions: selectedAreaStoredDimensions
     }
   }, null, 2));
 } catch (error) {
@@ -585,6 +802,80 @@ async function getExtensionWorker(browserContext) {
   }
 
   return worker;
+}
+
+async function waitForCaptureResultPage(browserContext, extensionId, captureId, timeoutMs = 15000) {
+  const expectedUrl = `chrome-extension://${extensionId}/result.html?capture=${encodeURIComponent(captureId)}`;
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const page = browserContext.pages().find((candidate) => candidate.url().startsWith(expectedUrl));
+
+    if (page) {
+      await page.waitForLoadState("domcontentloaded");
+      return page;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  const error = new Error("Timed out waiting for Lumen to open the capture result workspace.");
+  error.details = {
+    captureId,
+    expectedUrl,
+    pages: browserContext.pages().map((page) => page.url())
+  };
+  throw error;
+}
+
+async function readCaptureResultState(page, errors) {
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      errors.push(`result: ${message.text()}`);
+    }
+  });
+  page.on("pageerror", (error) => errors.push(`result: ${error.message}`));
+  await page.waitForFunction(() => ["ready", "limited"].includes(document.body.dataset.state), null, { timeout: 15000 });
+
+  return page.evaluate(() => {
+    const parameters = new URLSearchParams(location.search);
+    const image = document.querySelector("#resultImage");
+    const actionIds = [
+      "copyImageButton",
+      "downloadPngButton",
+      "exportPdfButton",
+      "annotateButton",
+      "openLibraryButton",
+      "openOriginalButton",
+      "showOriginalButton",
+      "zoomOutButton",
+      "zoomInButton",
+      "actualSizeButton",
+      "fitButton"
+    ];
+
+    return {
+      captureId: parameters.get("capture") || parameters.get("captureId") || "",
+      title: document.querySelector("#resultTitle")?.textContent?.trim() || "",
+      source: document.querySelector("#resultSource")?.textContent?.trim() || "",
+      status: document.querySelector("#resultStatus")?.textContent?.trim() || "",
+      bodyState: document.body.dataset.state || "",
+      imageVisible: Boolean(image && !image.hidden),
+      imageWidth: image?.naturalWidth || 0,
+      imageHeight: image?.naturalHeight || 0,
+      driveHidden: document.querySelector("#driveButton")?.hidden ?? false,
+      hasComparisonUi: Boolean(document.querySelector("#timelineList, #regionList, [data-comparison-view]")),
+      actions: actionIds.map((id) => {
+        const button = document.getElementById(id);
+        return {
+          id,
+          label: button?.textContent?.trim() || "",
+          disabled: button?.disabled ?? true,
+          hidden: !button || button.hidden || getComputedStyle(button).display === "none"
+        };
+      })
+    };
+  });
 }
 
 async function seedCutawayRegion(worker, fixtureUrl) {

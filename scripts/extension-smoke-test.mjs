@@ -41,6 +41,9 @@ try {
   assert(manifest.action?.default_popup === "popup.html", "Expected popup entrypoint.", manifest);
 
   const seededCaptureId = "smoke-capture-001";
+  const degradedResultCaptureId = "smoke-result-pdf-download-only";
+  const transparentLassoCaptureId = "smoke-result-transparent-lasso";
+  const staleDownloadCaptureId = "smoke-result-stale-download-only";
   await worker.evaluate((captureId) => chrome.storage.local.set({
     "lumen.capture.history": [
       {
@@ -171,6 +174,35 @@ try {
   await librarySeedPage.goto(`chrome-extension://${extensionId}/library.html`, { waitUntil: "load" });
   await librarySeedPage.evaluate(async (captureId) => {
     const store = await import(chrome.runtime.getURL("library-store.js"));
+    const editorCanvas = document.createElement("canvas");
+    editorCanvas.width = 720;
+    editorCanvas.height = 1200;
+    const editorContext = editorCanvas.getContext("2d");
+    editorContext.fillStyle = "#0b1b2d";
+    editorContext.fillRect(0, 0, editorCanvas.width, editorCanvas.height);
+    editorContext.fillStyle = "#64f2df";
+    editorContext.fillRect(80, 860, 560, 220);
+    const originalDownloadId = await chrome.downloads.download({
+      url: editorCanvas.toDataURL("image/png"),
+      filename: "Lumen/smoke-result-original.png",
+      saveAs: false
+    });
+    let originalDownload = null;
+
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      [originalDownload] = await chrome.downloads.search({ id: originalDownloadId });
+
+      if (originalDownload?.state === "complete") {
+        break;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    if (!originalDownload || originalDownload.state !== "complete") {
+      throw new Error("Could not seed a completed result-workspace original.");
+    }
+
     await store.putLibraryCapture({
       id: captureId,
       title: "Smoke capture",
@@ -182,8 +214,10 @@ try {
       exportPreset: "raw",
       archiveFolder: "Lumen/2026-05-02/smoke-capture",
       downloads: [{
-        downloadId: 12345,
+        downloadId: originalDownloadId,
         filename: "Lumen/2026-05-02/smoke-capture/smoke-desktop-raw.png",
+        bytesReceived: originalDownload.bytesReceived,
+        complete: true,
         kind: "image",
         role: "full-page",
         variantId: "desktop",
@@ -198,7 +232,7 @@ try {
         variantId: "desktop"
       }],
       editorSource: {
-        dataUrl: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='720' height='1200'%3E%3Crect width='720' height='1200' fill='%230b1b2d'/%3E%3Crect x='80' y='860' width='560' height='220' fill='%2364f2df'/%3E%3C/svg%3E",
+        dataUrl: editorCanvas.toDataURL("image/png"),
         width: 720,
         height: 1200,
         originalWidth: 720,
@@ -385,7 +419,469 @@ try {
     const store = await import(chrome.runtime.getURL("library-store.js"));
     await store.deleteLibraryCapture(captureId);
   }, editorOnlyCaptureId);
+  await librarySeedPage.evaluate(async ({ degradedCaptureId, lassoCaptureId, staleCaptureId }) => {
+    const store = await import(chrome.runtime.getURL("library-store.js"));
+    const createCompletedDownload = async (dataUrl, filename) => {
+      const downloadId = await chrome.downloads.download({ url: dataUrl, filename, saveAs: false });
+
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        const [download] = await chrome.downloads.search({ id: downloadId });
+
+        if (download?.state === "complete") {
+          return download;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+
+      throw new Error(`Could not seed completed download ${filename}.`);
+    };
+    const cachedPdf = new Blob([
+      "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF"
+    ], { type: "application/pdf" });
+    const lassoCanvas = document.createElement("canvas");
+    lassoCanvas.width = 240;
+    lassoCanvas.height = 180;
+    const lassoContext = lassoCanvas.getContext("2d", { alpha: true });
+    lassoContext.clearRect(0, 0, lassoCanvas.width, lassoCanvas.height);
+    lassoContext.fillStyle = "#6de8bd";
+    lassoContext.beginPath();
+    lassoContext.moveTo(120, 12);
+    lassoContext.lineTo(228, 90);
+    lassoContext.lineTo(120, 168);
+    lassoContext.lineTo(12, 90);
+    lassoContext.closePath();
+    lassoContext.fill();
+    const lassoDataUrl = lassoCanvas.toDataURL("image/png");
+    const [firstTileDownload, secondTileDownload, lassoDownload] = await Promise.all([
+      createCompletedDownload(lassoDataUrl, "Lumen/retained-formats-part-01-of-02.png"),
+      createCompletedDownload(lassoDataUrl, "Lumen/retained-formats-part-02-of-02.png"),
+      createCompletedDownload(lassoDataUrl, "Lumen/transparent-lasso-crop.png")
+    ]);
+
+    await store.putLibraryCapture({
+      id: degradedCaptureId,
+      title: "Retained formats only",
+      host: "example.test",
+      url: "https://example.test/retained-formats",
+      capturedAt: new Date().toISOString(),
+      sourceType: "manual",
+      dimensions: { width: 1280, height: 18000 },
+      fileCount: 2,
+      downloads: [
+        {
+          downloadId: firstTileDownload.id,
+          filename: "Lumen/retained-formats-part-01-of-02.png",
+          bytesReceived: firstTileDownload.bytesReceived,
+          complete: true,
+          kind: "image",
+          role: "full-page",
+          variantId: "desktop",
+          partIndex: 1,
+          partTotal: 2,
+          width: 1280,
+          height: 9000
+        },
+        {
+          downloadId: secondTileDownload.id,
+          filename: "Lumen/retained-formats-part-02-of-02.png",
+          bytesReceived: secondTileDownload.bytesReceived,
+          complete: true,
+          kind: "image",
+          role: "full-page",
+          variantId: "desktop",
+          partIndex: 2,
+          partTotal: 2,
+          width: 1280,
+          height: 9000
+        }
+      ],
+      pdfSource: {
+        blob: cachedPdf,
+        pageCount: 2,
+        rasterWidth: 1280,
+        sourceWidth: 1280,
+        sourceHeight: 18000,
+        sourceExact: true,
+        role: "full-page",
+        kind: "capture-tile-pdf"
+      }
+    });
+
+    await store.putLibraryCapture({
+      id: lassoCaptureId,
+      title: "Transparent lasso crop",
+      host: "example.test",
+      url: "https://example.test/lasso",
+      capturedAt: new Date().toISOString(),
+      sourceType: "manual",
+      dimensions: { width: 240, height: 180 },
+      fileCount: 1,
+      downloads: [{
+        downloadId: lassoDownload.id,
+        filename: "Lumen/transparent-lasso-crop.png",
+        bytesReceived: lassoDownload.bytesReceived,
+        complete: true,
+        kind: "image",
+        role: "cutaway",
+        variantId: "desktop",
+        width: 240,
+        height: 180
+      }],
+      editorSource: {
+        dataUrl: lassoDataUrl,
+        width: 240,
+        height: 180,
+        originalWidth: 240,
+        originalHeight: 180,
+        scaled: false,
+        kind: "lossless-cutaway-output",
+        role: "cutaway",
+        variantId: "desktop"
+      }
+    });
+
+    await store.putLibraryCapture({
+      id: staleCaptureId,
+      title: "Stale downloaded original",
+      host: "example.test",
+      url: "https://example.test/stale-download",
+      capturedAt: new Date().toISOString(),
+      sourceType: "manual",
+      dimensions: { width: 800, height: 1200 },
+      fileCount: 1,
+      downloads: [{
+        downloadId: 987654321,
+        filename: "Lumen/cleared-from-download-history.png",
+        bytesReceived: 12000,
+        complete: true,
+        kind: "image",
+        role: "full-page",
+        width: 800,
+        height: 1200
+      }]
+    });
+  }, {
+    degradedCaptureId: degradedResultCaptureId,
+    lassoCaptureId: transparentLassoCaptureId,
+    staleCaptureId: staleDownloadCaptureId
+  });
   await librarySeedPage.close();
+
+  const resultPage = await context.newPage();
+  resultPage.on("console", (message) => {
+    if (message.type() === "error") {
+      popupConsoleErrors.push(`result: ${message.text()}`);
+    }
+  });
+  resultPage.on("pageerror", (error) => popupConsoleErrors.push(`result: ${error.message}`));
+  await resultPage.setViewportSize({ width: 1280, height: 900 });
+  await resultPage.goto(
+    `chrome-extension://${extensionId}/result.html?captureId=${encodeURIComponent(seededCaptureId)}`,
+    { waitUntil: "load" }
+  );
+  await resultPage.waitForSelector('body[data-state="ready"]', { timeout: 10000 });
+  await resultPage.waitForSelector("#resultImage:not([hidden])", { timeout: 10000 });
+
+  const stableResultIds = [
+    "resultStatus",
+    "resultImage",
+    "copyImageButton",
+    "downloadPngButton",
+    "exportPdfButton",
+    "annotateButton",
+    "driveButton",
+    "openOriginalButton",
+    "showOriginalButton",
+    "openLibraryButton",
+    "zoomOutButton",
+    "zoomInButton",
+    "actualSizeButton",
+    "fitButton",
+    "zoomLabel"
+  ];
+  const resultWorkspaceState = await resultPage.evaluate((stableIds) => ({
+    state: document.body.dataset.state || "",
+    title: document.querySelector("#resultTitle")?.textContent?.trim() || "",
+    host: document.querySelector("#resultHost")?.textContent?.trim() || "",
+    source: document.querySelector("#resultSource")?.textContent?.trim() || "",
+    status: document.querySelector("#resultStatus")?.textContent?.trim() || "",
+    imageHidden: document.querySelector("#resultImage")?.hidden ?? true,
+    imageWidth: document.querySelector("#resultImage")?.naturalWidth || 0,
+    imageHeight: document.querySelector("#resultImage")?.naturalHeight || 0,
+    loadingVisible: getComputedStyle(document.querySelector("#loadingState")).display !== "none",
+    emptyVisible: getComputedStyle(document.querySelector("#emptyState")).display !== "none",
+    missingIds: stableIds.filter((id) => !document.getElementById(id)),
+    copyDisabled: document.querySelector("#copyImageButton")?.disabled ?? true,
+    pngDisabled: document.querySelector("#downloadPngButton")?.disabled ?? true,
+    pdfDisabled: document.querySelector("#exportPdfButton")?.disabled ?? true,
+    annotateDisabled: document.querySelector("#annotateButton")?.disabled ?? true,
+    openDisabled: document.querySelector("#openOriginalButton")?.disabled ?? true,
+    showDisabled: document.querySelector("#showOriginalButton")?.disabled ?? true,
+    driveHidden: document.querySelector("#driveButton")?.hidden ?? false,
+    viewerCount: document.querySelectorAll(".viewer-card").length,
+    actionCardCount: document.querySelectorAll(".action-card").length,
+    timelineCount: document.querySelectorAll(".timeline, [data-stage-step]").length
+  }), stableResultIds);
+
+  assert(resultWorkspaceState.missingIds.length === 0, "The result workspace lost stable action or viewer IDs.", resultWorkspaceState);
+  assert(
+    resultWorkspaceState.state === "ready" &&
+      !resultWorkspaceState.imageHidden &&
+      !resultWorkspaceState.loadingVisible &&
+      !resultWorkspaceState.emptyVisible &&
+      resultWorkspaceState.imageWidth === 720 &&
+      resultWorkspaceState.imageHeight === 1200,
+    "The result workspace did not load the seeded whole-image source.",
+    resultWorkspaceState
+  );
+  assert(
+    resultWorkspaceState.title === "Smoke capture" &&
+      resultWorkspaceState.host === "example.test" &&
+      /Full local image/i.test(resultWorkspaceState.source) &&
+      /Ready/i.test(resultWorkspaceState.status),
+    "The result workspace did not render concise seeded capture context.",
+    resultWorkspaceState
+  );
+  assert(
+    !resultWorkspaceState.copyDisabled &&
+      !resultWorkspaceState.pngDisabled &&
+      !resultWorkspaceState.pdfDisabled &&
+      !resultWorkspaceState.annotateDisabled &&
+      !resultWorkspaceState.openDisabled &&
+      !resultWorkspaceState.showDisabled &&
+      resultWorkspaceState.driveHidden,
+    "The clean result workspace did not expose the expected local actions.",
+    resultWorkspaceState
+  );
+  assert(
+    resultWorkspaceState.viewerCount === 1 &&
+      resultWorkspaceState.actionCardCount === 1 &&
+      resultWorkspaceState.timelineCount === 0,
+    "The result workspace should stay focused on one preview and one concise action surface.",
+    resultWorkspaceState
+  );
+
+  await resultPage.click("#copyImageButton");
+  await resultPage.waitForFunction(() => {
+    const status = document.querySelector("#resultStatus")?.textContent?.trim() || "";
+    return status && status !== "Copying image…" && !/^Ready\./.test(status);
+  }, null, { timeout: 10000 });
+  const copiedResultStatus = await resultPage.locator("#resultStatus").textContent();
+  assert(/Copied 720×1,200 PNG/i.test(copiedResultStatus || ""), "Copy image did not execute from the result workspace.", copiedResultStatus);
+
+  await resultPage.click("#downloadPngButton");
+  await resultPage.waitForFunction(() => /smoke-capture-result\.png saved to Downloads/i.test(
+    document.querySelector("#resultStatus")?.textContent || ""
+  ), null, { timeout: 15000 });
+  await resultPage.click("#exportPdfButton");
+  await resultPage.waitForFunction(() => /smoke-capture-result\.pdf saved as \d+ pages?/i.test(
+    document.querySelector("#resultStatus")?.textContent || ""
+  ), null, { timeout: 15000 });
+  const resultDownloadHistory = await worker.evaluate(async () => (await chrome.downloads.search({}))
+    .sort((left, right) => Date.parse(right.startTime || "") - Date.parse(left.startTime || ""))
+    .map((item) => ({
+      filename: item.filename,
+      state: item.state,
+      bytesReceived: item.bytesReceived
+    })));
+  const resultExports = resultDownloadHistory.slice(0, 2);
+  assert(
+    resultExports.length === 2 && resultExports.every((item) => item.state === "complete" && item.bytesReceived > 0),
+    "The result workspace did not finish its PNG and PDF downloads.",
+    resultDownloadHistory.slice(0, 10)
+  );
+
+  await resultPage.keyboard.press("1");
+  assert(
+    await resultPage.locator("#zoomLabel").textContent() === "100%",
+    "The result workspace keyboard shortcut did not switch to actual size."
+  );
+  await resultPage.keyboard.press("0");
+  assert(
+    await resultPage.locator("#zoomLabel").textContent() === "Fit",
+    "The result workspace keyboard shortcut did not restore fit zoom."
+  );
+
+  await resultPage.setViewportSize({ width: 320, height: 700 });
+  const mobileResultState = await resultPage.evaluate(() => ({
+    viewportWidth: innerWidth,
+    documentWidth: document.documentElement.scrollWidth,
+    annotateVisible: getComputedStyle(document.querySelector("#annotateButton")).display !== "none",
+    viewerColumns: getComputedStyle(document.querySelector(".result-shell")).gridTemplateColumns,
+    actionCardVisible: getComputedStyle(document.querySelector(".action-card")).display !== "none"
+  }));
+  assert(
+    mobileResultState.documentWidth <= mobileResultState.viewportWidth &&
+      mobileResultState.annotateVisible &&
+      mobileResultState.actionCardVisible &&
+      !mobileResultState.viewerColumns.includes(" "),
+    "The result workspace lost an action or overflowed at 320px.",
+    mobileResultState
+  );
+
+  await resultPage.goto(
+    `chrome-extension://${extensionId}/result.html?capture=${encodeURIComponent(seededCaptureId)}`,
+    { waitUntil: "load" }
+  );
+  await resultPage.waitForSelector('body[data-state="ready"]', { timeout: 10000 });
+  assert(
+    await resultPage.locator("#resultTitle").textContent() === "Smoke capture",
+    "The result workspace did not accept the existing ?capture= tool convention."
+  );
+
+  await resultPage.goto(
+    `chrome-extension://${extensionId}/result.html?capture=${encodeURIComponent(degradedResultCaptureId)}`,
+    { waitUntil: "load" }
+  );
+  await resultPage.waitForSelector('body[data-state="limited"]', { timeout: 10000 });
+  const degradedResultState = await resultPage.evaluate(() => ({
+    imageHidden: document.querySelector("#resultImage")?.hidden ?? false,
+    loadingVisible: getComputedStyle(document.querySelector("#loadingState")).display !== "none",
+    emptyVisible: getComputedStyle(document.querySelector("#emptyState")).display !== "none",
+    source: document.querySelector("#resultSource")?.textContent?.trim() || "",
+    emptyTitle: document.querySelector("#emptyStateTitle")?.textContent?.trim() || "",
+    emptyDescription: document.querySelector("#emptyStateDescription")?.textContent?.trim() || "",
+    fileSummary: document.querySelector("#filesValue")?.textContent?.trim() || "",
+    privacy: document.querySelector("#privacyValue")?.textContent?.trim() || "",
+    privacyNote: document.querySelector("#privacyNote")?.textContent?.trim() || "",
+    copyDisabled: document.querySelector("#copyImageButton")?.disabled ?? false,
+    pngDisabled: document.querySelector("#downloadPngButton")?.disabled ?? false,
+    pdfDisabled: document.querySelector("#exportPdfButton")?.disabled ?? true,
+    annotateDisabled: document.querySelector("#annotateButton")?.disabled ?? false,
+    openDisabled: document.querySelector("#openOriginalButton")?.disabled ?? true,
+    showDisabled: document.querySelector("#showOriginalButton")?.disabled ?? true,
+    openLabel: document.querySelector("#openOriginalButton")?.textContent?.trim() || "",
+    showLabel: document.querySelector("#showOriginalButton")?.textContent?.trim() || ""
+  }));
+  assert(
+    degradedResultState.imageHidden &&
+      !degradedResultState.loadingVisible &&
+      degradedResultState.emptyVisible &&
+      /cached PDF and 2 saved files remain/i.test(degradedResultState.source) &&
+      /working preview was removed/i.test(degradedResultState.emptyTitle) &&
+      /cached PDF and saved files/i.test(degradedResultState.emptyDescription) &&
+      degradedResultState.fileSummary === "2 saved files" &&
+      degradedResultState.privacy === "Browser + Downloads" &&
+      /already in Chrome Downloads/i.test(degradedResultState.privacyNote),
+    "The result workspace did not explain a pruned image without misrepresenting retained files or privacy.",
+    degradedResultState
+  );
+  assert(
+    degradedResultState.copyDisabled &&
+      degradedResultState.pngDisabled &&
+      !degradedResultState.pdfDisabled &&
+      degradedResultState.annotateDisabled &&
+      !degradedResultState.openDisabled &&
+      !degradedResultState.showDisabled &&
+      degradedResultState.openLabel === "Open tile 1 of 2" &&
+      degradedResultState.showLabel === "Show files in folder",
+    "The degraded result workspace did not keep only its genuinely usable actions enabled.",
+    degradedResultState
+  );
+  const degradedResultOpenResponse = await resultPage.evaluate((captureId) => chrome.runtime.sendMessage({
+    type: "LUMEN_OPEN_CAPTURE_RESULT",
+    payload: { captureId }
+  }), degradedResultCaptureId);
+  assert(
+    degradedResultOpenResponse?.ok && Number.isInteger(degradedResultOpenResponse.tabId),
+    "The result opener rejected a capture that still had a cached PDF and saved-file handles.",
+    degradedResultOpenResponse
+  );
+  await resultPage.click("#exportPdfButton");
+  await resultPage.waitForFunction(() => /retained-formats-only-result\.pdf saved as 2 pages/i.test(
+    document.querySelector("#resultStatus")?.textContent || ""
+  ), null, { timeout: 15000 });
+
+  const staleDownloadOpenResponse = await resultPage.evaluate((captureId) => chrome.runtime.sendMessage({
+    type: "LUMEN_OPEN_CAPTURE_RESULT",
+    payload: { captureId }
+  }), staleDownloadCaptureId);
+  assert(
+    !staleDownloadOpenResponse?.ok && staleDownloadOpenResponse.error?.title === "Result Unavailable",
+    "The result opener advertised a download handle that Chrome had already forgotten.",
+    staleDownloadOpenResponse
+  );
+  await resultPage.goto(
+    `chrome-extension://${extensionId}/result.html?capture=${encodeURIComponent(staleDownloadCaptureId)}`,
+    { waitUntil: "load" }
+  );
+  await resultPage.waitForSelector('body[data-state="limited"]', { timeout: 10000 });
+  const staleDownloadResultState = await resultPage.evaluate(() => ({
+    source: document.querySelector("#resultSource")?.textContent?.trim() || "",
+    fileSummary: document.querySelector("#filesValue")?.textContent?.trim() || "",
+    privacy: document.querySelector("#privacyValue")?.textContent?.trim() || "",
+    openDisabled: document.querySelector("#openOriginalButton")?.disabled ?? false,
+    showDisabled: document.querySelector("#showOriginalButton")?.disabled ?? false,
+    emptyDescription: document.querySelector("#emptyStateDescription")?.textContent?.trim() || ""
+  }));
+  assert(
+    /No retained image or saved file/i.test(staleDownloadResultState.source) &&
+      staleDownloadResultState.fileSummary === "No attached files" &&
+      staleDownloadResultState.privacy === "Private browser data" &&
+      staleDownloadResultState.openDisabled &&
+      staleDownloadResultState.showDisabled &&
+      /no preview, cached PDF, or attached download/i.test(staleDownloadResultState.emptyDescription),
+    "The result workspace presented a cleared Chrome download-history handle as usable.",
+    staleDownloadResultState
+  );
+
+  await resultPage.goto(
+    `chrome-extension://${extensionId}/result.html?capture=${encodeURIComponent(transparentLassoCaptureId)}`,
+    { waitUntil: "load" }
+  );
+  await resultPage.waitForSelector('body[data-state="ready"] #resultImage:not([hidden])', { timeout: 10000 });
+  const transparentLassoState = await resultPage.evaluate(() => {
+    const image = document.querySelector("#resultImage");
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d", { alpha: true });
+    context.drawImage(image, 0, 0);
+    const cornerAlpha = context.getImageData(0, 0, 1, 1).data[3];
+    const centerAlpha = context.getImageData(
+      Math.floor(canvas.width / 2),
+      Math.floor(canvas.height / 2),
+      1,
+      1
+    ).data[3];
+
+    return {
+      source: document.querySelector("#resultSource")?.textContent?.trim() || "",
+      imageBackground: getComputedStyle(image).backgroundColor,
+      transparentClass: image.classList.contains("is-transparent-image"),
+      checkerboardClass: document.querySelector("#resultViewport")?.classList.contains("has-transparent-image") || false,
+      cornerAlpha,
+      centerAlpha,
+      openLabel: document.querySelector("#openOriginalButton")?.textContent?.trim() || "",
+      showLabel: document.querySelector("#showOriginalButton")?.textContent?.trim() || ""
+    };
+  });
+  assert(
+    /Transparent lasso crop/i.test(transparentLassoState.source) &&
+      transparentLassoState.imageBackground === "rgba(0, 0, 0, 0)" &&
+      transparentLassoState.transparentClass &&
+      transparentLassoState.checkerboardClass &&
+      transparentLassoState.cornerAlpha === 0 &&
+      transparentLassoState.centerAlpha === 255 &&
+      transparentLassoState.openLabel === "Open saved crop" &&
+      transparentLassoState.showLabel === "Show in folder",
+    "The result workspace did not preserve and visibly present a transparent lasso crop.",
+    transparentLassoState
+  );
+  await resultPage.evaluate(async ({ degradedCaptureId, lassoCaptureId, staleCaptureId }) => {
+    const store = await import(chrome.runtime.getURL("library-store.js"));
+    await Promise.all([
+      store.deleteLibraryCapture(degradedCaptureId),
+      store.deleteLibraryCapture(lassoCaptureId),
+      store.deleteLibraryCapture(staleCaptureId)
+    ]);
+  }, {
+    degradedCaptureId: degradedResultCaptureId,
+    lassoCaptureId: transparentLassoCaptureId,
+    staleCaptureId: staleDownloadCaptureId
+  });
+  await resultPage.close();
 
   const editorPage = await context.newPage();
   editorPage.on("console", (message) => {
@@ -561,7 +1057,8 @@ try {
   assert(!popupState.captureReceiptCaptureId, "Hidden capture receipt should not retain a capture id.", popupState);
   assert(
     JSON.stringify(popupState.receiptActions) === JSON.stringify([
-      { action: "annotate", label: "Annotate & export" },
+      { action: "result", label: "View result" },
+      { action: "annotate", label: "Annotate" },
       { action: "open", label: "Open original" },
       { action: "show", label: "Show in folder" },
       { action: "library", label: "Library" }
@@ -839,6 +1336,7 @@ try {
       version: manifest.version,
       manifestVersion: manifest.manifest_version
     },
+    resultWorkspace: resultWorkspaceState,
     popup: popupState
   }, null, 2));
 } catch (error) {
