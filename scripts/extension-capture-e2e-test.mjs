@@ -552,7 +552,12 @@ try {
   assert(pickerStart?.ok, "Expected the rectangle area picker to open on the active page.", pickerStart);
   await target.waitForSelector("#lumen-cutaway-picker .lumen-cutaway-surface", { timeout: 10000 });
 
-  const pickerViewport = await target.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+  const pickerViewport = await target.evaluate(() => ({
+    width: innerWidth,
+    height: innerHeight,
+    captureWidth: document.documentElement.clientWidth || innerWidth,
+    captureHeight: innerHeight
+  }));
   const pickerStartPoint = {
     x: Math.max(80, Math.round(pickerViewport.width * 0.16)),
     y: Math.max(120, Math.round(pickerViewport.height * 0.2))
@@ -625,8 +630,8 @@ try {
     selectedAreaResult
   );
   const expectedAreaImage = {
-    width: Math.round(selectedRegionUi.width * visibleResponse.dimensions.width / pickerViewport.width),
-    height: Math.round(selectedRegionUi.height * visibleResponse.dimensions.height / pickerViewport.height)
+    width: Math.round(selectedRegionUi.width * visibleResponse.dimensions.width / pickerViewport.captureWidth),
+    height: Math.round(selectedRegionUi.height * visibleResponse.dimensions.height / pickerViewport.captureHeight)
   };
   assert(
     selectedAreaImage?.width > 0 &&
@@ -636,7 +641,7 @@ try {
       Math.abs(selectedAreaImage.width - expectedAreaImage.width) <= 4 &&
       Math.abs(selectedAreaImage.height - expectedAreaImage.height) <= 4,
     "Expected instant area capture to preserve the exact drawn bounds at capture scale.",
-    { selectedAreaImage, expectedAreaImage, selectedRegionUi, visibleDimensions: visibleResponse.dimensions }
+    { selectedAreaImage, expectedAreaImage, selectedRegionUi, pickerViewport, visibleDimensions: visibleResponse.dimensions }
   );
   assert(
     selectedAreaResult.dimensions?.width === selectedAreaImage.width &&

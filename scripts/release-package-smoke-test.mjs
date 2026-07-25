@@ -538,7 +538,12 @@ assert(
     ).then(() => true).catch(() => false);
     assert(areaPickerOpened, "The packaged area shortcut did not open the production picker.", areaTrigger);
 
-    const viewport = await target.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+    const viewport = await target.evaluate(() => ({
+      width: innerWidth,
+      height: innerHeight,
+      captureWidth: document.documentElement.clientWidth || innerWidth,
+      captureHeight: innerHeight
+    }));
     const areaStart = {
       x: Math.max(72, Math.round(viewport.width * 0.16)),
       y: Math.max(110, Math.round(viewport.height * 0.18))
@@ -560,8 +565,8 @@ assert(
     assert(areaShortcut, "The packaged Capture now action did not save the selected area.", areaTrigger);
     areaOutput = areaShortcut.downloads?.find((download) => download.kind === "image" && download.role === "cutaway") || null;
     const expectedAreaOutput = {
-      width: Math.round((areaEnd.x - areaStart.x) * (visibleShortcut.dimensions.width / viewport.width)),
-      height: Math.round((areaEnd.y - areaStart.y) * (visibleShortcut.dimensions.height / viewport.height))
+      width: Math.round((areaEnd.x - areaStart.x) * (visibleShortcut.dimensions.width / viewport.captureWidth)),
+      height: Math.round((areaEnd.y - areaStart.y) * (visibleShortcut.dimensions.height / viewport.captureHeight))
     };
     assert(
       areaShortcut.sourceType === "manual" &&
