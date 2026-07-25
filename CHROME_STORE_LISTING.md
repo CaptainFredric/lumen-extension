@@ -106,7 +106,7 @@ Use the matching `lumen-extension-<commit>` artifact for the upload ZIP; it is t
 1. Open a normal `https://` page, open Lumen from the toolbar, and run a default capture. Confirm Capture Result opens automatically.
 2. In Capture Result, zoom the image, use Copy image, download PNG and PDF, and open Annotation Studio. Then return to the local library and launch visual-change review.
 3. Open `Select an area` and `Lasso an area`; draw each shape and use **Capture now**. Open the picker again and use **Save** to create a reusable monitoring region.
-4. Physically test full-page (`Alt+Shift+L`), visible-area (`Alt+Shift+V`), and area-picker (`Alt+Shift+A`) shortcuts in stock Chrome. Linux CI requires all three exact-ZIP command paths, including a Playwright-drawn immediate area capture; the physical pass remains the final browser sign-off.
+4. Physically test full-page (`Alt+Shift+L`), visible-area (`Alt+Shift+V`), and area-picker (`Alt+Shift+X`; `Alt+Shift+A` on macOS) shortcuts in stock Chrome. Linux CI requires all three exact-ZIP command paths, including a Playwright-drawn immediate area capture; the physical pass remains the final browser sign-off.
 5. Create an arrow, rectangle, text label, blur, and pixelated region; use undo and redo; test Fit, 100%, and keyboard zoom on the local working image; export a reviewed PNG and raster PDF.
 6. Create a selected-area timer and delete it. Confirm Chrome removes saved access when it is the final plan for that origin.
 7. Google Drive export is disabled unless the release ZIP was packaged with the publisher OAuth client. In a configured build, press Export to Drive from the reviewed image, approve the narrow consent, verify one file appears, then press Disconnect Drive.

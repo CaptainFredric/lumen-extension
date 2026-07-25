@@ -17,6 +17,7 @@ const extensionDir = path.join(tempRoot, "extension");
 const profileDir = path.join(tempRoot, "profile");
 const popupErrors = [];
 const requireNativeShortcutCapture = process.env.CI === "true" && process.platform === "linux";
+const areaShortcutKey = process.platform === "darwin" ? "A" : "X";
 
 let context;
 let fixtureServer;
@@ -43,7 +44,8 @@ try {
   assert(
     packagedManifest.commands?.["capture-page"]?.suggested_key?.default === "Alt+Shift+L" &&
       packagedManifest.commands?.["capture-visible-area"]?.suggested_key?.default === "Alt+Shift+V" &&
-      packagedManifest.commands?.["capture-area"]?.suggested_key?.default === "Alt+Shift+A",
+      packagedManifest.commands?.["capture-area"]?.suggested_key?.default === "Alt+Shift+X" &&
+      packagedManifest.commands?.["capture-area"]?.suggested_key?.mac === "Alt+Shift+A",
     "Release package lost Lumen keyboard shortcuts.",
     packagedManifest.commands
   );
@@ -411,7 +413,7 @@ assert(
   assert(
     registeredCommands.some((command) => command.name === "capture-page" && hasRegisteredShortcut(command.shortcut, "L")) &&
       registeredCommands.some((command) => command.name === "capture-visible-area" && hasRegisteredShortcut(command.shortcut, "V")) &&
-      registeredCommands.some((command) => command.name === "capture-area" && hasRegisteredShortcut(command.shortcut, "A")),
+      registeredCommands.some((command) => command.name === "capture-area" && hasRegisteredShortcut(command.shortcut, areaShortcutKey)),
     "Chrome did not register every packaged capture shortcut.",
     registeredCommands
   );
@@ -529,7 +531,7 @@ assert(
     );
 
     await target.bringToFront();
-    areaTrigger = await dispatchBrowserShortcut(target, "A");
+    areaTrigger = await dispatchBrowserShortcut(target, areaShortcutKey);
     const areaPickerOpened = await target.waitForSelector(
       "#lumen-cutaway-picker .lumen-picker-capture-now",
       { timeout: areaTrigger.native ? 10000 : 3500 }

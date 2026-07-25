@@ -40,7 +40,7 @@ This file tracks what Lumen needs before a serious Chrome Web Store submission.
 34. Long capture runs publish active state so the popup can be reopened to cancel at a safe point or return to the source tab.
 35. Rectangle and lasso pickers offer an immediate one-viewport **Capture now** action while retaining an explicit **Save** path for local monitoring.
 36. Successful manual captures open a local Capture Result workspace with zoom, Copy image, PNG, paginated PDF, optional Drive, Annotate, original-file, and library actions; timed runs do not open tabs.
-37. Three commands are declared and checked in the release package: full page (`Alt+Shift+L`), visible area (`Alt+Shift+V`), and area picker (`Alt+Shift+A`).
+37. Three commands are declared and checked in the release package: full page (`Alt+Shift+L`), visible area (`Alt+Shift+V`), and area picker (`Alt+Shift+X`; `Alt+Shift+A` on macOS). The default avoids Chrome's reserved `Alt+Shift+A` binding on Windows and Linux.
 38. The clean-profile release test uses the exact production ZIP, verifies command registration and specific no-gesture rejection, checks zero persistent host access, and requires packaged full-page, visible-area, and drawn-area shortcut flows plus result handoff on Linux CI.
 39. CI uploads the exact tested ZIP as `lumen-extension-<commit>` instead of requiring the publisher to rebuild it locally.
 
