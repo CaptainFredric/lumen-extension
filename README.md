@@ -67,7 +67,7 @@ The extension includes:
 45. local PNG and paginated raster PDF export, plus Fit, 100%, and keyboard zoom for the local working image in Annotation Studio
 46. a capture-time review PDF cache generated from the original rendered capture output or tiles at up to 3200 raster pixels per page; it has its own 250 MB or 75-capture local budget
 47. an automatic Capture Result workspace after successful manual captures, with a zoomable preview, Copy image, PNG, PDF, optional Drive, Annotate, original-file, and library actions
-48. keyboard shortcuts for full-page capture (`Alt+Shift+L`), visible-area capture (`Alt+Shift+V`), and the area picker (`Alt+Shift+X`; `Alt+Shift+A` on macOS), plus active-run controls to cancel a long capture or reopen its source tab
+48. keyboard shortcuts for full-page capture (`Alt+Shift+L`), visible-area capture (`Alt+Shift+V`), and the exact-area picker (`Alt+Shift+E`; `Alt+Shift+A` on macOS), plus active-run controls to cancel a long capture or reopen its source tab
 49. exact packaged-extension testing for command registration, safe `activeTab` denial without a user gesture, CI-gated full-page, visible-area, and drawn-area shortcut flows, result-workspace handoff, and zero persistent host access
 50. a CI artifact containing the exact tested upload ZIP, named `lumen-extension-<commit>`
 

@@ -57,7 +57,7 @@
     },
     "capture-area": {
       "suggested_key": {
-        "default": "Alt+Shift+X",
+        "default": "Alt+Shift+E",
         "mac": "Alt+Shift+A"
       },
       "description": "Select and capture an area with Lumen"

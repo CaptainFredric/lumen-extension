@@ -8,7 +8,7 @@ This release makes the path from capture to a useful result immediate, while tes
 
 1. Added **Capture now** to the rectangle and freeform lasso pickers. It captures the selected current-viewport area immediately; **Save** remains the separate action for remembering a monitoring region.
 2. Added a clean Capture Result workspace that opens after successful manual captures with a zoomable preview, Copy image, PNG, paginated PDF, optional Google Drive, Annotate, original-file, and library actions. Timed captures remain quiet and stay in the local shelf.
-3. Added the area-picker shortcut (`Alt+Shift+X`; `Alt+Shift+A` on macOS) beside full-page (`Alt+Shift+L`) and visible-area (`Alt+Shift+V`) shortcuts.
+3. Added the exact-area shortcut (`Alt+Shift+E`; `Alt+Shift+A` on macOS) beside full-page (`Alt+Shift+L`) and visible-area (`Alt+Shift+V`) shortcuts.
 4. Kept visible and selected-area captures at the user's current scroll position instead of resetting the page before capture.
 5. Made the area picker keyboard-operable and non-destructive until Save, and made all capture shortcuts honor Privacy Shield and review-before-save.
 6. Kept cached PDF and saved-file actions available when an older capture's working image has been pruned, with accurate crop, tile, and transparency states.

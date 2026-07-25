@@ -17,7 +17,7 @@ const extensionDir = path.join(tempRoot, "extension");
 const profileDir = path.join(tempRoot, "profile");
 const popupErrors = [];
 const requireNativeShortcutCapture = process.env.CI === "true" && process.platform === "linux";
-const areaShortcutKey = process.platform === "darwin" ? "A" : "X";
+const areaShortcutKey = process.platform === "darwin" ? "A" : "E";
 
 let context;
 let fixtureServer;
@@ -44,7 +44,7 @@ try {
   assert(
     packagedManifest.commands?.["capture-page"]?.suggested_key?.default === "Alt+Shift+L" &&
       packagedManifest.commands?.["capture-visible-area"]?.suggested_key?.default === "Alt+Shift+V" &&
-      packagedManifest.commands?.["capture-area"]?.suggested_key?.default === "Alt+Shift+X" &&
+      packagedManifest.commands?.["capture-area"]?.suggested_key?.default === "Alt+Shift+E" &&
       packagedManifest.commands?.["capture-area"]?.suggested_key?.mac === "Alt+Shift+A",
     "Release package lost Lumen keyboard shortcuts.",
     packagedManifest.commands
