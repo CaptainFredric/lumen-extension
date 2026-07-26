@@ -326,6 +326,7 @@ a:focus-visible,
   flex: 1 1 auto;
   overflow: auto;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable both-edges;
   background:
     radial-gradient(circle at 50% -16%, rgba(255, 255, 255, 0.7), transparent 36rem),
     var(--canvas);

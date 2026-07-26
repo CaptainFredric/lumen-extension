@@ -363,6 +363,7 @@ assert(
       renderedWidth: Math.round(image.getBoundingClientRect().width),
       renderedHeight: Math.round(image.getBoundingClientRect().height),
       availableWidth: viewport.clientWidth - 60,
+      scrollbarGutter: getComputedStyle(viewport).scrollbarGutter,
       scrollHeight: viewport.scrollHeight,
       clientHeight: viewport.clientHeight,
       reachedBottom: Math.abs(viewport.scrollTop - (viewport.scrollHeight - viewport.clientHeight)) <= 2
@@ -372,6 +373,7 @@ assert(
     packagedTallWidthState.zoomLabel === "Width" &&
       packagedTallWidthState.widthPressed === "true" &&
       Math.abs(packagedTallWidthState.renderedWidth - packagedTallWidthState.availableWidth) <= 2 &&
+      /stable/.test(packagedTallWidthState.scrollbarGutter) &&
       packagedTallWidthState.renderedHeight > packagedTallWidthState.clientHeight &&
       packagedTallWidthState.scrollHeight > packagedTallWidthState.clientHeight &&
       packagedTallWidthState.reachedBottom,
