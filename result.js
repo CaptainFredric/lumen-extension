@@ -856,6 +856,8 @@ function fitPage(options = {}) {
     return;
   }
 
+  ui.resultImage.style.width = "1px";
+  ui.resultImage.style.height = "1px";
   const { width, height } = getAvailableViewerSpace();
   state.pageZoom = clampZoom(Math.min(
     1,
