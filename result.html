@@ -13,88 +13,163 @@
     <header class="topbar">
       <a class="brand" href="library.html" aria-label="Open the Lumen capture library">
         <span class="brand-mark" aria-hidden="true">L</span>
-        <span>
+        <span class="brand-copy">
           <strong>Lumen</strong>
           <small>Capture result</small>
         </span>
       </a>
 
-      <div class="topbar-actions">
-        <button id="annotateButton" class="quiet-button" type="button">Annotate</button>
-        <button id="openLibraryButton" class="quiet-button" type="button">Library</button>
+      <div class="capture-heading">
+        <p id="resultHost">Loading local capture</p>
+        <h1 id="resultTitle">Preparing your result…</h1>
       </div>
+
+      <nav class="result-actions" aria-label="Capture actions">
+        <button id="annotateButton" class="toolbar-action is-primary" type="button" disabled>
+          <span class="toolbar-icon" aria-hidden="true">✎</span>
+          <span>Edit</span>
+        </button>
+        <button id="copyImageButton" class="toolbar-action" type="button" disabled>
+          <span class="toolbar-icon" aria-hidden="true">⧉</span>
+          <span>Copy</span>
+        </button>
+        <button id="exportPdfButton" class="toolbar-action" type="button" disabled>
+          <span class="toolbar-icon toolbar-icon-text" aria-hidden="true">PDF</span>
+          <span>PDF</span>
+        </button>
+        <button id="downloadPngButton" class="toolbar-action" type="button" disabled>
+          <span class="toolbar-icon" aria-hidden="true">↓</span>
+          <span>PNG</span>
+        </button>
+        <button id="openLibraryButton" class="toolbar-action" type="button">
+          <span class="toolbar-icon" aria-hidden="true">▦</span>
+          <span>Library</span>
+        </button>
+        <button
+          id="detailsButton"
+          class="toolbar-action"
+          type="button"
+          aria-controls="detailsPanel"
+          aria-expanded="false"
+        >
+          <span class="toolbar-icon" aria-hidden="true">ⓘ</span>
+          <span>Details</span>
+        </button>
+        <button id="settingsButton" class="toolbar-action" type="button">
+          <span class="toolbar-icon" aria-hidden="true">⚙</span>
+          <span>Settings</span>
+        </button>
+        <button id="deleteCaptureButton" class="toolbar-action is-danger" type="button" disabled>
+          <span class="toolbar-icon" aria-hidden="true">⌫</span>
+          <span>Remove</span>
+        </button>
+      </nav>
     </header>
 
     <main class="result-shell">
       <section class="viewer-card" aria-labelledby="resultTitle">
         <div class="viewer-head">
-          <div class="viewer-title">
-            <p id="resultHost" class="eyebrow">Loading local capture</p>
-            <h1 id="resultTitle">Preparing your result…</h1>
+          <div class="viewer-summary">
+            <strong id="dimensionsValue">—</strong>
+            <span id="viewHint">The whole capture will fit here.</span>
           </div>
 
           <div class="zoom-controls" aria-label="Image zoom controls">
             <button id="zoomOutButton" type="button" aria-label="Zoom out" title="Zoom out (−)" disabled>−</button>
-            <span id="zoomLabel" aria-live="polite">Fit</span>
+            <span id="zoomLabel">Page</span>
             <button id="zoomInButton" type="button" aria-label="Zoom in" title="Zoom in (+)" disabled>+</button>
+            <button id="fitPageButton" type="button" title="Fit the whole capture (0)" aria-pressed="true" disabled>Page</button>
+            <button id="fitButton" type="button" title="Fit capture width (W)" aria-pressed="false" disabled>Width</button>
             <button id="actualSizeButton" type="button" title="Show actual pixels (1)" aria-pressed="false" disabled>100%</button>
-            <button id="fitButton" type="button" title="Fit capture width (0)" aria-pressed="false" disabled>Fit</button>
           </div>
         </div>
 
-        <div id="resultViewport" class="result-viewport" tabindex="0" aria-label="Captured webpage image">
-          <div id="loadingState" class="loading-state" role="status">
-            <span class="loading-orb" aria-hidden="true"></span>
-            <strong>Loading the private local image…</strong>
-          </div>
-          <img id="resultImage" alt="" hidden />
-          <div id="emptyState" class="empty-state" hidden>
-            <strong id="emptyStateTitle">This local preview is unavailable.</strong>
-            <p id="emptyStateDescription">Lumen is checking which saved formats are still available.</p>
+        <div
+          id="resultViewport"
+          class="result-viewport"
+          tabindex="0"
+          aria-label="Captured webpage image"
+          aria-describedby="viewHint"
+          aria-keyshortcuts="+ - 0 1 W Control+C Meta+C Control+S Meta+S"
+        >
+          <div id="resultStage" class="result-stage">
+            <div id="loadingState" class="loading-state" role="status">
+              <span class="loading-orb" aria-hidden="true"></span>
+              <strong>Loading the private local image…</strong>
+            </div>
+            <img id="resultImage" alt="" draggable="false" hidden />
+            <div id="emptyState" class="empty-state" hidden>
+              <strong id="emptyStateTitle">This local preview is unavailable.</strong>
+              <p id="emptyStateDescription">Lumen is checking which saved formats are still available.</p>
+            </div>
           </div>
         </div>
       </section>
-
-      <aside class="action-card" aria-label="Capture actions">
-        <div>
-          <p class="eyebrow">Ready to use</p>
-          <h2>What do you want to do?</h2>
-          <p id="resultSource" class="result-source">Lumen is checking the best local source.</p>
-        </div>
-
-        <div class="primary-actions">
-          <button id="copyImageButton" class="primary-action" type="button" disabled>
-            <span>Copy image</span>
-            <small>Paste into chat, docs, or design tools</small>
-          </button>
-          <div class="export-row">
-            <button id="downloadPngButton" type="button" disabled>Download PNG</button>
-            <button id="exportPdfButton" type="button" disabled>Export PDF</button>
-          </div>
-          <button id="driveButton" class="drive-action" type="button" hidden disabled>Export to Google Drive</button>
-        </div>
-
-        <dl class="capture-meta" aria-label="Capture details">
-          <div><dt>Captured</dt><dd id="capturedAtValue">—</dd></div>
-          <div><dt>Image</dt><dd id="dimensionsValue">—</dd></div>
-          <div><dt>Files</dt><dd id="filesValue">—</dd></div>
-          <div><dt>Privacy</dt><dd id="privacyValue">On this device</dd></div>
-        </dl>
-
-        <div class="file-actions" aria-label="Saved file actions">
-          <button id="openOriginalButton" type="button" disabled>Open saved file</button>
-          <button id="showOriginalButton" type="button" disabled>Show in folder</button>
-        </div>
-
-        <div id="resultStatus" class="result-status" role="status" aria-live="polite">
-          Loading your capture…
-        </div>
-
-        <p id="privacyNote" class="privacy-note">
-          Lumen keeps its working copy in this browser. Files you save are stored separately in Chrome Downloads.
-        </p>
-      </aside>
     </main>
+
+    <aside
+      id="detailsPanel"
+      class="action-card"
+      role="dialog"
+      aria-label="Capture details and saved files"
+      aria-hidden="true"
+      inert
+    >
+      <div class="details-head">
+        <div>
+          <p class="eyebrow">Capture details</p>
+          <h2>Saved locally</h2>
+        </div>
+        <button id="closeDetailsButton" class="icon-button" type="button" aria-label="Close details">×</button>
+      </div>
+
+      <p id="resultSource" class="result-source">Lumen is checking the best local source.</p>
+
+      <dl class="capture-meta" aria-label="Capture details">
+        <div><dt>Captured</dt><dd id="capturedAtValue">—</dd></div>
+        <div><dt>Image</dt><dd id="detailsDimensionsValue">—</dd></div>
+        <div><dt>Files</dt><dd id="filesValue">—</dd></div>
+        <div><dt>Privacy</dt><dd id="privacyValue">On this device</dd></div>
+      </dl>
+
+      <div class="secondary-actions" aria-label="Saved file actions">
+        <button id="driveButton" class="drive-action" type="button" hidden disabled>Export to Google Drive</button>
+        <button id="openOriginalButton" type="button" disabled>Open saved file</button>
+        <button id="showOriginalButton" type="button" disabled>Show in folder</button>
+      </div>
+
+      <div class="shortcut-help">
+        <strong>Fast controls</strong>
+        <span><kbd>0</kbd> whole page</span>
+        <span><kbd>W</kbd> fit width</span>
+        <span><kbd>1</kbd> actual pixels</span>
+        <span><kbd>⌘/Ctrl</kbd> + wheel to zoom</span>
+      </div>
+
+      <p id="privacyNote" class="privacy-note">
+        Lumen keeps its working copy in this browser. Files you save are stored separately in Chrome Downloads.
+      </p>
+    </aside>
+    <button id="detailsBackdrop" class="details-backdrop" type="button" tabindex="-1" aria-label="Close details" hidden></button>
+
+    <div id="resultStatus" class="result-status" role="status" aria-live="polite">
+      Loading your capture…
+    </div>
+
+    <dialog id="deleteDialog" class="delete-dialog" aria-labelledby="deleteDialogTitle">
+      <form method="dialog">
+        <p class="eyebrow">Remove local copy</p>
+        <h2 id="deleteDialogTitle">Remove this capture from Lumen?</h2>
+        <p>
+          Its private library image and metadata will be removed from this browser. Any PNG or PDF already in
+          Downloads stays on your device.
+        </p>
+        <div class="dialog-actions">
+          <button id="cancelDeleteButton" value="cancel" type="submit">Cancel</button>
+          <button id="confirmDeleteButton" class="danger-button" value="confirm" type="button">Remove capture</button>
+        </div>
+      </form>
+    </dialog>
 
     <script type="module" src="result.js"></script>
   </body>

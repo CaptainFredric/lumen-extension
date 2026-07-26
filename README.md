@@ -11,7 +11,7 @@ Lumen focuses on:
 5. keep real on-device previews in a local photo library while originals stay in Downloads
 6. redact sensitive visible data during export
 7. attach useful page signals and capture details beside the image
-8. open every completed manual capture in a clean, zoomable result workspace for Copy, PNG, PDF, Drive, or annotation
+8. open every completed manual capture in a viewer-first result workspace with Page/Width/100% views, drag-to-pan, Copy, PNG, PDF, Drive, Edit, library, Settings, and removal controls
 9. keep privacy, permissions, export behavior, and local-data controls together in dedicated Settings
 
 The repo is aimed at design review, QA, and product work.
@@ -66,7 +66,7 @@ The extension includes:
 44. a reversible Privacy Shield that enforces local-only mode, review-before-save, automatic redaction, and metadata minimization together, pauses unattended monitors while active, then restores the user's choices and monitor alarms when turned off
 45. local PNG and paginated raster PDF export, plus Fit, 100%, and keyboard zoom for the local working image in Annotation Studio
 46. a capture-time review PDF cache generated from the original rendered capture output or tiles at up to 3200 raster pixels per page; it has its own 250 MB or 75-capture local budget
-47. an automatic Capture Result workspace after successful manual captures, with a zoomable preview, Copy image, PNG, PDF, optional Drive, Annotate, original-file, and library actions
+47. an automatic viewer-first Capture Result workspace after successful manual captures, with whole-page/width/100% views, centered zoom, drag-to-pan, Copy, PNG, PDF, optional Drive, Edit, original-file, library, Settings, and remove-local-copy actions
 48. keyboard shortcuts for full-page capture (`Alt+Shift+L`), visible-area capture (`Alt+Shift+V`), and the exact-area picker (`Alt+Shift+E`; `Alt+Shift+A` on macOS), plus active-run controls to cancel a long capture or reopen its source tab
 49. exact packaged-extension testing for command registration, safe `activeTab` denial without a user gesture, CI-gated full-page, visible-area, and drawn-area shortcut flows, result-workspace handoff, and zero persistent host access
 50. a CI artifact containing the exact tested upload ZIP, named `lumen-extension-<commit>`
@@ -195,7 +195,7 @@ The public landing page will be available at `http://127.0.0.1:3000/`.
 7. Use `Scan` to preview detected redaction regions before export
 8. Use `Mark boxes` if you need manual redactions before capture
 9. Use `Select an area` or `Lasso an area`, draw the region, then choose `Capture now` for an immediate one-viewport crop or `Save` to remember it for monitoring
-10. After a successful manual capture, use the Capture Result workspace to zoom, copy the image, download PNG or PDF, export to configured Google Drive, open Annotation Studio, or return to the original and library
+10. After a successful manual capture, use Capture Result to see the entire long page at once, switch to width or actual pixels, drag to pan, copy the image, download PNG or PDF, export to configured Google Drive, edit, reach the original/library, open Settings, or remove the private library copy
 11. Choose `Once` for a 5, 10, or 30 second delayed area capture, `Repeat` for a 15-minute through daily schedule, or `Continuous` for a 1, 5, or 15 minute cadence capped at 10, 25, or 50 runs
 12. Use `Open library` to browse real local previews, search or filter them, mark favorites, and return to the originals in Downloads
 13. Choose `Annotate` to add arrows, rectangles, text, blur, or pixelation; use undo and redo; inspect the local working image with Fit, 100%, or keyboard zoom; then export a reviewed PNG or paginated raster PDF locally

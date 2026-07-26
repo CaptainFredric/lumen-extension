@@ -28,6 +28,7 @@ import {
 } from "./lumen-backend.js";
 import {
   clearLibrary as clearCaptureLibrary,
+  deleteLibraryCapture,
   getLibraryCapture,
   hasLibraryPreview,
   pruneLibraryPreviews,
@@ -568,6 +569,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "LUMEN_REMOVE_LOCAL_CAPTURE") {
+    removeLocalCaptureRecord(message.payload?.captureId)
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: normalizeCaptureError(error) }));
+
+    return true;
+  }
+
   if (message?.type === "LUMEN_OPEN_VISUAL_REVIEW") {
     openCaptureToolPage("review.html", message.payload?.captureId)
       .then((result) => sendResponse({ ok: true, ...result }))
@@ -886,6 +895,52 @@ async function openCaptureToolPage(pageName, captureId = "") {
   return {
     tabId: tab?.id || null,
     captureId: normalizedCaptureId
+  };
+}
+
+async function removeLocalCaptureRecord(captureId = "") {
+  const normalizedCaptureId = typeof captureId === "string" ? captureId.trim().slice(0, 160) : "";
+
+  if (!normalizedCaptureId) {
+    throw createFriendlyError(
+      "Capture Not Selected",
+      "Choose a saved capture before removing its local record."
+    );
+  }
+
+  const stored = await chrome.storage.local.get([
+    STORAGE_KEYS.captureHistory,
+    STORAGE_KEYS.watchRuns
+  ]);
+  const captureHistory = Array.isArray(stored[STORAGE_KEYS.captureHistory])
+    ? stored[STORAGE_KEYS.captureHistory]
+    : [];
+  const watchRuns = Array.isArray(stored[STORAGE_KEYS.watchRuns])
+    ? stored[STORAGE_KEYS.watchRuns]
+    : [];
+  const nextHistory = captureHistory.filter((record) => record?.id !== normalizedCaptureId);
+  const nextWatchRuns = watchRuns.filter((record) => record?.captureId !== normalizedCaptureId);
+  const removedHistoryCount = captureHistory.length - nextHistory.length;
+  const removedWatchRunCount = watchRuns.length - nextWatchRuns.length;
+  const library = await deleteLibraryCapture(normalizedCaptureId);
+
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.captureHistory]: nextHistory,
+    [STORAGE_KEYS.watchRuns]: nextWatchRuns
+  });
+  broadcastHistory(nextHistory);
+  broadcastWatchRuns(nextWatchRuns);
+  broadcastLibraryUpdated({
+    action: "removed",
+    captureId: normalizedCaptureId
+  });
+
+  return {
+    deleted: Boolean(library.deleted || removedHistoryCount || removedWatchRunCount),
+    libraryDeleted: Boolean(library.deleted),
+    assetCount: library.assetCount || 0,
+    historyCount: removedHistoryCount,
+    watchRunCount: removedWatchRunCount
   };
 }
 
@@ -3338,7 +3393,7 @@ async function capturePageSegments(target, page, sessionId, variant, { autoRedac
 
   throw createFriendlyError(
     "Page Too Long",
-    `This page exceeded the current ${maxSegments} slice safety limit. Raise the cap or switch to a tiled export for extremely long pages.`
+    `This page exceeded Lumen’s current ${maxSegments}-viewport capture safety limit. Capture it in selected sections or use visible-area capture; Lumen stopped instead of saving an incomplete full-page image.`
   );
 }
 

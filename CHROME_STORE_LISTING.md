@@ -31,14 +31,14 @@ Lumen supports:
 11. Pause, resume, run-now, and delete controls for local timed plans.
 12. Keyboard shortcuts for full-page capture, visible-area capture, and opening the area picker.
 13. Active-run controls to cancel a long capture or return to its source tab.
-14. A clean Capture Result workspace that opens after successful manual captures with a zoomable preview, Copy image, PNG, paginated PDF, optional Drive, Annotate, original-file, and library actions.
+14. A clean, viewer-first Capture Result workspace that opens after successful manual captures with whole-page, fit-width, and actual-pixel views; centered zoom and drag-to-pan; Copy image, PNG, paginated PDF, optional Drive, Edit, original-file, library, Settings, and remove-local-copy actions.
 15. An on-device photo library with actual previews, search, manual/timed filters, favorites, and sorting.
 16. Full-resolution originals retained in Chrome Downloads, with Open and Show actions from the library.
 17. Capture details JSON that keeps page context beside the images.
 18. A full annotation studio with arrows, rectangles, text, blur, pixelation, selection, undo, and redo.
 19. Local before/after review with a reveal slider, highlighted change regions, difference statistics, and a monitor timeline.
 20. Optional reviewed-image export to Google Drive after explicit user consent, using access limited to files Lumen creates or the user explicitly opens with Lumen.
-21. Local PNG and paginated raster PDF export with Fit, 100%, and keyboard zoom controls for the local working image.
+21. Local PNG and paginated raster PDF export with whole-page, width, 100%, keyboard, wheel, and drag-pan controls for the local working image.
 22. Dedicated Settings with fast capture, review-before-save, reversible Privacy Shield that pauses unattended monitors while active, permission revocation, Drive disconnect, and local-workspace deletion.
 23. Fresh-install one-click defaults that keep capture local, enable automatic redaction, omit capture-details JSON, and skip the extra review screen unless the user turns it on.
 24. A capture-time review PDF cache generated from the original rendered output or tiles at up to 3200 raster pixels per page, with a separate 250 MB or 75-capture local limit.
@@ -95,7 +95,7 @@ Generated assets live in `store-assets/screenshots/` and can be refreshed with `
 For submission, use the `lumen-store-screenshots-<commit>` artifact produced by the release commit's GitHub Actions run so every image comes from the exact pushed runtime. The checked-in annotation image is a review preview and must be replaced by that generated artifact.
 Use the matching `lumen-extension-<commit>` artifact for the upload ZIP; it is the same package exercised by the clean-profile release job.
 
-1. One-click capture opening the clean Capture Result workspace with Copy image, PNG, PDF, Annotate, original-file, and library actions beside dedicated Privacy Shield Settings.
+1. One-click capture opening the clean viewer-first Capture Result workspace with Page/Width/100% viewing, Copy image, PNG, PDF, Edit, original-file, library, Settings, and remove-local-copy actions.
 2. Annotation studio with arrows, text, shapes, blur, pixelation, undo, redo, Fit/100% working-image zoom, PNG/raster-PDF export, and optional reviewed-image Drive export.
 3. Before/after visual change review with highlighted regions and monitor timeline.
 4. Responsive desktop, tablet, and mobile outputs with redaction and focused-area context.
@@ -104,7 +104,7 @@ Use the matching `lumen-extension-<commit>` artifact for the upload ZIP; it is t
 ## Reviewer Test Instructions
 
 1. Open a normal `https://` page, open Lumen from the toolbar, and run a default capture. Confirm Capture Result opens automatically.
-2. In Capture Result, zoom the image, use Copy image, download PNG and PDF, and open Annotation Studio. Then return to the local library and launch visual-change review.
+2. In Capture Result, switch between Page, Width, and 100%, drag a magnified capture to pan, use Copy image, download PNG and PDF, open Annotation Studio, open Settings, and inspect the confirmed remove-local-copy action. Then return to the local library and launch visual-change review.
 3. Open `Select an area` and `Lasso an area`; draw each shape and use **Capture now**. Open the picker again and use **Save** to create a reusable monitoring region.
 4. Physically test full-page (`Alt+Shift+L`), visible-area (`Alt+Shift+V`), and exact-area (`Alt+Shift+E`; `Alt+Shift+A` on macOS) shortcuts in stock Chrome. Linux CI requires all three exact-ZIP command paths, including a Playwright-drawn immediate area capture; the physical pass remains the final browser sign-off.
 5. Create an arrow, rectangle, text label, blur, and pixelated region; use undo and redo; test Fit, 100%, and keyboard zoom on the local working image; export a reviewed PNG and raster PDF.

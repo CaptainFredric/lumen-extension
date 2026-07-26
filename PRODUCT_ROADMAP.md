@@ -31,7 +31,7 @@ The product can become ambitious without changing the first wedge. The screensho
 12. Local visual-change review with a before/after reveal, highlighted change regions, metrics, and monitor timeline.
 13. One-time, repeating, and capped continuous selected-area monitoring with pause, resume, run-now, and delete controls.
 14. Optional review-first Google Drive export using narrow `drive.file` access.
-15. Automatic Capture Result workspace for successful manual captures with zoom, Copy image, PNG, paginated PDF, optional Drive, Annotate, original-file, and library actions.
+15. Automatic viewer-first Capture Result workspace for successful manual captures with Page/Width/100% views, centered zoom, drag-to-pan, Copy image, PNG, paginated PDF, optional Drive, Edit, original-file, library, Settings, and confirmed remove-local-copy actions.
 16. Full-page, visible-area, and area-picker commands, plus exact packaged-extension registration and `activeTab` boundary testing.
 17. CI handoff of the exact tested Web Store ZIP as a commit-addressed artifact.
 

@@ -41,7 +41,10 @@ try {
   assert(manifest.action?.default_popup === "popup.html", "Expected popup entrypoint.", manifest);
 
   const seededCaptureId = "smoke-capture-001";
+  const tallResultCaptureId = "smoke-result-tall-disposable";
   const degradedResultCaptureId = "smoke-result-pdf-download-only";
+  const thumbnailResultCaptureId = "smoke-result-thumbnail-only";
+  const limitedReviewCaptureId = "smoke-result-limited-review-only";
   const transparentLassoCaptureId = "smoke-result-transparent-lasso";
   const staleDownloadCaptureId = "smoke-result-stale-download-only";
   await worker.evaluate((captureId) => chrome.storage.local.set({
@@ -275,6 +278,129 @@ try {
     storedEditorSource
   );
 
+  const tallResultSeed = await librarySeedPage.evaluate(async (captureId) => {
+    const store = await import(chrome.runtime.getURL("library-store.js"));
+    const { STORAGE_KEYS } = await import(chrome.runtime.getURL("config.js"));
+    const canvas = document.createElement("canvas");
+    canvas.width = 1200;
+    canvas.height = 7200;
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#f7fafc";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let y = 0; y < canvas.height; y += 600) {
+      context.fillStyle = y % 1200 ? "#dff7ee" : "#10243a";
+      context.fillRect(80, y + 70, 1040, 420);
+      context.fillStyle = y % 1200 ? "#10243a" : "#eff9fb";
+      context.font = "700 46px system-ui";
+      context.fillText(`Tall result section ${y / 600 + 1}`, 130, y + 170);
+    }
+
+    context.fillStyle = "#ff5f78";
+    context.fillRect(0, canvas.height - 28, canvas.width, 28);
+    const dataUrl = canvas.toDataURL("image/png");
+    const downloadId = await chrome.downloads.download({
+      url: dataUrl,
+      filename: "Lumen/tall-result-disposable-original.png",
+      saveAs: false
+    });
+    let download = null;
+
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      [download] = await chrome.downloads.search({ id: downloadId });
+
+      if (download?.state === "complete") {
+        break;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    if (!download || download.state !== "complete" || !download.bytesReceived) {
+      throw new Error("Could not seed the tall result-workspace original.");
+    }
+
+    await store.putLibraryCapture({
+      id: captureId,
+      title: "Tall result smoke capture",
+      host: "tall.example.test",
+      url: "https://tall.example.test/release-notes",
+      capturedAt: new Date().toISOString(),
+      sourceType: "manual",
+      dimensions: { width: canvas.width, height: canvas.height },
+      fileCount: 1,
+      downloads: [{
+        downloadId,
+        filename: "Lumen/tall-result-disposable-original.png",
+        bytesReceived: download.bytesReceived,
+        complete: true,
+        kind: "image",
+        role: "full-page",
+        variantId: "desktop",
+        width: canvas.width,
+        height: canvas.height
+      }],
+      editorSource: {
+        dataUrl,
+        width: canvas.width,
+        height: canvas.height,
+        originalWidth: canvas.width,
+        originalHeight: canvas.height,
+        scaled: false,
+        kind: "lossless-full-output",
+        role: "full-page",
+        variantId: "desktop"
+      }
+    });
+    const localState = await chrome.storage.local.get([
+      STORAGE_KEYS.captureHistory,
+      STORAGE_KEYS.watchRuns
+    ]);
+    const captureHistory = Array.isArray(localState[STORAGE_KEYS.captureHistory])
+      ? localState[STORAGE_KEYS.captureHistory]
+      : [];
+    const watchRuns = Array.isArray(localState[STORAGE_KEYS.watchRuns])
+      ? localState[STORAGE_KEYS.watchRuns]
+      : [];
+    await chrome.storage.local.set({
+      [STORAGE_KEYS.captureHistory]: [{
+        id: captureId,
+        title: "Tall result smoke capture",
+        url: "https://tall.example.test/release-notes",
+        capturedAt: new Date().toISOString(),
+        dimensions: { width: canvas.width, height: canvas.height }
+      }, ...captureHistory],
+      [STORAGE_KEYS.watchRuns]: [{
+        id: "watch-run-tall-result-disposable",
+        captureId,
+        status: "captured",
+        completedAt: new Date().toISOString()
+      }, ...watchRuns]
+    });
+
+    const storedCapture = await store.getLibraryCapture(captureId, {
+      includeEditorSource: true
+    });
+
+    return {
+      downloadId,
+      filename: download.filename,
+      bytesReceived: download.bytesReceived,
+      editorWidth: storedCapture?.editorSource?.width || 0,
+      editorHeight: storedCapture?.editorSource?.height || 0,
+      editorBytes: storedCapture?.editorSource?.blob?.size || 0
+    };
+  }, tallResultCaptureId);
+  assert(
+    Number.isInteger(tallResultSeed.downloadId) &&
+      tallResultSeed.bytesReceived > 0 &&
+      tallResultSeed.editorWidth === 1200 &&
+      tallResultSeed.editorHeight === 7200 &&
+      tallResultSeed.editorBytes > 0,
+    "The tall result fixture did not retain its full-page source and completed original.",
+    tallResultSeed
+  );
+
   const libraryIntegrity = await librarySeedPage.evaluate(async (captureId) => {
     const store = await import(chrome.runtime.getURL("library-store.js"));
     const database = await new Promise((resolve, reject) => {
@@ -419,7 +545,13 @@ try {
     const store = await import(chrome.runtime.getURL("library-store.js"));
     await store.deleteLibraryCapture(captureId);
   }, editorOnlyCaptureId);
-  await librarySeedPage.evaluate(async ({ degradedCaptureId, lassoCaptureId, staleCaptureId }) => {
+  await librarySeedPage.evaluate(async ({
+    degradedCaptureId,
+    thumbnailCaptureId,
+    limitedReviewCaptureId: reviewCaptureId,
+    lassoCaptureId,
+    staleCaptureId
+  }) => {
     const store = await import(chrome.runtime.getURL("library-store.js"));
     const createCompletedDownload = async (dataUrl, filename) => {
       const downloadId = await chrome.downloads.download({ url: dataUrl, filename, saveAs: false });
@@ -453,6 +585,30 @@ try {
     lassoContext.closePath();
     lassoContext.fill();
     const lassoDataUrl = lassoCanvas.toDataURL("image/png");
+    const thumbnailCanvas = document.createElement("canvas");
+    thumbnailCanvas.width = 360;
+    thumbnailCanvas.height = 240;
+    const thumbnailContext = thumbnailCanvas.getContext("2d");
+    thumbnailContext.fillStyle = "#f4f7f8";
+    thumbnailContext.fillRect(0, 0, thumbnailCanvas.width, thumbnailCanvas.height);
+    thumbnailContext.fillStyle = "#10243a";
+    thumbnailContext.fillRect(24, 24, 312, 72);
+    thumbnailContext.fillStyle = "#64f2df";
+    thumbnailContext.fillRect(24, 116, 208, 92);
+    const thumbnailDataUrl = thumbnailCanvas.toDataURL("image/png");
+    const reviewCanvas = document.createElement("canvas");
+    reviewCanvas.width = 240;
+    reviewCanvas.height = 1200;
+    const reviewContext = reviewCanvas.getContext("2d");
+    reviewContext.fillStyle = "#f4f7f8";
+    reviewContext.fillRect(0, 0, reviewCanvas.width, reviewCanvas.height);
+
+    for (let top = 24; top < reviewCanvas.height; top += 180) {
+      reviewContext.fillStyle = top % 360 === 24 ? "#10243a" : "#64f2df";
+      reviewContext.fillRect(18, top, 204, 128);
+    }
+
+    const reviewDataUrl = reviewCanvas.toDataURL("image/png");
     const [firstTileDownload, secondTileDownload, lassoDownload] = await Promise.all([
       createCompletedDownload(lassoDataUrl, "Lumen/retained-formats-part-01-of-02.png"),
       createCompletedDownload(lassoDataUrl, "Lumen/retained-formats-part-02-of-02.png"),
@@ -505,6 +661,46 @@ try {
         sourceExact: true,
         role: "full-page",
         kind: "capture-tile-pdf"
+      }
+    });
+
+    await store.putLibraryCapture({
+      id: thumbnailCaptureId,
+      title: "Thumbnail-only legacy capture",
+      host: "example.test",
+      url: "https://example.test/thumbnail-only",
+      capturedAt: new Date().toISOString(),
+      sourceType: "manual",
+      dimensions: { width: 1200, height: 12000 },
+      fileCount: 0,
+      previews: [{
+        dataUrl: thumbnailDataUrl,
+        width: 1200,
+        height: 12000,
+        role: "full-page",
+        variantId: "desktop"
+      }]
+    });
+
+    await store.putLibraryCapture({
+      id: reviewCaptureId,
+      title: "Limited complete-page review",
+      host: "example.test",
+      url: "https://example.test/limited-review",
+      capturedAt: new Date().toISOString(),
+      sourceType: "manual",
+      dimensions: { width: 1200, height: 6000 },
+      fileCount: 0,
+      editorSource: {
+        dataUrl: reviewDataUrl,
+        width: 240,
+        height: 1200,
+        originalWidth: 1200,
+        originalHeight: 6000,
+        scaled: true,
+        kind: "bounded-full-page-review",
+        role: "full-page",
+        variantId: "desktop"
       }
     });
 
@@ -563,6 +759,8 @@ try {
     });
   }, {
     degradedCaptureId: degradedResultCaptureId,
+    thumbnailCaptureId: thumbnailResultCaptureId,
+    limitedReviewCaptureId,
     lassoCaptureId: transparentLassoCaptureId,
     staleCaptureId: staleDownloadCaptureId
   });
@@ -594,9 +792,13 @@ try {
     "openOriginalButton",
     "showOriginalButton",
     "openLibraryButton",
+    "detailsButton",
+    "settingsButton",
+    "deleteCaptureButton",
     "zoomOutButton",
     "zoomInButton",
     "actualSizeButton",
+    "fitPageButton",
     "fitButton",
     "zoomLabel"
   ];
@@ -619,6 +821,9 @@ try {
     openDisabled: document.querySelector("#openOriginalButton")?.disabled ?? true,
     showDisabled: document.querySelector("#showOriginalButton")?.disabled ?? true,
     driveHidden: document.querySelector("#driveButton")?.hidden ?? false,
+    deleteDisabled: document.querySelector("#deleteCaptureButton")?.disabled ?? true,
+    zoomLabel: document.querySelector("#zoomLabel")?.textContent?.trim() || "",
+    pagePressed: document.querySelector("#fitPageButton")?.getAttribute("aria-pressed") || "",
     viewerCount: document.querySelectorAll(".viewer-card").length,
     actionCardCount: document.querySelectorAll(".action-card").length,
     timelineCount: document.querySelectorAll(".timeline, [data-stage-step]").length
@@ -636,9 +841,9 @@ try {
     resultWorkspaceState
   );
   assert(
-    resultWorkspaceState.title === "Smoke capture" &&
+      resultWorkspaceState.title === "Smoke capture" &&
       resultWorkspaceState.host === "example.test" &&
-      /Full local image/i.test(resultWorkspaceState.source) &&
+      /Full(?:-resolution)? local image/i.test(resultWorkspaceState.source) &&
       /Ready/i.test(resultWorkspaceState.status),
     "The result workspace did not render concise seeded capture context.",
     resultWorkspaceState
@@ -650,6 +855,9 @@ try {
       !resultWorkspaceState.annotateDisabled &&
       !resultWorkspaceState.openDisabled &&
       !resultWorkspaceState.showDisabled &&
+      !resultWorkspaceState.deleteDisabled &&
+      resultWorkspaceState.zoomLabel === "Page" &&
+      resultWorkspaceState.pagePressed === "true" &&
       resultWorkspaceState.driveHidden,
     "The clean result workspace did not expose the expected local actions.",
     resultWorkspaceState
@@ -699,8 +907,8 @@ try {
   );
   await resultPage.keyboard.press("0");
   assert(
-    await resultPage.locator("#zoomLabel").textContent() === "Fit",
-    "The result workspace keyboard shortcut did not restore fit zoom."
+    await resultPage.locator("#zoomLabel").textContent() === "Page",
+    "The result workspace keyboard shortcut did not restore whole-page fit."
   );
 
   await resultPage.setViewportSize({ width: 320, height: 700 });
@@ -719,6 +927,430 @@ try {
     "The result workspace lost an action or overflowed at 320px.",
     mobileResultState
   );
+
+  const tallResultPage = await context.newPage();
+  tallResultPage.on("console", (message) => {
+    if (message.type() === "error") {
+      popupConsoleErrors.push(`tall result: ${message.text()}`);
+    }
+  });
+  tallResultPage.on("pageerror", (error) => popupConsoleErrors.push(`tall result: ${error.message}`));
+  await tallResultPage.setViewportSize({ width: 1280, height: 900 });
+  await tallResultPage.goto(
+    `chrome-extension://${extensionId}/result.html?capture=${encodeURIComponent(tallResultCaptureId)}`,
+    { waitUntil: "load" }
+  );
+  await tallResultPage.waitForSelector('body[data-state="ready"] #resultImage:not([hidden])', { timeout: 15000 });
+  await tallResultPage.waitForFunction(() => {
+    const image = document.querySelector("#resultImage");
+    return document.querySelector("#zoomLabel")?.textContent === "Page" &&
+      parseFloat(image?.style.width || "0") > 0 &&
+      parseFloat(image?.style.height || "0") > 0;
+  });
+
+  const tallPageFitState = await tallResultPage.evaluate(() => {
+    const viewport = document.querySelector("#resultViewport");
+    const stage = document.querySelector("#resultStage");
+    const image = document.querySelector("#resultImage");
+    const stageStyle = getComputedStyle(stage);
+    const horizontalPadding = parseFloat(stageStyle.paddingLeft || "0") + parseFloat(stageStyle.paddingRight || "0");
+    const verticalPadding = parseFloat(stageStyle.paddingTop || "0") + parseFloat(stageStyle.paddingBottom || "0");
+    const availableWidth = viewport.clientWidth - horizontalPadding;
+    const availableHeight = viewport.clientHeight - verticalPadding;
+    const expectedZoom = Math.max(0.01, Math.min(
+      1,
+      availableWidth / image.naturalWidth,
+      availableHeight / image.naturalHeight
+    ));
+    const viewportRect = viewport.getBoundingClientRect();
+    const imageRect = image.getBoundingClientRect();
+
+    return {
+      naturalWidth: image.naturalWidth,
+      naturalHeight: image.naturalHeight,
+      renderedWidth: image.offsetWidth,
+      renderedHeight: image.offsetHeight,
+      expectedWidth: Math.round(image.naturalWidth * expectedZoom),
+      expectedHeight: Math.round(image.naturalHeight * expectedZoom),
+      zoomLabel: document.querySelector("#zoomLabel")?.textContent?.trim() || "",
+      pagePressed: document.querySelector("#fitPageButton")?.getAttribute("aria-pressed") || "",
+      widthPressed: document.querySelector("#fitButton")?.getAttribute("aria-pressed") || "",
+      actualPressed: document.querySelector("#actualSizeButton")?.getAttribute("aria-pressed") || "",
+      scrollWidth: viewport.scrollWidth,
+      clientWidth: viewport.clientWidth,
+      scrollHeight: viewport.scrollHeight,
+      clientHeight: viewport.clientHeight,
+      imageTop: imageRect.top,
+      imageBottom: imageRect.bottom,
+      viewportTop: viewportRect.top,
+      viewportBottom: viewportRect.bottom
+    };
+  });
+  assert(
+    tallPageFitState.naturalWidth === 1200 &&
+      tallPageFitState.naturalHeight === 7200 &&
+      tallPageFitState.zoomLabel === "Page" &&
+      tallPageFitState.pagePressed === "true" &&
+      tallPageFitState.widthPressed === "false" &&
+      tallPageFitState.actualPressed === "false" &&
+      Math.abs(tallPageFitState.renderedWidth - tallPageFitState.expectedWidth) <= 3 &&
+      Math.abs(tallPageFitState.renderedHeight - tallPageFitState.expectedHeight) <= 3 &&
+      tallPageFitState.scrollWidth <= tallPageFitState.clientWidth + 2 &&
+      tallPageFitState.scrollHeight <= tallPageFitState.clientHeight + 2 &&
+      tallPageFitState.imageTop >= tallPageFitState.viewportTop - 1 &&
+      tallPageFitState.imageBottom <= tallPageFitState.viewportBottom + 1,
+    "Whole-page mode did not fit the complete tall capture inside the result viewer.",
+    tallPageFitState
+  );
+
+  await tallResultPage.click("#fitButton");
+  await tallResultPage.waitForFunction(() => document.querySelector("#zoomLabel")?.textContent === "Width");
+  const tallWidthState = await tallResultPage.evaluate(async () => {
+    const viewport = document.querySelector("#resultViewport");
+    const stage = document.querySelector("#resultStage");
+    const image = document.querySelector("#resultImage");
+    const stageStyle = getComputedStyle(stage);
+    const horizontalPadding = parseFloat(stageStyle.paddingLeft || "0") + parseFloat(stageStyle.paddingRight || "0");
+    const verticalPadding = parseFloat(stageStyle.paddingTop || "0") + parseFloat(stageStyle.paddingBottom || "0");
+    viewport.scrollTop = viewport.scrollHeight;
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const viewportRect = viewport.getBoundingClientRect();
+    const imageRect = image.getBoundingClientRect();
+    const maximumScrollTop = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+
+    return {
+      renderedWidth: image.offsetWidth,
+      renderedHeight: image.offsetHeight,
+      expectedWidth: Math.round(((viewport.clientWidth - horizontalPadding) / image.naturalWidth) * image.naturalWidth),
+      expectedHeight: Math.round(((viewport.clientWidth - horizontalPadding) / image.naturalWidth) * image.naturalHeight),
+      verticalPadding,
+      zoomLabel: document.querySelector("#zoomLabel")?.textContent?.trim() || "",
+      pagePressed: document.querySelector("#fitPageButton")?.getAttribute("aria-pressed") || "",
+      widthPressed: document.querySelector("#fitButton")?.getAttribute("aria-pressed") || "",
+      scrollTop: viewport.scrollTop,
+      maximumScrollTop,
+      scrollHeight: viewport.scrollHeight,
+      clientHeight: viewport.clientHeight,
+      imageBottom: imageRect.bottom,
+      viewportTop: viewportRect.top,
+      viewportBottom: viewportRect.bottom
+    };
+  });
+  const tallBottomGap = tallWidthState.viewportBottom - tallWidthState.imageBottom;
+  assert(
+    tallWidthState.zoomLabel === "Width" &&
+      tallWidthState.pagePressed === "false" &&
+      tallWidthState.widthPressed === "true" &&
+      Math.abs(tallWidthState.renderedWidth - tallWidthState.expectedWidth) <= 1 &&
+      Math.abs(tallWidthState.renderedHeight - tallWidthState.expectedHeight) <= 1 &&
+      tallWidthState.scrollHeight > tallWidthState.clientHeight &&
+      tallWidthState.renderedHeight > tallWidthState.clientHeight * 5 &&
+      Math.abs(tallWidthState.scrollTop - tallWidthState.maximumScrollTop) <= 2 &&
+      tallWidthState.imageBottom >= tallWidthState.viewportTop &&
+      tallWidthState.imageBottom <= tallWidthState.viewportBottom + 1 &&
+      tallBottomGap >= Math.max(0, tallWidthState.verticalPadding / 2 - 4) &&
+      tallBottomGap <= tallWidthState.verticalPadding / 2 + 8,
+    "Width mode did not preserve a vertically scrollable, unclipped tall capture through its bottom edge.",
+    { ...tallWidthState, tallBottomGap }
+  );
+
+  await tallResultPage.click("#actualSizeButton");
+  await tallResultPage.waitForFunction(() => document.querySelector("#zoomLabel")?.textContent === "100%");
+  const tallActualState = await tallResultPage.evaluate(() => {
+    const image = document.querySelector("#resultImage");
+    return {
+      renderedWidth: image.offsetWidth,
+      renderedHeight: image.offsetHeight,
+      actualPressed: document.querySelector("#actualSizeButton")?.getAttribute("aria-pressed") || ""
+    };
+  });
+  assert(
+    tallActualState.renderedWidth === 1200 &&
+      tallActualState.renderedHeight === 7200 &&
+      tallActualState.actualPressed === "true",
+    "The tall result did not render at exact source pixels in 100% mode.",
+    tallActualState
+  );
+
+  await tallResultPage.click("#zoomOutButton");
+  await tallResultPage.waitForFunction(() => document.querySelector("#zoomLabel")?.textContent === "80%");
+  const tallZoomOutState = await tallResultPage.evaluate(() => {
+    const image = document.querySelector("#resultImage");
+    return {
+      renderedWidth: image.offsetWidth,
+      renderedHeight: image.offsetHeight
+    };
+  });
+  assert(
+    tallZoomOutState.renderedWidth === 960 && tallZoomOutState.renderedHeight === 5760,
+    "Zoom out did not scale both dimensions of the tall result by one step.",
+    tallZoomOutState
+  );
+
+  await tallResultPage.click("#zoomInButton");
+  await tallResultPage.waitForFunction(() => document.querySelector("#zoomLabel")?.textContent === "100%");
+  const tallZoomInState = await tallResultPage.evaluate(() => {
+    const image = document.querySelector("#resultImage");
+    return {
+      renderedWidth: image.offsetWidth,
+      renderedHeight: image.offsetHeight
+    };
+  });
+  assert(
+    tallZoomInState.renderedWidth === 1200 && tallZoomInState.renderedHeight === 7200,
+    "Zoom in did not restore both dimensions of the tall result by one step.",
+    tallZoomInState
+  );
+
+  await tallResultPage.click("#fitPageButton");
+  const pageFitBeforeResize = await tallResultPage.locator("#resultImage").evaluate((image) => ({
+    width: image.offsetWidth,
+    height: image.offsetHeight
+  }));
+  await tallResultPage.setViewportSize({ width: 1000, height: 1000 });
+  await tallResultPage.waitForFunction(() => {
+    const viewport = document.querySelector("#resultViewport");
+    const stage = document.querySelector("#resultStage");
+    const image = document.querySelector("#resultImage");
+    const stageStyle = getComputedStyle(stage);
+    const horizontalPadding = parseFloat(stageStyle.paddingLeft || "0") + parseFloat(stageStyle.paddingRight || "0");
+    const verticalPadding = parseFloat(stageStyle.paddingTop || "0") + parseFloat(stageStyle.paddingBottom || "0");
+    const expectedZoom = Math.max(0.01, Math.min(
+      1,
+      (viewport.clientWidth - horizontalPadding) / image.naturalWidth,
+      (viewport.clientHeight - verticalPadding) / image.naturalHeight
+    ));
+    return document.querySelector("#zoomLabel")?.textContent === "Page" &&
+      Math.abs(image.offsetWidth - Math.round(image.naturalWidth * expectedZoom)) <= 1 &&
+      Math.abs(image.offsetHeight - Math.round(image.naturalHeight * expectedZoom)) <= 1;
+  });
+  const pageFitAfterResize = await tallResultPage.evaluate(() => {
+    const viewport = document.querySelector("#resultViewport");
+    const image = document.querySelector("#resultImage");
+    const viewportRect = viewport.getBoundingClientRect();
+    const imageRect = image.getBoundingClientRect();
+    return {
+      width: image.offsetWidth,
+      height: image.offsetHeight,
+      scrollWidth: viewport.scrollWidth,
+      clientWidth: viewport.clientWidth,
+      scrollHeight: viewport.scrollHeight,
+      clientHeight: viewport.clientHeight,
+      imageBottom: imageRect.bottom,
+      viewportBottom: viewportRect.bottom,
+      pagePressed: document.querySelector("#fitPageButton")?.getAttribute("aria-pressed") || ""
+    };
+  });
+  assert(
+    pageFitAfterResize.pagePressed === "true" &&
+      pageFitAfterResize.height !== pageFitBeforeResize.height &&
+      pageFitAfterResize.scrollWidth <= pageFitAfterResize.clientWidth + 2 &&
+      pageFitAfterResize.scrollHeight <= pageFitAfterResize.clientHeight + 2 &&
+      pageFitAfterResize.imageBottom <= pageFitAfterResize.viewportBottom + 1,
+    "Whole-page fit did not recompute cleanly after the result viewer resized.",
+    { before: pageFitBeforeResize, after: pageFitAfterResize }
+  );
+
+  const closedDetailsState = await tallResultPage.evaluate(() => ({
+    expanded: document.querySelector("#detailsButton")?.getAttribute("aria-expanded") || "",
+    ariaHidden: document.querySelector("#detailsPanel")?.getAttribute("aria-hidden") || "",
+    inert: document.querySelector("#detailsPanel")?.inert ?? false,
+    backdropHidden: document.querySelector("#detailsBackdrop")?.hidden ?? false,
+    topbarInert: document.querySelector(".topbar")?.inert ?? false,
+    resultShellInert: document.querySelector(".result-shell")?.inert ?? false
+  }));
+  assert(
+    closedDetailsState.expanded === "false" &&
+      closedDetailsState.ariaHidden === "true" &&
+      closedDetailsState.inert &&
+      closedDetailsState.backdropHidden &&
+      !closedDetailsState.topbarInert &&
+      !closedDetailsState.resultShellInert,
+    "The result details drawer did not initialize closed and non-interactive.",
+    closedDetailsState
+  );
+  await tallResultPage.click("#detailsButton");
+  const openDetailsState = await tallResultPage.evaluate(() => ({
+    expanded: document.querySelector("#detailsButton")?.getAttribute("aria-expanded") || "",
+    ariaHidden: document.querySelector("#detailsPanel")?.getAttribute("aria-hidden") || "",
+    ariaModal: document.querySelector("#detailsPanel")?.getAttribute("aria-modal") || "",
+    inert: document.querySelector("#detailsPanel")?.inert ?? true,
+    openClass: document.querySelector("#detailsPanel")?.classList.contains("is-open") || false,
+    backdropHidden: document.querySelector("#detailsBackdrop")?.hidden ?? true,
+    focusedId: document.activeElement?.id || "",
+    source: document.querySelector("#resultSource")?.textContent?.trim() || "",
+    dimensions: document.querySelector("#detailsDimensionsValue")?.textContent?.trim() || "",
+    files: document.querySelector("#filesValue")?.textContent?.trim() || "",
+    topbarInert: document.querySelector(".topbar")?.inert ?? false,
+    resultShellInert: document.querySelector(".result-shell")?.inert ?? false
+  }));
+  assert(
+    openDetailsState.expanded === "true" &&
+      openDetailsState.ariaHidden === "false" &&
+      openDetailsState.ariaModal === "true" &&
+      !openDetailsState.inert &&
+      openDetailsState.openClass &&
+      !openDetailsState.backdropHidden &&
+      openDetailsState.focusedId === "closeDetailsButton" &&
+      /Full(?:-resolution)? local image/i.test(openDetailsState.source) &&
+      openDetailsState.dimensions === "1,200×7,200" &&
+      openDetailsState.files === "1 saved file" &&
+      openDetailsState.topbarInert &&
+      openDetailsState.resultShellInert,
+    "The result details drawer did not expose the tall capture context accessibly.",
+    openDetailsState
+  );
+  await tallResultPage.click("#closeDetailsButton");
+  await tallResultPage.waitForFunction(() => document.querySelector("#detailsPanel")?.getAttribute("aria-hidden") === "true");
+  await tallResultPage.waitForFunction(
+    () => document.querySelector("#resultStatus")?.classList.contains("is-hidden"),
+    null,
+    { timeout: 7000 }
+  );
+
+  const settingsPagePromise = context.waitForEvent("page", { timeout: 10000 });
+  await tallResultPage.click("#settingsButton");
+  const settingsPageFromResult = await settingsPagePromise;
+  settingsPageFromResult.on("console", (message) => {
+    if (message.type() === "error") {
+      popupConsoleErrors.push(`result settings: ${message.text()}`);
+    }
+  });
+  settingsPageFromResult.on("pageerror", (error) => popupConsoleErrors.push(`result settings: ${error.message}`));
+  await settingsPageFromResult.waitForLoadState("domcontentloaded");
+  await settingsPageFromResult.waitForSelector("#privacyShieldToggle", { timeout: 10000 });
+  assert(
+    settingsPageFromResult.url() === `chrome-extension://${extensionId}/settings.html`,
+    "The result Settings action did not route to the dedicated extension settings page.",
+    settingsPageFromResult.url()
+  );
+  await settingsPageFromResult.close();
+
+  const tallPreDeleteState = await tallResultPage.evaluate(async ({ captureId, downloadId }) => {
+    const store = await import(chrome.runtime.getURL("library-store.js"));
+    const { STORAGE_KEYS } = await import(chrome.runtime.getURL("config.js"));
+    const capture = await store.getLibraryCapture(captureId, { includeEditorSource: true });
+    const [download] = await chrome.downloads.search({ id: downloadId });
+    const localState = await chrome.storage.local.get([
+      STORAGE_KEYS.captureHistory,
+      STORAGE_KEYS.watchRuns
+    ]);
+    return {
+      captureExists: Boolean(capture),
+      editorExists: Boolean(capture?.editorSource?.blob),
+      historyExists: (localState[STORAGE_KEYS.captureHistory] || []).some((record) => record?.id === captureId),
+      watchRunExists: (localState[STORAGE_KEYS.watchRuns] || []).some((record) => record?.captureId === captureId),
+      downloadId: download?.id ?? null,
+      downloadState: download?.state || "",
+      downloadExists: download?.exists !== false,
+      bytesReceived: download?.bytesReceived || 0,
+      filename: download?.filename || ""
+    };
+  }, {
+    captureId: tallResultCaptureId,
+    downloadId: tallResultSeed.downloadId
+  });
+  const tallDownloadStatBeforeDelete = await stat(tallResultSeed.filename);
+  assert(
+    tallPreDeleteState.captureExists &&
+      tallPreDeleteState.editorExists &&
+      tallPreDeleteState.historyExists &&
+      tallPreDeleteState.watchRunExists &&
+      tallPreDeleteState.downloadId === tallResultSeed.downloadId &&
+      tallPreDeleteState.downloadState === "complete" &&
+      tallPreDeleteState.downloadExists &&
+      tallPreDeleteState.bytesReceived === tallResultSeed.bytesReceived &&
+      tallDownloadStatBeforeDelete.size === tallResultSeed.bytesReceived,
+    "The disposable tall capture was not intact before exercising deletion.",
+    { tallPreDeleteState, downloadSize: tallDownloadStatBeforeDelete.size }
+  );
+
+  await tallResultPage.click("#deleteCaptureButton");
+  await tallResultPage.waitForFunction(() => document.querySelector("#deleteDialog")?.open === true);
+  const deletePromptState = await tallResultPage.evaluate(() => ({
+    open: document.querySelector("#deleteDialog")?.open || false,
+    title: document.querySelector("#deleteDialogTitle")?.textContent?.trim() || "",
+    copy: document.querySelector("#deleteDialog")?.textContent?.replace(/\s+/g, " ").trim() || ""
+  }));
+  assert(
+    deletePromptState.open &&
+      /Remove this capture/i.test(deletePromptState.title) &&
+      /Downloads stays on your device/i.test(deletePromptState.copy),
+    "The result Remove action did not present an explicit local-only confirmation.",
+    deletePromptState
+  );
+  await tallResultPage.click("#cancelDeleteButton");
+  await tallResultPage.waitForFunction(() => document.querySelector("#deleteDialog")?.open === false);
+  const captureAfterDeleteCancel = await tallResultPage.evaluate(async (captureId) => {
+    const store = await import(chrome.runtime.getURL("library-store.js"));
+    return Boolean(await store.getLibraryCapture(captureId));
+  }, tallResultCaptureId);
+  assert(captureAfterDeleteCancel, "Cancelling result deletion still removed the disposable capture.");
+
+  await tallResultPage.click("#deleteCaptureButton");
+  await tallResultPage.waitForFunction(() => document.querySelector("#deleteDialog")?.open === true);
+  await Promise.all([
+    tallResultPage.waitForURL(`chrome-extension://${extensionId}/library.html?removed=1`, { timeout: 15000 }),
+    tallResultPage.click("#confirmDeleteButton")
+  ]);
+  await tallResultPage.waitForSelector("#captureGrid", { timeout: 10000 });
+  const tallPostDeleteState = await tallResultPage.evaluate(async ({ captureId, downloadId }) => {
+    const store = await import(chrome.runtime.getURL("library-store.js"));
+    const { STORAGE_KEYS } = await import(chrome.runtime.getURL("config.js"));
+    const capture = await store.getLibraryCapture(captureId, { includeEditorSource: true });
+    const orphanedAssetKeys = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("lumen.capture.library");
+      request.onerror = () => reject(request.error || new Error("Could not inspect deleted capture assets."));
+      request.onsuccess = () => {
+        const database = request.result;
+        const transaction = database.transaction("assets", "readonly");
+        const keyRequest = transaction.objectStore("assets").index("captureId").getAllKeys(captureId);
+        keyRequest.onerror = () => reject(keyRequest.error || new Error("Could not query deleted capture assets."));
+        keyRequest.onsuccess = () => resolve(keyRequest.result || []);
+      };
+    });
+    const [download] = await chrome.downloads.search({ id: downloadId });
+    const localState = await chrome.storage.local.get([
+      STORAGE_KEYS.captureHistory,
+      STORAGE_KEYS.watchRuns
+    ]);
+    return {
+      captureMissing: !capture,
+      assetCount: orphanedAssetKeys.length,
+      historyMissing: !(localState[STORAGE_KEYS.captureHistory] || []).some((record) => record?.id === captureId),
+      watchRunMissing: !(localState[STORAGE_KEYS.watchRuns] || []).some((record) => record?.captureId === captureId),
+      cardMissing: !document.querySelector(`.capture-card[data-capture-id="${CSS.escape(captureId)}"]`),
+      downloadId: download?.id ?? null,
+      downloadState: download?.state || "",
+      downloadExists: download?.exists !== false,
+      bytesReceived: download?.bytesReceived || 0,
+      filename: download?.filename || ""
+    };
+  }, {
+    captureId: tallResultCaptureId,
+    downloadId: tallResultSeed.downloadId
+  });
+  const tallDownloadStatAfterDelete = await stat(tallResultSeed.filename);
+  assert(
+    tallPostDeleteState.captureMissing &&
+      tallPostDeleteState.assetCount === 0 &&
+      tallPostDeleteState.historyMissing &&
+      tallPostDeleteState.watchRunMissing &&
+      tallPostDeleteState.cardMissing &&
+      tallPostDeleteState.downloadId === tallResultSeed.downloadId &&
+      tallPostDeleteState.downloadState === "complete" &&
+      tallPostDeleteState.downloadExists &&
+      tallPostDeleteState.bytesReceived === tallResultSeed.bytesReceived &&
+      tallPostDeleteState.filename === tallResultSeed.filename &&
+      tallDownloadStatAfterDelete.size === tallDownloadStatBeforeDelete.size,
+    "Confirmed result deletion did not remove only the private library copy while preserving Downloads.",
+    {
+      tallPostDeleteState,
+      downloadSizeBefore: tallDownloadStatBeforeDelete.size,
+      downloadSizeAfter: tallDownloadStatAfterDelete.size
+    }
+  );
+  await tallResultPage.close();
 
   await resultPage.goto(
     `chrome-extension://${extensionId}/result.html?capture=${encodeURIComponent(seededCaptureId)}`,
@@ -826,6 +1458,125 @@ try {
     staleDownloadResultState
   );
 
+  await resultPage.setViewportSize({ width: 1920, height: 1000 });
+  await resultPage.goto(
+    `chrome-extension://${extensionId}/result.html?capture=${encodeURIComponent(thumbnailResultCaptureId)}`,
+    { waitUntil: "load" }
+  );
+  await resultPage.waitForSelector('body[data-state="limited"] #resultImage:not([hidden])', { timeout: 10000 });
+  const thumbnailOnlyState = await resultPage.evaluate(() => ({
+    imageWidth: document.querySelector("#resultImage")?.naturalWidth || 0,
+    imageHeight: document.querySelector("#resultImage")?.naturalHeight || 0,
+    source: document.querySelector("#resultSource")?.textContent?.trim() || "",
+    mainDimensions: document.querySelector("#dimensionsValue")?.textContent?.trim() || "",
+    originalDimensions: document.querySelector("#detailsDimensionsValue")?.textContent?.trim() || "",
+    hint: document.querySelector("#viewHint")?.textContent?.trim() || "",
+    zoomLabel: document.querySelector("#zoomLabel")?.textContent?.trim() || "",
+    pageLabel: document.querySelector("#fitPageButton")?.textContent?.trim() || "",
+    copyLabel: document.querySelector("#copyImageButton span:last-child")?.textContent?.trim() || "",
+    pngLabel: document.querySelector("#downloadPngButton span:last-child")?.textContent?.trim() || "",
+    copyDisabled: document.querySelector("#copyImageButton")?.disabled ?? true,
+    pngDisabled: document.querySelector("#downloadPngButton")?.disabled ?? true,
+    pdfDisabled: document.querySelector("#exportPdfButton")?.disabled ?? false,
+    annotateDisabled: document.querySelector("#annotateButton")?.disabled ?? false,
+    driveDisabled: document.querySelector("#driveButton")?.disabled ?? false
+  }));
+  assert(
+    thumbnailOnlyState.imageWidth === 360 &&
+      thumbnailOnlyState.imageHeight === 240 &&
+      thumbnailOnlyState.mainDimensions === "360×240 thumbnail" &&
+      thumbnailOnlyState.originalDimensions === "1,200×12,000" &&
+      /Cropped gallery thumbnail/i.test(thumbnailOnlyState.source) &&
+      /360×240 cropped thumbnail, not the whole capture/i.test(thumbnailOnlyState.source) &&
+      /No full-resolution saved file is still attached/i.test(thumbnailOnlyState.source) &&
+      !/complete-page review/i.test(thumbnailOnlyState.source) &&
+      /Cropped thumbnail only/i.test(thumbnailOnlyState.hint) &&
+      thumbnailOnlyState.zoomLabel === "Image" &&
+      thumbnailOnlyState.pageLabel === "Image",
+    "The result workspace presented a small gallery thumbnail as the complete capture.",
+    thumbnailOnlyState
+  );
+  assert(
+    thumbnailOnlyState.copyLabel === "Copy thumb" &&
+      thumbnailOnlyState.pngLabel === "Thumb PNG" &&
+      !thumbnailOnlyState.copyDisabled &&
+      !thumbnailOnlyState.pngDisabled &&
+      thumbnailOnlyState.pdfDisabled &&
+      thumbnailOnlyState.annotateDisabled &&
+      thumbnailOnlyState.driveDisabled,
+    "The thumbnail-only result exposed actions that require a complete capture source.",
+    thumbnailOnlyState
+  );
+  await resultPage.click("#fitButton");
+  await resultPage.waitForFunction(() => document.querySelector("#zoomLabel")?.textContent?.trim() === "Width");
+  const thumbnailWidthFit = await resultPage.evaluate(() => {
+    const image = document.querySelector("#resultImage");
+    const viewport = document.querySelector("#resultViewport");
+    const stageStyle = getComputedStyle(document.querySelector("#resultStage"));
+    const availableWidth = viewport.clientWidth -
+      parseFloat(stageStyle.paddingLeft || "0") -
+      parseFloat(stageStyle.paddingRight || "0");
+    return {
+      naturalWidth: image.naturalWidth,
+      renderedWidth: image.getBoundingClientRect().width,
+      availableWidth,
+      zoomLabel: document.querySelector("#zoomLabel")?.textContent?.trim() || ""
+    };
+  });
+  assert(
+    thumbnailWidthFit.zoomLabel === "Width" &&
+      thumbnailWidthFit.renderedWidth > thumbnailWidthFit.naturalWidth * 4 &&
+      Math.abs(thumbnailWidthFit.renderedWidth - thumbnailWidthFit.availableWidth) <= 2,
+    "Width mode did not fill the viewer when a narrow retained image required more than 4× enlargement.",
+    thumbnailWidthFit
+  );
+
+  await resultPage.goto(
+    `chrome-extension://${extensionId}/result.html?capture=${encodeURIComponent(limitedReviewCaptureId)}`,
+    { waitUntil: "load" }
+  );
+  await resultPage.waitForSelector('body[data-state="limited"] #resultImage:not([hidden])', { timeout: 10000 });
+  const limitedReviewState = await resultPage.evaluate(() => ({
+    source: document.querySelector("#resultSource")?.textContent?.trim() || "",
+    mainDimensions: document.querySelector("#dimensionsValue")?.textContent?.trim() || "",
+    originalDimensions: document.querySelector("#detailsDimensionsValue")?.textContent?.trim() || "",
+    copyLabel: document.querySelector("#copyImageButton span:last-child")?.textContent?.trim() || "",
+    pngLabel: document.querySelector("#downloadPngButton span:last-child")?.textContent?.trim() || "",
+    editLabel: document.querySelector("#annotateButton span:last-child")?.textContent?.trim() || "",
+    copyTitle: document.querySelector("#copyImageButton")?.title || "",
+    pngTitle: document.querySelector("#downloadPngButton")?.title || "",
+    editTitle: document.querySelector("#annotateButton")?.title || "",
+    pdfDisabled: document.querySelector("#exportPdfButton")?.disabled ?? true,
+    annotateDisabled: document.querySelector("#annotateButton")?.disabled ?? true,
+    pageLabel: document.querySelector("#fitPageButton")?.textContent?.trim() || ""
+  }));
+  const limitedReviewTitles = [
+    limitedReviewState.copyTitle,
+    limitedReviewState.pngTitle,
+    limitedReviewState.editTitle
+  ].join(" ");
+  assert(
+    /Complete-page review image/i.test(limitedReviewState.source) &&
+      /240×1,200 complete-page review image/i.test(limitedReviewState.source) &&
+      /No full-resolution saved file is still attached/i.test(limitedReviewState.source) &&
+      limitedReviewState.mainDimensions === "240×1,200 review" &&
+      limitedReviewState.originalDimensions === "1,200×6,000" &&
+      limitedReviewState.copyLabel === "Copy view" &&
+      limitedReviewState.pngLabel === "View PNG" &&
+      limitedReviewState.editLabel === "Edit view" &&
+      !limitedReviewState.pdfDisabled &&
+      !limitedReviewState.annotateDisabled &&
+      limitedReviewState.pageLabel === "Page",
+    "A bounded complete-page review source lost its honest dimensions or usable review actions.",
+    limitedReviewState
+  );
+  assert(
+    (limitedReviewTitles.match(/No full-resolution saved file is attached\./g) || []).length === 3 &&
+      !/unchanged|Use Details for saved/i.test(limitedReviewTitles),
+    "Limited review tooltips claimed that a full-resolution saved file existed when none was attached.",
+    limitedReviewState
+  );
+
   await resultPage.goto(
     `chrome-extension://${extensionId}/result.html?capture=${encodeURIComponent(transparentLassoCaptureId)}`,
     { waitUntil: "load" }
@@ -869,15 +1620,25 @@ try {
     "The result workspace did not preserve and visibly present a transparent lasso crop.",
     transparentLassoState
   );
-  await resultPage.evaluate(async ({ degradedCaptureId, lassoCaptureId, staleCaptureId }) => {
+  await resultPage.evaluate(async ({
+    degradedCaptureId,
+    thumbnailCaptureId,
+    limitedReviewCaptureId: reviewCaptureId,
+    lassoCaptureId,
+    staleCaptureId
+  }) => {
     const store = await import(chrome.runtime.getURL("library-store.js"));
     await Promise.all([
       store.deleteLibraryCapture(degradedCaptureId),
+      store.deleteLibraryCapture(thumbnailCaptureId),
+      store.deleteLibraryCapture(reviewCaptureId),
       store.deleteLibraryCapture(lassoCaptureId),
       store.deleteLibraryCapture(staleCaptureId)
     ]);
   }, {
     degradedCaptureId: degradedResultCaptureId,
+    thumbnailCaptureId: thumbnailResultCaptureId,
+    limitedReviewCaptureId,
     lassoCaptureId: transparentLassoCaptureId,
     staleCaptureId: staleDownloadCaptureId
   });

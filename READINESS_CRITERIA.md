@@ -42,7 +42,7 @@ Current positives:
 15. Visual-change review provides a before/after reveal, highlighted change regions, local difference statistics, and a monitor timeline.
 16. Difficult-site fixtures now cover long pages, nested scrollers, late-growing tails, transforms, lazy media, fixed overlays, canvas, sandboxed iframes, and open and closed shadow-root behavior.
 17. Rectangle and lasso pickers can capture the selected current-viewport area immediately without waiting for a second popup action; Save still creates a reusable monitoring region.
-18. Successful manual captures open a clean local result workspace with zoom, Copy image, PNG, paginated PDF, optional Drive, Annotate, original-file, and library actions.
+18. Successful manual captures open a clean viewer-first result workspace with whole-page/width/100% views, centered zoom, drag-to-pan, Copy image, PNG, paginated PDF, optional Drive, Edit, original-file, library, Settings, and confirmed remove-local-copy actions.
 
 Remaining gaps:
 

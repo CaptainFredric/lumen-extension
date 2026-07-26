@@ -191,12 +191,62 @@ async function captureResultShot(extensionId) {
   const captureId = "store-result-workspace";
 
   try {
-    await page.setViewportSize({ width: 1120, height: 720 });
+    await page.setViewportSize({ width: 1440, height: 720 });
     await page.goto(`chrome-extension://${extensionId}/library.html`, { waitUntil: "load" });
     await page.evaluate(async ({ captureId: id, imageDataUrl, capturedAt }) => {
       const { putLibraryCapture } = await import(chrome.runtime.getURL("library-store.js"));
+      const sourceImage = new Image();
+      sourceImage.src = imageDataUrl;
+      await sourceImage.decode();
+      const tallCanvas = document.createElement("canvas");
+      tallCanvas.width = sourceImage.naturalWidth;
+      tallCanvas.height = sourceImage.naturalHeight * 6;
+      const tallContext = tallCanvas.getContext("2d");
+      const sectionTitles = [
+        "Capture every detail",
+        "Review at any scale",
+        "Annotate without losing context",
+        "Export the format you need",
+        "Keep every capture private"
+      ];
+      tallContext.fillStyle = "#f7fafc";
+      tallContext.fillRect(0, 0, tallCanvas.width, tallCanvas.height);
+      tallContext.drawImage(sourceImage, 0, 0);
+
+      for (let index = 1; index < 6; index += 1) {
+        const top = index * sourceImage.naturalHeight;
+        const dark = index % 2 === 0;
+        tallContext.fillStyle = dark ? "#0e1d2d" : "#f4f8fb";
+        tallContext.fillRect(0, top, tallCanvas.width, sourceImage.naturalHeight);
+        tallContext.fillStyle = index % 2 ? "#78e7ba" : "#72d4f7";
+        tallContext.fillRect(0, top, tallCanvas.width, 10);
+        tallContext.fillStyle = dark ? "#f6fbff" : "#10243a";
+        tallContext.font = "800 66px system-ui";
+        tallContext.fillText(sectionTitles[index - 1], 96, top + 150);
+        tallContext.fillStyle = dark ? "#a9bdcf" : "#53677a";
+        tallContext.font = "400 25px system-ui";
+        tallContext.fillText("A complete Lumen workflow, saved as one continuous page.", 98, top + 205);
+
+        for (let card = 0; card < 3; card += 1) {
+          const left = 96 + card * 370;
+          tallContext.fillStyle = dark ? "#162b3f" : "#ffffff";
+          tallContext.fillRect(left, top + 285, 330, 360);
+          tallContext.fillStyle = card === 0 ? "#78e7ba" : card === 1 ? "#72d4f7" : "#ffb1ca";
+          tallContext.fillRect(left + 28, top + 315, 74, 10);
+          tallContext.fillStyle = dark ? "#eaf5ff" : "#173047";
+          tallContext.font = "700 27px system-ui";
+          tallContext.fillText(`Step ${index}.${card + 1}`, left + 28, top + 385);
+          tallContext.fillStyle = dark ? "#9eb3c7" : "#718094";
+
+          for (let line = 0; line < 6; line += 1) {
+            tallContext.fillRect(left + 28, top + 430 + line * 29, 250 - line * 12, 7);
+          }
+        }
+      }
+
+      const tallImageDataUrl = tallCanvas.toDataURL("image/png");
       const downloadId = await chrome.downloads.download({
-        url: imageDataUrl,
+        url: tallImageDataUrl,
         filename: "Lumen/store-shot/launch-page.png",
         saveAs: false
       });
@@ -223,7 +273,7 @@ async function captureResultShot(extensionId) {
         url: "https://lumen-store.test/",
         capturedAt,
         sourceType: "manual",
-        dimensions: { width: 1280, height: 860 },
+        dimensions: { width: tallCanvas.width, height: tallCanvas.height },
         fileCount: 1,
         downloads: [{
           downloadId,
@@ -233,15 +283,15 @@ async function captureResultShot(extensionId) {
           kind: "image",
           role: "full-page",
           variantId: "desktop",
-          width: 1280,
-          height: 860
+          width: tallCanvas.width,
+          height: tallCanvas.height
         }],
         editorSource: {
-          dataUrl: imageDataUrl,
-          width: 1280,
-          height: 860,
-          originalWidth: 1280,
-          originalHeight: 860,
+          dataUrl: tallImageDataUrl,
+          width: tallCanvas.width,
+          height: tallCanvas.height,
+          originalWidth: tallCanvas.width,
+          originalHeight: tallCanvas.height,
           scaled: false,
           kind: "lossless-full-output",
           role: "full-page",
@@ -255,7 +305,11 @@ async function captureResultShot(extensionId) {
     });
     await page.goto(`chrome-extension://${extensionId}/result.html?capture=${captureId}`, { waitUntil: "load" });
     await page.waitForSelector('body[data-state="ready"] #resultImage:not([hidden])', { timeout: 10000 });
-    await page.waitForTimeout(350);
+    await page.waitForFunction(
+      () => document.querySelector("#resultStatus")?.classList.contains("is-hidden"),
+      null,
+      { timeout: 7000 }
+    );
     return await page.screenshot({ type: "png", fullPage: false });
   } finally {
     await page.close();
@@ -395,7 +449,7 @@ function buildResultWorkspaceShot(resultImage, settingsImage) {
         <p>Copy the image, download PNG or PDF, annotate it, or return to the saved original from one clean workspace.</p>
       </div>
       <div class="workspace-pair">
-        <figure class="browser-card library-card"><img src="${resultImage}" alt="Lumen Capture Result workspace" /><figcaption>Copy, zoom, edit, and export</figcaption></figure>
+        <figure class="browser-card library-card result-card"><img src="${resultImage}" alt="Lumen Capture Result workspace" /><figcaption>Copy, zoom, edit, and export</figcaption></figure>
         <div class="phone-frame workspace-phone"><img src="${settingsImage}" alt="Lumen Privacy Shield settings" /></div>
       </div>
     </section>
@@ -775,6 +829,11 @@ function buildStoreShell(bodyHtml) {
             height: 414px;
             object-fit: cover;
             object-position: top left;
+          }
+          .browser-card.result-card img {
+            object-fit: contain;
+            object-position: center;
+            background: #dfe3e7;
           }
           figcaption {
             position: absolute;

@@ -7,7 +7,7 @@ This release makes the path from capture to a useful result immediate, while tes
 ### Capture and result flow
 
 1. Added **Capture now** to the rectangle and freeform lasso pickers. It captures the selected current-viewport area immediately; **Save** remains the separate action for remembering a monitoring region.
-2. Added a clean Capture Result workspace that opens after successful manual captures with a zoomable preview, Copy image, PNG, paginated PDF, optional Google Drive, Annotate, original-file, and library actions. Timed captures remain quiet and stay in the local shelf.
+2. Added a viewer-first Capture Result workspace that opens after successful manual captures with whole-page, fit-width, and actual-pixel views; centered zoom and drag-to-pan; Copy, PNG, paginated PDF, optional Google Drive, Edit, original-file, library, Settings, and confirmed remove-local-copy actions. Timed captures remain quiet and stay in the local shelf.
 3. Added the exact-area shortcut (`Alt+Shift+E`; `Alt+Shift+A` on macOS) beside full-page (`Alt+Shift+L`) and visible-area (`Alt+Shift+V`) shortcuts.
 4. Kept visible and selected-area captures at the user's current scroll position instead of resetting the page before capture.
 5. Made the area picker keyboard-operable and non-destructive until Save, and made all capture shortcuts honor Privacy Shield and review-before-save.
@@ -23,7 +23,7 @@ This release makes the path from capture to a useful result immediate, while tes
 
 1. Physical toolbar and shortcut gestures remain a short stock-Chrome release check on hosts where Chrome rejects virtual-display input; drawing through the area shortcut is part of that pass.
 2. Google Drive export still requires the publisher-owned production OAuth client. Local copy, PNG, PDF, and annotation work without it.
-3. Very large captures can use a bounded working proxy in the result/editor UI while the full-resolution original remains in Chrome Downloads.
+3. Very large captures can use a bounded complete-page review image in the result/editor UI while the full-resolution originals remain in Chrome Downloads. Result actions now label review-image Copy, PNG, Edit, and Drive output explicitly instead of presenting that proxy as the original resolution.
 
 ## 0.4.0 — July 18, 2026
 

@@ -211,13 +211,19 @@ assert(
   const packagedResultSeed = await library.evaluate(async (captureId) => {
     const store = await import(chrome.runtime.getURL("library-store.js"));
     const canvas = document.createElement("canvas");
-    canvas.width = 640;
-    canvas.height = 960;
+    canvas.width = 1200;
+    canvas.height = 7200;
     const context = canvas.getContext("2d");
     context.fillStyle = "#0b1725";
     context.fillRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = "#7fe9bd";
-    context.fillRect(64, 640, 512, 180);
+
+    for (let top = 0; top < canvas.height; top += 600) {
+      context.fillStyle = top % 1200 ? "#f4f8fb" : "#10243a";
+      context.fillRect(72, top + 54, 1056, 474);
+      context.fillStyle = top % 1200 ? "#10243a" : "#7fe9bd";
+      context.font = "800 48px system-ui";
+      context.fillText(`Exact package section ${top / 600 + 1}`, 120, top + 160);
+    }
     const dataUrl = canvas.toDataURL("image/png");
     const downloadId = await chrome.downloads.download({
       url: dataUrl,
@@ -247,7 +253,7 @@ assert(
       url: "https://release.test/result",
       capturedAt: new Date().toISOString(),
       sourceType: "manual",
-      dimensions: { width: 640, height: 960 },
+      dimensions: { width: 1200, height: 7200 },
       fileCount: 1,
       downloads: [{
         downloadId,
@@ -256,15 +262,15 @@ assert(
         complete: true,
         kind: "image",
         role: "full-page",
-        width: 640,
-        height: 960
+        width: 1200,
+        height: 7200
       }],
       editorSource: {
         dataUrl,
-        width: 640,
-        height: 960,
-        originalWidth: 640,
-        originalHeight: 960,
+        width: 1200,
+        height: 7200,
+        originalWidth: 1200,
+        originalHeight: 7200,
         scaled: false,
         kind: "lossless-full-output",
         role: "full-page",
@@ -296,13 +302,20 @@ assert(
     const actionIds = [
       "copyImageButton", "downloadPngButton", "exportPdfButton", "annotateButton",
       "openOriginalButton", "showOriginalButton", "openLibraryButton",
-      "zoomOutButton", "zoomInButton", "actualSizeButton", "fitButton"
+      "detailsButton", "settingsButton", "deleteCaptureButton",
+      "zoomOutButton", "zoomInButton", "actualSizeButton", "fitPageButton", "fitButton"
     ];
     return {
       title: document.querySelector("#resultTitle")?.textContent?.trim() || "",
       state: document.body.dataset.state || "",
       imageWidth: image?.naturalWidth || 0,
       imageHeight: image?.naturalHeight || 0,
+      renderedWidth: image?.getBoundingClientRect().width || 0,
+      renderedHeight: image?.getBoundingClientRect().height || 0,
+      viewportWidth: document.querySelector("#resultViewport")?.clientWidth || 0,
+      viewportHeight: document.querySelector("#resultViewport")?.clientHeight || 0,
+      zoomLabel: document.querySelector("#zoomLabel")?.textContent?.trim() || "",
+      pagePressed: document.querySelector("#fitPageButton")?.getAttribute("aria-pressed") || "",
       loadingVisible: getComputedStyle(document.querySelector("#loadingState")).display !== "none",
       emptyVisible: getComputedStyle(document.querySelector("#emptyState")).display !== "none",
       actionsReady: actionIds.every((id) => {
@@ -322,8 +335,12 @@ assert(
   assert(
     packagedResultState.title === "Packaged result" &&
       packagedResultState.state === "ready" &&
-      packagedResultState.imageWidth === 640 &&
-      packagedResultState.imageHeight === 960 &&
+      packagedResultState.imageWidth === 1200 &&
+      packagedResultState.imageHeight === 7200 &&
+      packagedResultState.renderedWidth <= packagedResultState.viewportWidth &&
+      packagedResultState.renderedHeight <= packagedResultState.viewportHeight &&
+      packagedResultState.zoomLabel === "Page" &&
+      packagedResultState.pagePressed === "true" &&
       !packagedResultState.loadingVisible &&
       !packagedResultState.emptyVisible &&
       packagedResultState.actionsReady &&
@@ -335,10 +352,50 @@ assert(
     "The exact release ZIP did not initialize its clean capture result workspace.",
     packagedResultState
   );
+  await packagedResult.click("#fitButton");
+  const packagedTallWidthState = await packagedResult.evaluate(() => {
+    const viewport = document.querySelector("#resultViewport");
+    const image = document.querySelector("#resultImage");
+    viewport.scrollTop = viewport.scrollHeight;
+    return {
+      zoomLabel: document.querySelector("#zoomLabel")?.textContent?.trim() || "",
+      widthPressed: document.querySelector("#fitButton")?.getAttribute("aria-pressed") || "",
+      renderedWidth: Math.round(image.getBoundingClientRect().width),
+      renderedHeight: Math.round(image.getBoundingClientRect().height),
+      availableWidth: viewport.clientWidth - 60,
+      scrollHeight: viewport.scrollHeight,
+      clientHeight: viewport.clientHeight,
+      reachedBottom: Math.abs(viewport.scrollTop - (viewport.scrollHeight - viewport.clientHeight)) <= 2
+    };
+  });
+  assert(
+    packagedTallWidthState.zoomLabel === "Width" &&
+      packagedTallWidthState.widthPressed === "true" &&
+      Math.abs(packagedTallWidthState.renderedWidth - packagedTallWidthState.availableWidth) <= 2 &&
+      packagedTallWidthState.renderedHeight > packagedTallWidthState.clientHeight &&
+      packagedTallWidthState.scrollHeight > packagedTallWidthState.clientHeight &&
+      packagedTallWidthState.reachedBottom,
+    "The exact release ZIP clipped or mis-scaled its tall fit-width result.",
+    packagedTallWidthState
+  );
+  await packagedResult.click("#actualSizeButton");
+  const packagedActualState = await packagedResult.evaluate(() => ({
+    zoomLabel: document.querySelector("#zoomLabel")?.textContent?.trim() || "",
+    width: Math.round(document.querySelector("#resultImage")?.getBoundingClientRect().width || 0),
+    height: Math.round(document.querySelector("#resultImage")?.getBoundingClientRect().height || 0)
+  }));
+  assert(
+    packagedActualState.zoomLabel === "100%" &&
+      packagedActualState.width === 1200 &&
+      packagedActualState.height === 7200,
+    "The exact release ZIP did not expose actual pixels for its tall result.",
+    packagedActualState
+  );
+  await packagedResult.click("#fitPageButton");
   await packagedResult.click("#copyImageButton");
-  await packagedResult.waitForFunction(() => /Copied 640×960 PNG to the clipboard/i.test(
+  await packagedResult.waitForFunction(() => /Copied 1,200×7,200 PNG to the clipboard/i.test(
     document.querySelector("#resultStatus")?.textContent || ""
-  ), null, { timeout: 10000 });
+  ), null, { timeout: 15000 });
   await packagedResult.close();
   await library.evaluate(async (captureId) => {
     const store = await import(chrome.runtime.getURL("library-store.js"));
