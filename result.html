@@ -133,6 +133,11 @@
       </dl>
 
       <div class="secondary-actions" aria-label="Saved file actions">
+        <label class="saved-file-field" for="savedFileSelect">
+          <span>Saved artifact</span>
+          <select id="savedFileSelect" aria-describedby="savedFileHint" disabled></select>
+        </label>
+        <p id="savedFileHint" class="privacy-note">Choose an original view, crop, or details file to open. The image above stays on the local review copy.</p>
         <button id="driveButton" class="drive-action" type="button" hidden disabled>Export to Google Drive</button>
         <button id="openOriginalButton" type="button" disabled>Open saved file</button>
         <button id="showOriginalButton" type="button" disabled>Show in folder</button>

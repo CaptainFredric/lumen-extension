@@ -3518,26 +3518,32 @@ async function createCaptureTarget(tab, variant) {
     focused: false
   });
 
-  const [viewportTab] = await chrome.tabs.query({
-    windowId: createdWindow.id,
-    active: true
-  });
+  try {
+    const [viewportTab] = await chrome.tabs.query({
+      windowId: createdWindow.id,
+      active: true
+    });
 
-  if (!viewportTab?.id) {
-    throw createFriendlyError(
-      `${variant.label} View Failed`,
-      `Chrome could not create the temporary ${variant.label.toLowerCase()} capture window.`
-    );
+    if (!viewportTab?.id) {
+      throw createFriendlyError(
+        `${variant.label} View Failed`,
+        `Chrome could not create the temporary ${variant.label.toLowerCase()} capture window.`
+      );
+    }
+
+    await waitForTabComplete(viewportTab.id);
+    await sleep(260);
+
+    return {
+      kind: "viewport",
+      tab: viewportTab,
+      windowId: createdWindow.id
+    };
+  } catch (error) {
+    // Callers can only clean up after this function returns a target.
+    await closeWindowSafely(createdWindow.id);
+    throw error;
   }
-
-  await waitForTabComplete(viewportTab.id);
-  await sleep(260);
-
-  return {
-    kind: "viewport",
-    tab: viewportTab,
-    windowId: createdWindow.id
-  };
 }
 
 async function calibrateCaptureViewport(target, variant) {

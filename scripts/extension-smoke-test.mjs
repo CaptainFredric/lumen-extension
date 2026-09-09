@@ -764,6 +764,14 @@ try {
     lassoCaptureId: transparentLassoCaptureId,
     staleCaptureId: staleDownloadCaptureId
   });
+  const artifactChoices = await librarySeedPage.evaluate(async ({ captureId, secondId }) => {
+    const store = await import(chrome.runtime.getURL("library-store.js"));
+    const capture = await store.getLibraryCapture(captureId);
+    const second = await store.getLibraryCapture(secondId);
+    const extra = { ...second.downloads[0], variantId: "tablet" };
+    await store.putLibraryCapture({ ...capture, downloads: [...capture.downloads, extra] });
+    return { first: capture.downloads[0].downloadId, second: extra.downloadId };
+  }, { captureId: seededCaptureId, secondId: tallResultCaptureId });
   await librarySeedPage.close();
 
   const resultPage = await context.newPage();
@@ -830,6 +838,28 @@ try {
   }), stableResultIds);
 
   assert(resultWorkspaceState.missingIds.length === 0, "The result workspace lost stable action or viewer IDs.", resultWorkspaceState);
+  await resultPage.click("#detailsButton");
+  assert(await resultPage.locator("#savedFileSelect option").count() === 2, "Every available original should be selectable.");
+  await resultPage.selectOption("#savedFileSelect", String(artifactChoices.second));
+  await resultPage.evaluate(() => {
+    const original = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = (message, ...args) => {
+      if (message.type === "LUMEN_SHOW_LIBRARY_PHOTO") {
+        window.selectedArtifactRequest = message;
+        chrome.runtime.sendMessage = original;
+        return Promise.resolve({ ok: true });
+      }
+      return original(message, ...args);
+    };
+  });
+  await resultPage.click("#showOriginalButton");
+  const selectedRequest = await resultPage.evaluate(() => window.selectedArtifactRequest);
+  assert(selectedRequest?.payload?.downloadId === artifactChoices.second && selectedRequest.payload.captureId === seededCaptureId,
+    "Saved file action should target the chosen artifact within this capture.", selectedRequest);
+  assert(await resultPage.locator("#resultImage").evaluate((image) => image.naturalWidth) === 720,
+    "Selecting an original should preserve the working review image.");
+  await resultPage.selectOption("#savedFileSelect", String(artifactChoices.first));
+  await resultPage.click("#closeDetailsButton");
   assert(
     resultWorkspaceState.state === "ready" &&
       !resultWorkspaceState.imageHidden &&

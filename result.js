@@ -46,6 +46,7 @@ const ui = {
   driveButton: document.querySelector("#driveButton"),
   openOriginalButton: document.querySelector("#openOriginalButton"),
   showOriginalButton: document.querySelector("#showOriginalButton"),
+  savedFileSelect: document.querySelector("#savedFileSelect"),
   openLibraryButton: document.querySelector("#openLibraryButton"),
   detailsButton: document.querySelector("#detailsButton"),
   detailsPanel: document.querySelector("#detailsPanel"),
@@ -115,6 +116,7 @@ async function initialize() {
   state.source = selectBestImageSource(state.capture);
   state.savedDownloads = await reconcileUsableDownloads(state.capture.downloads);
   state.originalDownload = selectPrimaryDownload(state.savedDownloads);
+  renderSavedFileChoices();
   renderCaptureDetails();
   await configureDriveAction();
 
@@ -136,6 +138,12 @@ async function initialize() {
 }
 
 function bindEvents() {
+  ui.savedFileSelect.addEventListener("change", () => {
+    state.originalDownload = state.savedDownloads.find((item) => String(item.downloadId) === ui.savedFileSelect.value) || null;
+    renderFileActions();
+    syncActionAvailability();
+    setStatus("Saved artifact selected. Open it or show its folder from Details.", "success");
+  });
   ui.copyImageButton.addEventListener("click", copyImage);
   ui.downloadPngButton.addEventListener("click", downloadPng);
   ui.exportPdfButton.addEventListener("click", exportPdf);
@@ -247,6 +255,24 @@ function selectPrimaryDownload(downloads = []) {
   ) || records.find((item) =>
     Number.isInteger(item?.downloadId) && item.kind === "image" && item.complete !== false
   ) || records.find((item) => item.kind !== "manifest") || records[0] || null;
+}
+
+function renderSavedFileChoices() {
+  ui.savedFileSelect.replaceChildren();
+  for (const download of state.savedDownloads) {
+    const option = document.createElement("option");
+    option.value = String(download.downloadId);
+    const filename = String(download.filename || "").split(/[\\/]/).pop();
+    const context = [download.variantId, download.role || download.kind].filter(Boolean).join(" / ");
+    option.textContent = [context, filename || "Saved file"].filter(Boolean).join(": ");
+    ui.savedFileSelect.append(option);
+  }
+  ui.savedFileSelect.value = String(state.originalDownload?.downloadId ?? "");
+  if (!state.savedDownloads.length) {
+    const option = document.createElement("option");
+    option.textContent = "No saved files available";
+    ui.savedFileSelect.append(option);
+  }
 }
 
 function renderCaptureDetails() {
@@ -413,6 +439,7 @@ function syncActionAvailability() {
   const hasCompleteImage = hasImage && state.source?.completePage !== false;
   const hasPdf = Boolean(state.capture?.pdfSource?.blob);
   const hasDownload = Boolean(state.originalDownload);
+  ui.savedFileSelect.disabled = !state.savedDownloads.length || state.busy;
 
   ui.copyImageButton.disabled = !hasImage;
   ui.downloadPngButton.disabled = !hasImage;
@@ -476,7 +503,7 @@ function renderFileActions() {
     return;
   }
 
-  const openLabel = describeOpenAction(download, countSavedImages());
+  const openLabel = describeOpenAction(download);
   ui.openOriginalButton.textContent = openLabel;
   ui.openOriginalButton.title = `${openLabel} from Chrome Downloads`;
   ui.showOriginalButton.textContent = savedFileCount > 1 ? "Show files in folder" : "Show in folder";
@@ -485,7 +512,7 @@ function renderFileActions() {
     : "Reveal the saved file in its folder";
 }
 
-function describeOpenAction(download, imageFileCount) {
+function describeOpenAction(download) {
   if (download.kind === "image" && download.role === "cutaway") {
     return "Open saved crop";
   }
@@ -495,7 +522,7 @@ function describeOpenAction(download, imageFileCount) {
   }
 
   if (download.kind === "image") {
-    return imageFileCount > 1 ? "Open first saved image" : "Open saved image";
+    return "Open saved image";
   }
 
   if (download.kind === "html" || download.role === "print-sheet") {
@@ -507,10 +534,6 @@ function describeOpenAction(download, imageFileCount) {
   }
 
   return "Open saved file";
-}
-
-function countSavedImages() {
-  return state.savedDownloads.filter((download) => download.kind === "image").length;
 }
 
 function renderPrivacyNote() {
@@ -691,7 +714,7 @@ async function runOriginalAction(action) {
     return;
   }
 
-  const openLabel = describeOpenAction(state.originalDownload, countSavedImages());
+  const openLabel = describeOpenAction(state.originalDownload);
   const openedName = openLabel.replace(/^Open\s+/i, "");
   const openedMessage = `${openedName.charAt(0).toUpperCase()}${openedName.slice(1)} opened.`;
   await runBusyAction(action === "open" ? `${openLabel.replace(/^Open/, "Opening")}…` : "Opening the saved-file location…", async () => {
@@ -836,6 +859,7 @@ async function runBusyAction(message, action) {
   }
 
   state.busy = true;
+  ui.savedFileSelect.disabled = true;
   document.body.dataset.busy = "true";
   document.body.setAttribute("aria-busy", "true");
   setStatus(message, "neutral");
@@ -846,6 +870,7 @@ async function runBusyAction(message, action) {
     setStatus(error?.message || "That result action did not complete.", "error");
   } finally {
     state.busy = false;
+    ui.savedFileSelect.disabled = !state.savedDownloads.length;
     document.body.dataset.busy = "false";
     document.body.setAttribute("aria-busy", "false");
   }

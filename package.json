@@ -8,6 +8,7 @@
     "api": "node backend/server.mjs",
     "site": "node scripts/site-server.mjs",
     "smoke:capture": "node scripts/capture-smoke-test.mjs",
+    "test:capture-lifecycle": "node --test scripts/capture-target-lifecycle-test.mjs",
     "smoke:difficult-sites": "node scripts/difficult-site-reliability-test.mjs",
     "smoke:backend": "node scripts/backend-smoke-test.mjs",
     "smoke:sync": "node scripts/bootstrap-sync-smoke-test.mjs",
