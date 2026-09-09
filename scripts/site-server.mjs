@@ -3,13 +3,12 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const repoRoot = path.resolve(__dirname, "..");
-const host = process.env.HOST ?? "127.0.0.1";
-const port = Number.parseInt(process.env.PORT ?? "3000", 10);
-
-const MIME_TYPES = {
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
+const siteRoot = path.join(repoRoot, "docs");
+const types = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -17,65 +16,82 @@ const MIME_TYPES = {
   ".png": "image/png",
   ".svg": "image/svg+xml",
   ".webm": "video/webm",
-  ".webmanifest": "application/manifest+json; charset=utf-8",
+  ".zip": "application/zip",
 };
 
-const resolveFilePath = (requestUrl) => {
-  const url = new URL(requestUrl, `http://${host}:${port}`);
-  const pathname = decodeURIComponent(url.pathname);
-  const normalizedPath = pathname === "/" ? "/index.html" : pathname;
-  const withIndex = normalizedPath.endsWith("/") ? `${normalizedPath}index.html` : normalizedPath;
-  const absolutePath = path.resolve(repoRoot, `.${withIndex}`);
-
-  if (!isInsideRoot(repoRoot, absolutePath)) {
-    return null;
-  }
-
-  return absolutePath;
-};
-
-const isInsideRoot = (root, targetPath) => {
-  const relative = path.relative(root, targetPath);
-  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
-};
-
-const send = (response, statusCode, body, contentType) => {
-  response.writeHead(statusCode, {
-    "Cache-Control": "no-cache",
-    "Content-Type": contentType,
-  });
-  response.end(body);
-};
-
-const server = http.createServer(async (request, response) => {
-  try {
-    const filePath = resolveFilePath(request.url ?? "/");
-    if (!filePath) {
-      send(response, 403, "Forbidden", "text/plain; charset=utf-8");
+// Preview exactly the folder deployed by Pages, never the extension's runtime.
+export function createSiteServer() {
+  return http.createServer(async (request, response) => {
+    const send = (status, body, type = "text/plain; charset=utf-8") => {
+      response.writeHead(status, {
+        "Cache-Control": "no-cache",
+        "Content-Type": type,
+        "X-Content-Type-Options": "nosniff",
+      });
+      response.end(request.method === "HEAD" ? undefined : body);
+    };
+    if (!["GET", "HEAD"].includes(request.method)) {
+      response.setHeader("Allow", "GET, HEAD");
+      send(405, "Method Not Allowed");
       return;
     }
-
-    const fileBuffer = await fs.readFile(filePath);
-    const ext = path.extname(filePath).toLowerCase();
-    const contentType = MIME_TYPES[ext] ?? "application/octet-stream";
-    send(response, 200, fileBuffer, contentType);
-  } catch (error) {
-    const fallbackPath = path.join(repoRoot, "404.html");
-
-    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
-      try {
-        const fallback = await fs.readFile(fallbackPath);
-        send(response, 404, fallback, "text/html; charset=utf-8");
-      } catch {
-        send(response, 404, "Not Found", "text/plain; charset=utf-8");
+    let pathname;
+    try {
+      pathname = decodeURIComponent(
+        new URL(request.url, "http://localhost").pathname,
+      );
+    } catch {
+      send(400, "Bad Request");
+      return;
+    }
+    const indexed = pathname.endsWith("/") ? pathname + "index.html" : pathname;
+    const filePath = path.resolve(siteRoot, "." + indexed);
+    const relative = path.relative(siteRoot, filePath);
+    if (
+      relative.startsWith("..") ||
+      path.isAbsolute(relative) ||
+      relative.includes("\0")
+    ) {
+      send(403, "Forbidden");
+      return;
+    }
+    try {
+      const file = await fs.readFile(filePath);
+      send(
+        200,
+        file,
+        types[path.extname(filePath)] || "application/octet-stream",
+      );
+    } catch (error) {
+      if (["ENOENT", "EISDIR", "ENOTDIR"].includes(error.code)) {
+        send(
+          404,
+          await fs.readFile(path.join(siteRoot, "404.html")),
+          types[".html"],
+        );
+      } else {
+        send(500, "Internal Server Error");
       }
-      return;
     }
+  });
+}
 
-    send(response, 500, "Internal Server Error", "text/plain; charset=utf-8");
-  }
-});
-
-server.listen(port, host, () => {
-  console.log(`Lumen site available at http://${host}:${port}/`);
-});
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  const host = process.env.HOST || "127.0.0.1";
+  const port = Number.parseInt(process.env.PORT || "4173", 10);
+  const server = createSiteServer();
+  server.on("error", (error) => {
+    console.error(
+      `Lumen preview could not start: ${error.message}. Set PORT to an available port.`,
+    );
+    process.exitCode = 1;
+  });
+  server.listen(port, host, () =>
+    console.log(
+      `Lumen site available at http://${host}:${server.address().port}/`,
+    ),
+  );
+}

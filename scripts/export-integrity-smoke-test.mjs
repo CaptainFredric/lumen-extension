@@ -15,7 +15,7 @@ const context = await browser.newContext({ acceptDownloads: true });
 try {
   await verifySourceGuards();
   const page = await context.newPage();
-  await page.goto(`${fixture.baseUrl}/index.html`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${fixture.baseUrl}/test-harness.html`, { waitUntil: "domcontentloaded" });
 
   const sequenceResult = await page.evaluate(async () => {
     const { createCanvasSequencePdfBlob } = await import("./export-utils.js");
@@ -416,6 +416,12 @@ async function startStaticServer() {
   const server = createServer(async (request, response) => {
     try {
       const pathname = decodeURIComponent(new URL(request.url || "/", "http://127.0.0.1").pathname);
+      // Module tests need a stable origin independent of public-site redirects.
+      if (pathname === "/test-harness.html") {
+        response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        response.end('<!doctype html><title>Export integrity fixture</title>');
+        return;
+      }
       const target = path.resolve(repoRoot, `.${pathname}`);
       const relative = path.relative(repoRoot, target);
 

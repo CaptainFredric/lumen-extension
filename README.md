@@ -370,7 +370,9 @@ Release and store handoff documents:
 3. Wait for the `Deploy Pages` workflow to complete
 4. Use `https://captainfredric.github.io/lumen-extension/`
 
-The Pages workflow deploys `docs/` as the public root. The root public files mirror the `docs/` copies so local repository-root previews match the deployed page. The project also keeps a compatibility route at `/docs/` so older shared links redirect back to the root product page.
+The Pages workflow deploys `docs/` as the public root. This is the only website source. Run `npm run site` to preview that exact folder at `http://127.0.0.1:4173/`; set `PORT` to choose another port. Port 3000 stays available for other apps. Root `index.html` and `privacy.html` are compatibility redirects for generic repository previews.
+
+The former public review demo at `review.html?demo=1` now redirects to the workflow section. The working extension review page stays at the repository root and remains part of the extension runtime. Avoid copying extension modules into `docs/`. The compatibility route at `/docs/` sends old shared links back to the root website.
 
 To verify the deployed route shape locally:
 
@@ -378,7 +380,7 @@ To verify the deployed route shape locally:
 npm run smoke:site
 ```
 
-This checks the mirrored public files, the root landing page, privacy page, legacy `/docs/` route, 404 fallback, and required social and store screenshot assets.
+This checks the actual preview server, legacy redirects, public asset and anchor paths, privacy page, keyboard focus, reduced motion, JavaScript failure, mobile/tablet/desktop layout, and isolation from extension runtime files. Extension review behavior has its own `npm run smoke:review` test.
 
 ## Product Backlog
 

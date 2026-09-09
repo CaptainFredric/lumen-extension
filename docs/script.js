@@ -1,60 +1,21 @@
-const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-const revealTargets = [...document.querySelectorAll("[data-reveal]")];
-
-if ("IntersectionObserver" in window && !reducedMotion) {
-  const revealObserver = new IntersectionObserver(
-    (entries) => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) {
-          continue;
-        }
-
-        entry.target.classList.add("is-visible");
-        revealObserver.unobserve(entry.target);
-      }
-    },
-    { rootMargin: "0px 0px -4%", threshold: 0.08 }
-  );
-
-  for (const target of revealTargets) {
-    revealObserver.observe(target);
-  }
-} else {
-  for (const target of revealTargets) {
-    target.classList.add("is-visible");
-  }
-}
-
+// Navigation is progressive enhancement. All content and actions work without it.
 const navLinks = [...document.querySelectorAll('.site-nav a[href^="#"]')];
-const navSections = navLinks
-  .map((link) => document.querySelector(link.getAttribute("href")))
+const sections = navLinks
+  .map((link) => document.getElementById(link.hash.slice(1)))
   .filter(Boolean);
 
-if ("IntersectionObserver" in window && navSections.length) {
-  const sectionObserver = new IntersectionObserver(
+if ("IntersectionObserver" in window) {
+  const observer = new IntersectionObserver(
     (entries) => {
-      const visible = entries
-        .filter((entry) => entry.isIntersecting)
-        .sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0];
-
-      if (!visible) {
-        return;
-      }
-
+      const current = entries.find((entry) => entry.isIntersecting);
+      if (!current) return;
       for (const link of navLinks) {
-        const isCurrent = link.getAttribute("href") === `#${visible.target.id}`;
-
-        if (isCurrent) {
-          link.setAttribute("aria-current", "true");
-        } else {
-          link.removeAttribute("aria-current");
-        }
+        if (link.hash === `#${current.target.id}`)
+          link.setAttribute("aria-current", "location");
+        else link.removeAttribute("aria-current");
       }
     },
-    { rootMargin: "-18% 0px -66%", threshold: [0, 0.2, 0.5] }
+    { rootMargin: "-10% 0px -65%" },
   );
-
-  for (const section of navSections) {
-    sectionObserver.observe(section);
-  }
+  sections.forEach((section) => observer.observe(section));
 }
