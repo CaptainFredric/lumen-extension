@@ -145,8 +145,8 @@
       <aside class="properties-panel" aria-label="Annotation properties">
         <div class="properties-heading">
           <div>
-            <p class="panel-label">Inspector</p>
-            <h2 id="inspectorTitle">New annotation</h2>
+            <p class="panel-label">Tool options</p>
+            <h2 id="inspectorTitle">Choose a tool or select an edit</h2>
           </div>
           <button id="deleteButton" class="delete-button" type="button" disabled>Delete</button>
         </div>
@@ -161,7 +161,7 @@
           </label>
 
           <label class="field-label" for="strokeWidthInput">
-            <span>Line weight <output id="strokeWidthValue" for="strokeWidthInput">4 px</output></span>
+            <span>Line thickness <output id="strokeWidthValue" for="strokeWidthInput">4 px</output></span>
             <input id="strokeWidthInput" type="range" min="2" max="16" step="1" value="4" />
           </label>
         </div>
@@ -195,11 +195,8 @@
           </label>
         </div>
 
-        <section class="shortcut-card" aria-labelledby="shortcutTitle">
-          <div class="shortcut-heading">
-            <h3 id="shortcutTitle">Keyboard</h3>
-            <span>Fast editing</span>
-          </div>
+        <details class="shortcut-card">
+          <summary>Keyboard shortcuts</summary>
           <dl>
             <div><dt>Undo / redo</dt><dd><kbd>⌘Z</kbd> <kbd>⇧⌘Z</kbd></dd></div>
             <div><dt>Create centered</dt><dd><kbd>Tool</kbd> <kbd>Enter</kbd></dd></div>
@@ -209,7 +206,7 @@
             <div><dt>PNG / PDF</dt><dd><kbd>⌘S</kbd> <kbd>⇧⌘S</kbd></dd></div>
             <div><dt>Fit / actual size</dt><dd><kbd>⌘0</kbd> <kbd>⌘1</kbd></dd></div>
           </dl>
-        </section>
+        </details>
 
         <p class="privacy-note">Edits stay in this tab unless you explicitly export a local PNG/PDF or choose the optional reviewed-image Drive action.</p>
       </aside>

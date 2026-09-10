@@ -1291,10 +1291,11 @@ function updateInspector() {
   ui.inspectorTitle.textContent = selected
     ? `${titleCase(selected.type)} selected`
     : activeType === "select"
-      ? "New annotation"
+      ? "Choose a tool or select an edit"
       : `New ${titleCase(activeType)}`;
   ui.deleteButton.disabled = !selected;
-  ui.annotationStyleProperties.classList.toggle("is-hidden", ["blur", "pixelate"].includes(activeType));
+  ui.annotationStyleProperties.classList.toggle("is-hidden", !["arrow", "rectangle", "text"].includes(activeType));
+  ui.strokeWidthInput.closest("label").classList.toggle("is-hidden", !["arrow", "rectangle"].includes(activeType));
   ui.textProperties.classList.toggle("is-hidden", activeType !== "text");
   ui.blurProperties.classList.toggle("is-hidden", activeType !== "blur");
   ui.pixelateProperties.classList.toggle("is-hidden", activeType !== "pixelate");

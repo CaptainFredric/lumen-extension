@@ -61,8 +61,24 @@ try {
   await page.reload();
   await page.waitForFunction(() => ["ready", "limited"].includes(document.body.dataset.state));
   assert(await page.locator("#captureWarning").isHidden(), "Complete capture retained warning");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${origin}/editor.html?capture=partial-fixture`);
+  await page.waitForFunction(() => !document.querySelector("#exportButton").disabled);
+  const color = page.locator("#colorInput");
+  const thickness = page.locator("#strokeWidthInput");
+  assert(await color.isHidden(), "Empty selection showed style controls");
+  for (const tool of ["arrow", "rectangle", "text", "blur", "pixelate", "select"]) {
+    await page.locator(`[data-tool="${tool}"]`).click();
+    assert.equal(await color.isVisible(), ["arrow", "rectangle", "text"].includes(tool));
+    assert.equal(await thickness.isVisible(), ["arrow", "rectangle"].includes(tool));
+    assert.equal(await page.locator("#blurRadiusInput").isVisible(), tool === "blur");
+    assert.equal(await page.locator("#pixelSizeInput").isVisible(), tool === "pixelate");
+  }
+  assert(await page.locator(".shortcut-card dl").isHidden());
+  await page.locator(".shortcut-card summary").click();
+  assert(await page.locator(".shortcut-card dl").isVisible());
   assert.deepEqual(errors, []);
-  console.log("Result recovery UI passed at 1440, 768, and 390px; copy/save enabled; complete state cleared warning.");
+  console.log("Result recovery UI passed at three widths; editor contextual options and keyboard disclosure passed.");
 } finally {
   await browser?.close();
   await rm(temporary, { recursive: true, force: true });

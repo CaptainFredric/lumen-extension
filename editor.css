@@ -759,6 +759,17 @@ textarea {
   font-size: 0.61rem;
 }
 
+.shortcut-card summary {
+  cursor: pointer;
+  font-weight: 650;
+  padding-block: 4px;
+}
+
+.shortcut-card summary:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+
 .shortcut-card dl {
   display: grid;
   gap: 9px;

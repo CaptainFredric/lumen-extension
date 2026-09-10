@@ -8,6 +8,33 @@ This review starts from GitHub commit 824b2a4, version 0.5.0. The local checkout
 
 Lumen captures whole pages, visible areas, rectangles, and lasso selections. It opens a result viewer with local copy and export, an annotation editor, a library, and visual comparison. Area monitoring has explicit timing and run limits. The narrow value remains evidence capture for design review, QA, and product work.
 
+## September 10 feature review
+
+The central workflow is capture, review, edit, and save. Completed responsive views now survive a later interruption as a partial library item. Automatic redaction and Privacy Shield start off for fresh installs, with saved preferences preserved.
+
+### Menu ergonomics
+
+The editor now calls its property panel "Tool options". An empty selection hides style controls. Arrows and rectangles expose color and thickness; text exposes color and text controls; blur and pixelation expose only their relevant strength controls. Keyboard help is collapsed by default. These changes reduce irrelevant choices without removing editing functionality.
+
+### Feature decisions
+
+1. Real demonstration video: worthwhile after the capture-set viewer is stable. Show a real page capture, a selected area, one annotation, optional redaction, and the saved result in roughly 45 to 60 seconds. Use synthetic private details, captions, playback controls, and a poster image. Keep playback user initiated and label fixtures. The website currently has no newly recorded video from this pass.
+2. Clickable capture: a useful future export mode. PNG cannot contain clickable link regions. A self-contained HTML viewer or PDF link annotations could pair pixels with captured link rectangles. Preserve coordinates through scaling, cropping, and tiling; allow only HTTP/HTTPS links; exclude redacted regions and sensitive URLs; never execute source-page scripts. The snapshot would preserve links, not live forms or application behavior. No linked export is implemented yet.
+3. Timed captures: the existing bounded area-monitoring path is the starting point. Improve a session-oriented UI with interval, duration, expected image count, storage budget, pause, and stop. Interviews require participant awareness and a visible indicator. Background or hidden-page capture needs separate verification; current functionality should not be described as a desktop or meeting recorder.
+4. Lasso: already implemented. Prioritize selection adjustment, cancellation, and predictable transparent edges before adding more selection tools.
+5. Direct computer storage: already uses Chrome Downloads. Explain the destination and expose Show in folder. Browser settings determine prompts and location; arbitrary filesystem access would require a different permission model.
+6. Small completion preview: a promising preference alongside the existing automatic result tab. It should offer Open, Copy, and Dismiss, avoid stealing focus, and avoid displaying sensitive pixels over a shared page without consent. No new preview overlay is implemented in this pass.
+7. Keyboard capture: page, visible-area, and selection commands already exist in manifest.json. Expose actual assigned shortcuts and a Customize action rather than hardcoded promises. Chrome and operating-system reserved shortcuts take precedence; preserve macOS Command-Shift-3/4/5. Desktop-wide capture is outside the current tab-capture architecture.
+8. Readable page parts and one packet: highest next product priority. Existing tile/print output provides the capture foundation. Build an ordered filmstrip with full-resolution page parts, fit-width scrolling, page count, keyboard navigation, selection, and ZIP export. Keep all parts local and apply retention limits. Current original-file selection is only a download selector; it is not yet this fluid multipage viewer.
+
+### Execution order
+
+First deliver the capture-set viewer and selected-files ZIP export with memory limits and cancellation tests. Then record the actual workflow for the website. Next improve shortcut discovery and optional completion preview. Follow with bounded session capture controls. Linked exports require their own geometry and privacy tests before release.
+
+### Reference checks
+
+GoFullPage describes full-page capture and image/PDF export at https://gofullpage.com/. Its simplicity is a useful benchmark; this review does not attribute interactive-link capture to it. Chrome's command constraints and user remapping are documented at https://developer.chrome.com/docs/extensions/reference/api/commands.
+
 ## What should improve next
 
 1. Treat a responsive capture as one browsable bundle. The result screen now exposes every retained original file. A future viewer should retain and display each full resolution variant with independent annotation state and explicit storage bounds.
@@ -20,11 +47,11 @@ Lumen captures whole pages, visible areas, rectangles, and lasso selections. It 
 
 Existing percentages are subjective estimates. Use observed workflows and outstanding release gates to decide whether to ship. New code and passing fixture counts alone cannot establish paid readiness.
 
-## This pass
+## Initial September pass
 
 The result viewer can select any still available saved original, crop, tile, or details file for Open and Show in folder. Selection preserves the local review image and its export actions. Temporary responsive windows now close if tab discovery or navigation fails before a capture target is returned.
 
-## Validation
+## Initial September validation
 
 `npm run check`, `npm run test:capture-lifecycle`, `npm run smoke:extension`, and `npm run smoke:e2e` passed. The lifecycle suite covers missing tabs, query failures, navigation failures, and successful ownership transfer. The result test verifies selection routes the chosen download ID while retaining the review image.
 
