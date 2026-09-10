@@ -50,8 +50,8 @@
     />
     <link rel="icon" href="brandmark.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/brandmark-512.png" />
-    <link rel="stylesheet" href="styles.css?v=20260909" />
-    <script src="script.js?v=20260909" defer></script>
+    <link rel="stylesheet" href="styles.css?v=20260909-setup" />
+    <script src="script.js?v=20260909-setup" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -78,9 +78,9 @@
           </p>
           <h1 id="hero-title">Capture it.<br /><em>Make it clear.</em></h1>
           <p class="hero-lede">
-            Clean up a webpage, capture what matters, and mark the details. Keep
-            the image and its context together for your next design review or
-            bug report.
+            Take a clean screenshot, hide sensitive details, and add a note or
+            arrow. Keep what you need for a design review or bug report in one
+            place.
           </p>
           <div class="hero-actions">
             <a class="button button-primary" href="#install"
@@ -142,15 +142,12 @@
       >
         <div class="section-heading">
           <div>
-            <p class="eyebrow">One capture, a useful result</p>
-            <h2 id="workflow-title">
-              Finish the thought<br />alongside the screenshot.
-            </h2>
+            <p class="eyebrow">How it works</p>
+            <h2 id="workflow-title">Show what<br />needs attention.</h2>
           </div>
           <p>
-            Capture is the starting point. The result opens in a local workspace
-            where you can inspect the pixels, explain the issue, and choose the
-            file to share.
+            Each capture opens ready to review. Zoom in, mark the issue, cover
+            anything private, then choose how to save it.
           </p>
         </div>
         <div class="workflow-grid">
@@ -202,7 +199,7 @@
               <span class="step-number">03 / EXPORT</span
               ><span class="subtle-label">Local files</span>
             </div>
-            <h3>Ready for the next conversation.</h3>
+            <h3>Save the reviewed image.</h3>
             <p>
               Copy the image, export PNG or PDF, or open an original from your
               capture. Keep page signals alongside the images.
@@ -254,9 +251,7 @@
         <div class="section-heading">
           <div>
             <p class="eyebrow">Implemented now</p>
-            <h2 id="features-title">
-              Small details.<br />Less capture cleanup.
-            </h2>
+            <h2 id="features-title">Less cleanup<br />after each capture.</h2>
           </div>
           <a
             class="text-link"
@@ -309,9 +304,7 @@
         <div class="scope-copy">
           <p class="eyebrow">Local by default</p>
           <h2 id="scope-title">
-            Your browser.<br />Your review.<br /><span class="accent"
-              >Your call to share.</span
-            >
+            Keep your captures<br /><span class="accent">on your device.</span>
           </h2>
           <p>
             Capture, review, and export without signing in. Privacy Shield
@@ -355,26 +348,41 @@
         aria-labelledby="install-title"
       >
         <div>
-          <p class="eyebrow">Try it on a page you know</p>
-          <h2 id="install-title">Make your next<br />capture useful.</h2>
+          <p class="eyebrow">Set up the beta</p>
+          <h2 id="install-title">Try Lumen<br />in Chrome.</h2>
           <p>
-            The beta is installed from source in Chrome.<br />A Chrome Web Store
-            release is still ahead.
+            For now, install it from GitHub on your computer. The Chrome Web
+            Store version is still in progress.
           </p>
           <a
             class="button button-primary"
-            href="https://github.com/CaptainFredric/lumen-extension#load-the-extension-locally"
-            target="_blank"
-            rel="noreferrer"
-            >Open installation guide <span aria-hidden="true">↗</span></a
+            href="https://github.com/CaptainFredric/lumen-extension/archive/refs/heads/main.zip"
+            >Download source ZIP <span aria-hidden="true">↓</span></a
           >
+          <p>
+            <a
+              class="text-link"
+              href="https://github.com/CaptainFredric/lumen-extension#load-the-extension-locally"
+              target="_blank"
+              rel="noreferrer"
+              >Read the full setup guide <span aria-hidden="true">↗</span></a
+            >
+          </p>
+          <p
+            class="setup-feedback"
+            id="setup-feedback"
+            role="status"
+            aria-live="polite"
+          ></p>
         </div>
         <ol class="install-steps">
           <li>
             <span>01</span>
             <div>
-              <h3>Get the source</h3>
-              <p>Download or clone the GitHub repository.</p>
+              <h3>Download and unzip</h3>
+              <p>
+                Extract the ZIP. Keep the folder somewhere you can leave it.
+              </p>
             </div>
           </li>
           <li>
@@ -383,8 +391,12 @@
               <h3>Load it in Chrome</h3>
               <p>
                 Open <code>chrome://extensions</code>, enable Developer mode,
-                and choose Load unpacked.
+                and choose Load unpacked. Select the extracted folder that
+                contains <code>manifest.json</code>.
               </p>
+              <button class="copy-setup" type="button" data-copy-setup hidden>
+                Copy Chrome setup address
+              </button>
             </div>
           </li>
           <li>
@@ -395,6 +407,15 @@
             </div>
           </li>
         </ol>
+        <details class="setup-help">
+          <summary>Already installed? Here is how to update.</summary>
+          <p>
+            Replace your local source files with the latest version, then click
+            Reload on Lumen's card at <code>chrome://extensions</code>. Reload
+            your test webpage too. Keeping the same extension folder preserves
+            its local identity.
+          </p>
+        </details>
       </section>
     </main>
     <footer class="site-footer section-shell">
@@ -403,7 +424,7 @@
           >Lumen</span
         ></a
       >
-      <p>Built by Dan DeBugger. Available to inspect.</p>
+      <p>Built by Dan DeBugger.</p>
       <nav aria-label="Footer navigation">
         <a href="privacy.html">Privacy</a
         ><a
@@ -419,5 +440,48 @@
         >
       </nav>
     </footer>
+    <dialog
+      id="editor-preview"
+      class="image-dialog"
+      aria-labelledby="preview-title"
+      aria-describedby="preview-description"
+    >
+      <div class="preview-header">
+        <div>
+          <h2 id="preview-title">Inside the Lumen editor</h2>
+          <p id="preview-description">
+            A screenshot of the editor with sample content.
+          </p>
+        </div>
+        <div class="preview-actions">
+          <button
+            class="button button-small button-secondary"
+            type="button"
+            data-preview-zoom
+            aria-pressed="false"
+          >
+            Actual size
+          </button>
+          <form method="dialog">
+            <button class="button button-small button-secondary" autofocus>
+              Close
+            </button>
+          </form>
+        </div>
+      </div>
+      <div
+        class="preview-scroll"
+        tabindex="0"
+        aria-label="Editor screenshot. Scroll to inspect when zoomed."
+      >
+        <img
+          src="assets/store-annotation-studio.png"
+          alt="The Lumen editor with annotation tools, a sample image, and controls for exporting PNG or PDF."
+          width="1280"
+          height="800"
+          loading="lazy"
+        />
+      </div>
+    </dialog>
   </body>
 </html>

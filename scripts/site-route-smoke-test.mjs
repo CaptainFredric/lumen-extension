@@ -72,9 +72,9 @@ try {
     await page.goto(origin, { waitUntil: "networkidle" });
     await page.locator(".redaction-example").scrollIntoViewIfNeeded();
     await page.waitForFunction(() =>
-      [...document.images].every(
-        (image) => image.complete && image.naturalWidth,
-      ),
+      [...document.images]
+        .filter((image) => !image.closest("dialog"))
+        .every((image) => image.complete && image.naturalWidth),
     );
     const layout = await page.evaluate(() => {
       const hero = document.querySelector(".hero-copy").getBoundingClientRect();
@@ -114,7 +114,7 @@ try {
     assert.equal(new URL(page.url()).hash, "#install");
     assert.equal(
       await page.locator("#install .button").getAttribute("href"),
-      "https://github.com/CaptainFredric/lumen-extension#load-the-extension-locally",
+      "https://github.com/CaptainFredric/lumen-extension/archive/refs/heads/main.zip",
     );
     await page
       .getByText("Does anything go to a background agent?", { exact: true })
@@ -159,6 +159,78 @@ try {
       });
     }
 
+    await page.locator(".editor-image-link").click();
+    assert.equal(await page.locator("#editor-preview").isVisible(), true);
+    await page
+      .getByRole("button", { name: "Actual size", exact: true })
+      .click();
+    assert.equal(
+      await page.locator("[data-preview-zoom]").getAttribute("aria-pressed"),
+      "true",
+    );
+    assert.equal(
+      await page
+        .locator(".preview-scroll img")
+        .evaluate((image) => image.getBoundingClientRect().width),
+      1280,
+    );
+    assert.equal(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth,
+      ),
+      true,
+      "Zoom must stay inside the dialog",
+    );
+    await page.keyboard.press("Escape");
+    assert.equal(await page.locator("#editor-preview").isVisible(), false);
+    assert.equal(
+      await page.evaluate(() => document.activeElement.className),
+      "editor-image-link",
+    );
+    await page.locator(".editor-image-link").click();
+    assert.equal(
+      await page.locator("[data-preview-zoom]").getAttribute("aria-pressed"),
+      "false",
+    );
+    await page.getByRole("button", { name: "Close", exact: true }).click();
+
+    // Stub only the browser clipboard boundary; the real click handler runs.
+    // This avoids changing the developer's system clipboard during tests.
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          writeText: async (text) => {
+            window.copiedSetupAddress = text;
+          },
+        },
+      });
+    });
+    await page.locator("[data-copy-setup]").click();
+    await page.waitForFunction(() =>
+      document
+        .querySelector("#setup-feedback")
+        .textContent.startsWith("Copied."),
+    );
+    assert.equal(
+      await page.evaluate(() => window.copiedSetupAddress),
+      "chrome://extensions",
+    );
+    await page.evaluate(() => {
+      navigator.clipboard.writeText = async () => {
+        throw new Error("Permission denied");
+      };
+    });
+    await page.locator("[data-copy-setup]").click();
+    await page.waitForFunction(() =>
+      document
+        .querySelector("#setup-feedback")
+        .textContent.includes("Type chrome://extensions"),
+    );
+    assert.equal(await page.locator("[data-copy-setup]").isEnabled(), true);
+
     await page.goto(`${origin}/privacy.html`, { waitUntil: "networkidle" });
     assert.equal(await page.locator("h1").count(), 1);
     assert.equal(
@@ -196,6 +268,8 @@ try {
       overflow: false,
       policy: "passed",
       keyboardFocus: "passed",
+      imagePreview: "zoom, Escape, close, and focus return passed",
+      setupCopy: "success and permission failure passed",
     });
     await page.close();
   }

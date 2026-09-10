@@ -674,6 +674,92 @@ details p {
 .install-steps h3 {
   font-size: 13px;
 }
+.copy-setup {
+  margin-top: 10px;
+  padding: 8px 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 11px;
+  cursor: pointer;
+}
+.copy-setup:hover {
+  background: #ffffff08;
+}
+.copy-setup:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.setup-feedback {
+  min-height: 3.4em;
+}
+.setup-help {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+}
+.setup-help summary {
+  padding-bottom: 8px;
+}
+.setup-help p {
+  max-width: 740px;
+  padding-top: 10px;
+  padding-bottom: 0;
+}
+.image-dialog {
+  width: min(1320px, calc(100% - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--page);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+.image-dialog::backdrop {
+  background: #000b;
+  backdrop-filter: blur(5px);
+}
+.preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px;
+}
+.preview-header h2 {
+  font-size: 16px;
+}
+.preview-header p {
+  color: var(--muted);
+  font-size: 11px;
+}
+.preview-actions {
+  display: flex;
+  gap: 8px;
+}
+.preview-actions form {
+  margin: 0;
+}
+.preview-actions button {
+  cursor: pointer;
+}
+.preview-scroll {
+  max-height: 72dvh;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.preview-scroll img {
+  width: 100%;
+}
+.image-dialog.is-zoomed .preview-scroll img {
+  width: 1280px;
+  max-width: none;
+}
 .install-steps p {
   margin-top: 5px;
   font-size: 12px;
