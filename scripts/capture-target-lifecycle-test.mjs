@@ -4,6 +4,68 @@ import vm from "node:vm";
 import test from "node:test";
 
 const background = await readFile(new URL("../background.js", import.meta.url), "utf8");
+const recoveryStart = background.indexOf("async function recoverInterruptedCapture(");
+const recoveryEnd = background.indexOf("async function runHistoryDownloadAction(", recoveryStart);
+assert(recoveryStart >= 0 && recoveryEnd > recoveryStart);
+
+for (const scenario of ["first view failed", "later view failed", "storage failed", "cancelled"]) {
+  test(`partial capture recovery: ${scenario}`, async () => {
+    const records = [];
+    const notices = [];
+    const error = { description: scenario === "cancelled" ? "Capture cancelled." : "Page changed." };
+    const context = vm.createContext({
+      URL,
+      putLibraryCapture: async (record) => {
+        if (scenario === "storage failed") throw new Error("Quota exceeded");
+        records.push(record);
+      },
+      sanitizeCaptureUrl: () => "https://example.test/",
+      buildAggregateCaptureHealth: () => ({ status: "complete" }),
+      pruneLibraryPreviews: async () => {},
+      broadcastLibraryUpdated: (notice) => notices.push(notice),
+      normalizeCaptureError: (value) => value,
+      createFriendlyError: (title, description) => ({ title, description })
+    });
+    vm.runInContext(background.slice(recoveryStart, recoveryEnd), context);
+    const result = await context.recoverInterruptedCapture({
+      error,
+      results: scenario === "first view failed" ? [] : [{
+        page: { title: "Example", url: "https://example.test/?secret=1" },
+        variant: { id: "desktop" },
+        downloadRecords: [{ downloadId: 12, filename: "desktop.png" }],
+        photoPreviews: [{ previewDataUrl: "data:image/png;base64,AA", width: 100, height: 200 }],
+        editorSource: { dataUrl: "original" }
+      }],
+      variants: [{}, {}, {}],
+      captureId: "partial-1",
+      capturedAt: "2026-09-10T00:00:00Z",
+      runContext: { folder: "Lumen/run-1" },
+      options: { devicePreset: "responsive" },
+      context: {}
+    });
+    if (scenario === "first view failed") {
+      assert.equal(result, error);
+      assert.equal(records.length, 0);
+    } else {
+      assert.match(result.description, /1 of 3 views completed/);
+      assert.match(result.description, /Retrying starts a new set/);
+      assert.match(result.description, /Lumen\/run-1/);
+      if (scenario === "storage failed") {
+        assert.match(result.description, /Chrome Downloads/);
+        assert.equal(notices.length, 0);
+      } else {
+        assert.match(result.description, /Open Library/);
+        assert.equal(records[0].captureHealth.status, "partial");
+        assert.equal(records[0].variantCount, 1);
+        assert.equal(records[0].downloads[0].downloadId, 12);
+        assert.equal(records[0].previews.length, 1);
+        assert.equal(records[0].url, "https://example.test/");
+        assert.equal(notices.length, 1);
+      }
+    }
+  });
+}
+
 const start = background.indexOf("async function createCaptureTarget(");
 const end = background.indexOf("async function calibrateCaptureViewport(", start);
 assert(start >= 0 && end > start);

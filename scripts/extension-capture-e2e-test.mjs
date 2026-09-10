@@ -135,6 +135,25 @@ try {
 
   const primaryResultPage = await waitForCaptureResultPage(context, extensionId, response.captureId);
   primaryResultState = await readCaptureResultState(primaryResultPage, popupConsoleErrors);
+  assert(await primaryResultPage.locator("#captureWarning").isHidden(), "Complete capture showed an interruption warning.");
+  // Exercise the persisted partial status through the real result UI, then
+  // restore this fixture so the remaining export checks use the complete run.
+  const originalHealth = await primaryResultPage.evaluate(async (id) => {
+    const { getLibraryCapture, putLibraryCapture } = await import("./library-store.js");
+    const capture = await getLibraryCapture(id);
+    await putLibraryCapture({ id, captureHealth: { ...capture.captureHealth, status: "partial" } });
+    return capture.captureHealth;
+  }, response.captureId);
+  await primaryResultPage.reload();
+  await primaryResultPage.locator("#captureWarning:not([hidden])").waitFor();
+  assert((await primaryResultPage.locator("#captureWarning").textContent()).includes("incomplete"), "Partial capture warning was missing.");
+  await primaryResultPage.evaluate(async ({ id, health }) => {
+    const { putLibraryCapture } = await import("./library-store.js");
+    await putLibraryCapture({ id, captureHealth: health });
+  }, { id: response.captureId, health: originalHealth });
+  await primaryResultPage.reload();
+  await primaryResultPage.waitForFunction(() => ["ready", "limited"].includes(document.body.dataset.state));
+  assert(await primaryResultPage.locator("#captureWarning").isHidden(), "Complete status did not clear the warning.");
   assert(
     primaryResultState.captureId === response.captureId &&
       primaryResultState.bodyState !== "loading" &&

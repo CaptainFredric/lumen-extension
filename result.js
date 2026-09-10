@@ -25,6 +25,7 @@ const ui = {
   resultShell: document.querySelector(".result-shell"),
   resultHost: document.querySelector("#resultHost"),
   resultTitle: document.querySelector("#resultTitle"),
+  captureWarning: document.querySelector("#captureWarning"),
   resultSource: document.querySelector("#resultSource"),
   resultViewport: document.querySelector("#resultViewport"),
   resultImage: document.querySelector("#resultImage"),
@@ -297,6 +298,11 @@ function renderCaptureDetails() {
   document.title = `${capture.title || capture.host || "Capture"} — Lumen`;
   ui.resultHost.textContent = capture.host || formatHost(capture.url) || "Local capture";
   ui.resultTitle.textContent = capture.title || "Saved capture";
+  const incomplete = ["partial", "incomplete"].includes(capture.captureHealth?.status);
+  ui.captureWarning.hidden = !incomplete;
+  ui.captureWarning.textContent = incomplete
+    ? "This capture is incomplete. Review the saved views and files in Details before sharing. A new capture creates a separate set."
+    : "";
   ui.resultSource.textContent = `${sourceLabel}.${qualityDetail}`.trim();
   ui.capturedAtValue.textContent = formatTimestamp(capture.capturedAt);
   ui.dimensionsValue.textContent = reviewWidth && reviewHeight

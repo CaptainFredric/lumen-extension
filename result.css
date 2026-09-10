@@ -825,6 +825,21 @@ body[data-busy="true"] .zoom-controls {
   }
 }
 
+.capture-warning {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(239, 199, 133, 0.06);
+  color: #efc785;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  line-height: 1.5;
+  text-transform: none;
+  white-space: normal;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

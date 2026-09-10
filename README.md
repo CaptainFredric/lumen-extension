@@ -73,6 +73,8 @@ The extension includes:
 
 ## Current Limits
 
+If a responsive capture stops after completing a view, Lumen keeps completed views in a library item labeled "Partial capture". Open its result and Details to review the retained files. The error also identifies the download folder. Retrying creates a separate set and can duplicate previously completed views. Automatic resume and recovery of files from inside the failing view remain future work.
+
 These limits are important:
 
 1. redaction checks text and filled inputs again before every screenshot slice, but iframe, canvas, closed shadow-root, and image-only secrets still require manual review

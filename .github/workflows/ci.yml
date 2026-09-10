@@ -52,6 +52,9 @@ jobs:
       - name: Test capture interruption and window cleanup
         run: npm run test:capture-lifecycle
 
+      - name: Test partial result recovery UI
+        run: xvfb-run --auto-servernum npm run smoke:result-recovery
+
       - name: Test difficult-site fixtures
         run: npm run smoke:difficult-sites
 

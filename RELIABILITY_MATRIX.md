@@ -12,7 +12,11 @@ The September 10, 2026 pass adds checks before and after Chrome returns screensh
 
 Personal tab capture no longer reactivates the target after the user switches away. Cancellation is checked while a temporary responsive page is loading, so cleanup can run before the full navigation timeout expires.
 
-These checks complement the real loaded-extension capture test. They do not establish that every live website is supported. Earlier files from a responsive run may already exist if a later view is interrupted.
+If a later responsive view fails or is cancelled, completed views are retained as a partial library capture. The error includes the completed view count, saved folder, and an explicit warning that retrying creates a new set. If library storage fails, the error points to Chrome Downloads. The result screen labels partial or incomplete captures before sharing.
+
+Recovery tests cover first-view failure, later-view failure, cancellation, and library storage failure. These are deterministic function tests; a live browser interruption matrix remains a release check. Files exported inside a failing view before that view returns are still outside this recovery record. Automatic resume is not implemented.
+
+Run `npm run smoke:result-recovery` for a loaded-extension check of the persisted partial result at 1440, 768, and 390 pixels. It verifies the visible warning, enabled copy/save controls, and warning removal for a complete capture. Its image is a generated fixture, not a live-site capture. The test removes its temporary extension, profile, and image storage afterward.
 
 ## Deterministic difficult-site fixtures
 

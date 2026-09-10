@@ -1294,26 +1294,30 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
     startedAt: capturedAt
   });
 
-  for (let index = 0; index < variants.length; index += 1) {
-    checkCaptureCancelled();
-    const result = await captureVariant({
-      sourceTab,
-      variant: variants[index],
-      options,
-      manualRedactions,
-      cutawayRegion,
-      annotationRegion,
-      runContext,
-      extractBlueprint: index === 0,
-      cacheReviewPdf: index === 0,
-      focusedOnly,
-      visibleOnly: captureMode === "visible",
-      changeBaselineHash: context.changeBaselineHash || "",
-      saveOnlyWhenChanged: Boolean(context.saveOnlyWhenChanged)
-    });
+  try {
+    for (let index = 0; index < variants.length; index += 1) {
+      checkCaptureCancelled();
+      const result = await captureVariant({
+        sourceTab,
+        variant: variants[index],
+        options,
+        manualRedactions,
+        cutawayRegion,
+        annotationRegion,
+        runContext,
+        extractBlueprint: index === 0,
+        cacheReviewPdf: index === 0,
+        focusedOnly,
+        visibleOnly: captureMode === "visible",
+        changeBaselineHash: context.changeBaselineHash || "",
+        saveOnlyWhenChanged: Boolean(context.saveOnlyWhenChanged)
+      });
 
-    results.push(result);
-    blueprint ||= result.blueprint;
+      results.push(result);
+      blueprint ||= result.blueprint;
+    }
+  } catch (error) {
+    throw await recoverInterruptedCapture({ error, results, variants, captureId, capturedAt, runContext, options, context });
   }
 
   const firstResult = results[0];
@@ -2051,6 +2055,57 @@ function buildExportReviewWarnings({
   }
 
   return warnings;
+}
+
+async function recoverInterruptedCapture({ error, results, variants, captureId, capturedAt, runContext, options, context }) {
+  if (!results.length) return error;
+
+  const first = results[0];
+  const downloads = results.flatMap((result) => result.downloadRecords || []);
+  const summary = `${results.length} of ${variants.length} views completed. ${downloads.length} files saved in ${runContext.folder}.`;
+  let saved = false;
+  try {
+    await putLibraryCapture({
+      id: captureId,
+      title: `Partial capture (${results.length}/${variants.length} views): ${first.page.title}`,
+      host: new URL(first.page.url).host,
+      url: sanitizeCaptureUrl(first.page.url),
+      capturedAt,
+      sourceType: context.captureOrigin === "timed" ? "timed" : "manual",
+      watchPlanId: context.watchPlanId || "",
+      watchRunId: context.watchRunId || "",
+      devicePreset: options.devicePreset,
+      exportPreset: first.exportPreset,
+      archiveFolder: runContext.folder,
+      downloads,
+      dimensions: first.dimensions,
+      variantCount: results.length,
+      fileCount: downloads.length,
+      redactionCount: results.reduce((sum, result) => sum + (result.redactionCount || 0), 0),
+      manualRedactionCount: results.reduce((sum, result) => sum + (result.manualRedactionCount || 0), 0),
+      cutawayCount: results.reduce((sum, result) => sum + (result.cutawayCount || 0), 0),
+      captureHealth: { ...buildAggregateCaptureHealth(results.map((result) => result.captureHealth)), status: "partial" },
+      previews: results.flatMap((result) => (result.photoPreviews || []).map((preview, index) => ({
+        dataUrl: preview.previewDataUrl,
+        width: preview.width,
+        height: preview.height,
+        role: preview.role,
+        variantId: `${result.variant.id}-${preview.role || "image"}-${preview.partIndex || index + 1}`
+      }))),
+      editorSource: results.find((result) => result.editorSource)?.editorSource || null,
+      pdfSource: results.find((result) => result.pdfSource)?.pdfSource || null
+    });
+    saved = true;
+    await pruneLibraryPreviews().catch(() => {});
+    broadcastLibraryUpdated({ captureId, capturedAt });
+  } catch {
+    // A library storage failure must never obscure files already downloaded.
+  }
+
+  return createFriendlyError(
+    "Capture stopped with saved views",
+    `${normalizeCaptureError(error).description} ${summary} ${saved ? "Open Library to review the completed views." : "Open Chrome Downloads to find the completed files; the library copy could not be saved."} Retrying starts a new set and may duplicate completed views.`
+  );
 }
 
 async function runHistoryDownloadAction(payload = {}, action = "show") {
