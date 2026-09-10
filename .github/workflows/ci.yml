@@ -49,6 +49,9 @@ jobs:
       - name: Test capture behavior
         run: npm run smoke:capture
 
+      - name: Test capture interruption and window cleanup
+        run: npm run test:capture-lifecycle
+
       - name: Test difficult-site fixtures
         run: npm run smoke:difficult-sites
 

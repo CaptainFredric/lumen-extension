@@ -3478,25 +3478,57 @@ async function captureTargetVisibleTab(target) {
     throw createFriendlyError("Capture Target Lost", "Lumen could not verify the page selected for this screenshot slice.");
   }
 
-  await chrome.tabs.update(target.tab.id, {
-    active: true
-  });
-
-  const [activeTab] = await chrome.tabs.query({
-    windowId: target.windowId,
-    active: true
-  });
-
-  if (activeTab?.id !== target.tab.id) {
-    throw createFriendlyError(
-      "Capture Target Changed",
-      "Another tab became active during the capture. Lumen stopped instead of saving pixels from the wrong page."
-    );
+  // Only manage activation inside Lumen's own temporary viewport window.
+  // Switching away from a personal tab should interrupt capture, not pull focus back.
+  if (target.kind === "viewport") {
+    await chrome.tabs.update(target.tab.id, { active: true });
   }
 
-  return chrome.tabs.captureVisibleTab(target.windowId, {
-    format: "png"
-  });
+  let interrupted = false;
+  const onActivated = (info) => {
+    if (info.windowId === target.windowId && info.tabId !== target.tab.id) {
+      interrupted = true;
+    }
+  };
+  const onUpdated = (tabId, changes) => {
+    if (tabId === target.tab.id && (changes.status === "loading" || typeof changes.url === "string")) {
+      interrupted = true;
+    }
+  };
+  const onRemoved = (tabId) => {
+    if (tabId === target.tab.id) {
+      interrupted = true;
+    }
+  };
+  const assertStable = (tab, originalUrl) => {
+    if (
+      interrupted || tab?.id !== target.tab.id || tab.status === "loading" ||
+      (originalUrl && tab.url !== originalUrl)
+    ) {
+      throw createFriendlyError(
+        "Capture Interrupted",
+        "The page or active tab changed during capture. Lumen discarded this screenshot. Keep the page active and try again."
+      );
+    }
+  };
+
+  // Observe the whole screenshot operation, including a switch away and back.
+  chrome.tabs.onActivated.addListener(onActivated);
+  chrome.tabs.onUpdated.addListener(onUpdated);
+  chrome.tabs.onRemoved.addListener(onRemoved);
+  try {
+    const [before] = await chrome.tabs.query({ windowId: target.windowId, active: true });
+    assertStable(before);
+    const dataUrl = await chrome.tabs.captureVisibleTab(target.windowId, { format: "png" });
+    const [after] = await chrome.tabs.query({ windowId: target.windowId, active: true });
+    assertStable(after, before.url);
+    checkCaptureCancelled();
+    return dataUrl;
+  } finally {
+    chrome.tabs.onActivated.removeListener(onActivated);
+    chrome.tabs.onUpdated.removeListener(onUpdated);
+    chrome.tabs.onRemoved.removeListener(onRemoved);
+  }
 }
 
 async function createCaptureTarget(tab, variant) {
@@ -3531,7 +3563,7 @@ async function createCaptureTarget(tab, variant) {
       );
     }
 
-    await waitForTabComplete(viewportTab.id);
+    await waitForTabComplete(viewportTab.id, 15000, checkCaptureCancelled);
     await sleep(260);
 
     return {
@@ -3995,11 +4027,13 @@ async function getCurrentTab() {
   return tab;
 }
 
-async function waitForTabComplete(tabId, timeoutMs = 15000) {
+async function waitForTabComplete(tabId, timeoutMs = 15000, checkCancelled = () => {}) {
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
+    checkCancelled();
     const tab = await chrome.tabs.get(tabId);
+    checkCancelled();
 
     if (tab.status === "complete") {
       return tab;

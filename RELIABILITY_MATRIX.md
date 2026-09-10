@@ -4,6 +4,16 @@ Last full live run: July 18, 2026 America/Chicago (artifacts timestamped July 19
 
 This matrix separates reproducible CI evidence from live-site evidence. Live pages are valuable release checks, but third-party availability, login state, experiments, and markup can change, so they are not used as a blocking CI gate.
 
+## Capture interruption checks
+
+Run `npm run test:capture-lifecycle` for deterministic checks of the screenshot boundary and temporary window lifecycle.
+
+The September 10, 2026 pass adds checks before and after Chrome returns screenshot pixels. Switching tabs, switching away and back, navigating, reloading, or closing the target during that operation causes the slice to be discarded. A title update or activity in another window does not interrupt it. Temporary event listeners are removed on success and failure.
+
+Personal tab capture no longer reactivates the target after the user switches away. Cancellation is checked while a temporary responsive page is loading, so cleanup can run before the full navigation timeout expires.
+
+These checks complement the real loaded-extension capture test. They do not establish that every live website is supported. Earlier files from a responsive run may already exist if a later view is interrupted.
+
 ## Deterministic difficult-site fixtures
 
 Run:
