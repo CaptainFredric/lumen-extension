@@ -1,4 +1,4 @@
-import { getLibraryCapture } from "./library-store.js";
+import { getLibraryCapture, getLibraryBundleImage } from "./library-store.js";
 import {
   buildAnnotationFilename,
   cloneAnnotations,
@@ -28,7 +28,7 @@ const TOOL_TIPS = {
   select: ["Select and arrange", "Click an annotation to move or resize it. Press Delete to remove it."],
   arrow: ["Draw an arrow", "Drag from the point of emphasis toward the thing you want noticed."],
   rectangle: ["Frame an area", "Drag a clean outline around the part of the capture that matters."],
-  text: ["Place a note", "Write the note in the inspector, then click where it should appear."],
+  text: ["Place a note", "Write your text in Tool options, then click where it should appear."],
   blur: ["Blur sensitive detail", "Drag across text or imagery that should be obscured before sharing."],
   pixelate: ["Pixelate a region", "Drag across account details, faces, or other visual identifiers."]
 };
@@ -165,6 +165,17 @@ async function initialize() {
   const captureId = parameters.get("capture") || "";
 
   if (captureId) {
+    const bundleId = parameters.get("bundle");
+    if (bundleId) {
+      const image = await getLibraryBundleImage(captureId, bundleId);
+      if (!image?.blob) throw new Error("This original is no longer retained. Open its downloaded file instead.");
+      await loadImageBlob(image.blob, {
+        title: image.filename, origin: "bundle-image",
+        originalWidth: image.width, originalHeight: image.height, scaled: false
+      });
+      showStatus("Selected original loaded. Export saves a separate edited file.", "success");
+      return;
+    }
     await loadCapturePreview(captureId, parameters.get("asset") || "");
     return;
   }

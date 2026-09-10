@@ -35,6 +35,10 @@ export async function putLibraryCapture(input = {}) {
     throw new Error("A capture ID is required before a library item can be stored.");
   }
 
+  const bundleAssets = Object.hasOwn(input, "bundleImages")
+    ? await prepareBundleImages(captureId, input.bundleImages)
+    : null;
+
   const hasPreviewInput = Object.hasOwn(input, "previews") ||
     Object.hasOwn(input, "preview") ||
     Object.hasOwn(input, "previewBlob") ||
@@ -146,10 +150,75 @@ export async function putLibraryCapture(input = {}) {
     normalized.pdfSourceKind = normalizeText(existing?.pdfSourceKind, "", 80);
   }
 
+  normalized.bundleImages = existing?.bundleImages || [];
+  if (bundleAssets) {
+    for (const image of normalized.bundleImages) assetStore.delete(image.id);
+    for (const image of bundleAssets) assetStore.put(image);
+    normalized.bundleImages = bundleAssets.map(({ blob, thumbnail, ...metadata }) => metadata);
+
+    // Evict only cached bundle originals; downloaded files and capture metadata remain.
+    const captures = await requestResult(captureStore.getAll());
+    let bytes = bundleAssets.reduce((sum, image) => sum + image.byteLength, 0);
+    const older = captures.filter((capture) => capture.id !== captureId)
+      .sort((a, b) => readCaptureTimestamp(b) - readCaptureTimestamp(a));
+    for (const capture of older) {
+      const size = (capture.bundleImages || []).reduce((sum, image) => sum + image.byteLength, 0);
+      if (bytes + size > 128 * 1024 * 1024) {
+        for (const image of capture.bundleImages || []) assetStore.delete(image.id);
+        captureStore.put({ ...capture, bundleImages: [] });
+      } else {
+        bytes += size;
+      }
+    }
+  }
   captureStore.put(normalized);
   await transactionComplete(transaction);
 
   return normalized;
+}
+
+async function prepareBundleImages(captureId, images = []) {
+  const assets = [];
+  let bytes = 0;
+  for (const [index, image] of (Array.isArray(images) ? images : []).slice(0, 40).entries()) {
+    if (!/^data:image\/png;base64,/.test(image.dataUrl || "")) continue;
+    const estimatedBytes = Math.ceil((image.dataUrl.length - 22) * 3 / 4);
+    if (bytes + estimatedBytes > 64 * 1024 * 1024) continue;
+    const blob = await (await fetch(image.dataUrl)).blob();
+    const thumbnail = /^data:image\/png;base64,/.test(image.thumbnailDataUrl || "") && image.thumbnailDataUrl.length <= 128000
+      ? await (await fetch(image.thumbnailDataUrl)).blob() : null;
+    const byteLength = blob.size + (thumbnail?.size || 0);
+    if (bytes + byteLength > 64 * 1024 * 1024) continue;
+    bytes += byteLength;
+    assets.push({
+      id: `${captureId}:bundle:${index}`,
+      captureId,
+      purpose: "bundle-image",
+      blob,
+      thumbnail,
+      hasThumbnail: Boolean(thumbnail),
+      byteLength,
+      filename: String(image.filename || `image-${index + 1}.png`).split(/[\\/]/).pop().slice(0, 200),
+      width: Math.max(1, Number(image.width) || 1),
+      height: Math.max(1, Number(image.height) || 1),
+      role: String(image.role || "full-page"),
+      variantId: String(image.variantId || "desktop"),
+      downloadId: Number.isInteger(image.downloadId) ? image.downloadId : null
+    });
+  }
+  return assets;
+}
+
+export async function getLibraryBundleImage(captureId, assetId) {
+  const database = await openLibraryDatabase();
+  const transaction = database.transaction([CAPTURE_STORE, ASSET_STORE], "readonly");
+  const [capture, asset] = await Promise.all([
+    requestResult(transaction.objectStore(CAPTURE_STORE).get(captureId)),
+    requestResult(transaction.objectStore(ASSET_STORE).get(assetId))
+  ]);
+  await transactionComplete(transaction);
+  return capture?.bundleImages?.some((image) => image.id === assetId) &&
+    asset?.captureId === captureId && asset?.purpose === "bundle-image" ? asset : null;
 }
 
 export async function listLibraryCaptures(options = {}) {

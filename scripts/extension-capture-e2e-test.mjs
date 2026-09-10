@@ -131,6 +131,17 @@ try {
   assert(response.downloads.every((item) => Number.isInteger(item.downloadId)), "Expected Chrome download handles.", response.downloads);
   assert(response.downloads.every((item) => item.bytesReceived > 0), "Expected completed downloads with bytes.", response.downloads);
   assert(response.librarySaved, "Expected the completed capture to create a local photo-library record.", response);
+  const retainedImages = await popup.evaluate(async (id) => {
+    const { getLibraryCapture, getLibraryBundleImage } = await import("./library-store.js");
+    const capture = await getLibraryCapture(id);
+    const images = [];
+    for (const item of capture.bundleImages || []) {
+      const asset = await getLibraryBundleImage(id, item.id);
+      images.push({ variantId: item.variantId, bytes: asset?.blob?.size || 0, width: item.width, height: item.height });
+    }
+    return images;
+  }, response.captureId);
+  assert(retainedImages.length === expectedVariantCount + expectedCutawayCount && retainedImages.every((image) => image.bytes > 0 && image.width > 0), "Expected original responsive and crop images in the capture set.", retainedImages);
   assert(response.resultOpened && Number.isInteger(response.resultTabId), "Expected a successful manual capture to open its result workspace.", response);
 
   const primaryResultPage = await waitForCaptureResultPage(context, extensionId, response.captureId);

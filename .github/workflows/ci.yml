@@ -55,6 +55,9 @@ jobs:
       - name: Test partial result recovery UI
         run: xvfb-run --auto-servernum npm run smoke:result-recovery
 
+      - name: Test capture ZIP integrity and cancellation
+        run: npm run test:capture-zip
+
       - name: Test difficult-site fixtures
         run: npm run smoke:difficult-sites
 

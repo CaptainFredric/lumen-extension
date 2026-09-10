@@ -73,6 +73,10 @@ The extension includes:
 
 ## Current Limits
 
+New captures have a local image strip for retained original PNG views, page tiles, and crops. Click an image or use Left/Right/Home/End while a strip button is focused. Copy, PNG, PDF, and Edit use the viewed part. Check the images you want and choose Download ZIP to export those originals together. ZIP export can be cancelled while preparing; it excludes metadata files and later editor changes.
+
+The cache retains up to 40 images and 64 MB per capture, with a separate 128 MB total bundle budget. Larger sets may retain only a subset. Older cached originals, including favorites, can be evicted; downloaded files remain untouched. Existing captures keep their previous viewer and download actions. Their originals cannot be reconstructed from thumbnails. Opening an original in Edit may still scale it to the editor's canvas limits; exported edits remain separate files.
+
 If a responsive capture stops after completing a view, Lumen keeps completed views in a library item labeled "Partial capture". Open its result and Details to review the retained files. The error also identifies the download folder. Retrying creates a separate set and can duplicate previously completed views. Automatic resume and recovery of files from inside the failing view remain future work.
 
 These limits are important:

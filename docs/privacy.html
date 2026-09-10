@@ -89,7 +89,7 @@
           <p>
             The extension stores settings, marked regions, schedules, history,
             compact gallery previews, bounded whole-capture editor images, and
-            capture-time raster PDF caches on the device. Full-resolution
+            capture-time raster PDF caches, and bounded original image sets on the device. Full-resolution
             screenshots, user-exported PNGs and PDFs, and optional supporting
             metadata save through Chrome Downloads.
           </p>
@@ -227,7 +227,7 @@
             Lumen stores capture history, page signals, saved regions,
             schedules, and capture-note drafts in local Chrome extension
             storage. Gallery previews, bounded whole-capture editor images,
-            capture-time raster PDF caches, and their metadata are stored in
+            capture-time raster PDF caches, original image sets, and their metadata are stored in
             extension-owned IndexedDB on the same device. Harmless capture
             preferences can use Chrome Sync; note text, screenshot images, saved
             regions, schedules, capture history, and cached PDFs are not placed
@@ -243,7 +243,15 @@
             each category first while keeping capture metadata and downloaded
             originals. Favorite assets are preserved. Removing a library item or
             clearing the library removes its local gallery image, editor source,
-            and cached PDF; it does not delete Downloads files.
+            cached PDF, and retained original image set; it does not delete Downloads files.
+          </p>
+          <p>
+            Original image sets have a separate 128 MB cache budget, with up to
+            40 images and 64 MB per capture. Older sets, including favorites,
+            can be cleared from this cache. Larger captures may retain only a
+            subset. ZIP export packages selected retained originals locally;
+            it excludes page signals and later annotation edits. Downloaded
+            originals remain in Chrome Downloads independently of this cache.
           </p>
           <p>
             Annotation edits remain in the editor tab until PNG or PDF export or

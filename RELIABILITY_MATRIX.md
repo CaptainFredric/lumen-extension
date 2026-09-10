@@ -18,6 +18,12 @@ Recovery tests cover first-view failure, later-view failure, cancellation, and l
 
 Run `npm run smoke:result-recovery` for a loaded-extension check of the persisted partial result at 1440, 768, and 390 pixels. It verifies the visible warning, enabled copy/save controls, and warning removal for a complete capture. Its image is a generated fixture, not a live-site capture. The test removes its temporary extension, profile, and image storage afterward.
 
+## Capture set checks
+
+`npm run test:capture-zip` verifies archive headers, CRC, filename isolation, missing sources, size limits, and cancellation during preparation. `npm run smoke:result-recovery` browses originals in a loaded extension, confirms PNG export and Edit follow the selected image, extracts a selected-files ZIP using the operating system unzip utility, and checks ownership, metadata updates, cache count limits, eviction, and deletion. Storage budget eviction uses synthetic size metadata to avoid allocating hundreds of megabytes for the test.
+
+`npm run smoke:e2e` also verifies retained originals for all three responsive views and their crops. Tests use controlled fixtures and clean their temporary images, archives, and browser profiles. A fixture run is distinct from repeated personal use across live sites. ZIP export contains originals only; saved per-part annotation state and a demonstration video remain future work.
+
 ## Deterministic difficult-site fixtures
 
 Run:

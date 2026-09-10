@@ -30,6 +30,7 @@ import {
   clearLibrary as clearCaptureLibrary,
   deleteLibraryCapture,
   getLibraryCapture,
+  getLibraryBundleImage,
   hasLibraryPreview,
   pruneLibraryPreviews,
   putLibraryCapture
@@ -878,8 +879,10 @@ async function openCaptureToolPage(pageName, captureId = "") {
     capture.pdfSource?.purpose === "pdf-source" &&
     Boolean(capture.pdfSource?.blob);
   const savedDownloadAvailable = isResult && await hasUsableDownloadHandle(capture.downloads);
+  const bundleAvailable = isResult && capture.bundleImages?.length &&
+    Boolean((await getLibraryBundleImage(capture.id, capture.bundleImages[0].id))?.blob);
 
-  if (!previewAvailable && !editorSourceAvailable && !pdfSourceAvailable && !savedDownloadAvailable) {
+  if (!previewAvailable && !editorSourceAvailable && !pdfSourceAvailable && !savedDownloadAvailable && !bundleAvailable) {
     throw createFriendlyError(
       isEditor ? "Annotation Unavailable" : isResult ? "Result Unavailable" : "Comparison Unavailable",
       isResult
@@ -1511,6 +1514,7 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
       manualRedactionCount,
       cutawayCount,
       previews: libraryPreviews,
+      bundleImages: collectBundleImages(results),
       editorSource: libraryEditorSource,
       pdfSource: libraryPdfSource
     });
@@ -2057,6 +2061,20 @@ function buildExportReviewWarnings({
   return warnings;
 }
 
+function collectBundleImages(results) {
+  let bytes = 0;
+  const images = [];
+  for (const result of results) {
+    for (const image of result.bundleImages || []) {
+      const size = (image.dataUrl?.length || 0) * 3 / 4;
+      if (images.length >= 40 || bytes + size > 64 * 1024 * 1024) continue;
+      images.push(image);
+      bytes += size;
+    }
+  }
+  return images;
+}
+
 async function recoverInterruptedCapture({ error, results, variants, captureId, capturedAt, runContext, options, context }) {
   if (!results.length) return error;
 
@@ -2081,6 +2099,7 @@ async function recoverInterruptedCapture({ error, results, variants, captureId, 
       dimensions: first.dimensions,
       variantCount: results.length,
       fileCount: downloads.length,
+      bundleImages: collectBundleImages(results),
       redactionCount: results.reduce((sum, result) => sum + (result.redactionCount || 0), 0),
       manualRedactionCount: results.reduce((sum, result) => sum + (result.manualRedactionCount || 0), 0),
       cutawayCount: results.reduce((sum, result) => sum + (result.cutawayCount || 0), 0),
@@ -3268,6 +3287,16 @@ async function captureVariant({
       downloadedFiles,
       downloadRecords,
       photoPreviews,
+      bundleImages: unchanged ? [] : collectBundleImages([{ bundleImages: renderedOutputs.map((output, index) => ({
+        dataUrl: output.dataUrl,
+        thumbnailDataUrl: output.previewDataUrl,
+        width: output.width,
+        height: output.height,
+        role: output.role,
+        variantId: variant.id,
+        filename: downloadRecords[index]?.filename,
+        downloadId: downloadRecords[index]?.downloadId
+      })) }]),
       editorSource,
       pdfSource: unchanged ? null : stitched.pdfSource || null,
       visualHash,

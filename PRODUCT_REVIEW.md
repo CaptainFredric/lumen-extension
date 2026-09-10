@@ -25,11 +25,11 @@ The editor now calls its property panel "Tool options". An empty selection hides
 5. Direct computer storage: already uses Chrome Downloads. Explain the destination and expose Show in folder. Browser settings determine prompts and location; arbitrary filesystem access would require a different permission model.
 6. Small completion preview: a promising preference alongside the existing automatic result tab. It should offer Open, Copy, and Dismiss, avoid stealing focus, and avoid displaying sensitive pixels over a shared page without consent. No new preview overlay is implemented in this pass.
 7. Keyboard capture: page, visible-area, and selection commands already exist in manifest.json. Expose actual assigned shortcuts and a Customize action rather than hardcoded promises. Chrome and operating-system reserved shortcuts take precedence; preserve macOS Command-Shift-3/4/5. Desktop-wide capture is outside the current tab-capture architecture.
-8. Readable page parts and one packet: highest next product priority. Existing tile/print output provides the capture foundation. Build an ordered filmstrip with full-resolution page parts, fit-width scrolling, page count, keyboard navigation, selection, and ZIP export. Keep all parts local and apply retention limits. Current original-file selection is only a download selector; it is not yet this fluid multipage viewer.
+8. Readable page parts and one packet: the first capture-set viewer is implemented. New captures retain original PNG parts with a horizontal image strip, fit-width viewing, keyboard navigation, selection, and ZIP export. Copy, PDF, PNG, and Edit follow the viewed part. Up to 40 images and 64 MB are cached per capture, with a separate 128 MB total bundle cache. Older sets may be evicted, including favorites; downloaded files remain untouched. ZIP contains selected originals only, with no details JSON or subsequent editor changes. Independent persistent annotation state per part remains future work.
 
 ### Execution order
 
-First deliver the capture-set viewer and selected-files ZIP export with memory limits and cancellation tests. Then record the actual workflow for the website. Next improve shortcut discovery and optional completion preview. Follow with bounded session capture controls. Linked exports require their own geometry and privacy tests before release.
+The first capture-set viewer and selected-original ZIP export are delivered. Validate repeated use with long tiled pages, then record the actual workflow for the website. Next improve shortcut discovery and optional completion preview. Follow with bounded session capture controls. Linked exports require their own geometry and privacy tests before release.
 
 ### Reference checks
 
@@ -37,7 +37,7 @@ GoFullPage describes full-page capture and image/PDF export at https://gofullpag
 
 ## What should improve next
 
-1. Treat a responsive capture as one browsable bundle. The result screen now exposes every retained original file. A future viewer should retain and display each full resolution variant with independent annotation state and explicit storage bounds.
+1. Test capture-set ergonomics on large real pages. Full-resolution part viewing and selected-original ZIP export now work within explicit storage bounds. Independent saved annotation state per part remains open.
 2. Complete one coherent review flow: capture, inspect pixels, annotate, choose an artifact, export. Measure the steps needed to complete a real bug report, including recovering from an interrupted capture.
 3. Verify the physical toolbar, shortcuts, permissions, and editor in stock Chrome before release. Automated extension pages and programmatically granted test permissions cover a different interaction boundary.
 4. Keep continuous area capture visible and bounded. Expand agent handoff only after users can inspect the exact transmitted artifact and choose a destination.

@@ -22,6 +22,7 @@ for (const scenario of ["first view failed", "later view failed", "storage faile
       sanitizeCaptureUrl: () => "https://example.test/",
       buildAggregateCaptureHealth: () => ({ status: "complete" }),
       pruneLibraryPreviews: async () => {},
+      collectBundleImages: () => [],
       broadcastLibraryUpdated: (notice) => notices.push(notice),
       normalizeCaptureError: (value) => value,
       createFriendlyError: (title, description) => ({ title, description })

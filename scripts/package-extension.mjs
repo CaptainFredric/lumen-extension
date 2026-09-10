@@ -41,6 +41,8 @@ const requiredRuntimeFiles = [
   "result.css",
   "result.html",
   "result.js",
+  "capture-set.js",
+  "capture-zip.js",
   "settings-store.js",
   "settings.css",
   "settings.html",

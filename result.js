@@ -15,6 +15,7 @@ import {
   updateLibraryReview
 } from "./library-store.js";
 import { readAppSettings } from "./settings-store.js";
+import { mountCaptureSet } from "./capture-set.js";
 
 const MIN_ZOOM = 0.01;
 const MAX_ZOOM = 64;
@@ -120,6 +121,43 @@ async function initialize() {
   renderSavedFileChoices();
   renderCaptureDetails();
   await configureDriveAction();
+  const captureSet = mountCaptureSet({
+    capture: state.capture,
+    host: document.querySelector(".viewer-card"),
+    canSelect: () => !state.busy,
+    report: setStatus,
+    selectImage: async (image) => {
+      state.busy = true;
+      document.body.dataset.busy = "true";
+      try {
+        state.source = {
+          blob: image.blob, width: image.width, height: image.height,
+          originalWidth: image.width, originalHeight: image.height,
+          limited: false, completePage: true, sourceKind: "bundle-image",
+          role: image.role, bundleAssetId: image.id,
+          label: `${image.variantId} ${image.role === "cutaway" ? "crop" : "page part"}, full resolution`
+        };
+        // Each part exports its own pixels, never the first variant's cached PDF.
+        state.capture = { ...state.capture, pdfSource: null, pdfStatus: "unavailable" };
+        state.originalDownload = state.savedDownloads.find((item) => item.downloadId === image.downloadId) || null;
+        ui.savedFileSelect.value = String(state.originalDownload?.downloadId ?? "");
+        await loadResultImage(image.blob);
+        fitWidth();
+        document.body.dataset.state = "ready";
+        setStatus("Original image loaded. Copy, PNG, PDF, and Edit use this image. ZIP contains selected originals.", "success");
+      } finally {
+        state.busy = false;
+        document.body.dataset.busy = "false";
+        syncActionAvailability();
+      }
+    }
+  });
+
+  if (!state.source?.blob && captureSet) {
+    await captureSet.showFirst();
+    document.body.setAttribute("aria-busy", "false");
+    if (state.source?.blob) return;
+  }
 
   if (!state.source?.blob) {
     renderUnavailableImage();
@@ -385,6 +423,7 @@ function renderExportSemantics() {
 }
 
 async function loadResultImage(blob) {
+  state.png = null;
   releaseObjectUrl();
   state.objectUrl = URL.createObjectURL(blob);
   ui.resultImage.src = state.objectUrl;
@@ -641,6 +680,12 @@ async function openAnnotationStudio() {
   await runBusyAction("Opening Annotation Studio…", async () => {
     if (state.source?.completePage === false) {
       throw new Error("Only a cropped gallery thumbnail remains, so this capture cannot be edited safely.");
+    }
+
+    if (state.source.bundleAssetId) {
+      await chrome.tabs.create({ url: chrome.runtime.getURL(`editor.html?capture=${encodeURIComponent(state.captureId)}&bundle=${encodeURIComponent(state.source.bundleAssetId)}`) });
+      setStatus("Selected original opened in the editor. Edits export as a separate file.", "success");
+      return;
     }
 
     const response = await chrome.runtime.sendMessage({
