@@ -62,7 +62,7 @@ The extension includes:
 40. reviewed, edited, and exported states stored beside each item in the local photo library
 41. optional user-initiated Google Drive export for one reviewed image at a time, using `drive.file` and revocable Chrome Identity access
 42. a dedicated Settings app for capture behavior, Privacy Shield, local-only mode, export choices, optional-permission revocation, Drive disconnect, and local-workspace deletion
-43. a fresh-install one-click default that stays local, enables automatic redaction, skips the optional capture-details JSON, and saves without an extra review screen unless the user enables review-before-save
+43. a fresh-install one-click default that stays local, leaves automatic redaction optional and off, skips the optional capture-details JSON, and saves without an extra review screen unless the user enables review-before-save
 44. a reversible Privacy Shield that enforces local-only mode, review-before-save, automatic redaction, and metadata minimization together, pauses unattended monitors while active, then restores the user's choices and monitor alarms when turned off
 45. local PNG and paginated raster PDF export, plus Fit, 100%, and keyboard zoom for the local working image in Annotation Studio
 46. a capture-time review PDF cache generated from the original rendered capture output or tiles at up to 3200 raster pixels per page; it has its own 250 MB or 75-capture local budget
@@ -128,7 +128,7 @@ The publisher must create a Chrome Extension OAuth client for the permanent exte
 
 ### Data Controls
 
-The dedicated Settings screen exposes capture behavior, export choices, Privacy Shield, local-only mode, optional-permission revocation, Drive disconnect, and local workspace deletion. A fresh install defaults to one-click local capture with automatic redaction enabled, capture-details JSON disabled, and review-before-save disabled. Privacy Shield is an explicit stronger mode: while on it enforces review-before-save, automatic redaction, metadata minimization, and local-only behavior and pauses unattended monitor alarms; when turned off it restores the user's prior individual choices and active monitors resume.
+The dedicated Settings screen exposes capture behavior, export choices, Privacy Shield, local-only mode, optional-permission revocation, Drive disconnect, and local workspace deletion. A fresh install defaults to one-click local capture with automatic redaction, Privacy Shield, capture-details JSON, and review-before-save disabled. Saved choices are preserved on updates. Privacy Shield is an explicit stronger mode: while on it enforces review-before-save, automatic redaction, metadata minimization, and local-only behavior and pauses unattended monitor alarms; when turned off it restores the user's prior individual choices and active monitors resume.
 
 Local workspace deletion covers capture history, library images and cached PDFs, signals, regions, note drafts, schedules, and optional site access. Removing one library item or clearing the library deletes its local metadata, gallery previews, whole-capture editor source, and cached review PDF, not downloaded originals. The checked-in backend is a developer-run loopback contract test; the Web Store build contains no Lumen-owned production sync endpoint. In development, signing in is not consent to move content: capture and monitor reads or writes require the separate cloud-sync control, and outbound records strip sensitive URL parameters while keeping the complete scheduled target on-device.
 
@@ -189,7 +189,7 @@ The public landing page will be available at `http://127.0.0.1:3000/`.
 1. Open any normal `https://` page
 2. Open the Lumen popup
 3. Check the launch indicator to confirm the current tab is capture-ready
-4. Click `Capture page` for the fresh-install one-click full-page run. It stays local, enables automatic redaction, and omits capture-details JSON by default; enable review-before-save in Settings when you want a confirmation screen before each save
+4. Click `Capture page` for the fresh-install one-click full-page run. It stays local and omits capture-details JSON by default. Turn on automatic redaction in the popup when needed; enable review-before-save in Settings when you want a confirmation screen before each save
 5. Hold `Capture page` to open quick actions for responsive capture, visible-area capture, redaction scan, manual boxes, area selection, lasso, callout, review, or signal extraction
 6. Change capture device, export mode, cleanup, lazy-load forcing, auto-redaction, notes, or capture-detail settings when needed
 7. Use `Scan` to preview detected redaction regions before export

@@ -25,7 +25,7 @@ export const EXISTING_INSTALL_APP_SETTINGS = Object.freeze({
 export function getNewInstallCaptureSettings() {
   return getSyncSafeSettings({
     ...getDefaultSettings(),
-    autoRedact: true,
+    autoRedact: false,
     exportManifest: false
   });
 }

@@ -48,10 +48,13 @@ try {
   const initial = await readSettingsState(settings);
   assert(initial.title === "Lumen Settings", "Dedicated settings page title did not load.", initial);
   assert(!initial.privacyShieldEnabled, "New installs should expose individual safe defaults before strict Shield is enabled.", initial);
-  assert(initial.autoRedact && !initial.captureDetails, "New installs did not start with redaction on and exported details off.", initial);
+  assert(!initial.autoRedact && !initial.captureDetails, "New installs should start with optional redaction and exported details off.", initial);
   assert(initial.localOnly && !initial.reviewBeforeSave, "New installs did not start local-only with one-click capture enabled.", initial);
   assert(initial.siteSummary.includes("No optional sites"), "Clean profile unexpectedly displayed optional site access.", initial);
 
+  await toggleAndWait(settings, "#autoRedactToggle", async (state) => state.capture.autoRedact === true);
+  await settings.reload({ waitUntil: "load" });
+  await settings.waitForSelector("#autoRedactToggle:checked");
   await toggleAndWait(settings, "#autoRedactToggle", async (state) => state.capture.autoRedact === false);
   await toggleAndWait(settings, "#captureDetailsToggle", async (state) => state.capture.exportManifest === true);
   await toggleAndWait(settings, "#localOnlyToggle", async (state) => state.app.localOnlyMode === false);
@@ -505,13 +508,13 @@ async function verifySettingsInitializationRaceSafety() {
   const emptyState = emptyProfile.read();
 
   assert(
-    optionsInitialization.captureSettings.autoRedact === true &&
+    optionsInitialization.captureSettings.autoRedact === false &&
       optionsInitialization.captureSettings.exportManifest === false &&
-      workerInitialization.captureSettings.autoRedact === true &&
+      workerInitialization.captureSettings.autoRedact === false &&
       workerInitialization.captureSettings.exportManifest === false &&
       emptyState.local["lumen.app.settings"].localOnlyMode === true &&
       emptyState.local["lumen.app.settings"].reviewBeforeSave === false &&
-      emptyState.sync["lumen.capture.settings"].autoRedact === true &&
+      emptyState.sync["lumen.capture.settings"].autoRedact === false &&
       emptyState.sync["lumen.capture.settings"].exportManifest === false,
     "Concurrent first-run contexts did not converge on safe one-click defaults.",
     { optionsInitialization, workerInitialization, emptyState }
@@ -535,9 +538,9 @@ async function verifySettingsInitializationRaceSafety() {
   const resumedState = halfInitializedProfile.read();
 
   assert(
-    resumed.captureSettings.autoRedact === true &&
+    resumed.captureSettings.autoRedact === false &&
       resumed.captureSettings.exportManifest === false &&
-      resumedState.sync["lumen.capture.settings"].autoRedact === true &&
+      resumedState.sync["lumen.capture.settings"].autoRedact === false &&
       resumedState.sync["lumen.capture.settings"].exportManifest === false,
     "A half-initialized profile fell back to unsafe capture defaults.",
     { resumed, resumedState }
