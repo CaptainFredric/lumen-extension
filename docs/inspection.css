@@ -1,0 +1,88 @@
+/* Public inspection desk. Extension and privacy surfaces retain their own theme. */
+.inspection-desk {
+  color-scheme: light;
+  --page: #f4f3ef;
+  --surface: #eeeee7;
+  --ink: #202625;
+  --muted: #505b53;
+  --quiet: #596358;
+  --accent: #3e5a20;
+  --line: #20262524;
+  --line-strong: #20262545;
+  --radius: 3px;
+  --shadow: 0 14px 35px #20262518;
+  background: var(--page);
+  font-size: 16px;
+}
+.inspection-desk .site-header { min-height: 76px; }
+.inspection-desk .hero { grid-template-columns: 0.95fr 1.2fr; gap: 52px; padding-block: 72px; align-items: start; }
+.inspection-desk .hero h1 { font-size: clamp(42px, 4.6vw, 66px); letter-spacing: -0.055em; line-height: 1.06; }
+.inspection-desk .hero h1 em { color: var(--ink); background: linear-gradient(transparent 62%, #d9f36a 62%); }
+.inspection-desk .eyebrow { font: 600 13px/1.5 var(--font); letter-spacing: 0; text-transform: none; color: var(--muted); }
+.inspection-desk .hero-lede { font-size: 16px; line-height: 1.7; }
+.inspection-desk .hero-note, .inspection-desk .hero-capabilities { font-size: 12px; }
+.inspection-desk .hero-capabilities span::before { content: none; }
+.inspection-desk .button { border-radius: 3px; font-size: 13px; box-shadow: none; }
+.inspection-desk .button-primary { background: #d9f36a; color: #202625; border-color: #9cae57; }
+.inspection-desk .button-primary:hover { background: #c5e64b; }
+.inspection-desk .button-secondary { color: var(--ink); background: transparent; }
+.inspection-desk .button-secondary:hover { background: #e5e7dc; }
+.inspection-desk .product-window { margin-top: 6px; border: 1px solid #8b9488; background: #172021; border-radius: 3px; box-shadow: 10px 10px 0 #e0e1d6; }
+.inspection-desk .window-bar { background: #e6e7de; color: #30382e; font-size: 11px; height: 40px; }
+.inspection-desk .window-label { color: #505b53; }
+.inspection-desk .editor-image { aspect-ratio: 1.45; object-fit: cover; object-position: top; }
+.inspection-desk .image-action { color: #f4f3ef; font-size: 11px; }
+.inspection-desk .product-window > figcaption { color: #e0e6df; font: 12px/1.5 var(--font); }
+.inspection-desk .output-explorer { background: transparent; border: 0; border-top: 2px solid var(--ink); border-radius: 0; padding: 46px 0; margin-bottom: 0; grid-template-columns: 0.75fr 1.25fr; gap: 50px; }
+.inspection-desk .explorer-copy h2 { font-size: clamp(32px, 3.4vw, 46px); }
+.inspection-desk .sample-provenance { font-size: 13px; }
+.sample-tabs button { padding: 10px 14px; background: transparent; border: 1px solid #9ba492; color: #202625; font: 12px var(--mono); cursor: pointer; }
+.sample-tabs[hidden] { display: none; }
+.sample-tabs button[aria-pressed="true"] { background: #d9f36a; border-color: #526331; }
+.garden-viewer { min-width: 0; border: 1px solid #9ba492; background: #e4e5db; }
+.garden-viewer .sample-toolbar { color: #30382e; }
+.garden-stage { width: 100%; height: 400px; overflow: auto; position: relative; }
+#garden-frame { display: block; border: 0; transform-origin: top left; background: #f4f3ef; }
+.garden-viewer figcaption { padding: 12px 16px; border-top: 1px solid #9ba492; font-size: 13px; }
+.inspection-desk .workflow-strip { color: var(--ink); }
+.inspection-desk .workflow-strip p { font: 12px var(--font); letter-spacing: 0; }
+.inspection-desk .workflow-grid { gap: 0; }
+.inspection-desk .workflow-card { background: transparent; border: 0; border-top: 1px solid var(--line-strong); border-right: 1px solid var(--line); border-radius: 0; padding: 26px; }
+.inspection-desk .workflow-card:first-child { padding-left: 0; }
+.inspection-desk .workflow-card:last-child { padding-right: 0; border-right: 0; }
+.inspection-desk .workflow-card > p, .inspection-desk .feature-card p, .inspection-desk .section-heading > p { font-size: 14px; }
+.inspection-desk .card-heading { margin-bottom: 20px; font-size: 11px; }
+.inspection-desk .subtle-label { font-size: 10px; }
+.inspection-desk .artifact-list { background: #e9ebe1; border-radius: 0; }
+.inspection-desk .artifact-list > div { font-size: 12px; }
+.inspection-desk .artifact-list small { font-size: 11px; }
+.inspection-desk .file-type { font-size: 9px; border-color: #839770; }
+.inspection-desk .text-link { font-size: 13px; text-decoration: underline; text-underline-offset: 4px; }
+.inspection-desk .limits-note { font-size: 13px; }
+.inspection-desk .feature-grid { grid-template-columns: 1fr 1fr; gap: 32px 60px; }
+.inspection-desk .tool-symbol { display: none; }
+.inspection-desk .feature-card h3 { font-size: 20px; }
+.signals-example dl { display: grid; grid-template-columns: 110px 1fr; gap: 10px; font-size: 12px; }
+.signals-example dt { color: var(--muted); }
+.signals-example dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
+.inspection-desk .scope-section { border-top: 2px solid var(--ink); gap: 60px; }
+.inspection-desk .scope-copy > p:not(.eyebrow), .inspection-desk details p { font-size: 14px; }
+.inspection-desk details a { text-decoration: underline; }
+.inspection-desk .install-section { border: 0; border-top: 2px solid var(--ink); border-radius: 0; background: #e8eadd; padding: 40px; }
+.inspection-desk .install-section p, .inspection-desk .install-steps p { font-size: 14px; }
+.inspection-desk .install-steps h3 { font-size: 16px; }
+.inspection-desk code { color: #304427; }
+.inspection-desk .site-footer > p, .inspection-desk .site-footer nav { font-size: 12px; }
+@media (max-width: 820px) {
+  .inspection-desk .hero, .inspection-desk .output-explorer { grid-template-columns: 1fr; gap: 32px; }
+  .inspection-desk .hero { padding-block: 44px; }
+  .inspection-desk .workflow-card, .inspection-desk .workflow-card:first-child, .inspection-desk .workflow-card:last-child { padding: 24px 0; border-right: 0; }
+  .inspection-desk .scope-section { gap: 24px; }
+}
+@media (max-width: 560px) {
+  .inspection-desk .hero h1 { font-size: clamp(38px, 10.5vw, 58px); }
+  .inspection-desk .feature-grid { grid-template-columns: 1fr; }
+  .inspection-desk .install-section { padding: 24px 20px; }
+  .inspection-desk .window-label { display: none; }
+  .garden-stage { height: 300px; }
+}

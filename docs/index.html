@@ -3,18 +3,18 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Lumen | Capture. Review. Export.</title>
+    <title>Lumen | Web screenshots for design review and QA</title>
     <meta
       name="description"
       content="Clean webpage captures for design review, QA, and product work. Select an area, capture responsive views, redact details, and annotate before export. Local Chrome beta."
     />
-    <meta name="theme-color" content="#0a1014" />
+    <meta name="theme-color" content="#f4f3ef" />
     <link
       rel="canonical"
       href="https://captainfredric.github.io/lumen-extension/"
     />
     <meta property="og:site_name" content="Lumen" />
-    <meta property="og:title" content="Lumen | Capture. Review. Export." />
+    <meta property="og:title" content="Lumen | Web screenshots for design review and QA" />
     <meta
       property="og:description"
       content="Clean webpage captures. Useful context. A local workspace to review and annotate before sharing."
@@ -35,7 +35,7 @@
       content="Lumen annotation editor with a sample image, arrow, text, and selected rectangle."
     />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Lumen | Capture. Review. Export." />
+    <meta name="twitter:title" content="Lumen | Web screenshots for design review and QA" />
     <meta
       name="twitter:description"
       content="Clean webpage captures for design review, QA, and product work. Try the local Chrome beta."
@@ -51,9 +51,10 @@
     <link rel="icon" href="brandmark.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/brandmark-512.png" />
     <link rel="stylesheet" href="styles.css?v=20260910-capture-set" />
-    <script src="script.js?v=20260910-capture-set" defer></script>
+    <link rel="stylesheet" href="inspection.css?v=20260910-desk" />
+    <script src="script.js?v=20260910-desk" defer></script>
   </head>
-  <body>
+  <body class="inspection-desk">
     <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-header section-shell">
       <a class="brand" href="#top" aria-label="Lumen home"
@@ -66,42 +67,38 @@
         ><a href="privacy.html">Privacy</a>
       </nav>
       <a class="button button-small button-secondary" href="#install"
-        >Get Lumen <span aria-hidden="true">↗</span></a
+        >Install beta</a
       >
     </header>
     <main id="main">
       <section class="hero section-shell" id="top" aria-labelledby="hero-title">
         <div class="hero-copy">
           <p class="eyebrow">
-            <span class="status-dot" aria-hidden="true"></span>Capture. Review. Keep.
+            For design review and web QA
           </p>
-          <h1 id="hero-title">Capture it.<br /><em>Keep the<br />useful parts.</em></h1>
+          <h1 id="hero-title">The webpage.<br />The breakpoint.<br /><em>The problem.</em></h1>
           <p class="hero-lede">
-            A whole page, a small detail, or a set of responsive views.
-            Inspect the originals, mark what matters, and save the images
-            you need for your next review.
+            Take screenshots of a page or a selected region at multiple widths.
+            Mark the issue, cover private details, and save the images with
+            useful page context for your next review.
           </p>
           <div class="hero-actions">
             <a class="button button-primary" href="#install"
-              >Try the Chrome beta <span aria-hidden="true">↗</span></a
+              >Install from GitHub</a
             ><a class="button button-secondary" href="#explore"
-              >Explore the output <span aria-hidden="true">↓</span></a
+              >Try the test page <span aria-hidden="true">↓</span></a
             >
           </div>
           <p class="hero-note">
-            Runs locally. No account needed. Manual installation.
+            Chrome beta. Manual install. No account required.
           </p>
           <div class="hero-capabilities" aria-label="Capture options">
-            <span>Full page</span><span>Rectangle &amp; lasso</span
-            ><span>Responsive set</span>
+            <span>Local storage</span><span>PNG / PDF / ZIP</span>
           </div>
         </div>
         <figure class="product-window" id="actual-app">
           <div class="window-bar">
-            <span class="window-lights" aria-hidden="true"
-              ><i></i><i></i><i></i></span
-            ><span>Lumen / Capture set</span
-            ><span class="window-label">Running extension</span>
+            <span>Inside the extension</span><span class="window-label">Select originals. Download a set.</span>
           </div>
           <a
             class="editor-image-link"
@@ -123,28 +120,27 @@
             >
           </a>
           <figcaption>
-            <span class="status-dot" aria-hidden="true"></span>Actual extension,
-            sample page <span>Browse / Select / Export</span>
+            Real extension UI using a test page. Click to inspect at full size.
           </figcaption>
         </figure>
       </section>
       <section id="explore" class="output-explorer section-shell" aria-labelledby="explore-title">
         <div class="explorer-copy">
-          <p class="eyebrow">Look at the output</p>
-          <h2 id="explore-title">One page.<br />Three views.</h2>
-          <p>Switch between saved desktop, tablet, and mobile samples. Open an image to inspect it at its original size.</p>
-          <div class="sample-tabs" aria-label="Sample viewport">
-            <a href="assets/capture-run-desktop.png" data-sample="Desktop" aria-current="true">Desktop</a>
-            <a href="assets/capture-run-tablet.png" data-sample="Tablet">Tablet</a>
-            <a href="assets/capture-run-mobile.png" data-sample="Mobile">Mobile</a>
+          <p class="eyebrow">Bug Garden / Checkout 01</p>
+          <h2 id="explore-title">Find the width<br />where it breaks.</h2>
+          <p>This checkout has deliberate layout faults. At tablet width the coupon overlaps the address. On mobile the continue button clips.</p>
+          <div class="sample-tabs" aria-label="Test page viewport" hidden>
+            <button type="button" data-viewport="1280" aria-pressed="true">1280 px</button>
+            <button type="button" data-viewport="768" aria-pressed="false">768 px</button>
+            <button type="button" data-viewport="390" aria-pressed="false">390 px</button>
           </div>
-          <p class="sample-provenance">Saved sample outputs from the May 2026 proof run. This gallery previews images; capture and ZIP export run in the extension.</p>
-          <a class="text-link" href="assets/capture-run-summary.json">Read the sample run details ↗</a>
+          <p class="sample-provenance">Live test page, scaled to fit. These are seeded defects, not Lumen detections. Open it in Chrome to try your first responsive set.</p>
+          <a class="text-link" href="bug-garden.html" target="_blank" rel="noreferrer">Open the test page ↗</a>
         </div>
-        <figure class="sample-viewer">
-          <div class="sample-toolbar"><span id="sample-label" aria-live="polite">Desktop sample</span><a id="sample-original" href="assets/capture-run-desktop.png" target="_blank" rel="noreferrer">Open original ↗</a></div>
-          <div class="sample-viewport"><img id="sample-image" src="assets/capture-run-desktop.png" width="1280" height="860" alt="Desktop capture of the Orbit sample page" loading="lazy" /></div>
-          <figcaption>Captured images, available to inspect before you install.</figcaption>
+        <figure class="garden-viewer">
+          <div class="sample-toolbar"><span id="garden-label" aria-live="polite">1280 px / Desktop</span><span>Live HTML</span></div>
+          <div class="garden-stage"><iframe id="garden-frame" src="bug-garden.html" title="Checkout test page with deliberate responsive defects" sandbox="allow-same-origin" loading="lazy" width="1280" height="780"></iframe></div>
+          <figcaption id="garden-note">Desktop: the address and continue button fit.</figcaption>
         </figure>
       </section>
       <div class="workflow-strip section-shell" aria-label="Capture workflow">
@@ -161,7 +157,7 @@
         <div class="section-heading">
           <div>
             <p class="eyebrow">How it works</p>
-            <h2 id="workflow-title">Show what<br />needs attention.</h2>
+            <h2 id="workflow-title">Mark the issue.<br />Send the evidence.</h2>
           </div>
           <p>
             Each capture opens ready to review. Zoom in, mark the issue, cover
@@ -174,7 +170,7 @@
               <span class="step-number">01 / CAPTURE</span
               ><span class="subtle-label">Page or selection</span>
             </div>
-            <h3>Only the part you need.</h3>
+            <h3>Select a page or region.</h3>
             <p>
               Capture a full page, the visible area, or a rectangle or lasso
               selection. Generate desktop, tablet, and mobile views in one run.
@@ -196,7 +192,7 @@
               <span class="step-number">02 / REVIEW</span
               ><span class="subtle-label">Before sharing</span>
             </div>
-            <h3>Keep private details private.</h3>
+            <h3>Redact before you export.</h3>
             <p>
               Review detected details and add your own redactions. Draw an arrow
               or leave a note to make the issue clear.
@@ -217,10 +213,11 @@
               <span class="step-number">03 / EXPORT</span
               ><span class="subtle-label">Local files</span>
             </div>
-            <h3>Save the reviewed image.</h3>
+            <h3>Download the selected originals.</h3>
             <p>
               Copy an image or export PNG or PDF. Browse retained page parts
               and crops, then download selected originals together as a ZIP.
+              Save annotated images separately; the ZIP contains originals.
             </p>
             <div class="artifact-list" aria-label="Sample capture files">
               <div>
@@ -268,8 +265,8 @@
       >
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Implemented now</p>
-            <h2 id="features-title">Less cleanup<br />after each capture.</h2>
+            <p class="eyebrow">Alongside the image</p>
+            <h2 id="features-title">Keep the page context.</h2>
           </div>
           <a
             class="text-link"
@@ -290,11 +287,12 @@
           </article>
           <article class="feature-card">
             <span class="tool-symbol" aria-hidden="true">02</span>
-            <h3>Responsive evidence</h3>
+            <h3>Page signals</h3>
             <p>
-              Capture desktop, tablet, and mobile layouts. Keep each view with
-              its original files and page signals.
+              Export colors, fonts, headings, and navigation labels as JSON.
+              Keep the source context alongside the screenshot.
             </p>
+            <details class="signals-example"><summary>See an extracted example</summary><dl><dt>Heading font</dt><dd>Instrument Serif</dd><dt>Body font</dt><dd>Space Grotesk</dd><dt>Navigation</dt><dd>Product / Workflow / Security / Contact</dd><dt>Leading color</dt><dd><code>#112233</code></dd></dl><p>From the older Orbit test page. <a href="assets/capture-run-summary.json">Read the source JSON</a>.</p></details>
           </article>
           <article class="feature-card">
             <span class="tool-symbol" aria-hidden="true">03</span>
@@ -320,14 +318,15 @@
         aria-labelledby="scope-title"
       >
         <div class="scope-copy">
-          <p class="eyebrow">Local by default</p>
+          <p class="eyebrow">Privacy</p>
           <h2 id="scope-title">
-            Keep your captures<br /><span class="accent">on your device.</span>
+            Your screenshots<br /><span class="accent">stay local by default.</span>
           </h2>
           <p>
-            Capture, review, and export without signing in. Privacy Shield
-            combines automatic redaction, review before save, and metadata
-            minimization.
+            Take screenshots and edit them in Chrome without signing in.
+            Automatic redaction is optional and starts off. Choose it when you
+            need it, then check the result before sharing. Connected exports
+            require your setup and action.
           </p>
           <a class="text-link" href="privacy.html"
             >How your data is handled <span aria-hidden="true">↗</span></a
@@ -335,29 +334,14 @@
         </div>
         <div class="scope-details">
           <details open>
-            <summary>What to expect from this beta</summary>
+            <summary>Know the beta's limits</summary>
             <p>
               Local capture and editing are available now. Browser protected
               pages cannot be captured. Complex embeds, moving content, and
               unusual scrolling layouts may need a second pass.
             </p>
           </details>
-          <details>
-            <summary>What about automatic captures?</summary>
-            <p>
-              Timed area capture is available with an explicit schedule and run
-              limit. You choose to start it. Review local results before sharing
-              them.
-            </p>
-          </details>
-          <details>
-            <summary>Does anything go to a background agent?</summary>
-            <p>
-              Agent handoff is future work. There is no automatic agent upload
-              in the current workflow. External destinations require an explicit
-              action and setup.
-            </p>
-          </details>
+          <details><summary>Inspect saved example files</summary><p>Earlier sample exports: <a href="assets/capture-run-desktop.png">desktop PNG</a>, <a href="assets/capture-run-tablet.png">tablet PNG</a>, <a href="assets/capture-run-mobile.png">mobile PNG</a>, and <a href="assets/capture-run-signals.json">signals JSON</a>. These use the older Orbit fixture, separate from the checkout above. <a href="assets/capture-run-summary.json">Run details</a>.</p></details>
         </div>
       </section>
       <section

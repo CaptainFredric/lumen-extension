@@ -1,32 +1,31 @@
 // Navigation is progressive enhancement. All content and actions work without it.
-const sampleImage = document.querySelector("#sample-image");
-const sampleLinks = [...document.querySelectorAll("[data-sample]")];
-if (sampleImage) {
-  let sampleRequest = 0;
-  for (const link of sampleLinks) {
-    link.addEventListener("click", async (event) => {
-      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-      event.preventDefault();
-      const request = ++sampleRequest;
-      const next = new Image();
-      next.src = link.href;
-      try {
-        await next.decode();
-        if (request !== sampleRequest) return;
-        sampleImage.src = next.src;
-        sampleImage.width = next.naturalWidth;
-        sampleImage.height = next.naturalHeight;
-        sampleImage.alt = `${link.dataset.sample} capture of the Orbit sample page`;
-        sampleImage.parentElement.dataset.view = link.dataset.sample;
-        sampleImage.parentElement.scrollTop = 0;
-        document.querySelector("#sample-original").href = link.href;
-        document.querySelector("#sample-label").textContent = `${link.dataset.sample} sample`;
-        sampleLinks.forEach((item) => item === link ? item.setAttribute("aria-current", "true") : item.removeAttribute("aria-current"));
-      } catch {
-        if (request === sampleRequest) document.querySelector("#sample-label").textContent = "Image unavailable. Use the original image link to retry.";
-      }
+const gardenFrame = document.querySelector("#garden-frame");
+if (gardenFrame) {
+  document.querySelector(".sample-tabs").hidden = false;
+  let width = 1280;
+  const views = {
+    1280: ["Desktop", "Desktop: the address and continue button fit."],
+    768: ["Tablet", "Tablet: the coupon overlaps the shipping address."],
+    390: ["Mobile", "Mobile: the continue button clips inside the order card."],
+  };
+  const fit = () => {
+    const scale = Math.min(1, gardenFrame.parentElement.clientWidth / width);
+    gardenFrame.style.width = `${width}px`;
+    gardenFrame.style.transform = `scale(${scale})`;
+    gardenFrame.parentElement.style.height = `${780 * scale}px`;
+  };
+  for (const button of document.querySelectorAll("[data-viewport]")) {
+    button.addEventListener("click", () => {
+      width = Number(button.dataset.viewport);
+      document.querySelectorAll("[data-viewport]").forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
+      document.querySelector("#garden-label").textContent = `${width} px / ${views[width][0]}`;
+      document.querySelector("#garden-note").textContent = views[width][1];
+      fit();
     });
   }
+  if ("ResizeObserver" in window) new ResizeObserver(fit).observe(gardenFrame.parentElement);
+  else window.addEventListener("resize", fit);
+  fit();
 }
 
 const navLinks = [...document.querySelectorAll('.site-nav a[href^="#"]')];

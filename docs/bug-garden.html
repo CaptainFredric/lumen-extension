@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Lumen Bug Garden | Checkout 01</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #202625; background: #f4f3ef; font: 16px/1.6 "Avenir Next", "Trebuchet MS", sans-serif; }
+    header { padding: 20px 28px; border-bottom: 1px solid #c9cdc5; display: flex; justify-content: space-between; gap: 16px; }
+    a { color: inherit; text-underline-offset: 4px; }
+    :focus-visible { outline: 3px solid #395a21; outline-offset: 4px; }
+    main { max-width: 1000px; margin: 42px auto; padding: 0 28px; }
+    h1 { font-size: 38px; letter-spacing: -1.5px; margin: 0 0 8px; }
+    .intro { max-width: 660px; color: #505b53; margin-bottom: 30px; }
+    .checkout { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; }
+    .address, .order { background: #fff; padding: 28px; border: 1px solid #c9cdc5; position: relative; }
+    h2 { margin: 0 0 18px; font-size: 22px; }
+    label { display: block; margin: 15px 0 5px; }
+    input { width: 100%; padding: 12px; border: 1px solid #a1ada1; border-radius: 0; font: inherit; background: #fafbf8; }
+    .coupon { margin-top: 22px; padding: 12px; background: #e2efb5; border: 1px dashed #607039; }
+    .continue { display: block; width: 100%; padding: 14px; margin-top: 24px; border: 0; background: #26332c; color: white; font: inherit; }
+    .total { display: flex; justify-content: space-between; padding: 16px 0; border-block: 1px solid #c9cdc5; }
+    .notes { margin-top: 32px; border-top: 1px solid #c9cdc5; padding-top: 20px; font-size: 14px; }
+    .notes p { margin: 6px 0; }
+    /* Intentional defects form a stable, public capture regression target. */
+    @media (min-width: 601px) and (max-width: 900px) { .coupon { position: absolute; left: -100px; top: 170px; width: 280px; z-index: 2; } }
+    @media (max-width: 600px) { .checkout { grid-template-columns: 1fr; } .order { overflow: hidden; } .continue { width: calc(100% + 70px); text-align: right; padding-right: 10px; } header { font-size: 12px; } }
+  </style>
+</head>
+<body>
+  <header><strong>Lumen Bug Garden / 01</strong><nav aria-label="Fixture navigation"><a href="./">Lumen</a> / <a href="#checkout">Checkout</a></nav></header>
+  <main>
+    <h1>Checkout, with a few bugs.</h1>
+    <p class="intro">A test page for responsive screenshots and redaction. All details are fictional. Nothing is submitted or purchased.</p>
+    <div class="checkout" id="checkout">
+      <section class="address"><h2>Shipping address</h2><label for="name">Name</label><input id="name" value="Jane Example" readonly /><label for="email">Email</label><input id="email" value="jane@example.test" readonly /><label for="street">Street</label><input id="street" value="123 Example Street" readonly /></section>
+      <section class="order"><h2>Order summary</h2><p>Desk notebook / 1 item</p><div class="total"><span>Total</span><strong>$18.00</strong></div><div class="coupon">Coupon applied: EXAMPLE10</div><button class="continue" type="button">Continue to payment</button><small>Demonstration button only.</small></section>
+    </div>
+    <aside class="notes"><strong>Deliberate faults to inspect</strong><p>1280 px: normal layout. 768 px: coupon overlaps the address. 390 px: continue button clips.</p><p>Enable automatic redaction in Lumen to test the email field. Review the export yourself.</p></aside>
+  </main>
+</body>
+</html>

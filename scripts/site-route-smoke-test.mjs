@@ -19,9 +19,9 @@ try {
     await readFile(path.join(root, "docs/index.html"), "utf8"),
     "Preview must serve the deployed source.",
   );
-  assert.match(homepage, /Capture it\./);
-  assert.doesNotMatch(homepage, /review\.html|<iframe|<video|data-reveal/);
-  assert.match(homepage, /Agent handoff is future work/);
+  assert.match(homepage, /The webpage\./);
+  assert.doesNotMatch(homepage, /review\.html|data-reveal/);
+  assert.match(homepage, /sandbox="allow-same-origin"/);
   assert.match(homepage, /Review every capture before external sharing/);
   for (const filename of [
     "background.js",
@@ -104,7 +104,7 @@ try {
     assert.equal(layout.workflow, 3);
     assert.deepEqual(layout.image, [1280, 800]);
     assert.deepEqual(layout.brokenAnchors, []);
-    assert.equal(layout.background, "rgb(10, 16, 20)");
+    assert.equal(layout.background, "rgb(244, 243, 239)");
     assert.equal(
       width > 820 ? layout.sideBySide : layout.stacked,
       true,
@@ -115,15 +115,6 @@ try {
     assert.equal(
       await page.locator("#install .button").getAttribute("href"),
       "https://github.com/CaptainFredric/lumen-extension/archive/refs/heads/main.zip",
-    );
-    await page
-      .getByText("Does anything go to a background agent?", { exact: true })
-      .click();
-    assert.equal(
-      await page
-        .getByText("Agent handoff is future work.", { exact: false })
-        .isVisible(),
-      true,
     );
     await page.goto(origin, { waitUntil: "networkidle" });
     await page.keyboard.press("Tab");
@@ -147,11 +138,20 @@ try {
     for (const url of new Set(urls)) {
       assert.equal((await fetch(url)).status, 200, `Broken local link: ${url}`);
     }
-    for (const view of ["Tablet", "Mobile", "Desktop"]) {
-      await page.locator(`[data-sample="${view}"]`).click();
-      await page.waitForFunction((name) => document.querySelector("#sample-label").textContent === `${name} sample`, view);
-      assert.equal(await page.locator(`[data-sample="${view}"]`).getAttribute("aria-current"), "true");
-      assert((await page.locator("#sample-original").getAttribute("href")).endsWith(`capture-run-${view.toLowerCase()}.png`));
+    for (const view of [768, 390, 1280]) {
+      await page.locator(`[data-viewport="${view}"]`).click();
+      assert.equal(await page.locator(`[data-viewport="${view}"]`).getAttribute("aria-pressed"), "true");
+      const frame = page.frames().find((item) => item.url().endsWith("bug-garden.html"));
+      const geometry = await frame.evaluate(() => {
+        const address = document.querySelector(".address").getBoundingClientRect();
+        const coupon = document.querySelector(".coupon").getBoundingClientRect();
+        const order = document.querySelector(".order").getBoundingClientRect();
+        const button = document.querySelector(".continue").getBoundingClientRect();
+        return { width: innerWidth, overlaps: coupon.left < address.right && coupon.bottom > address.top && coupon.top < address.bottom, clips: button.right > order.right };
+      });
+      assert.equal(geometry.width, view);
+      assert.equal(geometry.overlaps, view === 768);
+      assert.equal(geometry.clips, view === 390);
     }
     if (process.env.LUMEN_SITE_SCREENSHOTS) {
       await mkdir(process.env.LUMEN_SITE_SCREENSHOTS, { recursive: true });
@@ -299,11 +299,11 @@ try {
       "1",
     );
     await page
-      .getByText("What about automatic captures?", { exact: true })
+      .getByText("Inspect saved example files", { exact: true })
       .click();
     assert.equal(
       await page
-        .getByText("Timed area capture is available", { exact: false })
+        .getByText("Earlier sample exports:", { exact: false })
         .isVisible(),
       true,
     );
