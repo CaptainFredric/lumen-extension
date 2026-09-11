@@ -146,6 +146,15 @@ try {
 
   const primaryResultPage = await waitForCaptureResultPage(context, extensionId, response.captureId);
   primaryResultState = await readCaptureResultState(primaryResultPage, popupConsoleErrors);
+  if (process.env.LUMEN_LANDING_PROOF) {
+    await primaryResultPage.setViewportSize({ width: 1280, height: 800 });
+    await primaryResultPage.locator(".capture-set-item button").first().click();
+    await primaryResultPage.waitForFunction(() => document.querySelector(".capture-set-item button")?.getAttribute("aria-pressed") === "true");
+    await primaryResultPage.waitForFunction(() => document.querySelector(".capture-set-item img")?.naturalWidth > 0);
+    await primaryResultPage.screenshot({ path: process.env.LUMEN_LANDING_PROOF });
+    await primaryResultPage.reload();
+    await primaryResultPage.waitForFunction(() => ["ready", "limited"].includes(document.body.dataset.state));
+  }
   assert(await primaryResultPage.locator("#captureWarning").isHidden(), "Complete capture showed an interruption warning.");
   // Exercise the persisted partial status through the real result UI, then
   // restore this fixture so the remaining export checks use the complete run.

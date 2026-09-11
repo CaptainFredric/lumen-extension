@@ -1,4 +1,34 @@
 // Navigation is progressive enhancement. All content and actions work without it.
+const sampleImage = document.querySelector("#sample-image");
+const sampleLinks = [...document.querySelectorAll("[data-sample]")];
+if (sampleImage) {
+  let sampleRequest = 0;
+  for (const link of sampleLinks) {
+    link.addEventListener("click", async (event) => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      const request = ++sampleRequest;
+      const next = new Image();
+      next.src = link.href;
+      try {
+        await next.decode();
+        if (request !== sampleRequest) return;
+        sampleImage.src = next.src;
+        sampleImage.width = next.naturalWidth;
+        sampleImage.height = next.naturalHeight;
+        sampleImage.alt = `${link.dataset.sample} capture of the Orbit sample page`;
+        sampleImage.parentElement.dataset.view = link.dataset.sample;
+        sampleImage.parentElement.scrollTop = 0;
+        document.querySelector("#sample-original").href = link.href;
+        document.querySelector("#sample-label").textContent = `${link.dataset.sample} sample`;
+        sampleLinks.forEach((item) => item === link ? item.setAttribute("aria-current", "true") : item.removeAttribute("aria-current"));
+      } catch {
+        if (request === sampleRequest) document.querySelector("#sample-label").textContent = "Image unavailable. Use the original image link to retry.";
+      }
+    });
+  }
+}
+
 const navLinks = [...document.querySelectorAll('.site-nav a[href^="#"]')];
 const sections = navLinks
   .map((link) => document.getElementById(link.hash.slice(1)))

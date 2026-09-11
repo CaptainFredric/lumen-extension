@@ -147,6 +147,12 @@ try {
     for (const url of new Set(urls)) {
       assert.equal((await fetch(url)).status, 200, `Broken local link: ${url}`);
     }
+    for (const view of ["Tablet", "Mobile", "Desktop"]) {
+      await page.locator(`[data-sample="${view}"]`).click();
+      await page.waitForFunction((name) => document.querySelector("#sample-label").textContent === `${name} sample`, view);
+      assert.equal(await page.locator(`[data-sample="${view}"]`).getAttribute("aria-current"), "true");
+      assert((await page.locator("#sample-original").getAttribute("href")).endsWith(`capture-run-${view.toLowerCase()}.png`));
+    }
     if (process.env.LUMEN_SITE_SCREENSHOTS) {
       await mkdir(process.env.LUMEN_SITE_SCREENSHOTS, { recursive: true });
       await page.locator("#hero-title").click();

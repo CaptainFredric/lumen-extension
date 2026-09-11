@@ -185,7 +185,7 @@ async function prepareBundleImages(captureId, images = []) {
     const estimatedBytes = Math.ceil((image.dataUrl.length - 22) * 3 / 4);
     if (bytes + estimatedBytes > 64 * 1024 * 1024) continue;
     const blob = await (await fetch(image.dataUrl)).blob();
-    const thumbnail = /^data:image\/png;base64,/.test(image.thumbnailDataUrl || "") && image.thumbnailDataUrl.length <= 128000
+    const thumbnail = /^data:image\/(?:png|webp|jpeg);base64,/.test(image.thumbnailDataUrl || "") && image.thumbnailDataUrl.length <= 128000
       ? await (await fetch(image.thumbnailDataUrl)).blob() : null;
     const byteLength = blob.size + (thumbnail?.size || 0);
     if (bytes + byteLength > 64 * 1024 * 1024) continue;

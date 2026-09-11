@@ -48,7 +48,7 @@ try {
       variantCount: 1,
       editorSourceDataUrl: canvas.toDataURL(),
       bundleImages: [
-        { dataUrl: canvas.toDataURL(), thumbnailDataUrl: canvas.toDataURL(), width: 640, height: 480, filename: "desktop.png", variantId: "desktop" },
+        { dataUrl: canvas.toDataURL(), thumbnailDataUrl: canvas.toDataURL("image/webp"), width: 640, height: 480, filename: "desktop.png", variantId: "desktop" },
         { dataUrl: second.toDataURL(), width: 320, height: 240, filename: "tablet.png", variantId: "tablet" }
       ],
       previews: [{ dataUrl: canvas.toDataURL(), width: 640, height: 480 }]
