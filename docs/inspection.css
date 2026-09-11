@@ -42,6 +42,7 @@
 .garden-viewer { min-width: 0; border: 1px solid #9ba492; background: #e4e5db; }
 .garden-viewer .sample-toolbar { color: #30382e; }
 .garden-stage { width: 100%; height: 400px; overflow: auto; position: relative; }
+.garden-stage.is-fitted { overflow: hidden; }
 #garden-frame { display: block; border: 0; transform-origin: top left; background: #f4f3ef; }
 .garden-viewer figcaption { padding: 12px 16px; border-top: 1px solid #9ba492; font-size: 13px; }
 .inspection-desk .workflow-strip { color: var(--ink); }
@@ -59,6 +60,12 @@
 .inspection-desk .file-type { font-size: 9px; border-color: #839770; }
 .inspection-desk .text-link { font-size: 13px; text-decoration: underline; text-underline-offset: 4px; }
 .inspection-desk .limits-note { font-size: 13px; }
+.proof-downloads { display: flex; flex-wrap: wrap; gap: 10px 16px; padding-top: 24px; margin-top: 24px; border-top: 1px solid var(--line); font-size: 13px; }
+.proof-downloads strong, .proof-downloads p { width: 100%; }
+.proof-downloads a { text-decoration: underline; text-underline-offset: 4px; }
+.proof-downloads p { color: var(--muted); }
+.inspection-desk .redaction-example img { object-position: 50% 41%; }
+.inspection-desk .redaction-example figcaption { font: 12px/1.5 var(--font); }
 .inspection-desk .feature-grid { grid-template-columns: 1fr 1fr; gap: 32px 60px; }
 .inspection-desk .tool-symbol { display: none; }
 .inspection-desk .feature-card h3 { font-size: 20px; }
@@ -80,6 +87,8 @@
   .inspection-desk .scope-section { gap: 24px; }
 }
 @media (max-width: 560px) {
+  .inspection-desk .site-nav { display: none; }
+  .inspection-desk .site-header .button { min-height: 44px; }
   .inspection-desk .hero h1 { font-size: clamp(38px, 10.5vw, 58px); }
   .inspection-desk .feature-grid { grid-template-columns: 1fr; }
   .inspection-desk .install-section { padding: 24px 20px; }

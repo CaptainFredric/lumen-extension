@@ -36,6 +36,7 @@
     "icons:generate": "node scripts/generate-icons.mjs",
     "cleanup:tmp": "node scripts/cleanup-test-artifacts.mjs",
     "capture:assets": "node scripts/generate-capture-artifacts.mjs",
+    "proof:garden": "node scripts/generate-garden-proof.mjs",
     "capture:install-browser": "playwright install chromium",
     "handoff:cloud": "node scripts/export-cloud-handoff.mjs"
   },

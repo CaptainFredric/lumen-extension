@@ -26,13 +26,13 @@
     />
     <meta
       property="og:image"
-      content="https://captainfredric.github.io/lumen-extension/assets/store-annotation-studio.png"
+      content="https://captainfredric.github.io/lumen-extension/assets/garden-result.png"
     />
     <meta property="og:image:width" content="1280" />
     <meta property="og:image:height" content="800" />
     <meta
       property="og:image:alt"
-      content="Lumen annotation editor with a sample image, arrow, text, and selected rectangle."
+      content="Lumen Capture Result with three responsive views of the Bug Garden checkout."
     />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Lumen | Web screenshots for design review and QA" />
@@ -42,17 +42,17 @@
     />
     <meta
       name="twitter:image"
-      content="https://captainfredric.github.io/lumen-extension/assets/store-annotation-studio.png"
+      content="https://captainfredric.github.io/lumen-extension/assets/garden-result.png"
     />
     <meta
       name="twitter:image:alt"
-      content="The Lumen annotation editor showing a sample capture."
+      content="Lumen Capture Result showing a real Bug Garden responsive set."
     />
     <link rel="icon" href="brandmark.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/brandmark-512.png" />
     <link rel="stylesheet" href="styles.css?v=20260910-capture-set" />
-    <link rel="stylesheet" href="inspection.css?v=20260910-desk" />
-    <script src="script.js?v=20260910-desk" defer></script>
+    <link rel="stylesheet" href="inspection.css?v=20260911-proof" />
+    <script src="script.js?v=20260911-proof" defer></script>
   </head>
   <body class="inspection-desk">
     <a class="skip-link" href="#main">Skip to content</a>
@@ -102,14 +102,14 @@
           </div>
           <a
             class="editor-image-link"
-            href="assets/store-capture-set.png"
+            href="assets/garden-result.png"
             target="_blank"
             rel="noreferrer"
             aria-label="Open the capture set screenshot at full size"
           >
             <img
               class="editor-image"
-              src="assets/store-capture-set.png"
+              src="assets/garden-result.png"
               alt="The running Lumen extension showing retained capture images, selection checkboxes, ZIP export, and the original image viewer. Sample page content."
               width="1280"
               height="800"
@@ -131,11 +131,12 @@
           <p>This checkout has deliberate layout faults. At tablet width the coupon overlaps the address. On mobile the continue button clips.</p>
           <div class="sample-tabs" aria-label="Test page viewport" hidden>
             <button type="button" data-viewport="1280" aria-pressed="true">1280 px</button>
-            <button type="button" data-viewport="768" aria-pressed="false">768 px</button>
-            <button type="button" data-viewport="390" aria-pressed="false">390 px</button>
+            <button type="button" data-viewport="1024" aria-pressed="false">1024 px</button>
+            <button type="button" data-viewport="430" aria-pressed="false">430 px</button>
           </div>
           <p class="sample-provenance">Live test page, scaled to fit. These are seeded defects, not Lumen detections. Open it in Chrome to try your first responsive set.</p>
           <a class="text-link" href="bug-garden.html" target="_blank" rel="noreferrer">Open the test page ↗</a>
+          <div class="proof-downloads" aria-label="Real extension exports"><strong>Download the actual screenshots</strong><a href="assets/garden-desktop.png">Desktop PNG</a><a href="assets/garden-tablet.png">Tablet PNG</a><a href="assets/garden-mobile.png">Mobile PNG</a><a href="assets/garden-run.json">Run record and page context</a><p>3 images. 3 email redactions across the set. 1 local library entry. Desktop uses the current window; this run used 1280 CSS pixels.</p></div>
         </div>
         <figure class="garden-viewer">
           <div class="sample-toolbar"><span id="garden-label" aria-live="polite">1280 px / Desktop</span><span>Live HTML</span></div>
@@ -199,13 +200,13 @@
             </p>
             <figure class="redaction-example">
               <img
-                src="assets/capture-run-redacted.png"
-                alt="Sample export with email, phone, API token, and owner values obscured by Lumen."
-                width="360"
-                height="387"
+                src="assets/garden-mobile.png"
+                alt="Real mobile checkout export with the fictional email field covered by Lumen."
+                width="860"
+                height="2732"
                 loading="lazy"
               />
-              <figcaption>Redacted output from a sample capture</figcaption>
+              <figcaption>Email redaction in the Bug Garden export. <a href="assets/garden-mobile.png">Open full image</a>.</figcaption>
             </figure>
           </article>
           <article class="workflow-card export-card">
@@ -213,7 +214,7 @@
               <span class="step-number">03 / EXPORT</span
               ><span class="subtle-label">Local files</span>
             </div>
-            <h3>Download the selected originals.</h3>
+            <h3>Take the evidence with you.</h3>
             <p>
               Copy an image or export PNG or PDF. Browse retained page parts
               and crops, then download selected originals together as a ZIP.
@@ -245,7 +246,7 @@
             </div>
             <a
               class="text-link"
-              href="assets/capture-run-summary.json"
+              href="assets/garden-run.json"
               target="_blank"
               rel="noreferrer"
               >Inspect the sample run <span aria-hidden="true">↗</span></a
@@ -292,7 +293,7 @@
               Export colors, fonts, headings, and navigation labels as JSON.
               Keep the source context alongside the screenshot.
             </p>
-            <details class="signals-example"><summary>See an extracted example</summary><dl><dt>Heading font</dt><dd>Instrument Serif</dd><dt>Body font</dt><dd>Space Grotesk</dd><dt>Navigation</dt><dd>Product / Workflow / Security / Contact</dd><dt>Leading color</dt><dd><code>#112233</code></dd></dl><p>From the older Orbit test page. <a href="assets/capture-run-summary.json">Read the source JSON</a>.</p></details>
+            <details class="signals-example"><summary>See an extracted example</summary><dl><dt>Heading font</dt><dd>Avenir Next</dd><dt>Body font</dt><dd>Avenir Next</dd><dt>Navigation</dt><dd>Lumen / Checkout</dd><dt>Heading</dt><dd>Checkout, with a few bugs.</dd></dl><p>Extracted during this Bug Garden run. <a href="assets/garden-run.json">Read the source JSON</a>.</p></details>
           </article>
           <article class="feature-card">
             <span class="tool-symbol" aria-hidden="true">03</span>
@@ -341,7 +342,7 @@
               unusual scrolling layouts may need a second pass.
             </p>
           </details>
-          <details><summary>Inspect saved example files</summary><p>Earlier sample exports: <a href="assets/capture-run-desktop.png">desktop PNG</a>, <a href="assets/capture-run-tablet.png">tablet PNG</a>, <a href="assets/capture-run-mobile.png">mobile PNG</a>, and <a href="assets/capture-run-signals.json">signals JSON</a>. These use the older Orbit fixture, separate from the checkout above. <a href="assets/capture-run-summary.json">Run details</a>.</p></details>
+          <details><summary>Inspect saved example files</summary><p>Actual extension exports: <a href="assets/garden-desktop.png">desktop PNG</a>, <a href="assets/garden-tablet.png">tablet PNG</a>, <a href="assets/garden-mobile.png">mobile PNG</a>. <a href="assets/garden-run.json">The run record</a> includes extracted context and the saved library identifier.</p></details>
         </div>
       </section>
       <section
@@ -477,7 +478,7 @@
         aria-label="Editor screenshot. Scroll to inspect when zoomed."
       >
         <img
-          src="assets/store-capture-set.png"
+          src="assets/garden-result.png"
           alt="The Lumen capture set with original image browsing, selection, and ZIP export on a sample page."
           width="1280"
           height="800"

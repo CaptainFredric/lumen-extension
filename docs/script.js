@@ -1,17 +1,19 @@
 // Navigation is progressive enhancement. All content and actions work without it.
 const gardenFrame = document.querySelector("#garden-frame");
 if (gardenFrame) {
+  gardenFrame.parentElement.classList.add("is-fitted");
   document.querySelector(".sample-tabs").hidden = false;
   let width = 1280;
   const views = {
     1280: ["Desktop", "Desktop: the address and continue button fit."],
-    768: ["Tablet", "Tablet: the coupon overlaps the shipping address."],
-    390: ["Mobile", "Mobile: the continue button clips inside the order card."],
+    1024: ["Tablet", "Tablet: the coupon overlaps the shipping address."],
+    430: ["Mobile", "Mobile: the continue button clips inside the order card."],
   };
   const fit = () => {
     const scale = Math.min(1, gardenFrame.parentElement.clientWidth / width);
     gardenFrame.style.width = `${width}px`;
     gardenFrame.style.transform = `scale(${scale})`;
+    gardenFrame.style.marginLeft = `${Math.max(0, (gardenFrame.parentElement.clientWidth - width * scale) / 2)}px`;
     gardenFrame.parentElement.style.height = `${780 * scale}px`;
   };
   for (const button of document.querySelectorAll("[data-viewport]")) {

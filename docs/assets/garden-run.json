@@ -1,0 +1,124 @@
+{
+  "generatedAt": "2026-09-11T04:51:23.660Z",
+  "fixtureSha256": "38e5e56f792dad61d12d75fe478085741c59b2c7e27d7366a1e80cf0bf01082c",
+  "source": "docs/bug-garden.html through the loaded Lumen extension. Temporary harness permissions differ from the toolbar installation.",
+  "captureId": "d250a0c4-ea08-4d22-b91f-1038fd11a737",
+  "variantCount": 3,
+  "redactionCount": 3,
+  "captureHealth": {
+    "status": "complete",
+    "coveragePercent": 100,
+    "verifiedVariantCount": 3,
+    "variantCount": 3,
+    "reachedTail": true,
+    "seamGapCount": 0,
+    "widthMismatchCount": 0,
+    "expectedPixels": 6050,
+    "coveredPixels": 6050
+  },
+  "historyItem": {
+    "id": "d250a0c4-ea08-4d22-b91f-1038fd11a737",
+    "title": "Lumen Bug Garden | Checkout 01"
+  },
+  "images": [
+    {
+      "variantId": "desktop",
+      "width": 2560,
+      "height": 1660,
+      "file": "garden-desktop.png"
+    },
+    {
+      "variantId": "tablet",
+      "width": 2048,
+      "height": 1658,
+      "file": "garden-tablet.png"
+    },
+    {
+      "variantId": "mobile",
+      "width": 860,
+      "height": 2732,
+      "file": "garden-mobile.png"
+    }
+  ],
+  "blueprint": {
+    "colors": [
+      {
+        "hex": "#222222",
+        "weight": 70.38
+      },
+      {
+        "hex": "#ffffff",
+        "weight": 7.27
+      },
+      {
+        "hex": "#555555",
+        "weight": 4.74
+      },
+      {
+        "hex": "#000000",
+        "weight": 3.43
+      },
+      {
+        "hex": "#cccccc",
+        "weight": 2
+      },
+      {
+        "hex": "#99aa99",
+        "weight": 1.5
+      }
+    ],
+    "generatedAt": "2026-09-11T04:51:09.552Z",
+    "identity": {
+      "heroHeadline": "Checkout, with a few bugs.",
+      "navLabels": [
+        "Lumen",
+        "Checkout"
+      ],
+      "primaryCta": "Lumen",
+      "siteType": "Brochure site"
+    },
+    "layout": {
+      "buttons": 3,
+      "forms": 0,
+      "headings": 3,
+      "navs": 1,
+      "sections": 2,
+      "viewportHeight": 600,
+      "viewportWidth": 1280,
+      "visuals": 0,
+      "words": 86
+    },
+    "page": {
+      "description": "",
+      "host": "127.0.0.1:62258",
+      "scrollContainer": "document",
+      "scrollMode": "document",
+      "title": "Lumen Bug Garden | Checkout 01",
+      "url": "http://127.0.0.1:62258/bug-garden.html"
+    },
+    "structure": [
+      {
+        "level": "h1",
+        "text": "Checkout, with a few bugs."
+      },
+      {
+        "level": "h2",
+        "text": "Shipping address"
+      },
+      {
+        "level": "h2",
+        "text": "Order summary"
+      }
+    ],
+    "typography": {
+      "bodyFont": "Avenir Next",
+      "families": [
+        {
+          "family": "Avenir Next",
+          "weight": 104.4
+        }
+      ],
+      "headingFont": "Avenir Next"
+    }
+  }
+}

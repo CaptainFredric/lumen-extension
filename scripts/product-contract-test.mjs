@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { createHash } from "node:crypto";
+import { LUMEN_CONFIG } from "../config.js";
 import {
   NEW_INSTALL_APP_SETTINGS,
   getNewInstallCaptureSettings,
@@ -44,6 +46,28 @@ test("release disclosures agree with the tested fresh defaults", async () => {
 test("popup has no development readiness meter", async () => {
   for (const filename of ["popup.html", "popup.js"]) {
     const text = await readFile(new URL(`../${filename}`, import.meta.url), "utf8");
-    assert.doesNotMatch(text, /productReadinessList|renderProductReadiness|Workspace meter/);
+    assert.doesNotMatch(text, /productReadinessList|renderProductReadiness|refreshProductReadiness|LUMEN_GET_PRODUCT_READINESS|Workspace meter/);
+  }
+});
+
+test("public demo and retained proof match the responsive presets", async () => {
+  const html = await readFile(new URL("../docs/index.html", import.meta.url), "utf8");
+  assert.doesNotMatch(html, /Orbit|capture-run-|store-capture-set/);
+  for (const preset of Object.values(LUMEN_CONFIG.capture.viewports)) {
+    assert.ok(html.includes(`data-viewport="${preset.width}"`));
+  }
+  const proof = JSON.parse(await readFile(new URL("../docs/assets/garden-run.json", import.meta.url), "utf8"));
+  const fixture = await readFile(new URL("../docs/bug-garden.html", import.meta.url));
+  assert.equal(proof.fixtureSha256, createHash("sha256").update(fixture).digest("hex"), "Regenerate proof after changing the fixture");
+  assert.equal(proof.images.length, 3);
+  assert.equal(proof.captureHealth.status, "complete");
+  assert.ok(proof.redactionCount >= 3);
+  assert.ok(proof.historyItem.id);
+  assert.ok(proof.blueprint.identity.navLabels.includes("Checkout"));
+  for (const image of proof.images) {
+    const png = await readFile(new URL(`../docs/assets/${image.file}`, import.meta.url));
+    assert.equal(png.subarray(1, 4).toString(), "PNG");
+    assert.equal(png.readUInt32BE(16), image.width);
+    assert.equal(png.readUInt32BE(20), image.height);
   }
 });

@@ -666,7 +666,6 @@ async function restoreAppState() {
   await refreshCutawayRegion();
   await refreshAnnotationRegion();
   await refreshDataControls();
-  await refreshProductReadiness();
   await refreshDestinations();
 }
 
@@ -1872,7 +1871,6 @@ async function handleSaveWatchPlan() {
     ].filter(Boolean));
     renderWatchPlanSummary(response.watchPlan);
     renderWatchRuns(response.watchRuns || latestWatchRuns);
-    await refreshProductReadiness();
 
     showStatus({
       tone: "success",
@@ -2443,7 +2441,6 @@ async function handleSignIn() {
   renderWatchPlans(response.watchPlans || latestWatchPlans);
   renderWatchRuns(response.watchRuns || []);
   await refreshDataControls();
-  await refreshProductReadiness();
   await refreshDestinations();
 
   showStatus({
@@ -2468,7 +2465,6 @@ async function handleSignOut() {
   }
 
   renderSession(response.session);
-  await refreshProductReadiness();
   await refreshDestinations();
   showStatus({
     tone: "neutral",
@@ -2491,13 +2487,6 @@ function handleBillingClick() {
     badge: "Access",
     progress: 0.12
   });
-}
-
-async function refreshProductReadiness() {
-  const response = await chrome.runtime.sendMessage({
-    type: "LUMEN_GET_PRODUCT_READINESS"
-  });
-
 }
 
 async function refreshDestinations() {

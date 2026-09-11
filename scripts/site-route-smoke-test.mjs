@@ -138,7 +138,7 @@ try {
     for (const url of new Set(urls)) {
       assert.equal((await fetch(url)).status, 200, `Broken local link: ${url}`);
     }
-    for (const view of [768, 390, 1280]) {
+    for (const view of [1024, 430, 1280]) {
       await page.locator(`[data-viewport="${view}"]`).click();
       assert.equal(await page.locator(`[data-viewport="${view}"]`).getAttribute("aria-pressed"), "true");
       const frame = page.frames().find((item) => item.url().endsWith("bug-garden.html"));
@@ -150,8 +150,14 @@ try {
         return { width: innerWidth, overlaps: coupon.left < address.right && coupon.bottom > address.top && coupon.top < address.bottom, clips: button.right > order.right };
       });
       assert.equal(geometry.width, view);
-      assert.equal(geometry.overlaps, view === 768);
-      assert.equal(geometry.clips, view === 390);
+      assert.equal(geometry.overlaps, view === 1024);
+      assert.equal(geometry.clips, view === 430);
+      const framing = await page.locator("#garden-frame").evaluate((iframe) => {
+        const frame = iframe.getBoundingClientRect();
+        const stage = iframe.parentElement.getBoundingClientRect();
+        return { centerOffset: Math.abs(frame.left + frame.width / 2 - stage.left - stage.width / 2), fits: frame.width <= stage.width + 1 };
+      });
+      assert(framing.centerOffset < 1 && framing.fits, `Centered demo at ${width}px / ${view}px`);
     }
     if (process.env.LUMEN_SITE_SCREENSHOTS) {
       await mkdir(process.env.LUMEN_SITE_SCREENSHOTS, { recursive: true });
@@ -303,7 +309,7 @@ try {
       .click();
     assert.equal(
       await page
-        .getByText("Earlier sample exports:", { exact: false })
+        .getByText("Actual extension exports:", { exact: false })
         .isVisible(),
       true,
     );
