@@ -33,7 +33,7 @@ This file tracks what Lumen needs before a serious Chrome Web Store submission.
 27. Reviewed-image Google Drive export is optional, starts from an explicit user action, uses Chrome Identity with the narrow `drive.file` scope, and removes cached authorization and optional permissions on disconnect.
 28. Dedicated Settings expose reversible Privacy Shield, local-only mode, review-before-save, monitor pause/resume behavior, optional-permission revocation, Drive disconnect, and verified local-workspace deletion outcomes.
 29. Local exports include PNG and paginated raster PDF, with Fit, 100%, and keyboard zoom controls for the local working image; connected export remains separately consented.
-30. Fresh installs default to one-click local capture with automatic redaction enabled, capture-details JSON disabled, review-before-save disabled, and Privacy Shield available as an explicit stronger mode.
+30. Fresh-install defaults: local-only mode starts on. Automatic redaction, capture-details JSON, review-before-save, and Privacy Shield start off. Saved choices are preserved on updates.
 31. Capture-time review PDFs are generated from the original rendered output or tiles at up to 3200 raster pixels per page and stored under their own bounded local cache.
 32. The clean-install popup keeps Capture page above the fold, does not force review when the saved default is off, and shows direct open, edit/export, reveal, and library actions after success.
 33. Visible-area capture is available from the popup quick-action menu and as a keyboard command, saving one current viewport without a scroll pass.

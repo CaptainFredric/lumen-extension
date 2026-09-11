@@ -1,5 +1,11 @@
 # Claude Design Prompt: Lumen Landing Layout Review
 
+> Archived brief. This describes an earlier page and must not guide new work.
+> Use `PRODUCT.md` for current scope and terminology, `docs/DEMO_NOTES.md` for
+> evidence boundaries, and the current `docs/index.html` plus `docs/inspection.css`
+> for the public inspection desk design. Selected-area export, local monitoring,
+> and visual comparison are implemented; their classification below is historical.
+
 You are reviewing the Lumen landing site for layout, hierarchy, and visual polish.
 
 ## Product Context

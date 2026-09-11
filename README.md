@@ -1,5 +1,9 @@
 # Lumen
 
+Product boundaries, terminology, and document ownership are defined in
+[PRODUCT.md](PRODUCT.md). Run `npm run test:product-contract` to check runtime
+defaults against release disclosures before changing installation or privacy copy.
+
 Lumen is a Manifest V3 Chrome extension for clean webpage capture, annotation, visual comparison, and local monitoring. The Chrome extension is the actual app: its toolbar popup, Capture Result workspace, local library, Annotation Studio, Change Review, and Settings screen perform the work. The GitHub Pages website is the public front door for installation guidance and a concise feature overview; a normal website cannot capture arbitrary browser tabs with extension privileges.
 
 Lumen focuses on:
@@ -8,7 +12,7 @@ Lumen focuses on:
 2. capture full pages, visible viewports, or desktop, tablet, and mobile views together
 3. capture a rectangle or transparent lasso immediately, or remember it for monitoring
 4. delay, repeat, or continuously monitor a selected area with explicit limits
-5. keep real on-device previews in a local photo library while originals stay in Downloads
+5. keep real on-device previews in Capture Library while originals stay in Downloads
 6. redact sensitive visible data during export
 7. attach useful page signals and capture details beside the image
 8. open every completed manual capture in a viewer-first result workspace with Page/Width/100% views, drag-to-pan, Copy, PNG, PDF, Drive, Edit, library, Settings, and removal controls
@@ -188,7 +192,7 @@ npm install
 npm run site
 ```
 
-The public landing page will be available at `http://127.0.0.1:3000/`.
+The public landing page will be available at `http://127.0.0.1:4173/`. Port 3000 remains available for other apps.
 
 ### Use The Extension
 

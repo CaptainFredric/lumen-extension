@@ -33,7 +33,7 @@ This release makes the Chrome extension—not the marketing website—the cleare
 
 1. Added a dedicated Settings app for capture defaults, privacy, exports, optional permissions, Google Drive disconnect, and local-workspace deletion.
 2. Added reversible Privacy Shield. While enabled, it centrally enforces local-only mode, review-before-save, automatic redaction, and metadata minimization and pauses unattended monitor alarms; disabling it restores the user's prior choices and resumes active monitors.
-3. Added fresh-install one-click defaults: local-only mode and automatic redaction start on, capture-details JSON and review-before-save start off, and the stronger Privacy Shield remains an explicit choice.
+3. Fresh-install defaults: local-only mode starts on. Automatic redaction, capture-details JSON, review-before-save, and Privacy Shield start off. Saved choices are preserved on updates.
 4. Added local PNG and paginated raster PDF export from review and Annotation Studio, with Fit, 100%, and keyboard zoom for the local working image.
 5. Added a capture-time PDF cache generated from the original rendered capture output or tiles at up to 3200 raster pixels per page. It remains available for review export even when a large capture's bounded editor proxy is later pruned, until its own cache limit is reached.
 6. Rebuilt the public landing page as the installation and concise feature front door while keeping the Chrome extension's popup, library, editor, comparison workspace, and Settings as the actual app.

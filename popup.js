@@ -125,7 +125,6 @@ const ui = {
   accountDescription: document.querySelector("#accountDescription"),
   accountPlan: document.querySelector("#accountPlan"),
   accountSource: document.querySelector("#accountSource"),
-  productReadinessList: document.querySelector("#productReadinessList"),
   destinationSummary: document.querySelector("#destinationSummary"),
   queueLatestDeliveryButton: document.querySelector("#queueLatestDeliveryButton"),
   captureShelfCount: document.querySelector("#captureShelfCount"),
@@ -628,7 +627,7 @@ async function handleCaptureReceiptAction(event) {
       : action === "annotate"
         ? "Annotation Studio opened."
       : action === "library"
-        ? "Photo library opened."
+        ? "Capture Library opened."
         : action === "open"
           ? "Original opened."
           : "Original shown in its folder.";
@@ -2499,7 +2498,6 @@ async function refreshProductReadiness() {
     type: "LUMEN_GET_PRODUCT_READINESS"
   });
 
-  renderProductReadiness(response?.readiness);
 }
 
 async function refreshDestinations() {
@@ -2852,35 +2850,6 @@ function renderSession(session) {
   updateDeliveryActionState();
 }
 
-function renderProductReadiness(payload = {}) {
-  const meters = Array.isArray(payload?.readiness) && payload.readiness.length
-    ? payload.readiness
-    : [
-        { label: "Capture core", score: 66, status: "local" },
-        { label: "Save flow", score: 58, status: "ready" },
-        { label: "Automation", score: 34, status: "queued" }
-      ];
-
-  ui.productReadinessList.replaceChildren();
-
-  for (const meter of meters.slice(0, 3)) {
-    const item = document.createElement("div");
-    const label = document.createElement("span");
-    const status = document.createElement("strong");
-    const track = document.createElement("i");
-    const bar = document.createElement("b");
-
-    item.className = "readiness-item";
-    label.textContent = meter.label || "Readiness";
-    status.textContent = `${Math.max(0, Math.min(100, Math.round(meter.score || 0)))}% ${meter.status || ""}`.trim();
-    bar.style.width = `${Math.max(4, Math.min(100, Math.round(meter.score || 0)))}%`;
-
-    track.append(bar);
-    item.append(label, status, track);
-    ui.productReadinessList.append(item);
-  }
-}
-
 function renderDestinationSummary(destinations = []) {
   const signedIn = Boolean(currentSession?.signedIn);
   const activeCount = destinations.filter((destination) => destination.status === "active").length;
@@ -3052,7 +3021,7 @@ async function refreshPhotoLibrary() {
       return;
     }
 
-    ui.photoLibraryCount.textContent = `${count} photo${count === 1 ? "" : "s"}`;
+    ui.photoLibraryCount.textContent = `${count} capture${count === 1 ? "" : "s"}`;
     ui.photoLibraryGrid.replaceChildren();
     ui.photoLibraryEmpty.classList.toggle("is-hidden", captures.length > 0);
     ui.photoLibraryGrid.classList.toggle("is-hidden", captures.length === 0);
@@ -3071,7 +3040,7 @@ async function refreshPhotoLibrary() {
       card.dataset.captureId = capture.id;
       previewButton.className = "photo-library-preview";
       previewButton.type = "button";
-      previewButton.setAttribute("aria-label", `Open ${capture.title || capture.host || "saved photo"} in the photo library`);
+      previewButton.setAttribute("aria-label", `Open ${capture.title || capture.host || "saved capture"} in Capture Library`);
       previewButton.addEventListener("click", () => openPhotoLibrary(capture.id));
       image.className = "is-hidden";
       image.alt = `Preview of ${capture.title || capture.host || "saved capture"}`;
@@ -3108,7 +3077,7 @@ async function refreshPhotoLibrary() {
     ui.photoLibraryCount.textContent = "Unavailable";
     ui.photoLibraryGrid.classList.add("is-hidden");
     ui.photoLibraryEmpty.classList.remove("is-hidden");
-    ui.photoLibraryEmpty.textContent = "The local photo library could not be opened in this browser context.";
+    ui.photoLibraryEmpty.textContent = "Capture Library could not be opened in this browser context.";
   }
 }
 
@@ -3122,7 +3091,7 @@ async function openPhotoLibrary(captureId = "") {
     showStatus({
       tone: "error",
       eyebrow: "Library",
-      title: "Photo library could not open",
+      title: "Capture Library could not open",
       detail: response?.error?.description || "Chrome blocked the local library page.",
       badge: "Blocked",
       progress: 0.12

@@ -40,6 +40,9 @@ jobs:
       - name: Check JavaScript syntax
         run: npm run check
 
+      - name: Verify product defaults and release disclosures
+        run: npm run test:product-contract
+
       - name: Test backend contract
         run: npm run smoke:backend
 

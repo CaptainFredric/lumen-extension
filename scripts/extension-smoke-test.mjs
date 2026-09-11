@@ -1912,7 +1912,7 @@ try {
   assert(popupState.shelfCount.includes("1 capture"), "Capture shelf did not count seeded history.", popupState);
   assert(popupState.shelfCount.includes("2 timed runs"), "Capture shelf did not count seeded timed runs.", popupState);
   assert(popupState.shelfCards === 3, "Capture shelf did not render seeded captures and timed runs.", popupState);
-  assert(popupState.photoLibraryCount === "1 photo", "Local photo library count did not render.", popupState);
+  assert(popupState.photoLibraryCount === "1 capture", "Capture Library count did not render.", popupState);
   assert(popupState.photoLibraryCards === 1 && popupState.photoLibraryImages === 1, "Local photo library did not render its real preview.", popupState);
   assert(popupState.photoLibraryOpenLabel === "Open all", "Photo library navigation action did not render.", popupState);
   assert(

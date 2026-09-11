@@ -2290,52 +2290,6 @@ h3 {
   line-height: 1.45;
 }
 
-.readiness-list {
-  display: grid;
-  gap: 8px;
-}
-
-.readiness-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 7px 12px;
-  align-items: center;
-  padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  background: rgba(5, 11, 20, 0.38);
-}
-
-.readiness-item span,
-.readiness-item strong {
-  font-size: 0.72rem;
-}
-
-.readiness-item span {
-  color: var(--text-secondary);
-  font-weight: 700;
-}
-
-.readiness-item strong {
-  color: var(--text-primary);
-}
-
-.readiness-item i {
-  grid-column: 1 / -1;
-  height: 7px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.readiness-item b {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--accent), #39b8ff);
-  box-shadow: 0 0 18px rgba(134, 221, 255, 0.22);
-}
-
 .routing-actions {
   display: grid;
 }

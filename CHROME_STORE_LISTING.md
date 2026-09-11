@@ -40,7 +40,7 @@ Lumen supports:
 20. Optional reviewed-image export to Google Drive after explicit user consent, using access limited to files Lumen creates or the user explicitly opens with Lumen.
 21. Local PNG and paginated raster PDF export with whole-page, width, 100%, keyboard, wheel, and drag-pan controls for the local working image.
 22. Dedicated Settings with fast capture, review-before-save, reversible Privacy Shield that pauses unattended monitors while active, permission revocation, Drive disconnect, and local-workspace deletion.
-23. Fresh-install one-click defaults that keep capture local, enable automatic redaction, omit capture-details JSON, and skip the extra review screen unless the user turns it on.
+23. Fresh-install defaults: local-only mode starts on. Automatic redaction, capture-details JSON, review-before-save, and Privacy Shield start off. Saved choices are preserved on updates.
 24. A capture-time review PDF cache generated from the original rendered output or tiles at up to 3200 raster pixels per page, with a separate 250 MB or 75-capture local limit.
 
 Redaction checks are a safety aid. Check each capture before sharing it outside your workspace.
@@ -110,5 +110,5 @@ Use the matching `lumen-extension-<commit>` artifact for the upload ZIP; it is t
 5. Create an arrow, rectangle, text label, blur, and pixelated region; use undo and redo; test Fit, 100%, and keyboard zoom on the local working image; export a reviewed PNG and raster PDF.
 6. Create a selected-area timer and delete it. Confirm Chrome removes saved access when it is the final plan for that origin.
 7. Google Drive export is disabled unless the release ZIP was packaged with the publisher OAuth client. In a configured build, press Export to Drive from the reviewed image, approve the narrow consent, verify one file appears, then press Disconnect Drive.
-8. Open Settings, confirm the fresh-install local-only, automatic-redaction, metadata-off, fast-capture defaults; turn Privacy Shield on and off; confirm its coordinated protections lock and restore the individual controls; then test site-access revoke and local-workspace clear.
+8. Open Settings. Confirm local-only mode is on and automatic redaction, capture-details JSON, review-before-save, and Privacy Shield are off. Turn Privacy Shield on and off; confirm its coordinated protections lock and restore the individual controls; then test site-access revoke and local-workspace clear.
 9. No feature requires or downloads remote executable code.
