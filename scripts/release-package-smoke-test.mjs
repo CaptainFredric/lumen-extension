@@ -60,7 +60,7 @@ try {
   assert(!packagedFiles.some((file) => /^(scripts|backend|docs|\.github|node_modules)\//.test(file)), "Release ZIP contains development-only files.", packagedFiles);
   assert(
     [
-      "library.html", "library.css", "library.js", "library-store.js",
+      "library.html", "library.css", "library.js", "library-monitors.js", "library-store.js",
       "annotation-engine.js", "export-utils.js", "editor.html", "editor.css", "editor.js", "editor-drive.js",
       "visual-diff-engine.js", "review.html", "review.css", "review.js", "review-actions.js",
       "result.html", "result.css", "result.js",
@@ -97,6 +97,9 @@ assert(
   context = await chromium.launchPersistentContext(profileDir, {
     acceptDownloads: true,
     headless: false,
+    // captureVisibleTab uses the physical viewport. Emulation introduces a
+    // fractional scale mismatch on Retina displays and invalidates coverage.
+    viewport: null,
     args: [
       `--disable-extensions-except=${extensionDir}`,
       `--load-extension=${extensionDir}`
@@ -125,19 +128,19 @@ assert(
   });
   popup.on("pageerror", (error) => popupErrors.push(error.message));
   await popup.goto(`chrome-extension://${extensionId}/popup.html`, { waitUntil: "load" });
-  await popup.waitForSelector("#onboardingPanel:not(.is-hidden)", { timeout: 10000 });
+  await popup.waitForFunction(() => document.querySelector("#launchStatusTitle")?.textContent !== "Checking this tab");
 
   const firstRun = await popup.evaluate(async () => ({
-    title: document.querySelector("#onboardingTitle")?.textContent?.trim() || "",
-    pageStatus: document.querySelector("#onboardingPageStatus")?.textContent?.trim() || "",
+    title: document.title,
+    pageStatus: document.querySelector("#launchStatusDetail")?.textContent?.trim() || "",
     hasDismissButton: Boolean(document.querySelector("#onboardingDismissButton")),
     hasStartButton: Boolean(document.querySelector("#onboardingStartButton")),
     hasSettingsButton: Boolean(document.querySelector("#onboardingSettingsButton")),
     stepCount: document.querySelectorAll("[data-onboarding-step]").length,
-    launchFollowsHeader: document.querySelector("header")?.nextElementSibling?.id === "launchPanel",
+    launchFollowsHeader: document.querySelector("header")?.nextElementSibling?.tagName === "MAIN",
     captureButtonBottom: Math.round(document.querySelector("#captureButton")?.getBoundingClientRect().bottom || 0),
     captureDisabled: document.querySelector("#captureButton")?.disabled || false,
-    launchState: document.querySelector("#launchStatus")?.dataset.state || "",
+    launchState: document.querySelector("#captureButton")?.disabled ? "blocked" : "ready",
     permissions: await chrome.permissions.getAll(),
     sync: await chrome.storage.sync.get("lumen.capture.settings"),
     local: await chrome.storage.local.get([
@@ -148,14 +151,8 @@ assert(
     ])
   }));
 
-  assert(firstRun.title === "Capture your first page", "Clean install did not show the compact first-run guide.", firstRun);
-  assert(firstRun.pageStatus, "First-run guide did not explain the current page state.", firstRun);
-  assert(firstRun.hasDismissButton, "First-run guide lost its dismiss action.", firstRun);
-  assert(
-    !firstRun.hasStartButton && !firstRun.hasSettingsButton && firstRun.stepCount === 0,
-    "First-run guide reintroduced a forced-review CTA or instructional steps.",
-    firstRun
-  );
+  assert(firstRun.title === "Lumen" && firstRun.pageStatus, "Clean launcher must explain how to start.", firstRun);
+  assert(!firstRun.hasDismissButton && !firstRun.hasStartButton && firstRun.stepCount === 0, "Launcher reintroduced redundant onboarding actions.", firstRun);
   assert(firstRun.launchFollowsHeader, "Capture launch must appear directly after the compact popup header.", firstRun);
   assert(
     firstRun.captureButtonBottom > 0 && firstRun.captureButtonBottom <= 600,
@@ -178,15 +175,9 @@ assert(
   );
   assert((firstRun.local["lumen.capture.history"] || []).length === 0, "Clean profile unexpectedly contains capture history.", firstRun.local);
 
-  await popup.click("#onboardingDismissButton");
-  await popup.waitForSelector("#onboardingPanel.is-hidden", { state: "attached" });
-  const dismissed = await worker.evaluate(() => chrome.storage.local.get("lumen.onboarding"));
-  assert(Boolean(dismissed["lumen.onboarding"]?.dismissedAt), "First-run dismissal did not persist.", dismissed);
-
   await popup.reload({ waitUntil: "load" });
   await popup.waitForSelector("#captureButton");
-  const onboardingStayedDismissed = await popup.$eval("#onboardingPanel", (node) => node.classList.contains("is-hidden"));
-  assert(onboardingStayedDismissed, "Dismissed first-run guide returned after reload.");
+  assert(await popup.locator("#onboardingPanel").count() === 0, "Redundant onboarding returned after reload.");
 
   const library = await context.newPage();
   library.on("console", (message) => {
@@ -533,6 +524,11 @@ assert(
   await waitForCaptureIdle(worker);
 
   await target.bringToFront();
+  await worker.evaluate(() => {
+    chrome.commands.onCommand.addListener(command => {
+      chrome.storage.session.set({ releaseObservedCommand: command });
+    });
+  });
   const fullPageTrigger = await dispatchBrowserShortcut(target, "L");
   const fullPageShortcut = await waitForShortcutCapture(worker, 1, fullPageTrigger.native ? 30000 : 3500);
   let visibleShortcut = null;
@@ -547,7 +543,22 @@ assert(
   assert(
     fullPageShortcut || (!fullPageTrigger.native && !requireNativeShortcutCapture),
     "The CI release gate did not complete the packaged full-page command through a native browser shortcut.",
-    { trigger: fullPageTrigger, requireNativeShortcutCapture }
+    {
+      trigger: fullPageTrigger,
+      requireNativeShortcutCapture,
+      diagnostics: fullPageShortcut ? null : await worker.evaluate(async () => ({
+        state: await chrome.storage.local.get(["lumen.capture.activeJob", "lumen.app.settings", "lumen.capture.history"]),
+        tabs: await chrome.tabs.query({ active: true }),
+        windows: await chrome.windows.getAll(),
+        actionTitle: await chrome.action.getTitle({}),
+        observedCommand: await chrome.storage.session.get("releaseObservedCommand")
+      })),
+      popupStatus: fullPageShortcut ? "" : await popup.evaluate(() => ({
+        status: document.querySelector("#statusDetail")?.textContent,
+        title: document.querySelector("#launchStatusTitle")?.textContent,
+        detail: document.querySelector("#launchStatusDetail")?.textContent
+      }))
+    }
   );
 
   if (fullPageShortcut) {
@@ -681,7 +692,7 @@ assert(
       stepCount: firstRun.stepCount,
       launchState: firstRun.launchState,
       grantedOrigins: firstRun.permissions.origins || [],
-      persistedDismissal: true
+      redundantOnboardingRemoved: true
     },
     productionCapturePath: {
       exactPackagedManifest: true,
@@ -840,9 +851,13 @@ async function dispatchBrowserShortcut(page, key) {
     }
   } else if (process.platform === "darwin") {
     try {
+      // Send physical keys: Option-modified keystroke text can be translated
+      // into a different character before Chrome resolves its command binding.
+      const keyCode = { L: 37, V: 9, A: 0, E: 14 }[key];
+      if (!Number.isInteger(keyCode)) throw new Error("Unsupported shortcut test key.");
       await execFileAsync("osascript", [
         "-e", "tell application id \"com.google.chrome.for.testing\" to activate",
-        "-e", `tell application \"System Events\" to keystroke \"${key.toLowerCase()}\" using {option down, shift down}`
+        "-e", `tell application \"System Events\" to key code ${keyCode} using {option down, shift down}`
       ], { timeout: 5000 });
       return { native: true, method: `macOS Alt+Shift+${key}`, error: "" };
     } catch (error) {

@@ -22,58 +22,21 @@ The repo is aimed at design review, QA, and product work.
 
 ## What Works Now
 
-The extension includes:
+**Capture.** The toolbar is a launcher with Full page, Visible, Area, and Set scopes, cleanup and lazy loading controls, optional redaction, live progress, Cancel, and one Last Capture entry. The worker prepares pages, calibrates responsive widths, stitches slices, and checks coverage before export.
 
-1. sticky, fixed, and high-z cleanup before capture
-2. lazy-load preflight scrolling
-3. tail remeasurement and stalled-scroll retries for late-growing pages
-4. a last-reachable-viewport fallback for app-shell pages that stop scrolling after repeated tail rechecks
-5. full-page stitching with offscreen composition
-6. full-page, visible-area, desktop, tablet, mobile, and responsive-set capture modes
-7. export-time redaction for emails, phone numbers, token-like strings, and filled inputs, rescanned before every screenshot slice
-8. redaction preview from the popup before export
-9. anchored manual redaction boxes for areas the scanner cannot infer, with projection into responsive captures when the source element still resolves
-10. a focused-region picker that captures the current rectangle or freeform lasso immediately, or stores it for monitoring; lasso exports keep transparent pixels outside the selected path
-11. a pre-export review screen that checks auto-redactions, manual projection, and cutaway resolution across the requested view set before saving
-12. an anchored callout picker that marks one page area and renders it into the exported image with the capture note
-13. page-signal extraction for palette, fonts, hero line, CTA, and navigation labels
-14. capture details JSON exports with view, redaction, manual projection, focused crop, callout, signal, output health, and note metadata
-15. dated per-run download folders so capture sets, tiles, and detail files stay together
-16. local capture history with file, folder, summary, and Chrome download-handle metadata
-17. an IndexedDB photo library with gallery previews, bounded whole-capture editor images, search, manual/timed filters, favorites, sorting, storage usage, and per-item removal
-18. library file actions that open or reveal the full-resolution originals retained in Chrome Downloads
-19. capture-time popup UI with run settings, cutaway state, a live stage timeline, and recent status log
-20. an on-page usage HUD that appears during preparation and review setup, then hides before screenshots so exports stay clean
-21. three local selected-area timer modes: one delayed run, scheduled repeat, and capped continuous monitoring
-22. 5, 10, and 30 second one-time delays; repeat cadences from 15 minutes through daily; and 1, 5, or 15 minute continuous cadence
-23. continuous-run safety caps of 10, 25, or 50 captures, plus visible pause, resume, run-now, and delete controls
-24. selected-area timed runs that save only the resolved rectangle or transparent lasso and fail closed when the stored area cannot be found safely
-25. a shared entitlement model used by the popup and backend so local and future connected features have one access contract
-26. backend retention and delete controls for session-owned captures, watch records, and agent jobs
-27. a local backend slice for demo session state, entitlement checks, and history sync when an API is reachable
-28. a GitHub Pages landing site in `docs/`
-29. capture-integrity verification that blocks export when slices leave gaps or miss the page tail
-30. pixel-correct cropping for offset nested scroll areas such as dashboard app shells
-31. automatic sensitive-data rescans before every screenshot slice, with a fail-closed truncation limit
-32. opaque redaction rendering so covered pixels are not recoverable from the saved image
-33. exact responsive CSS-width calibration with requested and actual viewport evidence in capture details
-34. a compact first-capture tip that keeps the Capture page action above the fold and disappears after success or dismissal
-35. one-shot site-permission leases that are removed after responsive capture unless a timed capture still needs them
-36. an always-available local workspace clear for history, previews, page signals, regions, note drafts, schedules, and optional site access
-37. a clean-profile smoke test that installs and boots the exact release ZIP
-38. a full annotation studio with arrows, rectangles, text, blur, pixelation, selection, resizing, undo, redo, keyboard shortcuts, and PNG export
-39. a visual-change review workspace with a before/after reveal slider, highlighted changed regions, difference metrics, and a monitor-run timeline
-40. reviewed, edited, and exported states stored beside each item in the local photo library
-41. optional user-initiated Google Drive export for one reviewed image at a time, using `drive.file` and revocable Chrome Identity access
-42. a dedicated Settings app for capture behavior, Privacy Shield, local-only mode, export choices, optional-permission revocation, Drive disconnect, and local-workspace deletion
-43. a fresh-install one-click default that stays local, leaves automatic redaction optional and off, skips the optional capture-details JSON, and saves without an extra review screen unless the user enables review-before-save
-44. a reversible Privacy Shield that enforces local-only mode, review-before-save, automatic redaction, and metadata minimization together, pauses unattended monitors while active, then restores the user's choices and monitor alarms when turned off
-45. local PNG and paginated raster PDF export, plus Fit, 100%, and keyboard zoom for the local working image in Annotation Studio
-46. a capture-time review PDF cache generated from the original rendered capture output or tiles at up to 3200 raster pixels per page; it has its own 250 MB or 75-capture local budget
-47. an automatic viewer-first Capture Result workspace after successful manual captures, with whole-page/width/100% views, centered zoom, drag-to-pan, Copy, PNG, PDF, optional Drive, Edit, original-file, library, Settings, and remove-local-copy actions
-48. keyboard shortcuts for full-page capture (`Alt+Shift+L`), visible-area capture (`Alt+Shift+V`), and the exact-area picker (`Alt+Shift+E`; `Alt+Shift+A` on macOS), plus active-run controls to cancel a long capture or reopen its source tab
-49. exact packaged-extension testing for command registration, safe `activeTab` denial without a user gesture, CI-gated full-page, visible-area, and drawn-area shortcut flows, result-workspace handoff, and zero persistent host access
-50. a CI artifact containing the exact tested upload ZIP, named `lumen-extension-<commit>`
+**Review.** Preflight warnings and the review-before-save preference still require confirmation. Review maps show sensitive regions and projected areas. Annotation Studio provides arrows, boxes, text, blur, pixelation, undo, redo, and export. Internal saved region and note keys remain compatible.
+
+**Capture Result.** Completed manual captures open a viewer with original image navigation, zoom, Copy, PNG, PDF, Edit, and selected-original ZIP export. Details includes source, viewport, saved files, and Page Context when capture-details JSON was enabled for that run. Old captures without retained context say so.
+
+**Capture Library.** Persistent captures belong here: search, filters, favorites, preview caches, original file access, removal, and Compare. The Monitors workspace owns saved area selection, delayed/repeated/capped schedules, pause, resume, run now, and deletion.
+
+**Storage and handoff.** Originals remain in Downloads. Local previews, editor sources, PDFs, and original image bundles have separate storage budgets. Configured Drive export is an explicit reviewed action with revocable access.
+
+**Settings.** Capture defaults, optional safeguards, local-only mode, permissions, storage, and destinations live here. Fresh installs keep automatic redaction and details export off. Privacy Shield coordinates stronger safeguards when explicitly enabled.
+
+**Verification.** Deterministic browser fixtures, lifecycle and ZIP tests, privacy checks, and exact-package smoke tests cover the runtime. Native toolbar and OS shortcut validation remains a separate manual release gate on hosts that cannot automate native input.
+
+The developer backend remains experimental. Accounts, billing, general cloud sync, and agent routing have no controls in the normal capture launcher.
 
 ## Current Limits
 
@@ -196,32 +159,19 @@ The public landing page will be available at `http://127.0.0.1:4173/`. Port 3000
 
 ### Use The Extension
 
-1. Open any normal `https://` page
-2. Open the Lumen popup
-3. Check the launch indicator to confirm the current tab is capture-ready
-4. Click `Capture page` for the fresh-install one-click full-page run. It stays local and omits capture-details JSON by default. Turn on automatic redaction in the popup when needed; enable review-before-save in Settings when you want a confirmation screen before each save
-5. Hold `Capture page` to open quick actions for responsive capture, visible-area capture, redaction scan, manual boxes, area selection, lasso, callout, review, or signal extraction
-6. Change capture device, export mode, cleanup, lazy-load forcing, auto-redaction, notes, or capture-detail settings when needed
-7. Use `Scan` to preview detected redaction regions before export
-8. Use `Mark boxes` if you need manual redactions before capture
-9. Use `Select an area` or `Lasso an area`, draw the region, then choose `Capture now` for an immediate one-viewport crop or `Save` to remember it for monitoring
-10. After a successful manual capture, use Capture Result to see the entire long page at once, switch to width or actual pixels, drag to pan, copy the image, download PNG or PDF, export to configured Google Drive, edit, reach the original/library, open Settings, or remove the private library copy
-11. Choose `Once` for a 5, 10, or 30 second delayed area capture, `Repeat` for a 15-minute through daily schedule, or `Continuous` for a 1, 5, or 15 minute cadence capped at 10, 25, or 50 runs
-12. Use `Open library` to browse real local previews, search or filter them, mark favorites, and return to the originals in Downloads
-13. Choose `Annotate` to add arrows, rectangles, text, blur, or pixelation; use undo and redo; inspect the local working image with Fit, 100%, or keyboard zoom; then export a reviewed PNG or paginated raster PDF locally
-14. Choose `Compare` to pair captures, drag the before/after reveal, inspect highlighted changes, export the selected capture as PNG or PDF when a suitable local source remains, and mark the comparison reviewed
-15. In a publisher-configured build, choose `Export to Drive` only after reviewing the image; use `Disconnect Drive` to revoke the cached connection and optional permissions
-16. Use `Open` or `Show in folder` from recent captures to get back to the saved original
-17. When the pre-export review appears, check auto-redaction counts, manual projection status, focused-region status, and warnings, then click `Run export`
-18. Expand recent capture details to review views, artifacts, redactions, detail-file status, notes, and page signals
-19. Open `Settings` to change capture defaults, turn reversible Privacy Shield on or off, revoke optional permissions, disconnect Drive, or clear local data
-20. Copy a capture summary when you need to paste evidence into a review note or bug report
+1. Open a normal webpage and click Lumen in the Chrome toolbar.
+2. Choose Full page, Visible, Area, or Set. Area exposes Rectangle and Lasso; the page picker offers Capture now or Save.
+3. Expand Capture safeguards to adjust cleanup, lazy loading, and optional redaction.
+4. Click Capture. If a review appears, inspect the counts, projection map, and warnings before confirming. Cancel remains available while capture runs.
+5. Use Capture Result to inspect images, copy, export, or open Edit. Details holds source information and retained Page Context.
+6. Open Capture Library to revisit captures, use Compare, or manage Monitors. Scheduled capture requires explicit site access.
+7. Open Settings to change defaults, enable stronger safeguards, revoke permissions, disconnect Drive, or clear local data.
 
 If the launch indicator says the page is blocked, switch to a normal `http://` or `https://` page. Chrome does not allow extension capture scripts on internal browser pages, Web Store pages, or other extension pages.
 
 ## Sample Capture Assets
 
-The landing page and store screenshot pack use generated sample capture assets:
+The homepage uses the real Bug Garden output from `npm run proof:garden`. These older generated assets remain available for reproducible fixtures and the existing store screenshot generator:
 
 1. `docs/assets/capture-run-desktop.png`
 2. `docs/assets/capture-run-tablet.png`
@@ -346,9 +296,12 @@ The script also tries to create `docs/assets/capture-run-bundle.zip` with the sy
 npm run store:screenshots
 ```
 
-This creates Chrome Web Store sized screenshots in `store-assets/screenshots/` from the live extension popup plus the current sample capture assets. The generated screenshots are 1280 by 800 PNGs.
+This creates Chrome Web Store sized screenshots in `store-assets/screenshots/` from extension workspaces and sample capture assets. The monitor image now comes from Capture Library. The generated screenshots are 1280 by 800 PNGs.
 
 ### Record The Product Demo
+
+The recorder now follows the four-scope launcher. Existing published recordings
+and store images predate this consolidation and need regeneration before submission.
 
 ```bash
 npm run demo:record
@@ -404,7 +357,7 @@ Potential product layers:
 
 See `PRODUCT_ROADMAP.md` for the longer product direction and Chrome Web Store guardrails.
 See `STORE_READINESS.md` for the current submission checklist, permission rationale, and policy references.
-See `READINESS_CRITERIA.md` for how the personal use, Web Store beta, and paid product percentages are estimated.
+Use the explicit release gates in `STORE_READINESS.md`; older readiness percentages are historical estimates.
 See `PRIVACY.md` for the local-first privacy disclosure that mirrors the public privacy page.
 See `CHROME_STORE_LISTING.md` for the single-purpose listing copy, permission rationale, and screenshot checklist.
 
@@ -415,4 +368,4 @@ The highest-leverage next steps are publisher and production gates:
 1. create the final Chrome Extension OAuth client and verify Drive consent with a non-publisher account
 2. complete the Chrome Web Store privacy attestations, distribution settings, and submission
 3. keep the four-site live matrix and difficult-site fixtures green for every release
-4. turn the entitlement contract into production auth, billing, support, retention, and deletion controls
+4. refresh the demo recording and store screenshots around the consolidated launcher and the same Bug Garden fixture; account and billing work remains experimental

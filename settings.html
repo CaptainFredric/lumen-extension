@@ -101,7 +101,7 @@
             <span class="setting-icon details-icon" aria-hidden="true"></span>
             <span class="setting-copy">
               <strong>Include capture details file</strong>
-              <small>Saves a JSON companion beside the image. Turn this off to minimize exported page metadata; Lumen still keeps enough local history to reopen the capture.</small>
+              <small>Saves a JSON companion and retains Page Context in Result Details. Turn this off to minimize page metadata; local history still lets you reopen the capture.</small>
             </span>
             <input id="captureDetailsToggle" type="checkbox" role="switch" />
             <span class="compact-track" aria-hidden="true"><span></span></span>
@@ -159,8 +159,17 @@
 
           <div class="one-click-note">
             <span aria-hidden="true">1</span>
-            <p><strong>Fast capture stays reversible.</strong> Hold the toolbar capture button and choose <em>Review capture</em> whenever one run needs the full confirmation screen.</p>
+            <p><strong>Check before saving.</strong> Enable review-before-save above to inspect redaction and selected area checks before each capture.</p>
           </div>
+          <details class="output-defaults">
+            <summary>Output defaults</summary>
+            <label for="outputStyle">Presentation style</label>
+            <select id="outputStyle"><option value="raw">Raw image</option><option value="browser">Browser frame</option><option value="phone">Phone frame</option></select>
+            <label for="longPageOutput">Long pages</label>
+            <select id="longPageOutput"><option value="auto">Automatic</option><option value="tiles">Image tiles</option><option value="print">Print sheet</option></select>
+            <label><input id="captureNoteToggle" type="checkbox"> Include the saved capture note</label>
+            <p>Existing note text stays on this device. Use Edit in Capture Result for new annotations.</p>
+          </details>
         </section>
       </div>
 

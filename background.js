@@ -1490,6 +1490,8 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
   });
 
   let librarySaved = false;
+  // Retain only context extracted in this run, never the latest global record.
+  const capturedBlueprint = results.find(result => result.blueprint)?.blueprint;
 
   try {
     await putLibraryCapture({
@@ -1516,7 +1518,14 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
       previews: libraryPreviews,
       bundleImages: collectBundleImages(results),
       editorSource: libraryEditorSource,
-      pdfSource: libraryPdfSource
+      pdfSource: libraryPdfSource,
+      pageContext: options.exportManifest && capturedBlueprint ? {
+        headline: capturedBlueprint.identity?.heroHeadline || "",
+        primaryAction: capturedBlueprint.identity?.primaryCta || "",
+        navigation: capturedBlueprint.identity?.navLabels || [],
+        colors: (capturedBlueprint.colors || []).map(color => typeof color === "string" ? color : color.value || color.hex || ""),
+        fonts: (capturedBlueprint.typography?.families || []).map(font => typeof font === "string" ? font : font.family || "")
+      } : null
     });
     await pruneLibraryPreviews();
     librarySaved = true;

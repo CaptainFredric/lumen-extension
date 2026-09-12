@@ -206,48 +206,29 @@ try {
   assert(!primaryResultState.hasComparisonUi, "The clean result workspace reintroduced comparison or timeline UI.", primaryResultState);
   await primaryResultPage.close();
 
-  await popup.waitForSelector("#captureReceipt:not(.is-hidden)", { timeout: 10000 });
+  await popup.waitForFunction(id => document.querySelector("#lastCapture")?.dataset.captureId === id, response.captureId);
   const receiptState = await popup.evaluate(() => ({
-    captureId: document.querySelector("#captureReceipt")?.dataset.captureId || "",
-    title: document.querySelector("#captureReceiptTitle")?.textContent?.trim() || "",
-    detail: document.querySelector("#captureReceiptDetail")?.textContent?.trim() || "",
-    actions: [...document.querySelectorAll("[data-receipt-action]")].map((button) => ({
-      action: button.dataset.receiptAction,
-      disabled: button.disabled,
-      label: button.textContent?.trim() || ""
-    }))
+    captureId: document.querySelector("#lastCapture").dataset.captureId,
+    title: document.querySelector("#lastCaptureTitle").textContent,
+    detail: document.querySelector("#lastCaptureMeta").textContent
   }));
-  assert(receiptState.captureId === response.captureId, "Expected the success receipt to reference the completed capture.", receiptState);
-  assert(receiptState.title === "Capture set ready" && /files saved/.test(receiptState.detail), "Expected the receipt to explain the saved responsive set.", receiptState);
-  assert(
-    receiptState.actions.length === 5 &&
-      ["result", "annotate", "open", "show", "library"].every((action) =>
-        receiptState.actions.some((item) => item.action === action && !item.disabled)
-      ),
-    "Expected every post-capture action to be immediately available.",
-    receiptState.actions
-  );
-
+  assert(receiptState.captureId === response.captureId && receiptState.detail.includes("3 views"), "Last Capture did not identify the saved responsive set.", receiptState);
+  const reopenedPromise = context.waitForEvent("page");
+  await popup.click("#openLastCaptureButton");
+  const reopened = await reopenedPromise;
+  await reopened.waitForSelector("#annotateButton:not(:disabled)");
   const editorPagePromise = context.waitForEvent("page");
-  await popup.click('[data-receipt-action="annotate"]');
+  await reopened.click("#annotateButton");
   const editorPage = await editorPagePromise;
   await editorPage.waitForLoadState("domcontentloaded");
-  assert(
-    editorPage.url().includes(`editor.html?capture=${encodeURIComponent(response.captureId)}`),
-    "Expected the receipt to open this capture in Annotation Studio.",
-    editorPage.url()
-  );
+  assert(editorPage.url().includes(`editor.html?capture=${encodeURIComponent(response.captureId)}`), "Result did not open this capture in Annotation Studio.", editorPage.url());
   await editorPage.close();
-
+  await reopened.close();
   const libraryPagePromise = context.waitForEvent("page");
-  await popup.click('[data-receipt-action="library"]');
+  await popup.click("#openPhotoLibraryButton");
   const libraryPage = await libraryPagePromise;
   await libraryPage.waitForLoadState("domcontentloaded");
-  assert(
-    libraryPage.url().includes(`library.html?capture=${encodeURIComponent(response.captureId)}`),
-    "Expected the receipt to open this capture in the local library.",
-    libraryPage.url()
-  );
+  assert(libraryPage.url().includes("library.html"), "Launcher did not open Capture Library.", libraryPage.url());
   await libraryPage.close();
 
   const libraryState = await popup.evaluate(async (captureId) => {
@@ -263,6 +244,7 @@ try {
       count: await store.countLibraryCaptures(),
       id: capture?.id || "",
       sourceType: capture?.sourceType || "",
+      pageContext: capture?.pageContext || null,
       previewCount: capture?.previewAssetIds?.length || 0,
       previewType: capture?.preview?.blob?.type || "",
       previewBytes: capture?.preview?.blob?.size || 0,
@@ -290,6 +272,8 @@ try {
 
   assert(libraryState.count === 1 && libraryState.id === response.captureId, "Expected one linked capture in the local photo library.", libraryState);
   assert(libraryState.sourceType === "manual", "Expected the library to distinguish manual captures.", libraryState);
+  assert(libraryState.pageContext?.fonts?.length > 0 && libraryState.pageContext?.colors?.length > 0,
+    "Capture-specific context did not retain extracted font and color values.", libraryState.pageContext);
   assert(libraryState.previewCount === expectedVariantCount + expectedCutawayCount, "Expected a preview for every downloaded PNG view.", libraryState);
   assert(libraryState.previewType === "image/webp" && libraryState.previewBytes > 0, "Expected a real WebP preview blob in IndexedDB.", libraryState);
   assert(

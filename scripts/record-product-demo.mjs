@@ -101,41 +101,21 @@ try {
   const popup = await navigateAppFrame(recordedPage, `chrome-extension://${extensionId}/popup.html`);
   recordRuntimeErrors(popup, runtimeErrors, "popup");
   await popup.locator("#captureButton").waitFor();
-  await popup.locator('#launchStatus[data-state="ready"]').waitFor({ timeout: 15_000 });
-
-  milestone("Recording the main click and press-and-hold controls");
-  await popup.locator("#launchPanel").scrollIntoViewIfNeeded();
+  await popup.locator("#captureButton:not(:disabled)").waitFor({ timeout: 15_000 });
+  milestone("Recording capture scopes and safeguards");
   await setScene(recordedPage, {
-    chapter: "01 / Start",
-    title: "Capture now, or open more options.",
-    copy: "Click Capture page for the fast path. Use the arrow—or press and hold—to open responsive, privacy, area, review, and analysis tools.",
-    mode: "split"
+    chapter: "01 / Start", title: "Choose what to capture.",
+    copy: "Capture a full page, the visible viewport, an exact area, or a responsive set.", mode: "split"
   });
   await moveCursor(recordedPage, popup, "#captureButton");
-  await pause(0.8);
   await saveStill(recordedPage, "01-capture-ready.png");
-
-  await pressAndHoldWithCursor(recordedPage, popup, "#captureButton");
-  await waitForHoldMenuState(popup, true);
-  await moveCursor(recordedPage, popup, '[data-quick-action="lasso"]');
-  await pause(1.1);
-  await saveStill(recordedPage, "02-hold-for-tools.png");
-  await popup.locator("#captureButton").press("Escape");
-  await waitForHoldMenuState(popup, false);
-
-  await setScene(recordedPage, {
-    chapter: "01 / Options",
-    title: "The arrow opens every capture tool.",
-    copy: "The same menu is always one normal click away, so advanced capture never depends on remembering a gesture.",
-    mode: "split"
-  });
-  await clickWithCursor(recordedPage, popup, "#captureOptionsButton");
-  await waitForHoldMenuState(popup, true);
-  await moveCursor(recordedPage, popup, '[data-quick-action="review"]');
-  await pause(1.05);
-  await saveStill(recordedPage, "03-click-for-options.png");
-  await popup.locator("#captureButton").press("Escape");
-  await waitForHoldMenuState(popup, false);
+  await clickWithCursor(recordedPage, popup, '[data-scope="area"]');
+  await moveCursor(recordedPage, popup, 'input[value="lasso"]');
+  await saveStill(recordedPage, "02-area-tools.png");
+  await clickWithCursor(recordedPage, popup, '[data-scope="desktop"]');
+  await clickWithCursor(recordedPage, popup, "#captureSafeguards summary");
+  await saveStill(recordedPage, "03-capture-safeguards.png");
+  await clickWithCursor(recordedPage, popup, "#captureSafeguards summary");
 
   await setScene(recordedPage, {
     chapter: "02 / Capture",
@@ -149,7 +129,7 @@ try {
   if (!skipCapture) {
     await clickWithCursor(recordedPage, popup, "#captureButton");
     try {
-      await popup.locator("#exportReviewPanel:not(.is-hidden)").waitFor({ timeout: captureTimeoutMs });
+      await popup.locator("#exportReviewPanel[open]").waitFor({ timeout: captureTimeoutMs });
     } catch (error) {
       const launchDiagnostics = await popup.evaluate(() => ({
         launchState: document.querySelector("#launchStatus")?.dataset.state || "",
@@ -171,8 +151,8 @@ try {
     await clickInBackgroundWithCursor(recordedPage, target, popup, "#exportReviewConfirmButton");
     try {
       await popup.waitForFunction(() => {
-        const title = document.querySelector("#statusTitle")?.textContent?.trim() || "";
-        return title === "Capture complete" || title === "Capture failed";
+        const status = document.querySelector("#statusDetail");
+        return status?.textContent?.includes("Capture saved.") || status?.dataset.error === "true";
       }, null, { timeout: captureTimeoutMs });
     } catch (error) {
       const diagnostics = await readCaptureDiagnostics(popup);
@@ -181,10 +161,10 @@ try {
       });
     }
     const diagnostics = await readCaptureDiagnostics(popup);
-    if (diagnostics.title !== "Capture complete") {
+    if (!diagnostics.detail.includes("Capture saved.")) {
       throw new Error(`Capture did not complete. ${formatCaptureDiagnostics(diagnostics)}`);
     }
-    await popup.locator("#statusPanel").scrollIntoViewIfNeeded();
+    await popup.locator("#lastCapture").scrollIntoViewIfNeeded();
     await pause(1.2);
     await saveStill(recordedPage, "05-capture-complete.png");
     await seedDemoLibraryCaptures(popup, fixture.url, false);
@@ -749,7 +729,7 @@ async function clickInBackgroundWithCursor(page, foregroundPage, frame, selector
 
 async function readCaptureDiagnostics(frame) {
   return frame.evaluate(() => ({
-    title: document.querySelector("#statusTitle")?.textContent?.trim() || "",
+    title: document.querySelector("#launchStatusTitle")?.textContent?.trim() || "",
     detail: document.querySelector("#statusDetail")?.textContent?.trim() || "",
     badge: document.querySelector("#statusBadge")?.textContent?.trim() || "",
     log: [...document.querySelectorAll("#statusLog > *")]

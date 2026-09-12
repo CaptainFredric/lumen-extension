@@ -24,6 +24,7 @@ const requiredRuntimeFiles = [
   "library.css",
   "library.html",
   "library.js",
+  "library-monitors.js",
   "drive-export.js",
   "editor.css",
   "editor.html",

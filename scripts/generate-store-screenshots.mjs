@@ -113,22 +113,12 @@ async function captureExtensionProductShots() {
   const popup = await extensionContext.newPage();
   await popup.goto(`chrome-extension://${extensionId}/popup.html`, { waitUntil: "load" });
   await popup.waitForSelector("#captureButton", { timeout: 10000 });
-  await popup.waitForFunction(() => document.querySelector("#launchStatus")?.dataset.state === "ready", null, {
-    timeout: 10000
-  });
-
+  await popup.waitForSelector("#captureButton:not(:disabled)", { timeout: 10000 });
   await seedStoreMonitorState(worker);
-  await popup.reload({ waitUntil: "load" });
-  await popup.locator(".options-workspace").evaluate((details) => {
-    details.open = true;
-  });
-  await popup.waitForSelector("#watchPlanCard:not(.is-hidden)", { timeout: 10000 });
-  const onboardingDismissButton = popup.locator("#onboardingDismissButton");
-  if (await onboardingDismissButton.isVisible().catch(() => false)) {
-    await onboardingDismissButton.click();
-  }
-  await popup.locator("#watchPlanCard").scrollIntoViewIfNeeded();
-  await popup.waitForTimeout(200);
+  await popup.goto(`chrome-extension://${extensionId}/library.html#monitors`);
+  await popup.setViewportSize({ width: 800, height: 800 });
+  await popup.waitForSelector("#monitorList .monitor-card", { timeout: 10000 });
+  await popup.locator("#monitorList").scrollIntoViewIfNeeded();
   const watchShot = await popup.screenshot({ type: "png" });
 
   const editorShot = await captureExtensionPageShot({

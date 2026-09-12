@@ -1021,3 +1021,8 @@ code {
     transition-duration: 0.01ms !important;
   }
 }
+.output-defaults { margin-top: 20px; border-top: 1px solid rgba(190, 220, 235, .2); padding-top: 16px; }
+.output-defaults summary { cursor: pointer; }
+.output-defaults label { display: block; margin: 16px 0 8px; }
+.output-defaults select { width: 100%; padding: 10px; color: inherit; background: #20262a; border: 1px solid #48545b; border-radius: 6px; }
+.output-defaults p { font-size: 13px; line-height: 1.5; }

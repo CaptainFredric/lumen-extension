@@ -314,8 +314,32 @@ function renderSavedFileChoices() {
   }
 }
 
+function renderPageContext(context) {
+  const list = document.getElementById("pageContextValues");
+  list.replaceChildren();
+  document.getElementById("pageContextHint").textContent = context
+    ? "Extracted when this capture was made. Page text is reported as found."
+    : "Page context was not retained for this capture. Enable capture-details JSON in Settings for future captures.";
+  if (!context) return;
+  for (const [label, value] of [
+    ["Headline", context.headline], ["Primary action", context.primaryAction],
+    ["Navigation", context.navigation?.join(" / ")],
+    ["Fonts", context.fonts?.join(", ")], ["Colors", context.colors?.join(", ")]
+  ]) {
+    if (!value) continue;
+    const row = document.createElement("div");
+    const term = document.createElement("dt");
+    const detail = document.createElement("dd");
+    term.textContent = label;
+    detail.textContent = value;
+    row.append(term, detail);
+    list.append(row);
+  }
+}
+
 function renderCaptureDetails() {
   const capture = state.capture;
+  renderPageContext(capture.pageContext);
   const dimensions = capture.dimensions || {};
   const originalWidth = state.source?.originalWidth || dimensions.width || state.source?.width || 0;
   const originalHeight = state.source?.originalHeight || dimensions.height || state.source?.height || 0;

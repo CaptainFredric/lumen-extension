@@ -27,6 +27,30 @@
     </header>
 
     <main class="library-shell">
+      <nav class="workspace-nav" aria-label="Library workspace">
+        <a href="#captures">Captures</a>
+        <a href="#monitors">Monitors</a>
+      </nav>
+      <section id="monitors" class="intro-panel" hidden aria-labelledby="monitorsTitle">
+        <div class="monitor-workspace">
+          <h2 id="monitorsTitle">Monitors</h2>
+          <p>Choose an area saved from the toolbar. Runs stay local and require Chrome to be available.</p>
+          <form id="monitorForm">
+            <label>Selected Area<select id="monitorArea" required></select></label>
+            <label>Schedule<select id="monitorMode"><option value="once">Once</option><option value="repeat">Repeat</option><option value="continuous">Continuous, with a limit</option></select></label>
+            <label id="monitorDelayField">Delay in seconds<input id="monitorDelay" type="number" min="5" max="86400" value="5"></label>
+            <label id="monitorIntervalField" hidden>Minutes between captures<input id="monitorInterval" type="number" min="1" max="10080" value="60"></label>
+            <label id="monitorLimitField" hidden>Stop after this many captures<input id="monitorLimit" type="number" min="2" max="50" value="25"></label>
+            <label id="monitorChangedField" hidden><input id="monitorChanged" type="checkbox" checked> Save only when the area changes</label>
+            <p id="monitorEstimate">Maximum: one capture.</p>
+            <button class="quiet-button" type="submit">Allow site access and save monitor</button>
+            <button id="cancelMonitorEdit" class="quiet-button" type="button" hidden>Cancel edit</button>
+          </form>
+          <p id="monitorStatus" role="status" aria-live="polite"></p>
+          <div id="monitorList"></div>
+        </div>
+      </section>
+      <div id="captures">
       <section class="intro-panel" aria-labelledby="introTitle">
         <div class="intro-copy">
           <p class="eyebrow">Local by design</p>
@@ -95,6 +119,7 @@
       </section>
 
       <section id="captureGrid" class="capture-grid" aria-label="Saved captures" tabindex="-1"></section>
+      </div>
     </main>
 
     <dialog id="captureDialog" class="capture-dialog" aria-labelledby="dialogTitle">
@@ -164,5 +189,6 @@
     </template>
 
     <script type="module" src="library.js"></script>
+    <script type="module" src="library-monitors.js"></script>
   </body>
 </html>

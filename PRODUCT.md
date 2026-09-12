@@ -14,9 +14,12 @@ Scope, viewport, context, review, time, and handoff determine whether a feature 
 | Settings | Defaults, safeguards, permissions, storage, explicit destinations |
 | Annotation Studio / Compare | Tools opened from captured evidence |
 
-These are target boundaries. The current popup still contains older browsing,
-analysis, monitor, and experimental account controls. Move them in tested stages.
-Do not delete controls before equivalent navigation and workflows are verified.
+The popup now owns four capture scopes, safeguards, preflight confirmation,
+active job status, and one Last Capture entry. Persistent browsing and monitor
+administration live in the Library. Result Details shows context retained with
+that capture when capture-details JSON was enabled; older captures cannot
+recover it from the latest global analysis record. Experimental account and
+delivery controls are absent from the launcher.
 
 ## Vocabulary
 

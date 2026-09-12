@@ -209,6 +209,13 @@ try {
     await store.putLibraryCapture({
       id: captureId,
       title: "Smoke capture",
+      pageContext: {
+        headline: "<script>capture context</script>",
+        primaryAction: "Continue",
+        navigation: ["Checkout", "Account"],
+        colors: ["#123456"],
+        fonts: ["Avenir Next"]
+      },
       host: "example.test",
       url: "https://example.test/",
       capturedAt: new Date().toISOString(),
@@ -838,6 +845,9 @@ try {
   }), stableResultIds);
 
   assert(resultWorkspaceState.missingIds.length === 0, "The result workspace lost stable action or viewer IDs.", resultWorkspaceState);
+  const pageContext = await resultPage.locator("#pageContextValues").textContent();
+  assert(pageContext.includes("<script>capture context</script>") && pageContext.includes("Checkout / Account"), "Result lost capture-specific context or interpreted page text as markup.", { pageContext });
+  assert(await resultPage.locator("#pageContextValues script").count() === 0, "Untrusted page context created executable markup.");
   await resultPage.click("#detailsButton");
   assert(await resultPage.locator("#savedFileSelect option").count() === 2, "Every available original should be selectable.");
   await resultPage.selectOption("#savedFileSelect", String(artifactChoices.second));
@@ -1738,314 +1748,77 @@ try {
 
   await popup.goto(`chrome-extension://${extensionId}/popup.html`, { waitUntil: "load" });
   await popup.waitForSelector("#captureButton", { timeout: 10000 });
-  await popup.waitForSelector("[data-history-action='open']", { timeout: 10000 });
-  await popup.waitForSelector("#photoLibraryGrid img:not(.is-hidden)", { timeout: 10000 });
-
+  await popup.waitForSelector("#openLastCaptureButton:not([hidden])", { timeout: 10000 });
+  await popup.waitForSelector("#captureButton:not(:disabled)", { timeout: 10000 });
   const popupState = await popup.evaluate(() => ({
     title: document.title,
-    hasShell: Boolean(document.querySelector(".shell")),
-    launchStatusState: document.querySelector("#launchStatus")?.dataset.state || "",
-    launchStatusTitle: document.querySelector("#launchStatusTitle")?.textContent?.trim() || "",
-    launchBlocked: document.querySelector("#launchPanel")?.classList.contains("is-blocked") || false,
-    captureButton: document.querySelector("#captureButton strong")?.textContent?.trim() || "",
-    captureHint: document.querySelector("#captureButton small")?.textContent?.trim() || "",
-    captureDisabled: document.querySelector("#captureButton")?.disabled || false,
-    captureOptionsLabel: document.querySelector("#captureOptionsButton")?.getAttribute("aria-label") || "",
-    captureOptionsExpanded: document.querySelector("#captureOptionsButton")?.getAttribute("aria-expanded") || "",
-    captureOptionsDisabled: document.querySelector("#captureOptionsButton")?.disabled || false,
-    analyzeButton: document.querySelector("#analyzeButton .action-label")?.textContent?.trim() || "",
-    analyzeDisabled: document.querySelector("#analyzeButton")?.disabled || false,
-    holdMenuHidden: document.querySelector("#holdMenu")?.getAttribute("aria-hidden") || "",
-    holdActionCount: document.querySelectorAll("[data-quick-action]").length,
-    holdActions: [...document.querySelectorAll("[data-quick-action]")].map((button) => button.dataset.quickAction),
-    captureReceiptHidden: document.querySelector("#captureReceipt")?.classList.contains("is-hidden") ?? false,
-    captureReceiptCaptureId: document.querySelector("#captureReceipt")?.dataset.captureId || "",
-    receiptActions: [...document.querySelectorAll("#captureReceipt [data-receipt-action]")].map((button) => ({
-      action: button.dataset.receiptAction,
-      label: button.textContent?.trim() || ""
-    })),
-    statusHidden: document.querySelector("#statusPanel")?.classList.contains("is-hidden") ?? false,
-    manualCount: document.querySelector("#manualRedactionCount")?.textContent?.trim() || "",
-    autoRedactDisabled: document.querySelector("#autoRedact")?.disabled || false,
-    cutawayStatus: document.querySelector("#cutawayRegionStatus")?.textContent?.trim() || "",
-    cutawayClearDisabled: document.querySelector("#clearCutawayButton")?.disabled || false,
-    watchCardHidden: document.querySelector("#watchPlanCard")?.classList.contains("is-hidden") ?? false,
-    runWatchNowDisabled: document.querySelector("#runWatchPlanNowButton")?.disabled || false,
-    toggleWatchDisabled: document.querySelector("#toggleWatchPlanButton")?.disabled || false,
-    deleteWatchDisabled: document.querySelector("#deleteWatchPlanButton")?.disabled || false,
-    watchMode: document.querySelector("#watchModeSelect")?.value || "",
-    watchDelayVisible: !document.querySelector("#watchDelayField")?.classList.contains("is-hidden"),
-    watchContinuousHidden: document.querySelector("#watchContinuousIntervalField")?.classList.contains("is-hidden") || false,
-    annotationStatus: document.querySelector("#annotationRegionStatus")?.textContent?.trim() || "",
-    annotationClearDisabled: document.querySelector("#clearAnnotationButton")?.disabled || false,
-    runViewSummary: document.querySelector("#runViewSummary")?.textContent?.trim() || "",
-    runExportSummary: document.querySelector("#runExportSummary")?.textContent?.trim() || "",
-    runSafetySummary: document.querySelector("#runSafetySummary")?.textContent?.trim() || "",
-    accountPlan: document.querySelector("#accountPlan")?.textContent?.trim() || "",
-    dataControlsSummary: document.querySelector("#dataControlsSummary")?.textContent?.trim() || "",
-    retentionDisabled: document.querySelector("#retentionSelect")?.disabled || false,
-    retentionValue: document.querySelector("#retentionSelect")?.value || "",
-    cloudSyncDisabled: document.querySelector("#cloudSyncEnabled")?.disabled || false,
-    deleteBackendDataDisabled: document.querySelector("#deleteBackendDataButton")?.disabled || false,
-    lockedFeatureCount: document.querySelectorAll("[data-pro-feature].is-locked").length,
-    disabledResponsiveModes: [...document.querySelectorAll("[data-device]:disabled")].map((button) => button.dataset.device),
-    disabledPosterModes: [...document.querySelectorAll("[data-export]:disabled")].map((button) => button.dataset.export),
-    exportReviewHidden: document.querySelector("#exportReviewPanel")?.classList.contains("is-hidden") ?? false,
-    exportReviewConfirm: document.querySelector("#exportReviewConfirmButton")?.textContent?.trim() || "",
-    activeJobActionsHidden: document.querySelector("#captureJobActions")?.classList.contains("is-hidden") ?? false,
-    cancelCaptureDisabled: document.querySelector("#cancelCaptureButton")?.disabled || false,
-    reopenCaptureDisabled: document.querySelector("#reopenCaptureButton")?.disabled || false,
-    runModeSummary: document.querySelector("#runModeSummary")?.textContent?.trim() || "",
-    timelineStepCount: document.querySelectorAll("[data-stage-step]").length,
-    statusLogText: document.querySelector("#statusLog")?.textContent?.trim() || "",
-    historyCount: document.querySelector("#historyCount")?.textContent?.trim() || "",
-    historyPath: document.querySelector(".history-path")?.textContent?.trim() || "",
-    historyDetailOpen: Boolean(document.querySelector(".history-item.is-expanded .history-detail")),
-    historyDetailMetrics: [...document.querySelectorAll(".history-detail-metric strong")].map((node) => node.textContent?.trim()),
-    historyDetailPanels: [...document.querySelectorAll(".history-detail-panel .field-label")].map((node) => node.textContent?.trim()),
-    historyArtifactFilters: [...document.querySelectorAll("[data-history-artifact-filter]")].map((button) => button.textContent?.trim()),
-    historyArtifactRows: [...document.querySelectorAll("[data-artifact-type]")].map((row) => row.dataset.artifactType),
-    historyCutawayPreview: Boolean(document.querySelector(".history-cutaway-preview")),
-    shelfCount: document.querySelector("#captureShelfCount")?.textContent?.trim() || "",
-    shelfCards: document.querySelectorAll(".capture-shelf-card").length,
-    shelfKinds: [...document.querySelectorAll(".capture-shelf-card")].map((card) => card.dataset.kind),
-    shelfBadges: [...document.querySelectorAll(".capture-shelf-badge")].map((badge) => badge.textContent?.trim()),
-    shelfActions: [...document.querySelectorAll("#captureShelfGrid [data-history-action]")].map((button) => ({
-      action: button.dataset.historyAction,
-      captureId: button.dataset.captureId,
-      watchRunId: button.dataset.watchRunId,
-      disabled: button.disabled,
-      text: button.textContent?.trim()
-    })),
-    historyActions: [...document.querySelectorAll("#historyList [data-history-action]")].map((button) => ({
-      action: button.dataset.historyAction,
-      captureId: button.dataset.captureId,
-      disabled: button.disabled
-    })),
-    photoLibraryCount: document.querySelector("#photoLibraryCount")?.textContent?.trim() || "",
-    photoLibraryCards: document.querySelectorAll("#photoLibraryGrid .photo-library-card").length,
-    photoLibraryImages: document.querySelectorAll("#photoLibraryGrid img:not(.is-hidden)").length,
-    photoLibraryOpenLabel: document.querySelector("#openPhotoLibraryButton")?.textContent?.trim() || ""
+    target: document.querySelector("#targetHost").textContent,
+    scopes: [...document.querySelectorAll("[data-scope]")].map(node => node.dataset.scope),
+    lastCapture: document.querySelector("#lastCapture").dataset.captureId,
+    duplicateWorkspaces: document.querySelectorAll("#analyzeButton, #historyList, #captureShelfGrid, #photoLibraryGrid, #watchPlanCard").length,
+    captureBottom: document.querySelector("#captureButton").getBoundingClientRect().bottom
   }));
+  assert(popupState.title === "Lumen" && popupState.target === "lumen-smoke.test", "Launcher did not resolve the fixture.", popupState);
+  assert(popupState.scopes.join(",") === "desktop,visible,area,responsive", "Capture scopes changed.", popupState);
+  assert(popupState.lastCapture && popupState.duplicateWorkspaces === 0, "Launcher reintroduced persistent workspaces.", popupState);
+  assert(popupState.captureBottom <= 600, "Primary action falls outside the popup viewport.", popupState);
+  if (process.env.LUMEN_POPUP_PROOF) {
+    await popup.locator("body").screenshot({ path: process.env.LUMEN_POPUP_PROOF });
+  }
+  await popup.click('[data-scope="area"]');
+  assert(await popup.locator("#areaControls").isVisible(), "Area scope did not expose selection tools.");
+  assert(await popup.locator('input[name="shape"]').count() === 2, "Rectangle/lasso choices are missing.");
+  await popup.click('[data-scope="responsive"]');
+  assert(await popup.locator("#captureButton").textContent() === "Capture responsive set", "Set action label did not update.");
+  assert(await popup.locator("#areaControls").isHidden(), "Area tools remained visible in set scope.");
+  await popup.locator('[data-scope="visible"]').focus();
+  await popup.keyboard.press("Enter");
+  assert(await popup.locator('[data-scope="visible"]').getAttribute("aria-pressed") === "true", "Scope selection is not keyboard accessible.");
+  const unchangedHistory = await popup.evaluate(async () => (await chrome.storage.local.get("lumen.capture.history"))["lumen.capture.history"].length);
+  assert(unchangedHistory === 1, "Choosing scopes accidentally started a capture.");
 
-  assert(popupState.title === "Lumen", "Popup title did not load.", popupState);
-  assert(popupState.hasShell, "Popup shell did not render.", popupState);
-  assert(popupState.launchStatusState === "ready", "Launch status should resolve the latest capturable tab.", popupState);
-  assert(popupState.launchStatusTitle === "lumen-smoke.test ready", "Launch status title did not render the target host.", popupState);
-  assert(!popupState.launchBlocked, "Launch panel should not block a capturable target tab.", popupState);
-  assert(popupState.captureButton === "Capture page", "Capture action did not render.", popupState);
-  assert(popupState.captureHint === "Click once", "One-click capture hint did not render.", popupState);
-  assert(!popupState.captureDisabled, "Capture action should be enabled for a capturable target tab.", popupState);
-  assert(popupState.captureOptionsLabel === "Capture options", "Capture options control needs an accessible label.", popupState);
-  assert(popupState.captureOptionsExpanded === "false", "Capture options control should start collapsed.", popupState);
-  assert(!popupState.captureOptionsDisabled, "Capture options should be available for a capturable target tab.", popupState);
-  assert(popupState.analyzeButton === "Analyze page", "Analyze action did not render.", popupState);
-  assert(!popupState.analyzeDisabled, "Analyze action should be enabled for a capturable target tab.", popupState);
-  assert(popupState.holdMenuHidden === "true", "Hold menu should start closed.", popupState);
-  assert(popupState.holdActionCount === 9, "Hold menu actions did not render.", popupState);
-  assert(popupState.holdActions.includes("visible"), "Hold menu should expose visible-area capture.", popupState);
-  assert(popupState.captureReceiptHidden, "Capture receipt should stay hidden until a real capture succeeds.", popupState);
-  assert(!popupState.captureReceiptCaptureId, "Hidden capture receipt should not retain a capture id.", popupState);
-  assert(
-    JSON.stringify(popupState.receiptActions) === JSON.stringify([
-      { action: "result", label: "View result" },
-      { action: "annotate", label: "Annotate" },
-      { action: "open", label: "Open original" },
-      { action: "show", label: "Show in folder" },
-      { action: "library", label: "Library" }
-    ]),
-    "Capture receipt actions or labels drifted from the post-capture handoff.",
-    popupState
-  );
-  assert(popupState.statusHidden, "Popup status panel should start hidden.", popupState);
-  assert(popupState.manualCount === "0 boxes", "Manual redaction counter did not initialize.", popupState);
-  assert(!popupState.autoRedactDisabled, "Local beta should make auto-redaction immediately usable.", popupState);
-  assert(popupState.cutawayStatus === "Choose region", "Cutaway region status did not initialize.", popupState);
-  assert(popupState.cutawayClearDisabled, "Cutaway clear action should start disabled without a region.", popupState);
-  assert(popupState.watchCardHidden, "Timed capture card should start hidden without a saved watch.", popupState);
-  assert(popupState.runWatchNowDisabled, "Run now should start disabled without a saved active watch.", popupState);
-  assert(popupState.toggleWatchDisabled, "Pause/resume should start disabled without a saved watch.", popupState);
-  assert(popupState.deleteWatchDisabled, "Clear watch should start disabled without a saved watch.", popupState);
-  assert(popupState.watchMode === "once" && popupState.watchDelayVisible && popupState.watchContinuousHidden, "Area monitor mode controls did not initialize to delayed once.", popupState);
-  assert(popupState.annotationStatus === "Choose target", "Annotation callout status did not initialize.", popupState);
-  assert(popupState.annotationClearDisabled, "Annotation clear action should start disabled without a callout.", popupState);
-  assert(popupState.runViewSummary === "Desktop", "Run view summary did not initialize.", popupState);
-  assert(popupState.runExportSummary === "Raw", "Run export summary did not initialize.", popupState);
-  assert(popupState.runSafetySummary.includes("Cleanup"), "Run safety summary did not initialize.", popupState);
-  assert(popupState.accountPlan === "Local beta", "Local beta plan did not render.", popupState);
-  assert(popupState.dataControlsSummary.includes("clear history"), "Data controls summary did not explain local cleanup.", popupState);
-  assert(popupState.retentionDisabled, "Retention control should start disabled without a backend session.", popupState);
-  assert(popupState.retentionValue === "90", "Retention control should default to 90 days.", popupState);
-  assert(popupState.cloudSyncDisabled, "Cloud sync control should start disabled for the free plan.", popupState);
-  assert(!popupState.deleteBackendDataDisabled, "Local workspace cleanup should always be available.", popupState);
-  assert(popupState.lockedFeatureCount === 1, "Only the connected cloud feature chip should remain locked in the local beta.", popupState);
-  assert(
-    popupState.disabledResponsiveModes.length === 0,
-    "Responsive modes should be available in the local beta.",
-    popupState
-  );
-  assert(
-    popupState.disabledPosterModes.length === 0,
-    "Poster export modes should be available in the local beta.",
-    popupState
-  );
-  assert(popupState.exportReviewHidden, "Export review screen should start hidden.", popupState);
-  assert(popupState.exportReviewConfirm === "Save capture", "Export review confirmation action did not render.", popupState);
-  assert(popupState.activeJobActionsHidden, "Active capture controls should stay hidden until a run is in flight.", popupState);
-  assert(popupState.cancelCaptureDisabled && popupState.reopenCaptureDisabled, "Active capture controls should start disabled.", popupState);
-  assert(popupState.runModeSummary === "Full page", "Capture mode summary should default to full page.", popupState);
-  assert(popupState.timelineStepCount === 6, "Capture timeline did not render.", popupState);
-  assert(popupState.statusLogText === "Run status appears here.", "Status log did not initialize.", popupState);
-  assert(popupState.historyCount === "1 item", "Seeded history count did not render.", popupState);
-  assert(popupState.historyPath === "Lumen/2026-05-02/smoke-capture", "Archive folder did not render.", popupState);
-  assert(popupState.historyDetailOpen, "Latest history detail panel did not open.", popupState);
-  assert(popupState.historyDetailMetrics.includes("Saved"), "History detail manifest state did not render.", popupState);
-  assert(popupState.historyDetailPanels.includes("Capture views"), "History detail capture views did not render.", popupState);
-  assert(popupState.historyDetailPanels.includes("Files"), "History detail files did not render.", popupState);
-  assert(popupState.historyDetailPanels.includes("Page signals"), "History detail page signals did not render.", popupState);
-  assert(popupState.historyArtifactFilters.includes("All 4"), "Files all filter did not render.", popupState);
-  assert(popupState.historyArtifactFilters.includes("Cutaway 1"), "Cutaway file filter did not render.", popupState);
-  assert(popupState.historyArtifactFilters.includes("Print sheet 1"), "Print sheet file filter did not render.", popupState);
-  assert(popupState.historyArtifactRows.includes("cutaway"), "Cutaway file row did not render.", popupState);
-  assert(popupState.historyArtifactRows.includes("print-sheet"), "Print sheet file row did not render.", popupState);
-  assert(popupState.historyCutawayPreview, "Cutaway preview did not render in history detail.", popupState);
-  assert(popupState.shelfCount.includes("1 capture"), "Capture shelf did not count seeded history.", popupState);
-  assert(popupState.shelfCount.includes("2 timed runs"), "Capture shelf did not count seeded timed runs.", popupState);
-  assert(popupState.shelfCards === 3, "Capture shelf did not render seeded captures and timed runs.", popupState);
-  assert(popupState.photoLibraryCount === "1 capture", "Capture Library count did not render.", popupState);
-  assert(popupState.photoLibraryCards === 1 && popupState.photoLibraryImages === 1, "Local photo library did not render its real preview.", popupState);
-  assert(popupState.photoLibraryOpenLabel === "Open all", "Photo library navigation action did not render.", popupState);
-  assert(
-    popupState.shelfKinds.filter((kind) => kind === "watch").length === 2 &&
-      popupState.shelfKinds.includes("capture"),
-    "Capture shelf did not label timed run cards and capture cards.",
-    popupState
-  );
-  assert(
-    popupState.shelfBadges.includes("Timed saved") &&
-      popupState.shelfBadges.includes("Timed Failed") &&
-      popupState.shelfBadges.includes("Capture"),
-    "Capture shelf status badges did not render.",
-    popupState
-  );
-  assert(
-    popupState.shelfActions.some((button) =>
-      button.action === "copy" &&
-        button.watchRunId === "watch-run-smoke-captured" &&
-        !button.disabled
-    ) &&
-      popupState.shelfActions.some((button) =>
-        button.action === "copy" &&
-          button.watchRunId === "watch-run-smoke-failed" &&
-          !button.disabled
-      ),
-    "Timed run shelf summaries should be copyable.",
-    popupState
-  );
-  assert(
-    popupState.shelfActions.some((button) =>
-      button.action === "open" &&
-        button.watchRunId === "watch-run-smoke-failed" &&
-        button.disabled
-    ),
-    "Failed timed runs should keep file actions disabled.",
-    popupState
-  );
-  assert(
-    popupState.historyActions.length === 4 &&
-      popupState.historyActions.every((button) => button.captureId === seededCaptureId && !button.disabled),
-    "History file actions did not render.",
-    popupState
-  );
-  assert(!popupConsoleErrors.length, "Popup emitted console errors.", popupConsoleErrors);
-
-  await popup.click("[data-history-artifact-filter='cutaway']");
-  const filteredArtifactState = await popup.evaluate(() => ({
-    activeFilter: document.querySelector("[data-history-artifact-filter].is-active")?.dataset.historyArtifactFilter || "",
-    visibleRows: [...document.querySelectorAll("[data-artifact-type]")]
-      .filter((row) => !row.classList.contains("is-filtered"))
-      .map((row) => row.dataset.artifactType),
-    hiddenRows: [...document.querySelectorAll("[data-artifact-type].is-filtered")]
-      .map((row) => row.dataset.artifactType)
+  const monitorPage = await context.newPage();
+  monitorPage.on("pageerror", error => popupConsoleErrors.push(error.message));
+  await monitorPage.goto(`chrome-extension://${extensionId}/library.html#monitors`);
+  await monitorPage.waitForSelector("#monitors:not([hidden])");
+  assert(await monitorPage.locator("#captures").isHidden(), "Monitor navigation leaves duplicate capture workspace visible.");
+  await monitorPage.selectOption("#monitorMode", "continuous");
+  assert(await monitorPage.locator("#monitorLimitField").isVisible(), "Continuous monitor lost its run limit.");
+  await monitorPage.fill("#monitorLimit", "10");
+  assert((await monitorPage.locator("#monitorEstimate").textContent()).includes("10"), "Monitor estimate does not follow the run limit.");
+  await monitorPage.selectOption("#monitorMode", "repeat");
+  assert(await monitorPage.locator("#monitorInterval").getAttribute("min") === "15", "Repeat cadence lost its lower bound.");
+  await worker.evaluate(() => chrome.storage.local.set({
+    "lumen.capture.cutawayRegions": {
+      "https://lumen-smoke.test/": {
+        url: "https://lumen-smoke.test/",
+        region: { id: "launcher-area", left: 0, top: 0, width: 200, height: 120, shape: "rect" }
+      }
+    }
   }));
-
-  assert(filteredArtifactState.activeFilter === "cutaway", "Cutaway artifact filter did not become active.", filteredArtifactState);
-  assert(
-    filteredArtifactState.visibleRows.length === 1 &&
-      filteredArtifactState.visibleRows[0] === "cutaway" &&
-      filteredArtifactState.hiddenRows.includes("image") &&
-      filteredArtifactState.hiddenRows.includes("manifest"),
-    "Cutaway artifact filter did not hide unrelated artifact rows.",
-    filteredArtifactState
-  );
-
-  await popup.click("#captureOptionsButton");
-
-  const clickMenuState = await popup.evaluate(async () => {
-    const stored = await chrome.storage.local.get("lumen.capture.history");
-    return {
-      menuOpen: document.querySelector("#launchPanel")?.classList.contains("is-menu-open") || false,
-      ariaHidden: document.querySelector("#holdMenu")?.getAttribute("aria-hidden") || "",
-      optionsExpanded: document.querySelector("#captureOptionsButton")?.getAttribute("aria-expanded") || "",
-      focusedAction: document.activeElement?.getAttribute("data-quick-action") || "",
-      captureHistoryCount: stored["lumen.capture.history"]?.length || 0
-    };
+  await monitorPage.waitForFunction(() => document.querySelector("#monitorArea")?.options[0]?.textContent.includes("Rectangle"));
+  await monitorPage.click('#monitorForm button[type="submit"]');
+  await monitorPage.waitForSelector("#monitorList .monitor-card");
+  await monitorPage.getByRole("button", { name: "Pause", exact: true }).click();
+  await monitorPage.getByRole("button", { name: "Resume", exact: true }).waitFor();
+  const pausedMonitor = await worker.evaluate(async () => {
+    const plans = (await chrome.storage.local.get("lumen.watch.plans"))["lumen.watch.plans"];
+    return { plan: plans[0], alarm: await chrome.alarms.get("lumen.watch." + plans[0].id) };
   });
-
-  assert(clickMenuState.menuOpen, "Clicking capture options did not open the real action menu.", clickMenuState);
-  assert(clickMenuState.ariaHidden === "false", "Capture options aria state did not open.", clickMenuState);
-  assert(clickMenuState.optionsExpanded === "true", "Capture options did not expose its expanded state.", clickMenuState);
-  assert(clickMenuState.focusedAction === "responsive", "Capture options did not focus the first available action.", clickMenuState);
-  assert(clickMenuState.captureHistoryCount === 1, "Opening capture options accidentally started a capture.", clickMenuState);
-
-  await popup.keyboard.press("Escape");
-  const escapedMenuState = await popup.evaluate(() => ({
-    menuOpen: document.querySelector("#launchPanel")?.classList.contains("is-menu-open") || false,
-    ariaHidden: document.querySelector("#holdMenu")?.getAttribute("aria-hidden") || "",
-    optionsExpanded: document.querySelector("#captureOptionsButton")?.getAttribute("aria-expanded") || "",
-    focusId: document.activeElement?.id || ""
-  }));
-
-  assert(!escapedMenuState.menuOpen && escapedMenuState.ariaHidden === "true", "Escape did not close capture options.", escapedMenuState);
-  assert(escapedMenuState.optionsExpanded === "false", "Escape did not collapse the options control.", escapedMenuState);
-  assert(escapedMenuState.focusId === "captureOptionsButton", "Escape did not return focus to capture options.", escapedMenuState);
-
-  await popup.click("#captureOptionsButton");
-  await popup.dispatchEvent("#launchStatus", "pointerdown", {
-    button: 0,
-    pointerId: 2,
-    pointerType: "mouse"
+  assert(pausedMonitor.plan.status === "paused" && !pausedMonitor.alarm, "Pausing in Library did not clear its alarm.", pausedMonitor);
+  await monitorPage.getByRole("button", { name: "Edit schedule", exact: true }).click();
+  await monitorPage.fill("#monitorInterval", "30");
+  await monitorPage.click('#monitorForm button[type="submit"]');
+  await monitorPage.waitForFunction(() => document.querySelector("#monitorList").textContent.includes("Every 30 minutes"));
+  const editedMonitor = await worker.evaluate(async () => {
+    const plans = (await chrome.storage.local.get("lumen.watch.plans"))["lumen.watch.plans"];
+    return { count: plans.length, plan: plans[0], alarm: await chrome.alarms.get("lumen.watch." + plans[0].id) };
   });
-  const outsideCloseState = await popup.evaluate(() => ({
-    menuOpen: document.querySelector("#launchPanel")?.classList.contains("is-menu-open") || false,
-    optionsExpanded: document.querySelector("#captureOptionsButton")?.getAttribute("aria-expanded") || ""
-  }));
-  assert(!outsideCloseState.menuOpen && outsideCloseState.optionsExpanded === "false", "Clicking outside the menu did not close it.", outsideCloseState);
-
-  await popup.dispatchEvent("#captureButton", "pointerdown", {
-    button: 0,
-    pointerId: 1,
-    pointerType: "mouse"
-  });
-  await popup.waitForTimeout(650);
-
-  const holdState = await popup.evaluate(() => ({
-    menuOpen: document.querySelector("#launchPanel")?.classList.contains("is-menu-open") || false,
-    ariaHidden: document.querySelector("#holdMenu")?.getAttribute("aria-hidden") || "",
-    optionsExpanded: document.querySelector("#captureOptionsButton")?.getAttribute("aria-expanded") || "",
-    statusTitle: document.querySelector("#launchStatusTitle")?.textContent?.trim() || ""
-  }));
-
-  assert(holdState.menuOpen, "Holding capture did not open the quick action menu.", holdState);
-  assert(holdState.ariaHidden === "false", "Hold menu aria state did not open.", holdState);
-  assert(holdState.optionsExpanded === "true", "Long press did not expand the capture options control.", holdState);
-  assert(holdState.statusTitle === "lumen-smoke.test ready", "Opening capture options should not replace the page readiness status.", holdState);
-
-  await popup.dispatchEvent("#captureButton", "pointerup", {
-    button: 0,
-    pointerId: 1,
-    pointerType: "mouse"
-  });
+  assert(editedMonitor.count === 1 && editedMonitor.plan.status === "active" && editedMonitor.alarm?.periodInMinutes === 30, "Editing created a duplicate or failed to update the alarm.", editedMonitor);
+  monitorPage.once("dialog", dialog => dialog.accept());
+  await monitorPage.getByRole("button", { name: "Delete", exact: true }).click();
+  await monitorPage.waitForFunction(() => document.querySelector("#monitorList").textContent.includes("No monitors saved"));
+  await monitorPage.close();
 
   const clearResponse = await popup.evaluate(() => chrome.runtime.sendMessage({
     type: "LUMEN_CLEAR_LOCAL_DATA"
@@ -2071,22 +1844,12 @@ try {
   await popup.reload({ waitUntil: "load" });
   await popup.waitForSelector("#captureButton", { timeout: 10000 });
 
+  await popup.waitForFunction(() => document.querySelector("#launchStatusTitle").textContent === "Open a webpage first");
   const blockedState = await popup.evaluate(() => ({
-    launchStatusState: document.querySelector("#launchStatus")?.dataset.state || "",
-    launchStatusTitle: document.querySelector("#launchStatusTitle")?.textContent?.trim() || "",
-    launchBlocked: document.querySelector("#launchPanel")?.classList.contains("is-blocked") || false,
-    captureDisabled: document.querySelector("#captureButton")?.disabled || false,
-    captureOptionsDisabled: document.querySelector("#captureOptionsButton")?.disabled || false,
-    analyzeDisabled: document.querySelector("#analyzeButton")?.disabled || false,
-    quickActionsDisabled: [...document.querySelectorAll("[data-quick-action]")].every((button) => button.disabled)
+    title: document.querySelector("#launchStatusTitle").textContent,
+    disabled: document.querySelector("#captureButton").disabled
   }));
-
-  assert(blockedState.launchStatusState === "blocked", "Launch status should block restricted or missing target tabs.", blockedState);
-  assert(blockedState.launchBlocked, "Launch panel should mark blocked target state.", blockedState);
-  assert(blockedState.captureDisabled, "Capture should be disabled without a capturable target tab.", blockedState);
-  assert(blockedState.captureOptionsDisabled, "Capture options should be disabled without a capturable target tab.", blockedState);
-  assert(blockedState.analyzeDisabled, "Analyze should be disabled without a capturable target tab.", blockedState);
-  assert(blockedState.quickActionsDisabled, "Quick actions should be disabled without a capturable target tab.", blockedState);
+  assert(blockedState.disabled, "Capture should be disabled without a capturable target.", blockedState);
 
   const storageState = await worker.evaluate(async () => ({
     sync: await chrome.storage.sync.get("lumen.capture.settings"),

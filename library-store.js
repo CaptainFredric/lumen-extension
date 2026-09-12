@@ -1002,6 +1002,7 @@ function normalizeCaptureRecord(input, existing = null) {
     manifestFile: normalizeText(input.manifestFile, existing?.manifestFile || "", 420),
     downloads: normalizeDownloads(input.downloads ?? existing?.downloads),
     captureHealth: normalizeCaptureHealth(input.captureHealth ?? existing?.captureHealth),
+    pageContext: normalizePageContext(input.pageContext === undefined ? existing?.pageContext : input.pageContext),
     dimensions: normalizeDimensions(input.dimensions ?? existing?.dimensions),
     variantCount: Math.max(0, Math.round(Number(input.variantCount ?? input.variants?.length ?? existing?.variantCount) || 0)),
     fileCount: Math.max(0, Math.round(Number(input.fileCount ?? input.files?.length ?? existing?.fileCount) || 0)),
@@ -1033,6 +1034,20 @@ function normalizeCaptureRecord(input, existing = null) {
     pdfSourceHeight: 0,
     pdfSourceExact: false,
     pdfSourceKind: ""
+  };
+}
+
+function normalizePageContext(input) {
+  if (!input || typeof input !== "object") return null;
+  const list = value => Array.isArray(value)
+    ? value.filter(item => typeof item === "string").slice(0, 20).map(item => item.slice(0, 200))
+    : [];
+  return {
+    headline: normalizeText(input.headline, "", 300),
+    primaryAction: normalizeText(input.primaryAction, "", 200),
+    navigation: list(input.navigation),
+    colors: list(input.colors),
+    fonts: list(input.fonts)
   };
 }
 

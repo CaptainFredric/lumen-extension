@@ -31,6 +31,9 @@ const ui = {
   reviewBeforeSaveToggle: document.querySelector("#reviewBeforeSaveToggle"),
   stickyCleanupToggle: document.querySelector("#stickyCleanupToggle"),
   lazyLoadToggle: document.querySelector("#lazyLoadToggle"),
+  outputStyle: document.querySelector("#outputStyle"),
+  longPageOutput: document.querySelector("#longPageOutput"),
+  captureNoteToggle: document.querySelector("#captureNoteToggle"),
   refreshAccessButton: document.querySelector("#refreshAccessButton"),
   siteAccessSummary: document.querySelector("#siteAccessSummary"),
   siteAccessList: document.querySelector("#siteAccessList"),
@@ -70,6 +73,9 @@ async function bootstrap() {
 }
 
 function bindEvents() {
+  ui.outputStyle.addEventListener("change", () => updateOutputChoice("exportPreset", ui.outputStyle.value));
+  ui.longPageOutput.addEventListener("change", () => updateOutputChoice("longPageMode", ui.longPageOutput.value));
+  ui.captureNoteToggle.addEventListener("change", () => updateCaptureChoice("annotationEnabled", ui.captureNoteToggle.checked));
   ui.privacyShieldToggle.addEventListener("change", handleShieldChange);
   ui.autoRedactToggle.addEventListener("change", () => updateCaptureChoice("autoRedact", ui.autoRedactToggle.checked));
   ui.captureDetailsToggle.addEventListener("change", () => updateCaptureChoice("exportManifest", ui.captureDetailsToggle.checked));
@@ -152,6 +158,13 @@ async function handleShieldChange() {
   };
   await persistAll("Privacy Shield off", "Your previous choices were restored and active monitors can resume.");
   await syncLocalOnlyPolicy(appSettings.localOnlyMode);
+}
+
+async function updateOutputChoice(key, value) {
+  const allowed = key === "exportPreset" ? ["raw", "browser", "phone"] : ["auto", "tiles", "print"];
+  if (saving || !allowed.includes(value)) return;
+  captureSettings = { ...captureSettings, [key]: value };
+  await persistAll("Output default saved", "This choice applies to future captures.");
 }
 
 async function updateCaptureChoice(key, value) {
@@ -250,6 +263,12 @@ function renderSettings() {
   ui.reviewBeforeSaveToggle.checked = appSettings.reviewBeforeSave !== false;
   ui.stickyCleanupToggle.checked = captureSettings.removeStickyHeaders !== false;
   ui.lazyLoadToggle.checked = captureSettings.forceLazyLoad !== false;
+  ui.outputStyle.value = captureSettings.exportPreset || "raw";
+  ui.longPageOutput.value = captureSettings.longPageMode || "auto";
+  ui.captureNoteToggle.checked = Boolean(captureSettings.annotationEnabled);
+  ui.outputStyle.disabled = saving;
+  ui.longPageOutput.disabled = saving;
+  ui.captureNoteToggle.disabled = saving;
 
   for (const control of lockedControls) {
     control.disabled = saving || shieldEnabled;
@@ -462,6 +481,9 @@ function showSaveState(state, title, detail) {
 }
 
 function describeCaptureChoice(key, value) {
+  if (key === "annotationEnabled") {
+    return value ? "The saved capture note will be included in future captures." : "Future captures will omit the saved note. Its text remains on this device.";
+  }
   if (key === "autoRedact") {
     return value ? "Recognized sensitive details will be obscured before export." : "New captures will preserve page pixels unless you mark redaction boxes.";
   }

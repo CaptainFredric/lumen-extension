@@ -50,6 +50,22 @@ test("popup has no development readiness meter", async () => {
   }
 });
 
+test("launcher boundaries keep persistent and experimental workspaces elsewhere", async () => {
+  const html = await readFile(new URL("../popup.html", import.meta.url), "utf8");
+  const js = await readFile(new URL("../popup.js", import.meta.url), "utf8");
+  assert.doesNotMatch(html, /Analyze page|Mark cutaway|Focused crop|Connect team preview|Queue latest capture|Allow cloud sync|Recent captures and timed runs|Archive|captureShelfGrid|photoLibraryGrid|historyList/);
+  assert.doesNotMatch(js, /LUMEN_ANALYZE_PAGE|LUMEN_SAVE_WATCH_PLAN|LUMEN_SIGN_IN|renderBlueprint|renderHistory/);
+  assert.ok(html.includes('href="library.html#monitors"'));
+  assert.ok(html.includes('id="lastCapture"'));
+  for (const scope of ["desktop", "visible", "area", "responsive"]) assert.ok(html.includes(`data-scope="${scope}"`));
+  assert.ok(html.split("\n").length < 400, "Keep launcher markup focused");
+  assert.ok(js.split("\n").length < 1000, "Persistent workspaces belong outside the launcher");
+  const library = await readFile(new URL("../library.html", import.meta.url), "utf8");
+  assert.ok(library.includes('id="monitors"') && library.includes("library-monitors.js"));
+  const result = await readFile(new URL("../result.html", import.meta.url), "utf8");
+  assert.ok(result.includes('id="pageContextValues"'));
+});
+
 test("public demo and retained proof match the responsive presets", async () => {
   const html = await readFile(new URL("../docs/index.html", import.meta.url), "utf8");
   assert.doesNotMatch(html, /Orbit|capture-run-|store-capture-set/);

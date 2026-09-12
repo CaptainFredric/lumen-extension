@@ -51,6 +51,19 @@ try {
   assert(!initial.autoRedact && !initial.captureDetails, "New installs should start with optional redaction and exported details off.", initial);
   assert(initial.localOnly && !initial.reviewBeforeSave, "New installs did not start local-only with one-click capture enabled.", initial);
   assert(initial.siteSummary.includes("No optional sites"), "Clean profile unexpectedly displayed optional site access.", initial);
+  await settings.locator(".output-defaults summary").click();
+  await settings.selectOption("#outputStyle", "browser");
+  await settings.waitForFunction(async () => (await chrome.storage.sync.get("lumen.capture.settings"))["lumen.capture.settings"].exportPreset === "browser");
+  await settings.reload({ waitUntil: "load" });
+  await settings.waitForFunction(() => document.querySelector("#outputStyle")?.value === "browser");
+  await settings.locator(".output-defaults summary").click();
+  await settings.selectOption("#outputStyle", "raw");
+  await settings.waitForFunction(async () => (await chrome.storage.sync.get("lumen.capture.settings"))["lumen.capture.settings"].exportPreset === "raw");
+  await settings.selectOption("#longPageOutput", "tiles");
+  await settings.waitForFunction(async () => (await chrome.storage.sync.get("lumen.capture.settings"))["lumen.capture.settings"].longPageMode === "tiles");
+  await settings.selectOption("#longPageOutput", "auto");
+  await settings.waitForFunction(async () => (await chrome.storage.sync.get("lumen.capture.settings"))["lumen.capture.settings"].longPageMode === "auto");
+  await settings.locator(".output-defaults summary").click();
 
   await toggleAndWait(settings, "#autoRedactToggle", async (state) => state.capture.autoRedact === true);
   await settings.reload({ waitUntil: "load" });
@@ -248,16 +261,25 @@ try {
   const popup = await context.newPage();
   watchPageErrors(popup, "popup");
   await popup.goto(`chrome-extension://${extensionId}/popup.html`, { waitUntil: "load" });
-  await popup.waitForSelector("#captureButton:not(:disabled)", { timeout: 10000 });
+  try {
+    await popup.waitForSelector("#captureButton:not(:disabled)", { timeout: 10000 });
+  } catch (error) {
+    error.details = await popup.evaluate(async () => ({
+      text: document.body.innerText,
+      tabs: await chrome.tabs.query({}),
+      current: await chrome.tabs.query({ currentWindow: true })
+    }));
+    throw error;
+  }
   await popup.click("#captureButton");
   try {
-    await popup.waitForFunction(() => document.querySelector("#statusTitle")?.textContent?.trim() === "Capture complete", null, { timeout: 40000 });
+    await popup.waitForFunction(() => document.querySelector("#statusDetail")?.textContent?.includes("Capture saved."), null, { timeout: 40000 });
   } catch (error) {
     const diagnostic = await popup.evaluate(async () => ({
-      statusTitle: document.querySelector("#statusTitle")?.textContent?.trim() || "",
+      statusTitle: document.querySelector("#launchStatusTitle")?.textContent?.trim() || "",
       statusDetail: document.querySelector("#statusDetail")?.textContent?.trim() || "",
       statusBadge: document.querySelector("#statusBadge")?.textContent?.trim() || "",
-      reviewHidden: document.querySelector("#exportReviewPanel")?.classList.contains("is-hidden") || false,
+      reviewHidden: !document.querySelector("#exportReviewPanel")?.open,
       captureDisabled: document.querySelector("#captureButton")?.disabled || false,
       app: (await chrome.storage.local.get("lumen.app.settings"))["lumen.app.settings"] || {},
       capture: (await chrome.storage.sync.get("lumen.capture.settings"))["lumen.capture.settings"] || {}
@@ -267,18 +289,18 @@ try {
     throw failure;
   }
   const fastCapture = await popup.evaluate(() => ({
-    title: document.querySelector("#statusTitle")?.textContent?.trim() || "",
-    reviewHidden: document.querySelector("#exportReviewPanel")?.classList.contains("is-hidden") || false,
-    settingsAction: document.querySelector("#openSettingsButton")?.textContent?.trim() || "",
-    reviewQuickAction: document.querySelector("[data-quick-action='review'] strong")?.textContent?.trim() || ""
+    title: document.querySelector("#statusDetail")?.textContent?.trim() || "",
+    reviewHidden: !document.querySelector("#exportReviewPanel")?.open,
+    settingsAction: document.querySelector('a[href="settings.html"]')?.textContent?.trim() || "",
+    safeguards: Boolean(document.querySelector("#captureSafeguards"))
   }));
   assert(
-    fastCapture.title === "Capture complete" && fastCapture.reviewHidden,
+    fastCapture.title.includes("Capture saved.") && fastCapture.reviewHidden,
     "Review-before-save off did not complete the main one-click capture path.",
     fastCapture
   );
   assert(
-    fastCapture.settingsAction === "Settings" && fastCapture.reviewQuickAction === "Review capture",
+    fastCapture.settingsAction === "Settings" && fastCapture.safeguards,
     "Popup did not expose dedicated Settings and explicit review actions.",
     fastCapture
   );
@@ -309,18 +331,18 @@ try {
     "Review-before-save keyboard capture did not stop before saving with a clear review action.",
     reviewShortcutGate
   );
-  await popup.waitForFunction(() => document.querySelector("#statusTitle")?.textContent?.trim() === "Review required before saving", null, { timeout: 10000 });
+  await popup.waitForFunction(() => document.querySelector("#launchStatusTitle")?.textContent?.trim() === "Review required before saving", null, { timeout: 10000 });
   await popup.reload({ waitUntil: "load" });
   await popup.waitForSelector("#captureButton:not(:disabled)", { timeout: 10000 });
   await popup.click("#captureButton");
-  await popup.waitForSelector("#exportReviewPanel:not(.is-hidden)", { timeout: 30000 });
+  await popup.waitForSelector("#exportReviewPanel[open]", { timeout: 30000 });
   const reviewedPath = await popup.evaluate(() => ({
-    reviewVisible: !document.querySelector("#exportReviewPanel")?.classList.contains("is-hidden"),
+    reviewVisible: Boolean(document.querySelector("#exportReviewPanel")?.open),
     confirmLabel: document.querySelector("#exportReviewConfirmButton")?.textContent?.trim() || "",
-    statusTitle: document.querySelector("#statusTitle")?.textContent?.trim() || ""
+    statusTitle: document.querySelector("#launchStatusTitle")?.textContent?.trim() || ""
   }));
   assert(
-    reviewedPath.reviewVisible && reviewedPath.confirmLabel === "Save capture" && reviewedPath.statusTitle === "Save check ready",
+    reviewedPath.reviewVisible && reviewedPath.confirmLabel === "Capture and save" && reviewedPath.statusTitle === "Check before saving",
     "Review-before-save on did not open the explicit confirmation path.",
     reviewedPath
   );
@@ -350,15 +372,15 @@ try {
   await popup.reload({ waitUntil: "load" });
   await popup.waitForSelector("#captureButton:not(:disabled)", { timeout: 10000 });
   await popup.click("#captureButton");
-  await popup.waitForSelector("#exportReviewPanel:not(.is-hidden)", { timeout: 30000 });
+  await popup.waitForSelector("#exportReviewPanel[open]", { timeout: 30000 });
   const warningEscalation = await popup.evaluate(() => ({
-    reviewVisible: !document.querySelector("#exportReviewPanel")?.classList.contains("is-hidden"),
+    reviewVisible: Boolean(document.querySelector("#exportReviewPanel")?.open),
     warningText: document.querySelector("#exportReviewWarnings")?.textContent?.trim() || "",
-    statusTitle: document.querySelector("#statusTitle")?.textContent?.trim() || ""
+    statusTitle: document.querySelector("#launchStatusTitle")?.textContent?.trim() || ""
   }));
   assert(
     warningEscalation.reviewVisible &&
-      warningEscalation.statusTitle === "Save check ready" &&
+      warningEscalation.statusTitle === "Check before saving" &&
       warningEscalation.warningText.includes("No redaction layer"),
     "One-click mode did not escalate an unresolved no-redaction warning into review.",
     warningEscalation
