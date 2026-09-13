@@ -107,7 +107,10 @@ The dedicated Settings screen exposes capture behavior, export choices, Private 
 
 Local workspace deletion covers capture history, library images and cached PDFs, signals, regions, note drafts, schedules, and optional site access. Removing one library item or clearing the library deletes its local metadata, gallery previews, whole-capture editor source, and cached review PDF, not downloaded originals. The checked-in backend is a developer-run loopback contract test; the Web Store build contains no Lumen-owned production sync endpoint. In development, signing in is not consent to move content: capture and monitor reads or writes require the separate cloud-sync control, and outbound records strip sensitive URL parameters while keeping the complete scheduled target on-device.
 
-### Page Signals
+### Page Context
+
+Retention is optional. Enable capture-details JSON in Settings to keep Page
+Context with future captures. Fresh installs leave this option off.
 
 The current signal extraction reads:
 

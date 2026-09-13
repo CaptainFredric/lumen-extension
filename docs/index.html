@@ -53,7 +53,7 @@
     <link rel="stylesheet" href="styles.css?v=20260913-inspection" />
     <script src="script.js?v=20260911-proof" defer></script>
   </head>
-  <body class="inspection-desk">
+  <body>
     <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-header section-shell">
       <a class="brand" href="#top" aria-label="Lumen home"
@@ -78,8 +78,8 @@
           <h1 id="hero-title">The webpage.<br />The breakpoint.<br /><em>The problem.</em></h1>
           <p class="hero-lede">
             Take screenshots of a page or a selected region at multiple widths.
-            Mark the issue, cover private details, and save the images with
-            useful page context for your next review.
+            Mark the issue, cover private details, and optionally keep useful
+            Page Context beside the capture.
           </p>
           <div class="hero-actions">
             <a class="button button-primary" href="#install"
@@ -248,7 +248,7 @@
               <div>
                 <span class="file-type">LOCAL</span
                 ><span
-                  >Capture history<small>Reopen the saved result</small></span
+                  >Saved capture<small>Reopen it in Capture Library</small></span
                 ><span class="file-count">1</span>
               </div>
             </div>
@@ -275,7 +275,7 @@
         <div class="section-heading">
           <div>
             <p class="eyebrow">Alongside the image</p>
-            <h2 id="features-title">Keep the page context.</h2>
+            <h2 id="features-title">Keep Page Context when you need it.</h2>
           </div>
           <a
             class="text-link"
@@ -296,8 +296,8 @@
           <article class="feature-card">
             <h3>Page Context</h3>
             <p>
-              Export colors, fonts, headings, and navigation labels as JSON.
-              Keep the source context alongside the screenshot.
+              Enable capture-details JSON in Settings to retain colors, fonts,
+              headings, and navigation labels. This option starts off.
             </p>
             <details class="signals-example"><summary>See an extracted example</summary><dl><dt>Heading font</dt><dd>Avenir Next</dd><dt>Body font</dt><dd>Avenir Next</dd><dt>Navigation</dt><dd>Lumen / Checkout</dd><dt>Heading</dt><dd>Checkout, with a few bugs.</dd></dl><p>Extracted during this Bug Garden run. <a href="assets/garden-run.json">Read the source JSON</a>.</p></details>
           </article>
@@ -309,7 +309,7 @@
             </p>
           </article>
           <article class="feature-card">
-            <h3>Local library</h3>
+            <h3>Capture Library</h3>
             <p>
               Return to captures, inspect saved files, and compare two images.
               Remove local copies when finished.

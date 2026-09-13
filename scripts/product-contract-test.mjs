@@ -51,9 +51,9 @@ test("popup has no development readiness meter", async () => {
 });
 
 test("visible safeguards and capture vocabulary agree across product surfaces", async () => {
-  for (const filename of ["settings.html", "settings.js", "library.html", "library.js", "content.js", "README.md", "PRIVACY.md", "docs/privacy.html"]) {
+  for (const filename of ["settings.html", "settings.js", "library.html", "library.js", "content.js", "README.md", "PRIVACY.md", "docs/privacy.html", "docs/index.html"]) {
     const text = await readFile(new URL(`../${filename}`, import.meta.url), "utf8");
-    assert.doesNotMatch(text, /Privacy Shield|Photo Library|photo library|Focused crop/, filename);
+    assert.doesNotMatch(text, /Privacy Shield|photo[- ]library|Focused crop/i, filename);
   }
   const background = await readFile(new URL("../background.js", import.meta.url), "utf8");
   assert.doesNotMatch(background, /prevents one-click saving/);
@@ -111,6 +111,17 @@ test("Store pack is one captured Bug Garden workflow with verified image hashes"
   const fixture = await readFile(new URL("../docs/bug-garden.html", import.meta.url));
   assert.equal(proof.fixtureSha256, createHash("sha256").update(fixture).digest("hex"));
   assert.equal(proof.frames.length, 5);
+  const generator = await readFile(new URL("../scripts/generate-garden-store.mjs", import.meta.url));
+  assert.equal(proof.generator.sha256, createHash("sha256").update(generator).digest("hex"));
+  assert.ok(proof.generator.commit === null || /^[a-f0-9]{40}$/.test(proof.generator.commit));
+  assert.ok(proof.generator.workingTreeDirty === null || typeof proof.generator.workingTreeDirty === "boolean");
+  for (const name of ["platform", "architecture", "node", "chromium"]) assert.ok(proof.environment[name]);
+  for (const name of ["capture", "presentation"]) {
+    const environment = proof.environment[name];
+    assert.ok(environment.locale && environment.timezone && environment.userAgent);
+    assert.ok(environment.deviceScaleFactor > 0);
+    assert.ok(environment.viewport.width > 0 && environment.viewport.height > 0);
+  }
   assert.deepEqual(proof.captures.map(capture => capture.variantCount), [3, 1]);
   assert.ok(proof.captures.every(capture => capture.health === "complete" && capture.redactions >= capture.variantCount));
   assert.equal(proof.annotations.sourceCapture, proof.captures[0].id);
@@ -135,6 +146,11 @@ test("public beta is pinned and the site has one accepted design system", async 
   assert.ok(html.includes(`href="${beta.downloadUrl}"`));
   assert.doesNotMatch(html, /archive\/refs\/heads\/main\.zip|inspection\.css/);
   assert.equal((html.match(/rel="stylesheet"/g) || []).length, 1);
+  assert.doesNotMatch(html, /class="inspection-desk"|Local library|Capture history/);
+  assert.match(html, /optionally keep useful\s+Page Context/);
+  assert.match(html, /Enable capture-details JSON in Settings/);
+  const archivedBrief = await readFile(new URL("../design-review/CLAUDE_DESIGN_PROMPT.md", import.meta.url), "utf8");
+  assert.doesNotMatch(archivedBrief, /docs\/inspection\.css/);
   const css = await readFile(new URL("../docs/styles.css", import.meta.url), "utf8");
   assert.doesNotMatch(css, /\.inspection-desk|\.sample-viewer|\.sample-viewport/);
   const legacy = await readFile(new URL("../scripts/generate-capture-artifacts.mjs", import.meta.url), "utf8");

@@ -1,5 +1,18 @@
 # Lumen Release Notes
 
+## September 13: optional context and proof environment
+
+The public page now states that Page Context retention is optional and starts
+off. Capture Library wording covers the site and privacy metadata, including
+hyphenated legacy terms. The unused body class and archived stylesheet reference
+were removed. Runtime privacy defaults and beta 1 remain unchanged.
+
+Store proof records now include browser, platform, locale, timezone, scale,
+viewport, generator hash, and source revision with a dirty-tree flag. These
+explain run differences without claiming cross-platform pixel determinism.
+The exact 8943e76 CI image pack was visually inspected and its hashes verified;
+`store-assets/CI_REVIEW.md` records the observations and remaining human gates.
+
 ## September 13: public beta and presentation completion
 
 The install link now downloads 0.5.0 beta 1 from tested commit a903623. The GitHub

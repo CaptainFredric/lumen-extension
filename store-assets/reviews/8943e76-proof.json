@@ -1,0 +1,77 @@
+{
+  "source": "Bug Garden through the loaded extension. Temporary harness site access replaces the toolbar gesture.",
+  "fixtureSha256": "38e5e56f792dad61d12d75fe478085741c59b2c7e27d7366a1e80cf0bf01082c",
+  "stateBSha256": "fd835bd992b7c75192bfb3256a0459a38812d50f53b74911acefe5f9bccfbe54",
+  "captures": [
+    {
+      "id": "a0d3577d-49be-42af-b449-932c607c439f",
+      "variantCount": 3,
+      "redactions": 3,
+      "health": "complete"
+    },
+    {
+      "id": "74e2039d-8465-4da3-b9f7-4e2b527a89a3",
+      "variantCount": 1,
+      "redactions": 1,
+      "health": "complete"
+    }
+  ],
+  "frames": [
+    {
+      "filename": "01-capture-result.png",
+      "aliases": [
+        "store-control-surface.png"
+      ],
+      "sha256": "52ad0626f20106c9398405e192aec370b12b2dec565ebdabef2313d366234e87"
+    },
+    {
+      "filename": "02-responsive-set.png",
+      "aliases": [
+        "store-responsive-set.png"
+      ],
+      "sha256": "c3948e455548f42857d9a69437252c8acb8a3b22fedad94d25ab8b48448256f2"
+    },
+    {
+      "filename": "03-annotation-redaction.png",
+      "aliases": [
+        "store-review-actions.png",
+        "store-annotation-studio.png"
+      ],
+      "sha256": "9cfa7c1737b30e10941b1e4772736bb7b27bb86bfa3c76acabb3d94db16aa176"
+    },
+    {
+      "filename": "04-compare.png",
+      "aliases": [
+        "store-visual-change-review.png"
+      ],
+      "sha256": "cc9a50142159243a21960922d10895e78f52f65fcb7ea97ea8ed581713c3ff7c"
+    },
+    {
+      "filename": "05-library-monitor.png",
+      "aliases": [
+        "store-library-monitor.png"
+      ],
+      "sha256": "06e9994df86e88dff14fed57e3453f561a7a57b3e0f75c672b61b88b2f4bc4b0"
+    }
+  ],
+  "annotations": {
+    "count": 1,
+    "sourceCapture": "a0d3577d-49be-42af-b449-932c607c439f",
+    "variant": "mobile",
+    "target": ".continue"
+  },
+  "compare": {
+    "before": "a0d3577d-49be-42af-b449-932c607c439f",
+    "after": "74e2039d-8465-4da3-b9f7-4e2b527a89a3",
+    "changed": "0.11%",
+    "revealPercent": 70
+  },
+  "monitor": {
+    "source": ".total",
+    "intervalMinutes": 1,
+    "maxRuns": 5,
+    "status": "paused",
+    "runs": 0
+  },
+  "generatedAt": "2026-09-13T18:17:11.209Z"
+}

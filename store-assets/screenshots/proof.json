@@ -4,13 +4,13 @@
   "stateBSha256": "fd835bd992b7c75192bfb3256a0459a38812d50f53b74911acefe5f9bccfbe54",
   "captures": [
     {
-      "id": "b05cefd4-1bb6-4bfd-a44e-f7eed5827728",
+      "id": "bc766f5d-ac2c-4077-b5ef-5bc86bd9c13d",
       "variantCount": 3,
       "redactions": 3,
       "health": "complete"
     },
     {
-      "id": "6294c655-cd6a-45ff-9ea2-194d631ce3e7",
+      "id": "993d9ae1-7d74-4427-bf90-bf3af7add8e2",
       "variantCount": 1,
       "redactions": 1,
       "health": "complete"
@@ -22,14 +22,14 @@
       "aliases": [
         "store-control-surface.png"
       ],
-      "sha256": "43309fd75fb4793d5c353d327e8ed0a30ac62175ef42d9edca9b0919ecaffb3b"
+      "sha256": "1f53c585d160abe10ff00712a3d99767203be04e94532da0f6a657cb18eaabcf"
     },
     {
       "filename": "02-responsive-set.png",
       "aliases": [
         "store-responsive-set.png"
       ],
-      "sha256": "e2821079f7ecdadc38c471deb8760924db05ebc3c71489f9671a75d6bfd98a6f"
+      "sha256": "71b4ae9e43b052336f01f3c84ce3e9ff8060c7977169a906dd93e301b2c912f8"
     },
     {
       "filename": "03-annotation-redaction.png",
@@ -37,7 +37,7 @@
         "store-review-actions.png",
         "store-annotation-studio.png"
       ],
-      "sha256": "accad9a7c177dc273eeab6b909601544c58e2758ce8425acea2e37ba97cf4ccc"
+      "sha256": "d4cf41992ffa8c4132d4da9e2954ebde093bff5cf15c080d494b0c72c6918a07"
     },
     {
       "filename": "04-compare.png",
@@ -51,18 +51,49 @@
       "aliases": [
         "store-library-monitor.png"
       ],
-      "sha256": "63b9c3d627407fa25cb2077b4ad45b8518cd952c76ab482a43cd51d2a509a455"
+      "sha256": "d76ce222bec012f618494ebbe6e95ec6641f771a4f37f57edaf2c7c821acece7"
     }
   ],
+  "generator": {
+    "sha256": "98407adaf8a0f6c2cca3c74cd5c29fa09543e258f9ef85ee22fdc47933f4eb17",
+    "commit": "8943e760442ba913ab879f400d4cd2bef23e7ec8",
+    "workingTreeDirty": true
+  },
+  "environment": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v24.14.0",
+    "capture": {
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
+      "locale": "en-US",
+      "timezone": "America/Chicago",
+      "deviceScaleFactor": 2,
+      "viewport": {
+        "width": 1280,
+        "height": 680
+      }
+    },
+    "chromium": "147.0.7727.15",
+    "presentation": {
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/147.0.7727.15 Safari/537.36",
+      "locale": "en-US",
+      "timezone": "America/Chicago",
+      "deviceScaleFactor": 1,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      }
+    }
+  },
   "annotations": {
     "count": 1,
-    "sourceCapture": "b05cefd4-1bb6-4bfd-a44e-f7eed5827728",
+    "sourceCapture": "bc766f5d-ac2c-4077-b5ef-5bc86bd9c13d",
     "variant": "mobile",
     "target": ".continue"
   },
   "compare": {
-    "before": "b05cefd4-1bb6-4bfd-a44e-f7eed5827728",
-    "after": "6294c655-cd6a-45ff-9ea2-194d631ce3e7",
+    "before": "bc766f5d-ac2c-4077-b5ef-5bc86bd9c13d",
+    "after": "993d9ae1-7d74-4427-bf90-bf3af7add8e2",
     "changed": "0.08%",
     "revealPercent": 70
   },
@@ -73,5 +104,5 @@
     "status": "paused",
     "runs": 0
   },
-  "generatedAt": "2026-09-13T18:06:02.073Z"
+  "generatedAt": "2026-09-13T21:33:26.254Z"
 }

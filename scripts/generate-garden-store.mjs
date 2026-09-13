@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,6 +25,8 @@ const dataUrl = buffer => "data:image/png;base64," + buffer.toString("base64");
 const proof = { source: "Bug Garden through the loaded extension. Temporary harness site access replaces the toolbar gesture.", fixtureSha256: hash(fixture), stateBSha256: hash(stateB), captures: [], frames: [] };
 
 try {
+  proof.generator = { sha256: hash(await readFile(fileURLToPath(import.meta.url))), ...sourceRevision() };
+  proof.environment = { platform: process.platform, architecture: process.arch, node: process.version };
   await mkdir(staged);
   await mkdir(downloads);
   server = createServer((req, res) => { res.writeHead(200, { "Content-Type": "text/html" }); res.end(currentFixture); });
@@ -54,6 +57,7 @@ try {
       await chrome.windows.update(tab.windowId, { width: window.width + 1280 - viewport.width, height: window.height + 680 - viewport.height });
     }, { tab, viewport });
     await target.waitForFunction(() => innerWidth === 1280);
+    proof.environment.capture ||= await renderingEnvironment(target);
     const result = await control.evaluate(preset => chrome.runtime.sendMessage({ type: "LUMEN_START_CAPTURE", payload: { options: { devicePreset: preset, exportPreset: "raw", removeStickyHeaders: true, forceLazyLoad: true, autoRedact: true, exportManifest: true, annotationEnabled: false } } }), preset);
     assert.equal(result.ok, true, JSON.stringify(result));
     assert.equal(result.captureHealth.status, "complete");
@@ -93,6 +97,7 @@ try {
 
   // Use the measured fixture element to place a real editor annotation.
   renderer = await chromium.launch();
+  proof.environment.chromium = renderer.version();
   const measure = await renderer.newPage({ viewport: { width: 430, height: 932 } });
   await measure.goto(url);
   const issue = await measure.locator(".continue").evaluate(node => {
@@ -175,6 +180,7 @@ try {
   await library.close();
 
   const page = await renderer.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
+  proof.environment.presentation = await renderingEnvironment(page);
   const frames = [
     ["01-capture-result.png", "Capture the page. Keep the context.", "Bug Garden / one real responsive capture, opened in Lumen.", `<img class="workspace" src="${resultShot}">`, ["store-control-surface.png"]],
     ["02-responsive-set.png", "Find the width where it breaks.", "1280 px: clear layout. 1024 px: coupon overlap. 430 px: clipped button.", `<div class="responsive">${["desktop", "tablet", "mobile"].map((name, index) => `<figure><figcaption>${[1280, 1024, 430][index]} CSS px</figcaption><img src="${images[name]}"></figure>`).join("")}</div>`, ["store-responsive-set.png"]],
@@ -209,6 +215,27 @@ try {
 }
 
 function hash(value) { return createHash("sha256").update(value).digest("hex"); }
+
+function sourceRevision() {
+  const git = args => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  try {
+    if (path.resolve(git(["rev-parse", "--show-toplevel"])) !== root) throw new Error("Archive inside another repository");
+    return { commit: git(["rev-parse", "HEAD"]), workingTreeDirty: Boolean(git(["status", "--porcelain"])) };
+  } catch {
+    // A source ZIP has no Git history. The generator hash still identifies its bytes.
+    return { commit: null, workingTreeDirty: null };
+  }
+}
+
+async function renderingEnvironment(page) {
+  return page.evaluate(() => ({
+    userAgent: navigator.userAgent,
+    locale: navigator.language,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    deviceScaleFactor: devicePixelRatio,
+    viewport: { width: innerWidth, height: innerHeight }
+  }));
+}
 function frame(title, detail, content) {
   return `<!doctype html><html lang="en"><meta charset="utf-8"><title>Lumen Store preview</title><style>
   *{box-sizing:border-box}body{margin:0;background:#f3f3ef;color:#192322;font-family:"Avenir Next","Trebuchet MS",sans-serif}

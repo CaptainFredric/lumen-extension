@@ -24,6 +24,16 @@ redaction counts, annotation source, comparison pair, monitor state and all five
 PNG hashes. The old pack stays in place until generation and validation succeed.
 Profiles, temporary downloads and intermediate screenshots are removed afterward.
 
+The proof also records Chromium and Node versions, platform and architecture,
+capture and presentation locales, timezones, device scale factors, viewport sizes,
+the generator's SHA-256, and Git revision with a dirty-tree flag. Source archives
+without Git retain the generator hash and report null revision fields.
+This is provenance for an individual run, not a promise of identical PNG bytes
+across machines. Fonts, scrollbars, antialiasing, IDs, ports, and timestamps vary.
+
+The exact CI pack from commit 8943e76 was visually inspected; see
+`CI_REVIEW.md`. That review does not approve later regenerations automatically.
+
 The harness grants site access in a temporary extension copy because scripted
 invocation is not Chrome's native toolbar gesture. Distributed permissions remain
 unchanged. Use the screenshot and extension artifacts from the same tested commit
