@@ -112,13 +112,24 @@ Local workspace deletion covers capture history, library images and cached PDFs,
 The current signal extraction reads:
 
 1. title, host, description, and hero headline
-2. primary CTA text
-3. navigation labels
-4. dominant palette colors
-5. most-used type families
-6. layout counts such as sections, headings, buttons, forms, visuals, and words
+2. navigation labels
+3. sampled palette colors
+4. most-used type families
+5. layout counts such as sections, headings, interactive elements, forms, visuals, and words
+
+New captures omit guessed primary actions and site classifications. Older saved
+primary-action values remain readable and are labeled as legacy estimates.
 
 The sample capture generator uses the same content-script extraction path. If the sample assets miss a signal, the product copy should avoid claiming that signal as reliable.
+
+### Store Images
+
+`npm run store:screenshots` captures Bug Garden through the loaded extension,
+then uses those artifacts in Result, Annotation Studio, Compare and Capture
+Library. It requires installed dependencies, Playwright Chromium and a graphical
+session (`xvfb-run --auto-servernum` on headless Linux). The pack contains five
+1280 by 800 images and a provenance record in `store-assets/screenshots/proof.json`.
+Temporary profiles and downloaded images are removed after the run.
 
 ## Local Development
 

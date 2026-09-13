@@ -57,6 +57,11 @@ test("visible safeguards and capture vocabulary agree across product surfaces", 
   }
   const background = await readFile(new URL("../background.js", import.meta.url), "utf8");
   assert.doesNotMatch(background, /prevents one-click saving/);
+  assert.doesNotMatch(background, /cutaway picker/i);
+  const result = await readFile(new URL("../result.js", import.meta.url), "utf8");
+  assert.doesNotMatch(result, /Open saved crop|Transparent lasso crop/);
+  const library = await readFile(new URL("../library.html", import.meta.url), "utf8");
+  assert.ok(library.includes('value="repeat">Recurring') && library.includes('value="continuous">Rapid watch'));
   const area = await readFile(new URL("../area-review.html", import.meta.url), "utf8");
   assert.ok(area.includes('id="approve"') && area.includes("Selection map, not an image preview"));
 });
@@ -91,10 +96,31 @@ test("public demo and retained proof match the responsive presets", async () => 
   assert.ok(proof.redactionCount >= 3);
   assert.ok(proof.historyItem.id);
   assert.ok(proof.blueprint.identity.navLabels.includes("Checkout"));
+  assert.equal(proof.blueprint.identity.primaryCta, undefined);
+  assert.equal(proof.blueprint.identity.siteType, undefined);
   for (const image of proof.images) {
     const png = await readFile(new URL(`../docs/assets/${image.file}`, import.meta.url));
     assert.equal(png.subarray(1, 4).toString(), "PNG");
     assert.equal(png.readUInt32BE(16), image.width);
     assert.equal(png.readUInt32BE(20), image.height);
+  }
+});
+
+test("Store pack is one captured Bug Garden workflow with verified image hashes", async () => {
+  const proof = JSON.parse(await readFile(new URL("../store-assets/screenshots/proof.json", import.meta.url), "utf8"));
+  const fixture = await readFile(new URL("../docs/bug-garden.html", import.meta.url));
+  assert.equal(proof.fixtureSha256, createHash("sha256").update(fixture).digest("hex"));
+  assert.equal(proof.frames.length, 5);
+  assert.deepEqual(proof.captures.map(capture => capture.variantCount), [3, 1]);
+  assert.ok(proof.captures.every(capture => capture.health === "complete" && capture.redactions >= capture.variantCount));
+  assert.equal(proof.annotations.sourceCapture, proof.captures[0].id);
+  assert.equal(proof.compare.after, proof.captures[1].id);
+  assert.equal(proof.monitor.status, "paused");
+  assert.equal(proof.monitor.runs, 0);
+  for (const frame of proof.frames) {
+    const bytes = await readFile(new URL("../store-assets/screenshots/" + frame.filename, import.meta.url));
+    assert.equal(createHash("sha256").update(bytes).digest("hex"), frame.sha256);
+    assert.equal(bytes.readUInt32BE(16), 1280);
+    assert.equal(bytes.readUInt32BE(20), 800);
   }
 });

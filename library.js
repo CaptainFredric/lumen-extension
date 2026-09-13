@@ -493,7 +493,7 @@ function appendCaptureBadges(container, capture) {
   }
 
   if (capture.cutawayCount) {
-    badges.push({ label: `${capture.cutawayCount} crop${capture.cutawayCount === 1 ? "" : "s"}`, className: "" });
+    badges.push({ label: `${capture.cutawayCount} selected area${capture.cutawayCount === 1 ? "" : "s"}`, className: "" });
   }
 
   if (["reviewed", "edited", "exported"].includes(capture.review?.status)) {

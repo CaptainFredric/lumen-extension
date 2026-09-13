@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-09-11T04:51:23.660Z",
+  "generatedAt": "2026-09-13T05:14:29.972Z",
   "fixtureSha256": "38e5e56f792dad61d12d75fe478085741c59b2c7e27d7366a1e80cf0bf01082c",
   "source": "docs/bug-garden.html through the loaded Lumen extension. Temporary harness permissions differ from the toolbar installation.",
-  "captureId": "d250a0c4-ea08-4d22-b91f-1038fd11a737",
+  "captureId": "52b1504d-526c-4c8f-8941-b034b54d7fa3",
   "variantCount": 3,
   "redactionCount": 3,
   "captureHealth": {
@@ -17,7 +17,7 @@
     "coveredPixels": 6050
   },
   "historyItem": {
-    "id": "d250a0c4-ea08-4d22-b91f-1038fd11a737",
+    "id": "52b1504d-526c-4c8f-8941-b034b54d7fa3",
     "title": "Lumen Bug Garden | Checkout 01"
   },
   "images": [
@@ -67,15 +67,13 @@
         "weight": 1.5
       }
     ],
-    "generatedAt": "2026-09-11T04:51:09.552Z",
+    "generatedAt": "2026-09-13T05:14:15.748Z",
     "identity": {
       "heroHeadline": "Checkout, with a few bugs.",
       "navLabels": [
         "Lumen",
         "Checkout"
-      ],
-      "primaryCta": "Lumen",
-      "siteType": "Brochure site"
+      ]
     },
     "layout": {
       "buttons": 3,
@@ -90,11 +88,11 @@
     },
     "page": {
       "description": "",
-      "host": "127.0.0.1:62258",
+      "host": "127.0.0.1:61816",
       "scrollContainer": "document",
       "scrollMode": "document",
       "title": "Lumen Bug Garden | Checkout 01",
-      "url": "http://127.0.0.1:62258/bug-garden.html"
+      "url": "http://127.0.0.1:61816/bug-garden.html"
     },
     "structure": [
       {

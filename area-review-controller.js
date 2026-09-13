@@ -3,6 +3,11 @@ export const AreaReviewMessage = Object.freeze({
   DECIDE: "LUMEN_AREA_REVIEW_DECIDE"
 });
 
+export function sameAreaReviewTab(before, after) {
+  return Number.isInteger(before?.id) && before.id === after?.id &&
+    before.url === after?.url && before.windowId === after?.windowId;
+}
+
 // Geometry approval is invalid after navigation, scrolling, or a viewport change.
 export function sameAreaReviewPage(before, after) {
   if (!before?.url || !after?.url || !(before.viewportWidth > 0) || !(before.viewportHeight > 0)) return false;

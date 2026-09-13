@@ -22,10 +22,10 @@ The product can become ambitious without changing the first wedge. The screensho
 3. Auto-redaction preview and export redaction for visible text, token-like strings, and filled inputs.
 4. Manual redaction boxes anchored to source elements when possible.
 5. One anchored capture note rendered into the export.
-6. Page-signal extraction for palette, typography, headline, CTA, navigation, and layout counts.
+6. Page Context extraction for sampled palette, typography, headline, navigation, and layout counts. New captures omit guessed primary actions and site classifications.
 7. Local history with run details, artifacts, copyable summaries, and file actions.
 8. Rectangle and freeform lasso picker with immediate one-viewport capture or explicit reusable-region storage for monitoring.
-9. Pre-export review that checks auto-redaction, manual projection, and cutaway resolution across the requested view set.
+9. Pre-export review that checks auto-redaction, manual projection, and Selected Area checks across the requested view set.
 10. Capture Library with real previews, favorites, review state, and original-file actions.
 11. Annotation Studio with arrows, rectangles, text, blur, pixelation, selection, undo, redo, and reviewed PNG export.
 12. Local visual-change review with a before/after reveal, highlighted change regions, metrics, and monitor timeline.
@@ -37,14 +37,14 @@ The product can become ambitious without changing the first wedge. The screensho
 
 ## Near-Term Product Bets
 
-### Cutaway Artifact Review
+### Selected Area Review
 
 The user can draw a rectangle or freeform lasso and capture that current-viewport area immediately, or save it for local monitoring. This is useful for pricing tables, hero sections, checkout modules, dashboards, and bug reproduction areas where a full-page capture is noisy.
 
 Implemented review layer:
 
-1. Popup history can filter artifacts by full-page image, cutaway crop, and manifest.
-2. Cutaway runs show a compact preview map, dimensions, variant, and projection status in the run detail.
+1. Capture Library and Result retain page images, Selected Area images and details files.
+2. Selected Area runs show a compact preview map, dimensions, variant, and projection status in the run detail.
 3. Reviewed editor output can go to Drive explicitly; any additional destination still needs its own review and consent path.
 
 ### Region Watch — Implemented Locally
@@ -61,7 +61,7 @@ Store-ready rules for this feature:
 
 ### Agent Handoff
 
-Send a capture bundle, cutaway image, manifest, and extracted signals to a background agent for review notes, QA summaries, or change explanations.
+Send a capture bundle, Selected Area image, manifest, and extracted signals to a background agent for review notes, QA summaries, or change explanations.
 
 Required guardrails:
 

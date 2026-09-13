@@ -41,7 +41,7 @@ import {
   initializeAppSettings,
   readAppSettings
 } from "./settings-store.js";
-import { createAreaReviewController, sameAreaReviewPage } from "./area-review-controller.js";
+import { createAreaReviewController, sameAreaReviewPage, sameAreaReviewTab } from "./area-review-controller.js";
 
 let areaReviewController = null;
 function getAreaReviewController() {
@@ -1230,7 +1230,7 @@ async function runSelectedAreaCapture(payload = {}, sourceTab = null) {
     const currentTab = await chrome.tabs.get(sourceTab.id);
     const currentSettings = await readAppSettings();
     const currentCaptureSettings = await readStoredCaptureSettings({ captureMode: "visible", devicePreset: "desktop", forceLazyLoad: false });
-    if (currentTab.url !== sourceTab.url || !sameAreaReviewPage(page, await requestPreparedPageMetrics(sourceTab.id))) {
+    if (!sameAreaReviewTab(sourceTab, currentTab) || !sameAreaReviewPage(page, await requestPreparedPageMetrics(sourceTab.id))) {
       throw createFriendlyError("Page Changed During Review", "Nothing was saved. Redraw the selected area in the current page and review it again.");
     }
     const currentManualBoxes = await getManualRedactionsForTab(sourceTab);
@@ -1910,7 +1910,7 @@ function buildExportReviewOutputPlan({ variants = [], variantCount = 1, cutawayA
       value: `${totalFiles} planned`,
       detail: [
         `${baseImageCount} image${baseImageCount === 1 ? "" : "s"}`,
-        cutawayAppliedCount ? `${cutawayAppliedCount} crop${cutawayAppliedCount === 1 ? "" : "s"}` : "",
+        cutawayAppliedCount ? `${cutawayAppliedCount} selected area${cutawayAppliedCount === 1 ? "" : "s"}` : "",
         printSheetCount ? `${printSheetCount} print sheet${printSheetCount === 1 ? "" : "s"}` : "",
         manifestCount ? "details JSON" : ""
       ].filter(Boolean).join(", ")
@@ -2415,14 +2415,14 @@ async function runCutawayRegionPicker(options = {}) {
   if (!sourceTab?.id || !sourceTab.url) {
     throw createFriendlyError(
       "No Active Page",
-      "Open a normal browser tab, then start the cutaway picker again."
+      "Open a normal browser tab, then start the area picker again."
     );
   }
 
   if (isRestrictedCaptureUrl(sourceTab.url)) {
     throw createFriendlyError(
       "This Page Cannot Be Marked",
-      "Chrome blocks script injection on internal pages, so the cutaway picker cannot run here."
+      "Chrome blocks script injection on internal pages, so the area picker cannot run here."
     );
   }
 

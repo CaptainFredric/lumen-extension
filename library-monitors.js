@@ -31,8 +31,8 @@ function scheduleFields() {
   get("monitorInterval").min = mode === "repeat" ? "15" : "1";
   if (mode === "repeat" && Number(get("monitorInterval").value) < 15) get("monitorInterval").value = "15";
   get("monitorEstimate").textContent = mode === "once" ? "Maximum: one capture."
-    : mode === "continuous" ? "Maximum: " + get("monitorLimit").value + " captures."
-    : "Repeats until you pause or delete this monitor.";
+    : mode === "continuous" ? "Checks as often as every minute. Stops after " + get("monitorLimit").value + " captures."
+    : "Every 15 minutes or longer, until you pause or delete this monitor.";
 }
 async function refresh() {
   const stored = await chrome.storage.local.get([STORAGE_KEYS.cutawayRegions, STORAGE_KEYS.watchPlans, STORAGE_KEYS.watchRuns]);

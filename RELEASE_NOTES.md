@@ -1,5 +1,20 @@
 # Lumen Release Notes
 
+## Unreleased: Bug Garden Store workflow
+
+The five Store images now follow actual Bug Garden captures through Result,
+responsive views, annotation, Compare and Capture Library. The generator replaces
+the old synthetic demos, verifies capture health and image hashes, and saves a
+real bounded monitor without inventing run history.
+
+Selected Area labels now extend to artifact actions and picker errors. Monitor
+choices are Once, Recurring and Rapid watch, with existing schedule keys intact.
+New Page Context omits guessed CTA and site classification; old retained values
+are labeled as estimates. Approval also rejects a source tab moved to another
+window, and empty warning lists are hidden.
+
+Versioned public beta downloads, CSS consolidation and new video remain pending.
+
 ## Unreleased: selected area review
 
 Selected Area now participates in review-before-save and Private Review Mode.

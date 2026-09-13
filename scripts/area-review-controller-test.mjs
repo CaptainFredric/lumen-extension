@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AreaReviewMessage, createAreaReviewController, sameAreaReviewPage } from "../area-review-controller.js";
+import { AreaReviewMessage, createAreaReviewController, sameAreaReviewPage, sameAreaReviewTab } from "../area-review-controller.js";
+
+test("moving the source tab to another window invalidates approval", () => {
+  const source = { id: 1, windowId: 10, url: "https://example.test/" };
+  assert.equal(sameAreaReviewTab(source, { ...source }), true);
+  assert.equal(sameAreaReviewTab(source, { ...source, windowId: 11 }), false);
+  assert.equal(sameAreaReviewTab(source, { ...source, id: 2 }), false);
+  assert.equal(sameAreaReviewTab(source, { ...source, url: "https://other.test/" }), false);
+  assert.equal(sameAreaReviewTab(source, undefined), false);
+});
 
 function harness(options) {
   let removedListener;

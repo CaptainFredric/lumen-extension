@@ -78,7 +78,7 @@ export function mountCaptureSet({ capture, host, selectImage, canSelect = () => 
     const card = document.createElement("div");
     card.className = "capture-set-item";
     const button = document.createElement("button");
-    button.textContent = `${index + 1}. ${image.variantId} · ${image.role === "cutaway" ? "Crop" : "Page"} · ${image.width} × ${image.height}`;
+    button.textContent = `${index + 1}. ${image.variantId} · ${image.role === "cutaway" ? "Selected Area" : "Page"} · ${image.width} × ${image.height}`;
     button.title = image.filename;
     if (image.hasThumbnail) {
       const thumbnail = document.createElement("img");

@@ -315,7 +315,6 @@
     const sampledElements = getVisibleElements(MAX_BLUEPRINT_SAMPLE_ELEMENTS);
     const structureHeadings = getStructureHeadings();
     const heroHeadline = findHeroHeadline(structureHeadings);
-    const primaryCta = findPrimaryCta();
     const navLabels = getNavLabels();
     const colors = buildPalette(sampledElements);
     const fonts = buildFontProfile(sampledElements);
@@ -332,9 +331,7 @@
         scrollContainer: metrics.scrollContainer
       },
       identity: {
-        siteType: inferSiteType(layout),
         heroHeadline,
-        primaryCta,
         navLabels
       },
       colors,
@@ -3701,21 +3698,6 @@
     return style.display !== "none" && style.visibility !== "hidden";
   }
 
-  function findPrimaryCta() {
-    const ctaPattern = /\b(get|start|try|book|request|sign up|join|download|install|launch|contact)\b/i;
-
-    const candidates = getVisibleInteractiveElements()
-      .map((node) => ({
-        text: cleanText(node.innerText || node.textContent || node.getAttribute("value") || ""),
-        top: node.getBoundingClientRect().top
-      }))
-      .filter((entry) => entry.text);
-
-    const promoted = candidates.find((candidate) => ctaPattern.test(candidate.text));
-    const fallback = candidates.sort((left, right) => left.top - right.top)[0];
-
-    return promoted?.text || fallback?.text || "";
-  }
 
   function getHeadingFont() {
     const heading = document.querySelector("h1, h2, h3");
@@ -3737,25 +3719,6 @@
     return normalizeFontFamily(window.getComputedStyle(bodyNode).fontFamily) || "";
   }
 
-  function inferSiteType(layout) {
-    if (layout.forms >= 1 && layout.buttons <= 6) {
-      return "Lead capture";
-    }
-
-    if (layout.visuals >= 12 && layout.words >= 1000) {
-      return "Editorial showcase";
-    }
-
-    if (layout.buttons >= 6 && layout.sections >= 4) {
-      return "Product marketing";
-    }
-
-    if (layout.navs >= 1 && layout.words < 450) {
-      return "Brochure site";
-    }
-
-    return "Hybrid landing page";
-  }
 
   function getMetaDescription() {
     return (

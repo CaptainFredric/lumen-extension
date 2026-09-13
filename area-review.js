@@ -32,6 +32,7 @@ function render(review) {
     const item = document.createElement("li"); item.textContent = warning;
     ui.warnings.append(item);
   }
+  ui.warnings.closest("details").hidden = review.warnings.length === 0;
   ui.status.textContent = "Nothing has been saved. Approval expires after two minutes. Keep the source page in place.";
   ui.approve.disabled = false;
   ui.cancel.focus();

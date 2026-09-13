@@ -24,7 +24,7 @@ Lumen supports:
 4. Redaction checks for visible sensitive text and filled fields.
 5. Manual redaction boxes for custom areas.
 6. Instant one-viewport rectangle and freeform lasso capture, with an optional Save action for monitoring and transparent pixels outside the selected lasso path.
-7. Page signals such as title, URL, colors, typography, headline, CTA text, and navigation labels.
+7. Page Context such as title, URL, sampled colors, typography, headline, and navigation labels.
 8. One-time delayed selected-area capture after 5, 10, or 30 seconds.
 9. Scheduled repeat capture from every 15 minutes through daily.
 10. Capped continuous selected-area monitoring every 1, 5, or 15 minutes, stopping after 10, 25, or 50 runs.
@@ -95,11 +95,11 @@ Generated assets live in `store-assets/screenshots/` and can be refreshed with `
 For submission, use the `lumen-store-screenshots-<commit>` artifact produced by the release commit's GitHub Actions run so every image comes from the exact pushed runtime. The checked-in annotation image is a review preview and must be replaced by that generated artifact.
 Use the matching `lumen-extension-<commit>` artifact for the upload ZIP; it is the same package exercised by the clean-profile release job.
 
-1. One-click capture opening the clean viewer-first Capture Result workspace with Page/Width/100% viewing, Copy image, PNG, PDF, Edit, original-file, library, Settings, and remove-local-copy actions.
-2. Annotation studio with arrows, text, shapes, blur, pixelation, undo, redo, Fit/100% working-image zoom, PNG/raster-PDF export, and optional reviewed-image Drive export.
-3. Before/after visual change review with highlighted regions and monitor timeline.
-4. Responsive desktop, tablet, and mobile outputs with redaction and focused-area context.
-5. Capture Library with real previews beside the selected-area timer and active monitor controls.
+1. A Bug Garden responsive capture opened in Capture Result.
+2. Desktop, tablet and mobile exports showing the fixture's deliberate defects.
+3. The actual mobile original with automatic email redaction and an editor rectangle around the clipped button.
+4. Compare displaying a second capture after the checkout total and coupon change.
+5. Both captures in Capture Library and a five-run area monitor, saved and paused before its first run.
 
 ## Reviewer Test Instructions
 

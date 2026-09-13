@@ -1649,13 +1649,13 @@ try {
     };
   });
   assert(
-    /Transparent lasso crop/i.test(transparentLassoState.source) &&
+    /Transparent Selected Area/i.test(transparentLassoState.source) &&
       transparentLassoState.imageBackground === "rgba(0, 0, 0, 0)" &&
       transparentLassoState.transparentClass &&
       transparentLassoState.checkerboardClass &&
       transparentLassoState.cornerAlpha === 0 &&
       transparentLassoState.centerAlpha === 255 &&
-      transparentLassoState.openLabel === "Open saved crop" &&
+      transparentLassoState.openLabel === "Open saved area" &&
       transparentLassoState.showLabel === "Show in folder",
     "The result workspace did not preserve and visibly present a transparent lasso crop.",
     transparentLassoState

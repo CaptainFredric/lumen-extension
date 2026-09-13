@@ -135,7 +135,7 @@ async function initialize() {
           originalWidth: image.width, originalHeight: image.height,
           limited: false, completePage: true, sourceKind: "bundle-image",
           role: image.role, bundleAssetId: image.id,
-          label: `${image.variantId} ${image.role === "cutaway" ? "crop" : "page part"}, full resolution`
+          label: `${image.variantId} ${image.role === "cutaway" ? "selected area" : "page part"}, full resolution`
         };
         // Each part exports its own pixels, never the first variant's cached PDF.
         state.capture = { ...state.capture, pdfSource: null, pdfStatus: "unavailable" };
@@ -322,7 +322,7 @@ function renderPageContext(context) {
     : "Page context was not retained for this capture. Enable capture-details JSON in Settings for future captures.";
   if (!context) return;
   for (const [label, value] of [
-    ["Headline", context.headline], ["Primary action", context.primaryAction],
+    ["Headline", context.headline], ["Primary action (legacy estimate)", context.primaryAction],
     ["Navigation", context.navigation?.join(" / ")],
     ["Fonts", context.fonts?.join(", ")], ["Colors", context.colors?.join(", ")]
   ]) {
@@ -457,7 +457,7 @@ async function loadResultImage(blob) {
   ui.resultViewport.classList.toggle("has-transparent-image", state.imageHasTransparency);
 
   if (state.imageHasTransparency && state.source?.role === "cutaway") {
-    state.source.label = "Transparent lasso crop";
+    state.source.label = "Transparent Selected Area";
     renderSourceDescription();
   }
 
@@ -583,7 +583,7 @@ function renderFileActions() {
 
 function describeOpenAction(download) {
   if (download.kind === "image" && download.role === "cutaway") {
-    return "Open saved crop";
+    return "Open saved area";
   }
 
   if (download.kind === "image" && Number(download.partTotal) > 1) {
