@@ -1,3 +1,4 @@
+// Legacy Orbit regression fixture. Current presentation uses the Bug Garden generators.
 import { promises as fs } from "node:fs";
 import { execFile as execFileCallback } from "node:child_process";
 import { promisify } from "node:util";
@@ -822,10 +823,6 @@ async function renderSignalsPanel(browser, blueprint, outputPath) {
         value: blueprint.identity?.heroHeadline || "None"
       },
       {
-        label: "CTA",
-        value: blueprint.identity?.primaryCta || "None"
-      },
-      {
         label: "Navigation",
         value: (blueprint.identity?.navLabels || []).join(" · ") || "None"
       },
@@ -886,7 +883,7 @@ async function renderSignalsPanel(browser, blueprint, outputPath) {
           <article class="panel">
             <span class="eyebrow">Signals JSON</span>
             <h1>${escapeHtml(blueprint.page?.title || "Untitled page")}</h1>
-            <p class="meta">${escapeHtml(blueprint.identity?.siteType || "Unknown")} · ${escapeHtml(blueprint.page?.host || "Unknown host")}</p>
+            <p class="meta">Legacy fixture · ${escapeHtml(blueprint.page?.host || "Unknown host")}</p>
             <div class="swatches">${colors}</div>
             <dl class="grid">${detailRows}</dl>
             <ul class="fonts">${fonts}</ul>
@@ -1178,8 +1175,7 @@ function buildHistoryItem(desktopRun) {
       timestamp,
       "3 views",
       "4 files",
-      `${desktopRun.redactions.count} redactions`,
-      desktopRun.blueprint.identity?.siteType || "Unknown"
+      `${desktopRun.redactions.count} redactions`
     ].join(" · ")
   };
 }
@@ -1187,7 +1183,7 @@ function buildHistoryItem(desktopRun) {
 function buildBundleManifest(desktopRun) {
   return {
     schemaVersion: 1,
-    generator: "Lumen sample asset script",
+    generator: "Lumen legacy Orbit regression fixture",
     capturedAt: new Date().toISOString(),
     page: {
       title: desktopRun.blueprint.page?.title || "Untitled capture",
@@ -1207,9 +1203,7 @@ function buildBundleManifest(desktopRun) {
       OUTPUT_FILES.mobile
     ],
     pageSignals: {
-      siteType: desktopRun.blueprint.identity?.siteType || "",
       heroHeadline: desktopRun.blueprint.identity?.heroHeadline || "",
-      primaryCta: desktopRun.blueprint.identity?.primaryCta || "",
       navLabels: desktopRun.blueprint.identity?.navLabels || [],
       colors: desktopRun.blueprint.colors || [],
       typography: desktopRun.blueprint.typography?.families || []

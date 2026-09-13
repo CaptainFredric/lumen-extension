@@ -1,5 +1,23 @@
 # Lumen Release Notes
 
+## September 13: public beta and presentation completion
+
+The install link now downloads 0.5.0 beta 1 from tested commit a903623. The GitHub
+release contains the original successful CI artifact, its SHA-256, and a source
+record. It was published without rebuilding. Drive is disabled in that package;
+the site states this before installation. `npm run verify:beta` checks the public
+download against `docs/beta-release.json`.
+
+The Store editor frame zooms closer to the marked button. Compare uses a 70%
+reveal, and Library and the paused monitor use tighter individual frames.
+The site has one accepted inspection stylesheet; the override file and obsolete
+viewer rules were removed. Historical Orbit assets are identified as legacy,
+and current privacy previews use Bug Garden.
+
+The roadmap prioritizes release completion and repeated personal use. A new video,
+publisher-owned Store submission, and physical toolbar verification remain open.
+Accounts, agents, and broad background refactoring stay deferred.
+
 ## Unreleased: Bug Garden Store workflow
 
 The five Store images now follow actual Bug Garden captures through Result,

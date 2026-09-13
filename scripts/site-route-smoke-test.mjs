@@ -10,6 +10,7 @@ const server = createSiteServer();
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const origin = `http://127.0.0.1:${server.address().port}`;
 const results = [];
+const beta = JSON.parse(await readFile(path.join(root, "docs/beta-release.json"), "utf8"));
 let browser;
 
 try {
@@ -114,7 +115,7 @@ try {
     assert.equal(new URL(page.url()).hash, "#install");
     assert.equal(
       await page.locator("#install .button").getAttribute("href"),
-      "https://github.com/CaptainFredric/lumen-extension/archive/refs/heads/main.zip",
+      beta.downloadUrl,
     );
     await page.goto(origin, { waitUntil: "networkidle" });
     await page.keyboard.press("Tab");

@@ -97,11 +97,16 @@ jobs:
       - name: Regenerate and validate Web Store screenshots
         run: xvfb-run --auto-servernum npm run store:screenshots
 
+      - name: Verify regenerated Store evidence
+        run: npm run test:product-contract
+
       - name: Upload validated Web Store screenshots
         uses: actions/upload-artifact@v4
         with:
           name: lumen-store-screenshots-${{ github.sha }}
-          path: store-assets/screenshots/*.png
+          path: |
+            store-assets/screenshots/*.png
+            store-assets/screenshots/proof.json
 
       - name: Validate extension package
         run: npm run smoke:package

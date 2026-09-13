@@ -4,13 +4,13 @@
   "stateBSha256": "fd835bd992b7c75192bfb3256a0459a38812d50f53b74911acefe5f9bccfbe54",
   "captures": [
     {
-      "id": "0cc4fe7b-88f1-4bb7-8e3e-12e2fbf892a4",
+      "id": "b05cefd4-1bb6-4bfd-a44e-f7eed5827728",
       "variantCount": 3,
       "redactions": 3,
       "health": "complete"
     },
     {
-      "id": "a4fd9d10-411c-43a5-8dae-39e3c5c67eac",
+      "id": "6294c655-cd6a-45ff-9ea2-194d631ce3e7",
       "variantCount": 1,
       "redactions": 1,
       "health": "complete"
@@ -22,14 +22,14 @@
       "aliases": [
         "store-control-surface.png"
       ],
-      "sha256": "2a894c517de25c2d73fdf00b2e6080052411c44939f9b7ad769c15d1890ec735"
+      "sha256": "43309fd75fb4793d5c353d327e8ed0a30ac62175ef42d9edca9b0919ecaffb3b"
     },
     {
       "filename": "02-responsive-set.png",
       "aliases": [
         "store-responsive-set.png"
       ],
-      "sha256": "48e58c7dcf731de358798fd6e0083756be904d411ab5cc3034b53294086cd2d0"
+      "sha256": "e2821079f7ecdadc38c471deb8760924db05ebc3c71489f9671a75d6bfd98a6f"
     },
     {
       "filename": "03-annotation-redaction.png",
@@ -37,33 +37,34 @@
         "store-review-actions.png",
         "store-annotation-studio.png"
       ],
-      "sha256": "bb8610af4ec71cb4a2049188d789ce195ec7dae020dcbc2a93d6a101764cbccc"
+      "sha256": "accad9a7c177dc273eeab6b909601544c58e2758ce8425acea2e37ba97cf4ccc"
     },
     {
       "filename": "04-compare.png",
       "aliases": [
         "store-visual-change-review.png"
       ],
-      "sha256": "2b9a78644b42cb3d6f297f7dbc9bdbaa2c915e797138f0e408f5972398e27461"
+      "sha256": "c2aa552665f7e0b6db42d0ac7f3f8f9436ccf2f8a4b3eeffcf8913ccb7aac713"
     },
     {
       "filename": "05-library-monitor.png",
       "aliases": [
         "store-library-monitor.png"
       ],
-      "sha256": "16e972cc5ce7fef7dbf2441ff418be08ee96c1dec4a426054d004926fbe9f34d"
+      "sha256": "63b9c3d627407fa25cb2077b4ad45b8518cd952c76ab482a43cd51d2a509a455"
     }
   ],
   "annotations": {
     "count": 1,
-    "sourceCapture": "0cc4fe7b-88f1-4bb7-8e3e-12e2fbf892a4",
+    "sourceCapture": "b05cefd4-1bb6-4bfd-a44e-f7eed5827728",
     "variant": "mobile",
     "target": ".continue"
   },
   "compare": {
-    "before": "0cc4fe7b-88f1-4bb7-8e3e-12e2fbf892a4",
-    "after": "a4fd9d10-411c-43a5-8dae-39e3c5c67eac",
-    "changed": "0.08%"
+    "before": "b05cefd4-1bb6-4bfd-a44e-f7eed5827728",
+    "after": "6294c655-cd6a-45ff-9ea2-194d631ce3e7",
+    "changed": "0.08%",
+    "revealPercent": 70
   },
   "monitor": {
     "source": ".total",
@@ -72,5 +73,5 @@
     "status": "paused",
     "runs": 0
   },
-  "generatedAt": "2026-09-13T17:37:48.013Z"
+  "generatedAt": "2026-09-13T18:06:02.073Z"
 }

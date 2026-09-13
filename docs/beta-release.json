@@ -1,0 +1,12 @@
+{
+  "tag": "v0.5.0-beta.1",
+  "version": "0.5.0",
+  "sourceCommit": "a903623faf1a4f751d8c7a717e3421d86539c019",
+  "filename": "lumen-extension-0.5.0.zip",
+  "downloadUrl": "https://github.com/CaptainFredric/lumen-extension/releases/download/v0.5.0-beta.1/lumen-extension-0.5.0.zip",
+  "releaseUrl": "https://github.com/CaptainFredric/lumen-extension/releases/tag/v0.5.0-beta.1",
+  "verificationUrl": "https://github.com/CaptainFredric/lumen-extension/actions/runs/34772356427",
+  "artifactId": 10322990158,
+  "sha256": "116332aad98c6f497af6f49567dadaeddc6dbbdc5d0a59e50bd4b081e5c2ce1e",
+  "driveEnabled": false
+}

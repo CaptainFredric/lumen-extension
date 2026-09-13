@@ -111,7 +111,7 @@ try {
   await editor.mouse.move(x(issue.right - 2), y(issue.bottom + 6), { steps: 12 });
   await editor.mouse.up();
   await editor.waitForFunction(() => globalThis.LumenAnnotationEditor.getAnnotationCount() === 1);
-  for (let step = 0; step < 2; step++) await editor.locator("#zoomInButton").click();
+  for (let step = 0; step < 3; step++) await editor.locator("#zoomInButton").click();
   await editor.locator(".canvas-stage").evaluate(async node => {
     node.scrollTop = node.scrollHeight;
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -131,9 +131,10 @@ try {
   const second = await capture("desktop");
   const compare = await workspace(`review.html?before=${first.captureId}&after=${second.captureId}`, page => page.waitForFunction(() => !document.querySelector("#reviewContent")?.classList.contains("is-hidden") && parseFloat(document.querySelector("#changePercentMetric")?.textContent) > 0), 1200, 1800);
   proof.compare = { before: first.captureId, after: second.captureId, changed: await compare.locator("#changePercentMetric").innerText() };
-  await compare.locator("#revealSlider").fill("100");
+  await compare.locator("#revealSlider").fill("70");
   await compare.locator("#revealSlider").dispatchEvent("input");
   await compare.locator("#revealSlider").blur();
+  proof.compare.revealPercent = Number(await compare.locator("#revealSlider").inputValue());
   await compare.evaluate(() => scrollTo(0, 0));
   const compareShot = dataUrl(await compare.locator("#comparisonPanel").screenshot());
   await compare.close();
@@ -162,8 +163,10 @@ try {
   assert.equal(plan.schedule.maxRuns, 5);
   assert.equal(plan.runCount || 0, 0);
   proof.monitor = { source: ".total", intervalMinutes: plan.schedule.intervalMinutes, maxRuns: plan.schedule.maxRuns, status: plan.status, runs: plan.runCount || 0 };
+  await library.setViewportSize({ width: 480, height: 700 });
   await library.locator("#monitorList").scrollIntoViewIfNeeded();
   const monitorShot = dataUrl(await library.locator("#monitorList").screenshot());
+  await library.setViewportSize({ width: 740, height: 570 });
   await library.goto(`chrome-extension://${id}/library.html`);
   await library.waitForFunction(() => Number(document.getElementById("captureMetric")?.textContent) === 2);
   await library.locator("#captureGrid").scrollIntoViewIfNeeded();
@@ -216,8 +219,9 @@ function frame(title, detail, content) {
   figure{margin:0;border:1px solid #8fa39a;background:white;height:560px;overflow:hidden;border-radius:6px}
   figcaption{font-family:monospace;padding:12px;background:#192622;color:#a6e6c9}
   figure img{width:100%;height:515px;object-fit:contain;object-position:top;display:block}
-  .pair{display:grid;grid-template-columns:1fr 1fr;gap:20px;background:#171b1e;padding:12px;border-radius:8px}
-  .pair img{width:100%;max-height:455px;object-fit:contain;object-position:top}
-  .pair{min-height:550px;padding:20px}.pair h2{color:#bde2ce;font-size:18px;margin:0 0 20px}.note{color:#a8bfb3;font-size:16px;line-height:1.7;margin-top:24px}
+  .pair{display:grid;grid-template-columns:1.55fr 1fr;gap:24px;align-items:start}
+  .pair section{background:#171b1e;padding:20px;border:1px solid #4e6259;border-radius:8px}
+  .pair img{width:100%;max-height:475px;object-fit:contain;object-position:top}
+  .pair h2{color:#bde2ce;font-size:18px;margin:0 0 20px}.note{color:#a8bfb3;font-size:16px;line-height:1.7;margin:24px 0 0}
   </style><main><header><strong>Lumen</strong><span>Browser capture / local evidence</span></header><h1>${title}</h1><p>${detail}</p>${content}</main></html>`;
 }

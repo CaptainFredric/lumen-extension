@@ -115,6 +115,7 @@ test("Store pack is one captured Bug Garden workflow with verified image hashes"
   assert.ok(proof.captures.every(capture => capture.health === "complete" && capture.redactions >= capture.variantCount));
   assert.equal(proof.annotations.sourceCapture, proof.captures[0].id);
   assert.equal(proof.compare.after, proof.captures[1].id);
+  assert.equal(proof.compare.revealPercent, 70);
   assert.equal(proof.monitor.status, "paused");
   assert.equal(proof.monitor.runs, 0);
   for (const frame of proof.frames) {
@@ -123,4 +124,20 @@ test("Store pack is one captured Bug Garden workflow with verified image hashes"
     assert.equal(bytes.readUInt32BE(16), 1280);
     assert.equal(bytes.readUInt32BE(20), 800);
   }
+});
+
+test("public beta is pinned and the site has one accepted design system", async () => {
+  const html = await readFile(new URL("../docs/index.html", import.meta.url), "utf8");
+  const beta = JSON.parse(await readFile(new URL("../docs/beta-release.json", import.meta.url), "utf8"));
+  assert.match(beta.sourceCommit, /^[a-f0-9]{40}$/);
+  assert.match(beta.sha256, /^[a-f0-9]{64}$/);
+  assert.equal(beta.downloadUrl, `https://github.com/CaptainFredric/lumen-extension/releases/download/${beta.tag}/${beta.filename}`);
+  assert.ok(html.includes(`href="${beta.downloadUrl}"`));
+  assert.doesNotMatch(html, /archive\/refs\/heads\/main\.zip|inspection\.css/);
+  assert.equal((html.match(/rel="stylesheet"/g) || []).length, 1);
+  const css = await readFile(new URL("../docs/styles.css", import.meta.url), "utf8");
+  assert.doesNotMatch(css, /\.inspection-desk|\.sample-viewer|\.sample-viewport/);
+  const legacy = await readFile(new URL("../scripts/generate-capture-artifacts.mjs", import.meta.url), "utf8");
+  assert.match(legacy, /Legacy Orbit regression fixture/);
+  assert.doesNotMatch(legacy, /primaryCta|siteType/);
 });

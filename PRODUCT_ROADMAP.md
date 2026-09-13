@@ -1,96 +1,59 @@
-# Lumen Product Roadmap
+# Lumen Roadmap
 
-Lumen should stay focused on clean, responsive, safer evidence capture for design review, QA, and product work.
+Lumen preserves web evidence for design review, QA, and product work. The next
+phase is repeated use and release completion. New capabilities wait until that
+work identifies a concrete need.
 
-The product can become ambitious without changing the first wedge. The screenshot is still only the starting point. The durable value is the workflow around the screenshot: cleanup, focused selection, redaction, context, review, and handoff.
+## Current Product
 
-## Current Wedge
+1. Capture a full page, visible viewport, selected area, or responsive set.
+2. Clean overlays and load lazy content before capture.
+3. Retain observable Page Context beside the images.
+4. Review, redact, annotate, and export from Capture Result.
+5. Revisit captures in Capture Library and open Compare.
+6. Opt into Once, Recurring, or bounded Rapid watch for a saved area.
+7. Keep captures local; choose any configured destination explicitly.
 
-1. Clean the page before capture.
-2. Capture desktop, tablet, and mobile views together.
-3. Redact visible sensitive data during export.
-4. Attach useful page signals beside the image.
-5. Keep local history and portable capture details.
-6. Annotate and compare saved captures before they leave the browser.
-7. Monitor one selected area on an explicit local schedule.
-8. Move every manual capture directly into a simple local result and export flow.
+Automatic redaction is optional and requires review before external sharing.
+Private Review Mode coordinates stronger safeguards. PRODUCT.md owns the runtime
+defaults and vocabulary, checked by the product contract tests.
 
-## Implemented Now
+## Release Completion
 
-1. Full-page capture with DOM cleanup, lazy-load preflight, tail remeasurement, and offscreen stitching.
-2. Responsive capture sets for desktop, tablet, and mobile.
-3. Auto-redaction preview and export redaction for visible text, token-like strings, and filled inputs.
-4. Manual redaction boxes anchored to source elements when possible.
-5. One anchored capture note rendered into the export.
-6. Page Context extraction for sampled palette, typography, headline, navigation, and layout counts. New captures omit guessed primary actions and site classifications.
-7. Local history with run details, artifacts, copyable summaries, and file actions.
-8. Rectangle and freeform lasso picker with immediate one-viewport capture or explicit reusable-region storage for monitoring.
-9. Pre-export review that checks auto-redaction, manual projection, and Selected Area checks across the requested view set.
-10. Capture Library with real previews, favorites, review state, and original-file actions.
-11. Annotation Studio with arrows, rectangles, text, blur, pixelation, selection, undo, redo, and reviewed PNG export.
-12. Local visual-change review with a before/after reveal, highlighted change regions, metrics, and monitor timeline.
-13. One-time, repeating, and capped continuous selected-area monitoring with pause, resume, run-now, and delete controls.
-14. Optional review-first Google Drive export using narrow `drive.file` access.
-15. Automatic viewer-first Capture Result workspace for successful manual captures with Page/Width/100% views, centered zoom, drag-to-pan, Copy image, PNG, paginated PDF, optional Drive, Edit, original-file, library, Settings, and confirmed remove-local-copy actions.
-16. Full-page, visible-area, and area-picker commands, plus exact packaged-extension registration and `activeTab` boundary testing.
-17. CI handoff of the exact tested Web Store ZIP as a commit-addressed artifact.
+1. Publish a versioned beta ZIP from a successful exact-package test run. Retain
+   its source commit, workflow link, and SHA-256 alongside the download.
+2. Finish publisher-owned Store fields, privacy disclosures, and stock Chrome
+   toolbar testing. Drive stays unavailable in packages without configured OAuth.
+3. Keep Store images tied to Bug Garden and the actual product. Record a new short
+   walkthrough from this workflow when the release surface is stable.
+4. Preserve one website stylesheet and remove superseded presentation rules.
+5. Validate releases against difficult pages and the exact packaged manifest.
+   Keep native shortcut testing separate from harness grants.
 
-## Near-Term Product Bets
+## Repeated Personal Use
 
-### Selected Area Review
+Use Lumen for actual design and QA work. Record the source page, capture scope,
+expected result, and observed failure for each issue. Prioritize lost captures,
+unexpected redactions, hard-to-find originals, and confusing review decisions.
 
-The user can draw a rectangle or freeform lasso and capture that current-viewport area immediately, or save it for local monitoring. This is useful for pricing tables, hero sections, checkout modules, dashboards, and bug reproduction areas where a full-page capture is noisy.
+Selected Area review currently shows a geometry map rather than captured pixels.
+Follow-up integrity work can investigate page mutation during approval and
+area-intersecting sensitive-match counts. Add each behavior behind a regression
+test before changing the capture path.
 
-Implemented review layer:
+## Bounded Maintenance
 
-1. Capture Library and Result retain page images, Selected Area images and details files.
-2. Selected Area runs show a compact preview map, dimensions, variant, and projection status in the run detail.
-3. Reviewed editor output can go to Drive explicitly; any additional destination still needs its own review and consent path.
+After release completion, extract one independently testable responsibility at
+a time from background.js or content.js. Begin with shared pure models and
+permission or scheduling boundaries. Preserve storage keys and message contracts.
+Keep the browser-specific capture engine behind its existing tests.
 
-### Region Watch — Implemented Locally
+## Deferred Experiments
 
-The user can opt into delayed, repeated, or capped continuous captures of a marked region. The implementation is local, visible, pauseable, and bounded rather than silent surveillance.
+Accounts, billing, agent handoff, and additional cloud destinations are outside
+the next release. The experimental backend remains separate from the local
+product. Revisit a proposal only when repeated use demonstrates a workflow gap.
 
-Store-ready rules for this feature:
-
-1. The user explicitly marks the region.
-2. The user explicitly chooses the schedule.
-3. The extension shows a visible status and pause control.
-4. The bundle keeps retention limits and deletion controls.
-5. No page content is sent off-device unless the user chooses a destination.
-
-### Agent Handoff
-
-Send a capture bundle, Selected Area image, manifest, and extracted signals to a background agent for review notes, QA summaries, or change explanations.
-
-Required guardrails:
-
-1. Explicit user action before any handoff.
-2. Clear destination label.
-3. Redaction review step before sending.
-4. Local preview of what will be sent.
-5. Per-destination disable controls.
-
-## Future Feature Backlog
-
-1. Numbered callouts, highlight strokes, and reusable annotation styles.
-2. Multiple named monitored regions per page and optional post-review change notifications.
-3. Agent handoff: summarize change, prepare bug evidence, or draft review notes.
-4. Additional review-first destinations such as Slack, Notion, GitHub, or Jira.
-5. Capture inbox: local queue of captures that need review, redaction approval, or export.
-6. Capture templates: QA bug report, design review, competitor reference, release evidence.
-7. Safer sharing: outbound checklist that confirms redactions, source URL, and included files.
-
-## Chrome Web Store Direction
-
-Lumen should avoid hidden or surprising capture behavior. Continuous capture, watchlists, and agent handoff need visible controls, narrow permissions, explicit user opt-in, and clear local storage or data-transfer disclosure.
-
-The current extension should stay usable with `activeTab`, optional host access for responsive captures, local storage, downloads, scripting, and offscreen composition. Do not add broad permissions until a feature clearly needs them.
-
-## Next Engineering Milestones
-
-1. Complete publisher-owned Web Store fields, OAuth setup, signed-ID testing, and submission.
-2. Use the commit-addressed CI ZIP for submission and keep the exact-package, four-site live, and deterministic difficult-page checks green for releases.
-3. Complete the short stock-Chrome boundary for physical toolbar use, all three shortcuts, area drawing, permissions, and revocation.
-4. Keep privacy disclosure aligned as new destinations or remote automation are added.
-5. Tighten the backend from demo session state into a real account path.
+Any future handoff needs an explicit destination, a preview of the outgoing
+artifact, review before sending, and revocation controls. No unattended upload
+or broad permission expansion is implied by this roadmap.

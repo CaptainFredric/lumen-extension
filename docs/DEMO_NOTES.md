@@ -49,7 +49,10 @@ work. They are no longer used by the landing page.
 
 ## Next proof milestone
 
-Record the actual selection, annotation, comparison, and export workflow on this
-same fixture, then regenerate the store screenshots. Publish
-that recording only after inspecting the resulting files. Simulated cursor
+The Store pack now uses this same fixture through Result, annotation, Compare,
+and Library. Run `npm run store:screenshots`; its provenance is retained in
+`store-assets/screenshots/proof.json` in the repository.
+
+Record a short selection, annotation, comparison, and export walkthrough next.
+Publish that recording only after inspecting the resulting files. Simulated cursor
 animation must never substitute for a recording of working extension behavior.

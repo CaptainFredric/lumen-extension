@@ -133,6 +133,21 @@ Temporary profiles and downloaded images are removed after the run.
 
 ## Local Development
 
+### Public Beta
+
+The site's beta download is the exact tested ZIP from commit `a903623`, published
+as [0.5.0 beta 1](https://github.com/CaptainFredric/lumen-extension/releases/tag/v0.5.0-beta.1).
+It contains the extension rather than the development repository. Unzip it, open
+`chrome://extensions`, enable Developer mode, and load the folder containing
+`manifest.json`. Keep that folder for later updates. This package has no Drive
+OAuth configuration; local capture and export remain available.
+
+`docs/beta-release.json` records the source, CI run, release URL, and SHA-256.
+Run `npm run verify:beta` to download and verify the public bytes, or
+`npm run verify:beta -- /path/to/lumen-extension-0.5.0.zip` to verify a local copy.
+The verification requires the system `unzip` command. Future releases must use
+the successfully tested CI artifact, never a rebuilt substitute under the same tag.
+
 ### Load The Extension
 
 1. Open `chrome://extensions`
@@ -182,28 +197,20 @@ The public landing page will be available at `http://127.0.0.1:4173/`. Port 3000
 
 If the launch indicator says the page is blocked, switch to a normal `http://` or `https://` page. Chrome does not allow extension capture scripts on internal browser pages, Web Store pages, or other extension pages.
 
-## Sample Capture Assets
+## Capture Examples
 
-The homepage uses the real Bug Garden output from `npm run proof:garden`. These older generated assets remain available for reproducible fixtures and the existing store screenshot generator:
+Current public proof uses Bug Garden: `npm run proof:garden` captures the responsive
+set, and `npm run store:screenshots` runs the same fixture through the extension
+workspaces.
 
-1. `docs/assets/capture-run-desktop.png`
-2. `docs/assets/capture-run-tablet.png`
-3. `docs/assets/capture-run-mobile.png`
-4. `docs/assets/capture-run-redacted.png`
-5. `docs/assets/capture-run-signals.png`
-6. `docs/assets/capture-run-history.png`
-7. `docs/assets/capture-run-bundle.json`
-8. `docs/assets/capture-run-signals.json`
-9. `docs/assets/capture-run-summary.json`
-10. `docs/assets/lumen-social-card.png`
-11. `docs/assets/capture-run-bundle.zip`
+Older `docs/assets/capture-run-*` files are historical regression references.
+Their old inferred fields and seeded history describe that legacy fixture, not
+current Page Context or Store output. Existing URLs remain available for older
+review documents. See `docs/assets/LEGACY_FIXTURES.md`.
 
-To regenerate them:
-
-```bash
-npm install
-npm run capture:assets
-```
+`npm run capture:assets` is the legacy fixture generator. It requires Playwright
+and is kept for reproducing old comparisons; use the Bug Garden commands for
+current presentation.
 
 ### Run Capture Smoke Tests
 
