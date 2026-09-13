@@ -147,8 +147,12 @@ test("public beta is pinned and the site has one accepted design system", async 
   assert.doesNotMatch(html, /archive\/refs\/heads\/main\.zip|inspection\.css/);
   assert.equal((html.match(/rel="stylesheet"/g) || []).length, 1);
   assert.doesNotMatch(html, /class="inspection-desk"|Local library|Capture history/);
-  assert.match(html, /optionally keep useful\s+Page Context/);
-  assert.match(html, /Enable capture-details JSON in Settings/);
+  assert.match(html, /optionally keep useful\s+page context/i);
+  assert.match(html, /In Settings, turn on <strong>Include capture details file<\/strong>/);
+  const settingsHtml = await readFile(new URL("../settings.html", import.meta.url), "utf8");
+  assert.match(settingsHtml, /<strong>Include capture details file<\/strong>/);
+  const readme = await readFile(new URL("../README.md", import.meta.url), "utf8");
+  assert.match(readme, /retain optional Page Context and capture details/);
   const archivedBrief = await readFile(new URL("../design-review/CLAUDE_DESIGN_PROMPT.md", import.meta.url), "utf8");
   assert.doesNotMatch(archivedBrief, /docs\/inspection\.css/);
   const css = await readFile(new URL("../docs/styles.css", import.meta.url), "utf8");

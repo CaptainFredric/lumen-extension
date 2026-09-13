@@ -31,8 +31,10 @@ without Git retain the generator hash and report null revision fields.
 This is provenance for an individual run, not a promise of identical PNG bytes
 across machines. Fonts, scrollbars, antialiasing, IDs, ports, and timestamps vary.
 
-The exact CI pack from commit 8943e76 was visually inspected; see
-`CI_REVIEW.md`. That review does not approve later regenerations automatically.
+The current reviewed candidate is the clean f6aa7f2 CI pack, retained as an
+additional beta release asset. `CI_REVIEW.md` records its download link, hashes,
+and observations, plus the earlier 8943e76 review. Neither review approves later
+regenerations automatically.
 
 The harness grants site access in a temporary extension copy because scripted
 invocation is not Chrome's native toolbar gesture. Distributed permissions remain

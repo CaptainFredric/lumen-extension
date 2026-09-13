@@ -1,5 +1,19 @@
 # Lumen Release Notes
 
+## September 13: durable Store candidate
+
+The README summary now uses optional Page Context. Public copy introduces page
+context in plain language and names the actual Settings switch, Include capture
+details file, before explaining JSON output.
+
+The clean f6aa7f2 CI Store pack was visually inspected and hash-verified. Its
+original archive is attached to beta 1 as `lumen-store-f6aa7f2.zip`, preserving
+the exact reviewed images beyond Actions retention. Runtime files, privacy
+defaults, Store artwork, and the beta extension ZIP are unchanged.
+
+The next work is repeated personal use and the remaining manual release gates.
+No additional product design or feature expansion is planned for this pass.
+
 ## September 13: optional context and proof environment
 
 The public page now states that Page Context retention is optional and starts

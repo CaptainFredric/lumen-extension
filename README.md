@@ -14,7 +14,7 @@ Lumen focuses on:
 4. delay, repeat, or continuously monitor a selected area with explicit limits
 5. keep real on-device previews in Capture Library while originals stay in Downloads
 6. redact sensitive visible data during export
-7. attach useful page signals and capture details beside the image
+7. retain optional Page Context and capture details beside the image
 8. open every completed manual capture in a viewer-first result workspace with Page/Width/100% views, drag-to-pan, Copy, PNG, PDF, Drive, Edit, library, Settings, and removal controls
 9. keep privacy, permissions, export behavior, and local-data controls together in dedicated Settings
 
