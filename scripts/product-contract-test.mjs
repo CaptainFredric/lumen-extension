@@ -33,7 +33,7 @@ test("explicit choices survive normalization and stronger safeguards enforce pol
 
 test("release disclosures agree with the tested fresh defaults", async () => {
   // One shared sentence keeps submission copy explicit and reviewable.
-  const disclosure = "Fresh-install defaults: local-only mode starts on. Automatic redaction, capture-details JSON, review-before-save, and Privacy Shield start off. Saved choices are preserved on updates.";
+  const disclosure = "Fresh-install defaults: local-only mode starts on. Automatic redaction, capture-details JSON, review-before-save, and Private Review Mode start off. Saved choices are preserved on updates.";
   for (const filename of ["PRIVACY.md", "RELEASE_NOTES.md", "STORE_READINESS.md", "CHROME_STORE_LISTING.md", "CHROME_WEB_STORE_PRIVACY_FORM.md"]) {
     const text = await readFile(new URL(`../${filename}`, import.meta.url), "utf8");
     assert.ok(text.includes(disclosure), `${filename}: review the default disclosure alongside settings-store.js`);
@@ -48,6 +48,17 @@ test("popup has no development readiness meter", async () => {
     const text = await readFile(new URL(`../${filename}`, import.meta.url), "utf8");
     assert.doesNotMatch(text, /productReadinessList|renderProductReadiness|refreshProductReadiness|LUMEN_GET_PRODUCT_READINESS|Workspace meter/);
   }
+});
+
+test("visible safeguards and capture vocabulary agree across product surfaces", async () => {
+  for (const filename of ["settings.html", "settings.js", "library.html", "library.js", "content.js", "README.md", "PRIVACY.md", "docs/privacy.html"]) {
+    const text = await readFile(new URL(`../${filename}`, import.meta.url), "utf8");
+    assert.doesNotMatch(text, /Privacy Shield|Photo Library|photo library|Focused crop/, filename);
+  }
+  const background = await readFile(new URL("../background.js", import.meta.url), "utf8");
+  assert.doesNotMatch(background, /prevents one-click saving/);
+  const area = await readFile(new URL("../area-review.html", import.meta.url), "utf8");
+  assert.ok(area.includes('id="approve"') && area.includes("Selection map, not an image preview"));
 });
 
 test("launcher boundaries keep persistent and experimental workspaces elsewhere", async () => {

@@ -270,7 +270,7 @@ try {
     };
   }, response.captureId);
 
-  assert(libraryState.count === 1 && libraryState.id === response.captureId, "Expected one linked capture in the local photo library.", libraryState);
+  assert(libraryState.count === 1 && libraryState.id === response.captureId, "Expected one linked capture in the Capture Library.", libraryState);
   assert(libraryState.sourceType === "manual", "Expected the library to distinguish manual captures.", libraryState);
   assert(libraryState.pageContext?.fonts?.length > 0 && libraryState.pageContext?.colors?.length > 0,
     "Capture-specific context did not retain extracted font and color values.", libraryState.pageContext);
@@ -636,7 +636,49 @@ try {
     }
   });
 
-  await target.click("#lumen-cutaway-picker .lumen-picker-capture-now");
+  await popup.evaluate(async () => {
+    const { readAppSettings, writeAppSettings } = await import("./settings-store.js");
+    await writeAppSettings({ ...await readAppSettings(), reviewBeforeSave: true });
+  });
+  const downloadCountBeforeReview = await popup.evaluate(async () => (await chrome.downloads.search({})).length);
+  async function openAreaReview() {
+    await target.bringToFront();
+    const opened = context.waitForEvent("page", { timeout: 15000 });
+    await target.click("#lumen-cutaway-picker .lumen-picker-capture-now");
+    const page = await opened;
+    await page.waitForURL(/area-review\.html/);
+    await page.waitForFunction(() => !document.getElementById("approve")?.disabled);
+    assert(!(await page.locator("#areaMap polygon").getAttribute("points")).includes("NaN"), "Review map has invalid coordinates.");
+    return page;
+  }
+  // A dismissed review must leave the picker usable and create no artifacts.
+  const cancelledReview = await openAreaReview();
+  const forgedApproval = await popup.evaluate(id => chrome.runtime.sendMessage({
+    type: "LUMEN_AREA_REVIEW_DECIDE", id, approved: true
+  }), new URL(cancelledReview.url()).searchParams.get("id"));
+  assert(forgedApproval?.ok === false, "Another extension page approved the area review.", forgedApproval);
+  await cancelledReview.locator("#cancel").click();
+  await target.waitForFunction(() => !document.querySelector(".lumen-picker-capture-now")?.disabled);
+  assert(await popup.evaluate(async () => (await chrome.downloads.search({})).length) === downloadCountBeforeReview, "Cancel created a download.");
+  assert(await popup.evaluate(() => globalThis.__lumenSelectedAreaResult) === null, "Cancel created a capture record.");
+
+  const closedReview = await openAreaReview();
+  await closedReview.close();
+  await target.waitForFunction(() => !document.querySelector(".lumen-picker-capture-now")?.disabled);
+  assert(await popup.evaluate(async () => (await chrome.downloads.search({})).length) === downloadCountBeforeReview, "Closing review created a download.");
+
+  const staleReview = await openAreaReview();
+  const originalScroll = await target.evaluate(() => scrollY);
+  await target.evaluate(() => scrollBy(0, 40));
+  await staleReview.locator("#approve").click();
+  await target.waitForFunction(() => document.querySelector(".lumen-picker-hint")?.textContent.includes("Nothing was saved"));
+  assert(await popup.evaluate(async () => (await chrome.downloads.search({})).length) === downloadCountBeforeReview, "Stale review created a download.");
+  await target.evaluate(y => scrollTo(0, y), originalScroll);
+
+  const approvedReview = await openAreaReview();
+  assert(await popup.evaluate(async () => (await chrome.downloads.search({})).length) === downloadCountBeforeReview, "Review saved a download before approval.");
+  if (process.env.LUMEN_AREA_REVIEW_PROOF) await approvedReview.screenshot({ path: process.env.LUMEN_AREA_REVIEW_PROOF });
+  await approvedReview.locator("#approve").click();
   await popup.waitForFunction(() => Boolean(globalThis.__lumenSelectedAreaResult?.captureId), null, { timeout: 120000 });
   selectedAreaResult = await popup.evaluate(() => globalThis.__lumenSelectedAreaResult);
   const selectedAreaImage = selectedAreaResult.downloads?.find((download) => download.kind === "image" && download.role === "cutaway");
@@ -721,6 +763,36 @@ try {
   );
   await selectedAreaResultPage.close();
 
+  // Stronger safeguards stay enabled for an approved lasso, rather than blocking it.
+  await popup.evaluate(async () => {
+    const { readAppSettings, writeAppSettings } = await import("./settings-store.js");
+    await writeAppSettings({ ...await readAppSettings(), privacyShieldEnabled: true });
+    globalThis.__lumenSelectedAreaResult = null;
+  });
+  await target.bringToFront();
+  const lassoStart = await popup.evaluate(() => chrome.runtime.sendMessage({
+    type: "LUMEN_START_CUTAWAY_PICKER", payload: { selectionMode: "lasso" }
+  }));
+  assert(lassoStart?.ok, "Lasso picker failed under stronger safeguards.", lassoStart);
+  await target.waitForSelector(".lumen-cutaway-surface");
+  await target.mouse.move(pickerStartPoint.x, pickerStartPoint.y);
+  await target.mouse.down();
+  await target.mouse.move(pickerEndPoint.x, pickerStartPoint.y, { steps: 10 });
+  await target.mouse.move(pickerEndPoint.x - 40, pickerEndPoint.y, { steps: 10 });
+  await target.mouse.move(pickerStartPoint.x, pickerEndPoint.y - 30, { steps: 10 });
+  await target.mouse.move(pickerStartPoint.x, pickerStartPoint.y, { steps: 10 });
+  await target.mouse.up();
+  const privateReview = await openAreaReview();
+  assert(await privateReview.locator("#mode").textContent() === "Private Review Mode", "Private review label missing.");
+  assert((await privateReview.locator("#checks").innerText()).includes("Automatic redaction\nOn"), "Private review failed to enable redaction.");
+  await privateReview.locator("#approve").click();
+  await popup.waitForFunction(() => Boolean(globalThis.__lumenSelectedAreaResult?.captureId), null, { timeout: 120000 });
+  const privateArea = await popup.evaluate(() => globalThis.__lumenSelectedAreaResult);
+  assert(privateArea.selectionMode === "lasso" && privateArea.cutawayCount === 1 && privateArea.librarySaved, "Private lasso capture failed.", privateArea);
+  assert(!privateArea.downloads.some(item => item.kind === "manifest"), "Private review exported metadata.", privateArea.downloads);
+  const safeguardsAfterArea = await popup.evaluate(async () => (await import("./settings-store.js")).readAppSettings());
+  assert(safeguardsAfterArea.privacyShieldEnabled && safeguardsAfterArea.reviewBeforeSave && safeguardsAfterArea.localOnlyMode, "Area approval weakened safeguards.", safeguardsAfterArea);
+
   assert(!popupConsoleErrors.length, "Popup emitted console errors.", popupConsoleErrors);
 
   console.log(JSON.stringify({
@@ -755,6 +827,10 @@ try {
       image: `${primaryResultState.imageWidth}x${primaryResultState.imageHeight}`
     },
     selectedArea: {
+      reviewCancelledWithoutSaving: true,
+      closedReviewWithoutSaving: true,
+      stalePageApprovalRejected: true,
+      privateLassoApproved: true,
       captureId: selectedAreaResult.captureId,
       selectionMode: selectedAreaResult.selectionMode,
       segmentCount: selectedAreaResult.segmentCount,

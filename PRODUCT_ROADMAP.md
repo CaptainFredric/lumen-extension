@@ -26,7 +26,7 @@ The product can become ambitious without changing the first wedge. The screensho
 7. Local history with run details, artifacts, copyable summaries, and file actions.
 8. Rectangle and freeform lasso picker with immediate one-viewport capture or explicit reusable-region storage for monitoring.
 9. Pre-export review that checks auto-redaction, manual projection, and cutaway resolution across the requested view set.
-10. Local photo library with real previews, favorites, review state, and original-file actions.
+10. Capture Library with real previews, favorites, review state, and original-file actions.
 11. Annotation Studio with arrows, rectangles, text, blur, pixelation, selection, undo, redo, and reviewed PNG export.
 12. Local visual-change review with a before/after reveal, highlighted change regions, metrics, and monitor timeline.
 13. One-time, repeating, and capped continuous selected-area monitoring with pause, resume, run-now, and delete controls.

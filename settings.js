@@ -133,7 +133,7 @@ async function handleShieldChange() {
       autoRedact: true,
       exportManifest: false
     };
-    await persistAll("Privacy Shield on", "Redaction, metadata minimization, save review, local-only mode, and monitor pausing are now enforced.");
+    await persistAll("Private Review Mode on", "Redaction, metadata minimization, save review, local-only mode, and monitor pausing are now enforced.");
     await syncLocalOnlyPolicy(true);
     return;
   }
@@ -156,7 +156,7 @@ async function handleShieldChange() {
     autoRedact: Boolean(restore.autoRedact),
     exportManifest: restore.exportManifest !== false
   };
-  await persistAll("Privacy Shield off", "Your previous choices were restored and active monitors can resume.");
+  await persistAll("Private Review Mode off", "Your previous choices were restored and active monitors can resume.");
   await syncLocalOnlyPolicy(appSettings.localOnlyMode);
 }
 
@@ -256,7 +256,7 @@ function renderSettings() {
   ui.privacyShieldToggle.disabled = saving;
   ui.shieldCard.classList.toggle("is-enabled", shieldEnabled);
   ui.shieldStateLabel.textContent = shieldEnabled ? "On" : "Off";
-  ui.privacyModeBadge.textContent = shieldEnabled ? "Shielded" : "Custom";
+  ui.privacyModeBadge.textContent = shieldEnabled ? "Private review" : "Custom";
   ui.autoRedactToggle.checked = Boolean(captureSettings.autoRedact);
   ui.captureDetailsToggle.checked = captureSettings.exportManifest !== false;
   ui.localOnlyToggle.checked = Boolean(appSettings.localOnlyMode);

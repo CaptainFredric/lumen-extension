@@ -41,6 +41,12 @@ import {
   initializeAppSettings,
   readAppSettings
 } from "./settings-store.js";
+import { createAreaReviewController, sameAreaReviewPage } from "./area-review-controller.js";
+
+let areaReviewController = null;
+function getAreaReviewController() {
+  return areaReviewController ||= createAreaReviewController(chrome);
+}
 
 const OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
 const OFFSCREEN_REASON = "BLOBS";
@@ -262,7 +268,7 @@ if (chrome.storage?.onChanged) {
     }
 
     syncWatchAlarmsForPrivacyShield().catch((error) => {
-      console.debug("Lumen could not synchronize timed captures with Privacy Shield:", error);
+      console.debug("Lumen could not synchronize timed captures with Private Review Mode:", error);
     });
   });
 }
@@ -280,6 +286,10 @@ if (chrome.alarms?.onAlarm) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "LUMEN_AREA_REVIEW_READ" || message?.type === "LUMEN_AREA_REVIEW_DECIDE") {
+    getAreaReviewController().handle(message, sender, sendResponse);
+    return;
+  }
   if (message?.type === "LUMEN_BOOTSTRAP_APP") {
     bootstrapAppState()
       .then(async (result) => {
@@ -372,6 +382,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message?.type === "LUMEN_CANCEL_CAPTURE") {
     captureCancelRequested = true;
+    areaReviewController?.cancel();
     updateActiveCaptureJob({
       cancelRequested: true,
       title: "Stopping capture",
@@ -1009,7 +1020,7 @@ async function clearLocalWorkspaceData() {
       area: "photo-library",
       description: "Chrome did not clear one or more locally cached capture previews. Reload Lumen and try Clear local workspace again."
     });
-    console.debug("Lumen photo library cleanup was incomplete:", libraryOutcome.error);
+    console.debug("Lumen Capture Library cleanup was incomplete:", libraryOutcome.error);
   }
   const savedRegionSets = [
     storedRegions[STORAGE_KEYS.manualRedactions],
@@ -1191,21 +1202,46 @@ async function runSelectedAreaCapture(payload = {}, sourceTab = null) {
   };
   const appSettings = await readAppSettings();
 
-  if (appSettings.reviewBeforeSave) {
-    throw createFriendlyError(
-      appSettings.privacyShieldEnabled ? "Privacy Shield Is On" : "Review Before Save Is On",
-      appSettings.privacyShieldEnabled
-        ? "Privacy Shield prevents one-click saving. Turn it off in Lumen Settings, or choose Save to remember this area for reviewed and timed captures."
-        : "Review Before Save prevents one-click saving. Turn it off in Lumen Settings, or choose Save to remember this area for reviewed and timed captures."
-    );
-  }
-
   const settings = await readStoredCaptureSettings({
     captureMode: "visible",
     devicePreset: "desktop",
     forceLazyLoad: false
   });
-  const result = await runCaptureFlow(settings, {
+  if (appSettings.reviewBeforeSave) {
+    const page = await requestPreparedPageMetrics(sourceTab.id);
+    const reviewedManualBoxes = await getManualRedactionsForTab(sourceTab);
+    if (!sameAreaReviewPage(payload.context, page)) {
+      throw createFriendlyError("Page Changed", "The page moved after selection. Redraw the area before reviewing it.");
+    }
+    const review = await runExportReviewFlow(settings, { sourceTab, cutawayRegionOverride: instantCutawayRegion });
+    if (!review.variants[0]?.cutawayApplied) {
+      throw createFriendlyError("Area Could Not Be Checked", "Redraw the area in the current viewport and try again.");
+    }
+    const approved = await getAreaReviewController().request({
+      host: review.page.host, page, region: directRegion,
+      privateReview: appSettings.privacyShieldEnabled,
+      autoRedact: review.options.autoRedact, exportManifest: review.options.exportManifest,
+      autoRedactionCount: review.autoRedactionCount, manualAppliedCount: review.manualAppliedCount,
+      warnings: review.warnings
+    });
+    if (!approved || captureCancelRequested) {
+      throw createFriendlyError("Area Capture Cancelled", "Nothing was saved. Your safeguards remain enabled. Choose Capture now to review the area again.");
+    }
+    const currentTab = await chrome.tabs.get(sourceTab.id);
+    const currentSettings = await readAppSettings();
+    const currentCaptureSettings = await readStoredCaptureSettings({ captureMode: "visible", devicePreset: "desktop", forceLazyLoad: false });
+    if (currentTab.url !== sourceTab.url || !sameAreaReviewPage(page, await requestPreparedPageMetrics(sourceTab.id))) {
+      throw createFriendlyError("Page Changed During Review", "Nothing was saved. Redraw the selected area in the current page and review it again.");
+    }
+    const currentManualBoxes = await getManualRedactionsForTab(sourceTab);
+    if (JSON.stringify(currentSettings) !== JSON.stringify(appSettings) || JSON.stringify(currentCaptureSettings) !== JSON.stringify(settings) ||
+        JSON.stringify(currentManualBoxes) !== JSON.stringify(reviewedManualBoxes)) {
+      throw createFriendlyError("Settings Changed During Review", "Nothing was saved. Review the area again using your current settings.");
+    }
+    await chrome.windows.update(sourceTab.windowId, { focused: true });
+    await chrome.tabs.update(sourceTab.id, { active: true });
+  }
+  const result = await runCaptureFlow(applyPrivacyShieldToCaptureSettings(settings, appSettings), {
     sourceTab,
     // Capture now must preserve the exact same-viewport geometry the user
     // drew. Anchors are retained only when Save explicitly creates a reusable
@@ -1228,7 +1264,7 @@ async function runCaptureFlow(options = getDefaultSettings(), context = {}) {
   if (context.captureOrigin === "timed" && shouldPauseAutomaticCapture(appSettings)) {
     throw createFriendlyError(
       "Timed Capture Paused",
-      "Privacy Shield pauses unattended captures so every saved image can be reviewed first. Turn the Shield off to resume this monitor."
+      "Private Review Mode pauses unattended captures so every saved image can be reviewed first. Turn this mode off to resume this monitor."
     );
   }
 
@@ -1718,9 +1754,9 @@ async function runRedactionPreviewFlow() {
   };
 }
 
-async function runExportReviewFlow(options = getDefaultSettings()) {
+async function runExportReviewFlow(options = getDefaultSettings(), context = {}) {
   options = applyPrivacyShieldToCaptureSettings(options, await readAppSettings());
-  const sourceTab = await getCurrentTab();
+  const sourceTab = context.sourceTab || await getCurrentTab();
 
   if (!sourceTab?.id || !sourceTab.url) {
     throw createFriendlyError(
@@ -1739,7 +1775,7 @@ async function runExportReviewFlow(options = getDefaultSettings()) {
   const variants = getCaptureVariants(options.devicePreset);
   const [manualRedactions, cutawayRegion] = await Promise.all([
     getManualRedactionsForTab(sourceTab),
-    getCutawayRegionForTab(sourceTab)
+    context.cutawayRegionOverride || getCutawayRegionForTab(sourceTab)
   ]);
   const variantReviews = [];
 
@@ -2049,7 +2085,7 @@ function buildExportReviewWarnings({
   }
 
   if (cutawayRegion.region && cutawayResolutionStats.skippedCount) {
-    warnings.push(`${cutawayResolutionStats.skippedCount} cutaway check${cutawayResolutionStats.skippedCount === 1 ? "" : "s"} did not resolve in the requested view set.`);
+    warnings.push(`${cutawayResolutionStats.skippedCount} selected area check${cutawayResolutionStats.skippedCount === 1 ? "" : "s"} did not resolve in the requested view set.`);
   }
 
   if ((manualCount || cutawayRegion.region) && variants.length > 1) {
@@ -2402,8 +2438,8 @@ async function runCutawayRegionPicker(options = {}) {
 
   if (!response?.ok) {
     throw createFriendlyError(
-      "Cutaway Picker Failed",
-      response?.error || "Lumen could not start the cutaway picker on this page."
+      "Area Picker Failed",
+      response?.error || "Lumen could not start the area picker on this page."
     );
   }
 
@@ -3117,7 +3153,7 @@ async function captureVariant({
     await showPageUsageHud(target.tab.id, {
       stage: "review",
       title: "Resolving review marks",
-      detail: "Projecting manual redactions, cutaways, and callouts into the current layout.",
+      detail: "Projecting manual redactions, selected areas, and callouts into the current layout.",
       progress: 0.52
     });
 
@@ -4298,7 +4334,7 @@ function buildCaptureCompletionDetail({
   }
 
   if (cutawayCount) {
-    fragments.push(`${cutawayCount} cutaway crop${cutawayCount === 1 ? "" : "s"} exported`);
+    fragments.push(`${cutawayCount} selected area${cutawayCount === 1 ? "" : "s"} exported`);
   }
 
   if (projectionText) {
@@ -4367,7 +4403,7 @@ function formatCutawayResolutionStats(stats) {
     parts.push(`${normalized.skippedCount} skipped`);
   }
 
-  return parts.length ? `cutaway ${parts.join(", ")}` : "";
+  return parts.length ? `selected area ${parts.join(", ")}` : "";
 }
 
 function buildVariantProgressDetail(variant, stage) {
@@ -4509,7 +4545,7 @@ async function presentShortcutReviewNotice({ command, appSettings = {} } = {}) {
   const privacyShieldEnabled = Boolean(appSettings.privacyShieldEnabled);
   const reason = privacyShieldEnabled ? "privacy-shield" : "review-before-save";
   const title = privacyShieldEnabled
-    ? "Privacy Shield requires review"
+    ? "Private Review Mode requires review"
     : "Review required before saving";
   const detail = `No ${captureLabel.toLowerCase()} image was saved. Open Lumen, choose ${captureLabel}, review the save check, then choose Save capture.`;
   const sourceTab = await getCurrentTab();
@@ -4736,7 +4772,7 @@ async function handleWatchAlarm(alarm) {
       status: "skipped",
       scheduledAt: skippedAt,
       completedAt: skippedAt,
-      error: "Privacy Shield paused this unattended capture because every saved image requires review."
+      error: "Private Review Mode paused this unattended capture because every saved image requires review."
     });
     await chrome.alarms.clear(alarm.name);
     await broadcastWatchState(watchRuns);

@@ -440,7 +440,7 @@ function buildResultWorkspaceShot(resultImage, settingsImage) {
       </div>
       <div class="workspace-pair">
         <figure class="browser-card library-card result-card"><img src="${resultImage}" alt="Lumen Capture Result workspace" /><figcaption>Copy, zoom, edit, and export</figcaption></figure>
-        <div class="phone-frame workspace-phone"><img src="${settingsImage}" alt="Lumen Privacy Shield settings" /></div>
+        <div class="phone-frame workspace-phone"><img src="${settingsImage}" alt="Lumen Private Review Mode settings" /></div>
       </div>
     </section>
   `;
@@ -494,7 +494,7 @@ function buildLibraryMonitorShot(libraryImage, watchImage) {
         <p>Browse real local previews, keep favorites, inspect a timed area, and send only the reviewed image to Drive when you choose.</p>
       </div>
       <div class="workspace-pair">
-        <figure class="browser-card library-card"><img src="${libraryImage}" alt="Lumen local capture library" /><figcaption>Local photo library</figcaption></figure>
+        <figure class="browser-card library-card"><img src="${libraryImage}" alt="Lumen local capture library" /><figcaption>Capture Library</figcaption></figure>
         <div class="phone-frame workspace-phone"><img src="${watchImage}" alt="Lumen active area monitor" /></div>
       </div>
     </section>

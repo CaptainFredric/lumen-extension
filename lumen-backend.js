@@ -919,7 +919,7 @@ function buildLocalReadiness(session) {
         label: "Save flow",
         score: entitlements.features?.autoRedact?.available ? 78 : 58,
         status: "solid",
-        signals: ["Redaction check", "Focused crop", "Capture notes"]
+        signals: ["Redaction check", "Selected Area", "Capture notes"]
       },
       {
         id: "team-automation",

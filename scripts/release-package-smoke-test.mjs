@@ -194,9 +194,9 @@ assert(
     resultsCount: document.querySelector("#resultsCount")?.textContent?.trim() || "",
     emptyTitle: document.querySelector("#emptyTitle")?.textContent?.trim() || ""
   }));
-  assert(cleanLibrary.title === "Lumen Capture Library", "Packaged photo library title did not load.", cleanLibrary);
-  assert(cleanLibrary.captureMetric === "0" && cleanLibrary.resultsCount === "0 items", "Clean release profile did not start with an empty photo library.", cleanLibrary);
-  assert(/No captures/i.test(cleanLibrary.emptyTitle), "Clean release photo library did not explain its empty state.", cleanLibrary);
+  assert(cleanLibrary.title === "Lumen Capture Library", "Packaged Capture Library title did not load.", cleanLibrary);
+  assert(cleanLibrary.captureMetric === "0" && cleanLibrary.resultsCount === "0 items", "Clean release profile did not start with an empty Capture Library.", cleanLibrary);
+  assert(/No captures/i.test(cleanLibrary.emptyTitle), "Clean release Capture Library did not explain its empty state.", cleanLibrary);
 
   const packagedResultCaptureId = "release-result-smoke";
   const packagedResultSeed = await library.evaluate(async (captureId) => {

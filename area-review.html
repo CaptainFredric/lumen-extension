@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Check selected area | Lumen</title>
+  <link rel="stylesheet" href="area-review.css">
+  <script type="module" src="area-review.js"></script>
+</head>
+<body>
+  <main>
+    <header><span>Lumen</span><span id="mode">Review before save</span></header>
+    <h1>Check selected area</h1>
+    <p id="source">Loading the page checks...</p>
+    <svg id="areaMap" role="img" aria-label="Selected area position within the viewport"></svg>
+    <p id="geometry"></p>
+    <p class="muted">Selection map, not an image preview. Cancel to redraw or mark private areas on the page.</p>
+    <dl id="checks"></dl>
+    <details><summary>Page checks and limits</summary><ul id="warnings"></ul></details>
+    <p class="muted">When enabled, automatic redaction covers supported visible text and filled inputs. Inspect the saved image before sharing, including images, canvases and embedded content.</p>
+    <p id="status" role="status" aria-live="polite"></p>
+    <footer><button id="cancel" type="button">Cancel</button><button id="approve" type="button" disabled>Capture selected area</button></footer>
+  </main>
+</body>
+</html>

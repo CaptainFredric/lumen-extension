@@ -23,7 +23,7 @@ This file tracks what Lumen needs before a serious Chrome Web Store submission.
 17. One-shot responsive site access is removed after capture; deleting the last timed capture removes its site access.
 18. Local workspace deletion is available without an account or backend connection.
 19. Stored capture URLs remove fragments and common token, auth, session, secret, and key parameters.
-20. The local photo library stores gallery previews, bounded whole-capture editor images, and metadata in extension-owned IndexedDB while full-resolution originals remain in Chrome Downloads.
+20. The Capture Library stores gallery previews, bounded whole-capture editor images, and metadata in extension-owned IndexedDB while full-resolution originals remain in Chrome Downloads.
 21. Gallery cleanup is bounded to 50 MB or 500 preview-bearing captures; editor-source cleanup and cached-review-PDF cleanup each have separate 250 MB or 75-capture budgets. All preserve favorites, capture metadata, and downloaded originals.
 22. Freeform lasso capture preserves its polygon through projection and exports transparent pixels outside the selected path.
 23. Selected-area timers are explicit and local: one delayed run, scheduled repeat, or continuous monitoring capped at 10, 25, or 50 runs.
@@ -31,9 +31,9 @@ This file tracks what Lumen needs before a serious Chrome Web Store submission.
 25. Deterministic difficult-site fixtures cover long pages, nested application scrollers, late-growing tails, sticky and fixed overlays, lazy media, transforms, canvas, sandboxed iframes, and open and closed shadow-root behavior.
 26. A loaded-extension permission test proves a clean install starts without host access, a user gesture can grant one origin, the last timed-plan deletion revokes that origin and clears its alarm, and local workspace cleanup revokes remaining optional site access.
 27. Reviewed-image Google Drive export is optional, starts from an explicit user action, uses Chrome Identity with the narrow `drive.file` scope, and removes cached authorization and optional permissions on disconnect.
-28. Dedicated Settings expose reversible Privacy Shield, local-only mode, review-before-save, monitor pause/resume behavior, optional-permission revocation, Drive disconnect, and verified local-workspace deletion outcomes.
+28. Dedicated Settings expose reversible Private Review Mode, local-only mode, review-before-save, monitor pause/resume behavior, optional-permission revocation, Drive disconnect, and verified local-workspace deletion outcomes.
 29. Local exports include PNG and paginated raster PDF, with Fit, 100%, and keyboard zoom controls for the local working image; connected export remains separately consented.
-30. Fresh-install defaults: local-only mode starts on. Automatic redaction, capture-details JSON, review-before-save, and Privacy Shield start off. Saved choices are preserved on updates.
+30. Fresh-install defaults: local-only mode starts on. Automatic redaction, capture-details JSON, review-before-save, and Private Review Mode start off. Saved choices are preserved on updates.
 31. Capture-time review PDFs are generated from the original rendered output or tiles at up to 3200 raster pixels per page and stored under their own bounded local cache.
 32. The clean-install popup keeps Capture page above the fold, does not force review when the saved default is off, and shows direct open, edit/export, reveal, and library actions after success.
 33. Visible-area capture is available from the popup quick-action menu and as a keyboard command, saving one current viewport without a scroll pass.
@@ -112,7 +112,7 @@ Run `npm run smoke:release` to rebuild that ZIP, extract it without source chang
 
 Run `npm run smoke:permissions` manually in a headed stock-Chrome release session, click the isolated fixture's **Allow** prompt, and verify optional origin grant, timed-plan lease retention, last-plan revocation, alarm cleanup, and local-workspace permission cleanup. This native consent flow is intentionally not an unattended CI gate.
 
-Run `npm run smoke:settings`, `npm run smoke:export`, and `npm run smoke:export-integrity` to verify the dedicated Settings contract, reversible Privacy Shield enforcement, local working-image zoom, raster PDF generation, cached-PDF provenance and pruning, and export download lifecycle.
+Run `npm run smoke:settings`, `npm run smoke:export`, and `npm run smoke:export-integrity` to verify the dedicated Settings contract, reversible Private Review Mode enforcement, local working-image zoom, raster PDF generation, cached-PDF provenance and pruning, and export download lifecycle.
 
 Run `npm run smoke:difficult-sites` for deterministic hostile-page classes. Run `npm run smoke:real-sites` separately for the live Lumen site, GitHub, Chrome extension documentation, and MDN. All four live captures completed in the 0.4.0 release verification pass; live-site checks are intentionally not a CI gate because third-party availability and markup can change.
 

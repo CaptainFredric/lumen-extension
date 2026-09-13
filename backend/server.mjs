@@ -1476,7 +1476,7 @@ function buildProductReadinessPayload(store, session) {
           "Clean full-page capture",
           "Responsive view set",
           "Redaction checks",
-          "Focused crop output",
+          "Selected Area output",
           "Local history"
         ]
       },
@@ -1508,7 +1508,7 @@ function buildProductReadinessPayload(store, session) {
     ],
     completeness: {
       capture: ["page cleanup", "lazy-load preflight", "responsive views", "framed output"],
-      review: ["auto-redaction", "manual boxes", "focused crop", "callout note"],
+      review: ["auto-redaction", "manual boxes", "selected area", "callout note"],
       operations: ["local history", "backend sync", "watch plans", "watch run shelf", "delivery queue", "agent jobs"]
     },
     monetization: [

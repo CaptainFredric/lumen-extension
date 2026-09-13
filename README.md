@@ -26,13 +26,15 @@ The repo is aimed at design review, QA, and product work.
 
 **Review.** Preflight warnings and the review-before-save preference still require confirmation. Review maps show sensitive regions and projected areas. Annotation Studio provides arrows, boxes, text, blur, pixelation, undo, redo, and export. Internal saved region and note keys remain compatible.
 
+With review-before-save or Private Review Mode enabled, **Capture now** in the area picker opens a separate approval window. It shows selection geometry and page checks, rather than captured pixels. Approval expires after two minutes; cancellation saves nothing. Navigation, scrolling, viewport changes, changed manual boxes, or changed settings require a new review. After capture, inspect the image in Result before external sharing.
+
 **Capture Result.** Completed manual captures open a viewer with original image navigation, zoom, Copy, PNG, PDF, Edit, and selected-original ZIP export. Details includes source, viewport, saved files, and Page Context when capture-details JSON was enabled for that run. Old captures without retained context say so.
 
 **Capture Library.** Persistent captures belong here: search, filters, favorites, preview caches, original file access, removal, and Compare. The Monitors workspace owns saved area selection, delayed/repeated/capped schedules, pause, resume, run now, and deletion.
 
 **Storage and handoff.** Originals remain in Downloads. Local previews, editor sources, PDFs, and original image bundles have separate storage budgets. Configured Drive export is an explicit reviewed action with revocable access.
 
-**Settings.** Capture defaults, optional safeguards, local-only mode, permissions, storage, and destinations live here. Fresh installs keep automatic redaction and details export off. Privacy Shield coordinates stronger safeguards when explicitly enabled.
+**Settings.** Capture defaults, optional safeguards, local-only mode, permissions, storage, and destinations live here. Fresh installs keep automatic redaction and details export off. Private Review Mode coordinates stronger safeguards when explicitly enabled.
 
 **Verification.** Deterministic browser fixtures, lifecycle and ZIP tests, privacy checks, and exact-package smoke tests cover the runtime. Native toolbar and OS shortcut validation remains a separate manual release gate on hosts that cannot automate native input.
 
@@ -74,10 +76,10 @@ The current capture flow is:
 7. offscreen crops the selected scroll surface, stitches the final output using device-pixel-ratio aware composition, verifies full vertical coverage, renders one capture note and callout marker, and can export a rectangular or transparent lasso crop from the stitched result
 8. if the page is too large for one safe canvas, the export falls back to tiled raw output and skips cutaway cropping for that view
 9. for the primary capture variant, offscreen composition can also generate a paginated raster PDF from the original rendered output canvases or tiles, limiting each PDF page to at most 3200 raster pixels wide
-10. background downloads the full-resolution image files, writes capture details and local history, and places gallery previews, a bounded whole-capture editor image, and the capture-time review PDF in the on-device photo library before restoring the page
+10. background downloads the full-resolution image files, writes capture details and local history, and places gallery previews, a bounded whole-capture editor image, and the capture-time review PDF in the on-device Capture Library before restoring the page
 11. successful manual runs open Capture Result for the exact saved item; timed runs finish quietly in the local shelf
 
-### Local Photo Library
+### Capture Library
 
 The library keeps compact gallery previews, capture metadata, one bounded whole-capture working image, and—when capture-time generation succeeds—a paginated raster review PDF in extension-owned IndexedDB. Safe-size single images can keep a lossless working image; very large or tiled outputs use a scaled whole-page proxy. The review PDF is produced from the original rendered capture output or tiles rather than that proxy, but each PDF page is capped at 3200 raster pixels wide. Full-resolution original images remain in Chrome Downloads and are opened or revealed through stored download handles.
 
@@ -97,11 +99,11 @@ The publisher must create a Chrome Extension OAuth client for the permanent exte
 
 ### Entitlements
 
-`entitlements.js` is the shared plan contract for the extension and backend. The local beta unlocks the local capture toolkit immediately, including responsive sets, auto-redaction, framed exports, the photo library, and selected-area timers. Team and Enterprise remain future paths for cloud destinations and agent handoff; those connected records still require explicit opt-in and review flags.
+`entitlements.js` is the shared plan contract for the extension and backend. The local beta unlocks the local capture toolkit immediately, including responsive sets, auto-redaction, framed exports, the Capture Library, and selected-area timers. Team and Enterprise remain future paths for cloud destinations and agent handoff; those connected records still require explicit opt-in and review flags.
 
 ### Data Controls
 
-The dedicated Settings screen exposes capture behavior, export choices, Privacy Shield, local-only mode, optional-permission revocation, Drive disconnect, and local workspace deletion. A fresh install defaults to one-click local capture with automatic redaction, Privacy Shield, capture-details JSON, and review-before-save disabled. Saved choices are preserved on updates. Privacy Shield is an explicit stronger mode: while on it enforces review-before-save, automatic redaction, metadata minimization, and local-only behavior and pauses unattended monitor alarms; when turned off it restores the user's prior individual choices and active monitors resume.
+The dedicated Settings screen exposes capture behavior, export choices, Private Review Mode, local-only mode, optional-permission revocation, Drive disconnect, and local workspace deletion. A fresh install defaults to one-click local capture with automatic redaction, Private Review Mode, capture-details JSON, and review-before-save disabled. Saved choices are preserved on updates. Private Review Mode is an explicit stronger mode: while on it enforces review-before-save, automatic redaction, metadata minimization, and local-only behavior and pauses unattended monitor alarms; when turned off it restores the user's prior individual choices and active monitors resume.
 
 Local workspace deletion covers capture history, library images and cached PDFs, signals, regions, note drafts, schedules, and optional site access. Removing one library item or clearing the library deletes its local metadata, gallery previews, whole-capture editor source, and cached review PDF, not downloaded originals. The checked-in backend is a developer-run loopback contract test; the Web Store build contains no Lumen-owned production sync endpoint. In development, signing in is not consent to move content: capture and monitor reads or writes require the separate cloud-sync control, and outbound records strip sensitive URL parameters while keeping the complete scheduled target on-device.
 
@@ -234,7 +236,7 @@ npm run smoke:review
 npm run smoke:drive
 ```
 
-To verify dedicated Settings, reversible Privacy Shield invariants, local export zoom, raster PDF generation, cached-PDF provenance, storage budgets, and export download lifecycle:
+To verify dedicated Settings, reversible Private Review Mode invariants, local export zoom, raster PDF generation, cached-PDF provenance, storage budgets, and export download lifecycle:
 
 ```bash
 npm run smoke:settings

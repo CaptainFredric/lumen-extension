@@ -542,7 +542,7 @@ function buildDialogMeta(capture) {
     capture.captureHealth?.coveragePercent ? `${capture.captureHealth.coveragePercent}% capture coverage` : "",
     capture.redactionCount ? `${capture.redactionCount} redaction${capture.redactionCount === 1 ? "" : "s"}` : "",
     capture.manualRedactionCount ? `${capture.manualRedactionCount} manual` : "",
-    capture.cutawayCount ? `${capture.cutawayCount} cutaway` : ""
+    capture.cutawayCount ? `${capture.cutawayCount} selected area${capture.cutawayCount === 1 ? "" : "s"}` : ""
   ].filter(Boolean).join(" · ");
 }
 
@@ -556,7 +556,7 @@ function selectPrimaryDownload(downloads) {
 
 function formatArtifactLabel(download) {
   if (download.role === "cutaway") {
-    return "Focused crop PNG";
+    return "Selected Area PNG";
   }
 
   if (download.role === "print-sheet" || download.kind === "html") {

@@ -1,11 +1,15 @@
 # Web Store screenshot handoff
 
-The upload-ready pack is generated from the extension runtime with:
+The checked-in images still show the older workflow and terminology. The
+generator's labels have been updated, but its five-frame story still needs to
+be rebuilt around Bug Garden before submission. Regenerate preview images with:
 
 ```bash
 npm run store:screenshots
 ```
 
-The generator renders into a temporary directory, validates exactly five 1280 by 800 PNGs, and replaces the pack only after all five pass. GitHub Actions runs the same command and uploads `lumen-store-screenshots-<commit>` as a build artifact. The five-image limit matches [Chrome's current listing guidance](https://developer.chrome.com/docs/webstore/best-listing), so the first image pairs the clean Capture Result workspace with dedicated Privacy Shield Settings.
+The generator renders into a temporary directory, validates exactly five 1280 by 800 PNGs, and replaces the pack only after all five pass. GitHub Actions runs the same command and uploads `lumen-store-screenshots-<commit>` as a build artifact. Passing dimensions and rendering checks does not approve the narrative for submission.
 
-The first image shows the real result viewer and its Copy, PNG, PDF, annotation, original-file, and library actions beside Privacy Shield Settings. Use the CI artifact from the release commit for Chrome Web Store submission. The checked-in images are review previews; always upload the exact artifact produced from the signed release commit.
+The next pack should follow one fixture through Capture Result, responsive
+views, annotation and redaction, Compare, and Capture Library with a monitor.
+Review each resulting image against the exact tested release before uploading.

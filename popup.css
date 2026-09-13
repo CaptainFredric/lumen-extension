@@ -56,7 +56,6 @@ progress { width: 100%; accent-color: var(--accent); margin: 12px 0; }
 dialog { width: calc(100% - 24px); max-height: 90vh; border: 1px solid var(--line); border-radius: 10px; padding: 18px; color: var(--text); background: var(--bg); }
 dialog::backdrop { background: #000b; }
 .review-actions { display: flex; justify-content: space-between; gap: 8px; position: sticky; bottom: -18px; background: var(--bg); padding: 12px 0; }
-.review-variant-card { border: 1px solid var(--line); padding: 10px; margin: 10px 0; border-radius: 7px; }
 .review-preview-map { position: relative; height: 120px; background: var(--panel); overflow: hidden; }
 .review-preview-region { position: absolute; border: 1px solid var(--accent); background: #8ce3cf30; }
 .review-preview-legend { display: flex; gap: 12px; font-size: 11px; margin-top: 8px; }

@@ -88,7 +88,7 @@ try {
   }, { alarmName: shieldAlarmName, fixtureUrl: fixture.url });
   assert(
     await settings.evaluate((alarmName) => chrome.alarms.get(alarmName).then(Boolean), shieldAlarmName),
-    "Timed monitor fixture did not register before Privacy Shield was enabled."
+    "Timed monitor fixture did not register before Private Review Mode was enabled."
   );
 
   await toggleAndWait(settings, "#privacyShieldToggle", async (state) =>
@@ -101,7 +101,7 @@ try {
   await settings.waitForFunction((alarmName) => chrome.alarms.get(alarmName).then((alarm) => !alarm), shieldAlarmName);
   assert(
     !await settings.evaluate((alarmName) => chrome.alarms.get(alarmName).then(Boolean), shieldAlarmName),
-    "Privacy Shield did not pause the existing timed monitor alarm."
+    "Private Review Mode did not pause the existing timed monitor alarm."
   );
 
   await settings.reload({ waitUntil: "load" });
@@ -113,7 +113,7 @@ try {
       shielded.captureDetailsDisabled &&
       shielded.localOnlyDisabled &&
       shielded.reviewDisabled,
-    "Privacy Shield did not persist or lock its coordinated protections after reload.",
+    "Private Review Mode did not persist or lock its coordinated protections after reload.",
     shielded
   );
 
@@ -127,12 +127,12 @@ try {
   await settings.waitForFunction((alarmName) => chrome.alarms.get(alarmName).then(Boolean), shieldAlarmName);
   assert(
     await settings.evaluate((alarmName) => chrome.alarms.get(alarmName).then(Boolean), shieldAlarmName),
-    "Turning Privacy Shield off did not restore the active timed monitor alarm."
+    "Turning Private Review Mode off did not restore the active timed monitor alarm."
   );
   const restored = await readSettingsState(settings);
   assert(
     !restored.autoRedact && restored.captureDetails && !restored.localOnly && !restored.reviewBeforeSave,
-    "Turning Privacy Shield off did not restore the user's previous individual choices.",
+    "Turning Private Review Mode off did not restore the user's previous individual choices.",
     restored
   );
 
@@ -186,10 +186,10 @@ try {
       shieldedShortcutGate.beforeDownloadCount === shieldedShortcutGate.afterDownloadCount &&
       !shieldedShortcutGate.activeCaptureJob &&
       shieldedShortcutGate.badge === "!" &&
-      /Privacy Shield requires review/.test(shieldedShortcutGate.actionTitle) &&
+      /Private Review Mode requires review/.test(shieldedShortcutGate.actionTitle) &&
       /No visible area image was saved/.test(shieldedShortcutGate.result.detail) &&
       /Save capture/.test(shieldedShortcutGate.result.detail),
-    "Privacy Shield keyboard capture did not stop before saving with a clear review action.",
+    "Private Review Mode keyboard capture did not stop before saving with a clear review action.",
     shieldedShortcutGate
   );
   const shieldedBackgroundCapture = await settings.evaluate(() => chrome.runtime.sendMessage({
@@ -221,7 +221,7 @@ try {
       shieldedBackgroundCapture.manifestFile === "" &&
       shieldedRuntimePolicy.driveStatus.localOnly === true &&
       shieldedRuntimePolicy.app.reviewBeforeSave === true,
-    "The background capture path accepted unsafe options while Privacy Shield was enabled.",
+    "The background capture path accepted unsafe options while Private Review Mode was enabled.",
     { shieldedBackgroundCapture, shieldedRuntimePolicy }
   );
   const clearedShieldShortcutNotice = await worker.evaluate(async (tabId) => ({
@@ -479,12 +479,12 @@ async function verifyShieldStorageTransactions() {
   });
   assert(
     effective.autoRedact === true && effective.exportManifest === false,
-    "Central Privacy Shield policy did not override unsafe capture inputs.",
+    "Central Private Review Mode policy did not override unsafe capture inputs.",
     effective
   );
   assert(
     effectiveApp.localOnlyMode === true && effectiveApp.reviewBeforeSave === true,
-    "Central Privacy Shield policy did not enforce local-only review behavior.",
+    "Central Private Review Mode policy did not enforce local-only review behavior.",
     effectiveApp
   );
 
@@ -496,7 +496,7 @@ async function verifyShieldStorageTransactions() {
   }));
   assert(
     syncFailure.localWriteCount === 0 && syncFailure.localState["lumen.app.settings"].privacyShieldEnabled === false,
-    "A failed safe-settings sync write still enabled Privacy Shield locally.",
+    "A failed safe-settings sync write still enabled Private Review Mode locally.",
     syncFailure
   );
 

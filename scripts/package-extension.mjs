@@ -14,6 +14,10 @@ const publicHomepageUrl = "https://captainfredric.github.io/lumen-extension/";
 const requiredRuntimeFiles = [
   "manifest.json",
   "background.js",
+  "area-review-controller.js",
+  "area-review.html",
+  "area-review.js",
+  "area-review.css",
   "annotation-engine.js",
   "export-utils.js",
   "content.js",

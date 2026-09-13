@@ -7,9 +7,9 @@ export const LUMEN_FEATURES = {
     description: "Full-page export with sticky cleanup, lazy-load preflight, local history, and manifest output."
   },
   manualRedaction: {
-    label: "Manual redaction and cutaway tools",
+    label: "Manual redaction and Selected Area tools",
     status: "implemented",
-    description: "Draw review boxes, cutaway regions, and one callout before export."
+    description: "Draw redaction boxes, select an area, and add a callout before export."
   },
   responsiveSnap: {
     label: "Responsive capture set",

@@ -27,18 +27,19 @@ delivery controls are absent from the launcher.
 | --- | --- |
 | Capture | One user requested run |
 | Capture Set | Related originals and responsive views from that run |
-| Selected Area | Rectangle or lasso scope; replaces cutaway and focused crop |
+| Selected Area | Rectangle or lasso scope |
 | Callout | A note identifying a region |
 | Page Context | Source and extracted page signals beside the image |
-| Capture Library | Persistent local collection; replaces Photo Library and Capture Shelf |
+| Capture Library | Persistent local collection of captures and monitors |
 | Recent | A short list linking to saved captures |
 | Monitor | Explicitly scheduled repeated capture of a selected source |
 | Compare | Visual comparison of saved evidence |
-| Private Review Mode | Target label for the coordinated safeguards currently called Privacy Shield |
+| Private Review Mode | Optional coordinated redaction, local storage, metadata and save-review safeguards |
 
-Migrate visible labels before internal storage keys. The Privacy Shield label
-remains in current Settings and policy instructions until both are changed and
-tested together. Preserve stored preferences and compatibility.
+Visible labels, Settings and privacy disclosures use this vocabulary. Internal
+`privacyShieldEnabled` and `cutaway` keys remain compatible with saved preferences.
+Selected Area capture opens a bounded approval window when review is enabled;
+cancellation saves nothing, and changed page geometry requires a new review.
 
 ## Current boundaries
 

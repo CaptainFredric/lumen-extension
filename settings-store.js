@@ -55,7 +55,7 @@ export function normalizeAppSettings(value = {}, fallback = EXISTING_INSTALL_APP
     shieldRestore: restore
   };
 
-  // Treat Privacy Shield as a policy, not merely a UI preset. This keeps the
+  // Treat Private Review Mode as a policy, not merely a UI preset. This keeps the
   // effective app behavior safe even if storage changes arrive out of order or
   // an older popup writes an incomplete settings object.
   if (normalized.privacyShieldEnabled) {

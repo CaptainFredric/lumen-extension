@@ -520,7 +520,7 @@ async function showSettingsScene({ recordedPage: page, extensionId, extensionDir
   await setScene(page, {
     chapter: "06 / Settings",
     title: "Privacy controls live in Settings.",
-    copy: "Turn Privacy Shield on or off, keep work local, choose whether to review before saving, and disconnect optional exports.",
+    copy: "Turn Private Review Mode on or off, keep work local, choose whether to review before saving, and disconnect optional exports.",
     mode: "settings"
   });
 

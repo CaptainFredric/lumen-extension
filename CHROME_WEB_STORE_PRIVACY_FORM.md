@@ -31,7 +31,7 @@ Paste:
 
 ### `downloads`
 
-> Saves full-resolution captures, reviewed PNG and paginated raster PDF exports, focused crops, and capture-details JSON to the user's Downloads folder, and supports Open and Show actions for those saved originals.
+> Saves full-resolution captures, reviewed PNG and paginated raster PDF exports, selected areas, and capture-details JSON to the user's Downloads folder, and supports Open and Show actions for those saved originals.
 
 ### `offscreen`
 
@@ -87,7 +87,7 @@ If the dashboard separately lists **Form data** or **User-generated content**, s
 
 Use this explanation wherever the dashboard provides a data-use text field:
 
-> Lumen uses the selected page content, URL, capture settings, selected regions, annotations, and local run history only to create, review, compare, organize, and export captures requested by the user. Dedicated Settings expose reversible Privacy Shield, local-only mode, review-before-save, permission revocation, Drive disconnect, and local deletion controls. Fresh-install defaults: local-only mode starts on. Automatic redaction, capture-details JSON, review-before-save, and Privacy Shield start off. Saved choices are preserved on updates. Privacy Shield is an explicit stronger review mode that pauses unattended monitor alarms until it is turned off. The Web Store build has no Lumen-owned production sync endpoint, so data stays on the device unless the user explicitly chooses Export to Drive. That action sends the reviewed image, its filename, review timestamp, Lumen capture identifier, and source host to the user's Google Drive over HTTPS. Lumen does not use capture data for advertising, credit decisions, data brokerage, or unrelated analytics.
+> Lumen uses the selected page content, URL, capture settings, selected regions, annotations, and local run history only to create, review, compare, organize, and export captures requested by the user. Dedicated Settings expose reversible Private Review Mode, local-only mode, review-before-save, permission revocation, Drive disconnect, and local deletion controls. Fresh-install defaults: local-only mode starts on. Automatic redaction, capture-details JSON, review-before-save, and Private Review Mode start off. Saved choices are preserved on updates. Private Review Mode is an explicit stronger review mode that pauses unattended monitor alarms until it is turned off. The Web Store build has no Lumen-owned production sync endpoint, so data stays on the device unless the user explicitly chooses Export to Drive. That action sends the reviewed image, its filename, review timestamp, Lumen capture identifier, and source host to the user's Google Drive over HTTPS. Lumen does not use capture data for advertising, credit decisions, data brokerage, or unrelated analytics.
 
 ## Limited Use certifications
 

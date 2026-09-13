@@ -1,5 +1,21 @@
 # Lumen Release Notes
 
+## Unreleased: selected area review
+
+Selected Area now participates in review-before-save and Private Review Mode.
+The extension opens a bounded approval window with the selection map and page
+checks before saving. Closing, cancelling or allowing the review to expire
+saves nothing. Changed source geometry, manual boxes or settings require a new
+review. Stored region and privacy preference keys remain compatible.
+
+Settings, policy disclosures and runtime labels now use Private Review Mode,
+Selected Area and Capture Library. Monitor choices are Once, Scheduled and
+Short-term watch; scheduling behavior and limits are unchanged.
+
+Store screenshot storytelling, Page Context heuristics and versioned public
+beta distribution remain separate pending work. Existing media has not been
+regenerated for this change.
+
 ## 0.5.0 — July 24, 2026
 
 This release makes the path from capture to a useful result immediate, while testing the same production ZIP that is handed to the Chrome Web Store.
@@ -10,7 +26,7 @@ This release makes the path from capture to a useful result immediate, while tes
 2. Added a viewer-first Capture Result workspace that opens after successful manual captures with whole-page, fit-width, and actual-pixel views; centered zoom and drag-to-pan; Copy, PNG, paginated PDF, optional Google Drive, Edit, original-file, library, Settings, and confirmed remove-local-copy actions. Timed captures remain quiet and stay in the local shelf.
 3. Added the exact-area shortcut (`Alt+Shift+E`; `Alt+Shift+A` on macOS) beside full-page (`Alt+Shift+L`) and visible-area (`Alt+Shift+V`) shortcuts.
 4. Kept visible and selected-area captures at the user's current scroll position instead of resetting the page before capture.
-5. Made the area picker keyboard-operable and non-destructive until Save, and made all capture shortcuts honor Privacy Shield and review-before-save.
+5. Made the area picker keyboard-operable and non-destructive until Save, and made all capture shortcuts honor Private Review Mode and review-before-save.
 6. Kept cached PDF and saved-file actions available when an older capture's working image has been pruned, with accurate crop, tile, and transparency states.
 
 ### Release reliability
@@ -32,15 +48,15 @@ This release makes the Chrome extension—not the marketing website—the cleare
 ### New
 
 1. Added a dedicated Settings app for capture defaults, privacy, exports, optional permissions, Google Drive disconnect, and local-workspace deletion.
-2. Added reversible Privacy Shield. While enabled, it centrally enforces local-only mode, review-before-save, automatic redaction, and metadata minimization and pauses unattended monitor alarms; disabling it restores the user's prior choices and resumes active monitors.
-3. Fresh-install defaults: local-only mode starts on. Automatic redaction, capture-details JSON, review-before-save, and Privacy Shield start off. Saved choices are preserved on updates.
+2. Added reversible Private Review Mode. While enabled, it centrally enforces local-only mode, review-before-save, automatic redaction, and metadata minimization and pauses unattended monitor alarms; disabling it restores the user's prior choices and resumes active monitors.
+3. Fresh-install defaults: local-only mode starts on. Automatic redaction, capture-details JSON, review-before-save, and Private Review Mode start off. Saved choices are preserved on updates.
 4. Added local PNG and paginated raster PDF export from review and Annotation Studio, with Fit, 100%, and keyboard zoom for the local working image.
 5. Added a capture-time PDF cache generated from the original rendered capture output or tiles at up to 3200 raster pixels per page. It remains available for review export even when a large capture's bounded editor proxy is later pruned, until its own cache limit is reached.
 6. Rebuilt the public landing page as the installation and concise feature front door while keeping the Chrome extension's popup, library, editor, comparison workspace, and Settings as the actual app.
 
 ### Reliability and privacy
 
-1. Privacy Shield is enforced in the shared settings and background capture paths rather than only represented by a UI toggle.
+1. Private Review Mode is enforced in the shared settings and background capture paths rather than only represented by a UI toggle.
 2. Signing in no longer implies content synchronization: capture and monitor reads or writes require the separate cloud-sync control to be explicitly enabled. Outbound capture and monitor URLs remove fragments and sensitive token, authorization, session, secret, and key parameters while the complete scheduled target remains on-device.
 3. Local deletion and permission-revoke results now report what Chrome actually removed; downloaded originals and already-exported Drive files remain under the user's control.
 4. Gallery previews retain their 50 MB or 500-capture cleanup limit. Whole-capture editor sources and cached review PDFs each have separate 250 MB or 75-capture limits, preserving favorites while removing the oldest eligible local assets first.
@@ -54,7 +70,7 @@ This release makes the Chrome extension—not the marketing website—the cleare
 2. Removed the long screenshot-shortcut tutorial, competitor table, faux proof labels, numbered markers, and repeated calls to action from the landing page.
 3. Added a visible capture-options arrow beside the one-click Capture page button. The arrow and press-and-hold gesture now open the same eight actions without accidentally starting a capture.
 4. Added menu keyboard navigation, Escape and outside-click closure, focus restoration, and synchronized accessibility state for the new capture control.
-5. Re-recorded the unpacked extension performing a real capture, save review, library flow, annotation and undo/redo, 100% zoom, PNG and PDF exports, change review, and reversible Privacy Shield changes. Refreshed all affected Chrome Web Store screenshots from the current build.
+5. Re-recorded the unpacked extension performing a real capture, save review, library flow, annotation and undo/redo, 100% zoom, PNG and PDF exports, change review, and reversible Private Review Mode changes. Refreshed all affected Chrome Web Store screenshots from the current build.
 
 ### July 22 first-click refinement
 
@@ -90,7 +106,7 @@ This release turns Lumen from a full-page capture utility into a local review wo
 1. Full annotation studio with arrows, rectangles, text, blur, pixelation, selection, resizing, keyboard shortcuts, undo, redo, and reviewed PNG export.
 2. Local visual-change review with a before/after reveal slider, changed-region highlights, difference statistics, and a monitor-run timeline.
 3. Optional reviewed-image export to Google Drive. Drive access is requested only from an explicit export action and uses the narrow `drive.file` scope.
-4. Local photo library with gallery previews, bounded whole-capture editor images, search, source filters, favorites, sorting, capture details, and original-file actions.
+4. Capture Library with gallery previews, bounded whole-capture editor images, search, source filters, favorites, sorting, capture details, and original-file actions.
 5. True freeform lasso capture with transparent pixels outside the selected polygon.
 6. One-time, repeating, and capped continuous selected-area capture, including save-only-when-changed behavior.
 
@@ -114,5 +130,5 @@ This release turns Lumen from a full-page capture utility into a local review wo
 
 1. Added full-page and responsive desktop, tablet, and mobile capture.
 2. Added redaction checks, manual redaction boxes, focused rectangles, transparent lassos, notes, and capture-detail exports.
-3. Added a local photo library and selected-area timer modes.
+3. Added a Capture Library and selected-area timer modes.
 4. Added exact release-ZIP, loaded-extension, capture, schedule, and backend smoke coverage.

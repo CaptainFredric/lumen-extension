@@ -538,7 +538,7 @@
     hint.className = "lumen-picker-hint";
     hint.id = `${pickerId}-hint`;
     hint.setAttribute("aria-live", "polite");
-    title.textContent = normalizedSelectionMode === "lasso" ? "Lasso capture" : "Focused crop";
+    title.textContent = normalizedSelectionMode === "lasso" ? "Selected Area / Lasso" : "Selected Area";
     hint.textContent = normalizedSelectionMode === "lasso"
       ? "Draw a freeform area, then capture it now or remember it for monitoring."
       : "Drag an area, or press Enter for a keyboard rectangle. Capture it now or save it for monitoring.";
@@ -1042,7 +1042,7 @@
     const payload = buildCutawayPickerPayload();
     picker.capturePending = true;
     picker.captureButton.textContent = "Starting…";
-    picker.hint.textContent = "Starting a private, one-viewport capture of this selection.";
+    picker.hint.textContent = "Checking this selection. If save review is enabled, an approval window opens before capture.";
     renderCutawayRegionBox();
 
     try {

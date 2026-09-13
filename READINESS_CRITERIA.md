@@ -35,7 +35,7 @@ Current positives:
 8. Redaction rescans each slice, uses opaque output, and fails closed when its review limit is exceeded.
 9. A compact first-run tip keeps one-click capture above the fold, and successful manual captures open the matching Capture Result workspace without another popup step.
 10. Rectangle and freeform lasso selections survive layout projection; lasso exports retain transparent pixels outside the path.
-11. The local photo library stores gallery previews and bounded whole-capture editor images, supports search/filter/favorite workflows, and keeps full-resolution originals in Downloads.
+11. The Capture Library stores gallery previews and bounded whole-capture editor images, supports search/filter/favorite workflows, and keeps full-resolution originals in Downloads.
 12. Local selected-area automation now distinguishes a delayed one-time run, scheduled repeat, and capped continuous monitoring.
 13. Continuous plans have an explicit 10, 25, or 50 run stop, and timed runs fail instead of silently saving a full page when the selected region cannot resolve.
 14. The annotation studio supports arrows, rectangles, text, blur, pixelation, selection, undo, redo, and local reviewed-image export.

@@ -115,7 +115,7 @@ async function releasePermission() {
 
 function askReview(review) {
   ui.launchStatusTitle.textContent = "Check before saving";
-  ui.exportReviewSummary.textContent = String(review.variantCount || 1) + " views. " +
+  ui.exportReviewSummary.textContent = String(review.variantCount || 1) + ((review.variantCount || 1) === 1 ? " view. " : " views. ") +
     String(review.redactionCount || 0) + " sensitive regions detected.";
   renderExportReviewVariants(review.variants || []);
   renderExportReviewWarnings(review.warnings || []);

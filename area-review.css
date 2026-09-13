@@ -1,0 +1,23 @@
+:root { color-scheme: dark; font-family: "Avenir Next", sans-serif; background: #171b1e; color: #eef1f0; font-size: 14px; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 560px; margin: auto; padding: 24px; }
+header, footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+header { color: #9baaa9; font-size: 12px; border-bottom: 1px solid #343d40; padding-bottom: 12px; }
+h1 { font-size: 24px; margin: 22px 0 8px; }
+p { line-height: 1.5; overflow-wrap: anywhere; }
+.muted { color: #a6b2b5; font-size: 12px; }
+svg { display: block; width: 100%; height: 155px; background: #101416; border: 1px solid #343d40; border-radius: 8px; }
+svg polygon { fill: #66d8bc33; stroke: #66d8bc; stroke-width: 2; vector-effect: non-scaling-stroke; }
+#geometry { font-family: monospace; font-size: 12px; }
+dl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; border-block: 1px solid #343d40; padding-block: 16px; }
+dt { color: #a6b2b5; } dd { margin: 0; text-align: right; }
+details { font-size: 13px; } summary { cursor: pointer; padding: 6px 0; }
+li { line-height: 1.5; margin-bottom: 8px; }
+footer { position: sticky; bottom: 0; background: #171b1e; padding: 16px 0 0; }
+button { font: inherit; font-weight: 600; border: 1px solid #495355; border-radius: 6px; padding: 11px 14px; background: #252d30; color: inherit; cursor: pointer; }
+#approve { background: #66d8bc; border-color: #66d8bc; color: #11201c; }
+button:hover { filter: brightness(1.1); } button:disabled { opacity: .5; cursor: default; }
+:focus-visible { outline: 2px solid #66d8bc; outline-offset: 4px; }
+#status { color: #e5c995; font-size: 12px; }
+@media (max-width: 380px) { main { padding: 16px; } footer { flex-wrap: wrap; } }

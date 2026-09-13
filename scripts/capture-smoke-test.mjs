@@ -760,7 +760,7 @@ async function runCutawayRegionSmoke(browser, contentScript) {
     );
     assert(completedSaveUi.hudTitle === "Area saved", "Successful persistence was not surfaced to the user.", completedSaveUi);
     assert(
-      cutawayPickerUi.title === "Focused crop" &&
+      cutawayPickerUi.title === "Selected Area" &&
         cutawayPickerUi.count === "Region selected" &&
         cutawayPickerUi.primary === "Save" &&
         cutawayPickerUi.captureNow === "Capture now" &&
@@ -995,7 +995,7 @@ async function runCutawayRegionSmoke(browser, contentScript) {
     assert(resolvedLasso.region?.shape === "lasso", "Resolved lasso lost its shape metadata.", resolvedLasso);
     assert(resolvedLasso.region?.points?.length >= 4, "Resolved lasso lost its projected polygon points.", resolvedLasso);
     assert(
-      lassoPickerUi.title === "Lasso capture" &&
+      lassoPickerUi.title === "Selected Area / Lasso" &&
         lassoPickerUi.count === "Lasso selected" &&
         lassoPickerUi.primary === "Save" &&
         lassoPickerUi.captureNow === "Capture now" &&

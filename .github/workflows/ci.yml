@@ -55,6 +55,9 @@ jobs:
       - name: Test capture interruption and window cleanup
         run: npm run test:capture-lifecycle
 
+      - name: Test selected area approval boundaries
+        run: npm run test:area-review
+
       - name: Test partial result recovery UI
         run: xvfb-run --auto-servernum npm run smoke:result-recovery
 
@@ -67,7 +70,7 @@ jobs:
       - name: Test area-monitor schedules
         run: npm run smoke:watch
 
-      - name: Test Settings and Privacy Shield
+      - name: Test Settings and Private Review Mode
         run: xvfb-run --auto-servernum npm run smoke:settings
 
       - name: Test annotation editing

@@ -12,12 +12,12 @@ Lumen is a local-first browser capture workflow for design review, QA, and produ
 4. Focused-region metadata, including selected coordinates, dimensions, rectangle or lasso shape, lasso points, and projection status.
 5. Extracted page signals such as colors, fonts, navigation labels, headline text, CTA text, and layout counts.
 6. Local capture history, file names, Chrome download IDs, and capture detail metadata.
-7. Compact gallery previews and bounded whole-capture editor images stored for the local photo library. Safe-size captures can keep a lossless editor image; very large or tiled captures use a scaled whole-page proxy. These local working copies do not replace the full-resolution downloaded originals.
+7. Compact gallery previews and bounded whole-capture editor images stored for the Capture Library. Safe-size captures can keep a lossless editor image; very large or tiled captures use a scaled whole-page proxy. These local working copies do not replace the full-resolution downloaded originals.
 8. A capture-time paginated raster PDF cache when generation succeeds. Lumen builds it from the original rendered capture output or tiles, caps each PDF page at 3200 raster pixels wide, and stores it locally for review export; it is not a full-resolution or searchable-text copy.
 9. Optional timer-plan details, including the selected page, saved area, one-time delay or repeat cadence, continuous-run cap, status, and run history.
 10. Optional capture notes that you choose to add to an export.
 11. Optional annotation and visual-review details, including editable shapes in the current editor tab, the selected comparison pair, measured change percentage, highlighted region count, and reviewed/exported status.
-12. For an explicit Google Drive export: the reviewed image, chosen file name, capture ID, review time, and source host. Lumen does not send the rest of the photo library, monitor history, page text, or Drive contents with that action.
+12. For an explicit Google Drive export: the reviewed image, chosen file name, capture ID, review time, and source host. Lumen does not send the rest of the Capture Library, monitor history, page text, or Drive contents with that action.
 
 ## Use
 
@@ -43,9 +43,9 @@ Timed captures are local and opt-in. When you save one, Lumen records the chosen
 
 ## Your Controls
 
-Lumen provides a dedicated Settings screen for capture behavior, privacy, permissions, exports, and local data. Fresh-install defaults: local-only mode starts on. Automatic redaction, capture-details JSON, review-before-save, and Privacy Shield start off. Saved choices are preserved on updates. Privacy Shield is a separate stronger choice that locks review-before-save, automatic redaction, metadata minimization, and local-only behavior together and pauses unattended monitor alarms so they cannot save without review; turning it off restores the user's explicit individual choices and resumes active monitors. Local-only mode blocks optional connected export while leaving local PNG and raster PDF export available.
+Lumen provides a dedicated Settings screen for capture behavior, privacy, permissions, exports, and local data. Fresh-install defaults: local-only mode starts on. Automatic redaction, capture-details JSON, review-before-save, and Private Review Mode start off. Saved choices are preserved on updates. Private Review Mode is a separate stronger choice that locks review-before-save, automatic redaction, metadata minimization, and local-only behavior together and pauses unattended monitor alarms so they cannot save without review; turning it off restores the user's explicit individual choices and resumes active monitors. Local-only mode blocks optional connected export while leaving local PNG and raster PDF export available.
 
-You can remove individual library items, clear the local photo library and its gallery/editor images and cached PDFs, or clear local capture history, page signals, saved regions, note drafts, timed-capture records, and optional site permissions at any time. You can disconnect Google Drive, which removes Lumen's cached Chrome token and optional Drive-related permissions. Files already saved through Chrome Downloads or explicitly exported to Drive remain under your control until you delete them there. One-shot responsive site access is removed after the capture finishes when no timed capture still needs it.
+You can remove individual library items, clear the Capture Library and its gallery/editor images and cached PDFs, or clear local capture history, page signals, saved regions, note drafts, timed-capture records, and optional site permissions at any time. You can disconnect Google Drive, which removes Lumen's cached Chrome token and optional Drive-related permissions. Files already saved through Chrome Downloads or explicitly exported to Drive remain under your control until you delete them there. One-shot responsive site access is removed after the capture finishes when no timed capture still needs it.
 
 ## Limited Use Disclosure
 

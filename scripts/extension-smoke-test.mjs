@@ -1838,7 +1838,7 @@ try {
     const store = await import(chrome.runtime.getURL("library-store.js"));
     return store.countLibraryCaptures();
   });
-  assert(clearedLibraryCount === 0, "Local photo library survived workspace cleanup.", { clearedLibraryCount });
+  assert(clearedLibraryCount === 0, "Capture Library survived workspace cleanup.", { clearedLibraryCount });
 
   await target.close();
   await popup.reload({ waitUntil: "load" });
