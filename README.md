@@ -206,6 +206,14 @@ Current public proof uses Bug Garden: `npm run proof:garden` captures the respon
 set, and `npm run store:screenshots` runs the same fixture through the extension
 workspaces.
 
+`npm run proof:compare` creates the raw Compare workspace image used on the
+site, from two captured Bug Garden states. It updates only
+`docs/assets/garden-compare.png` and its JSON record, leaving the Store pack
+intact. Run `npm install` and `npm run capture:install-browser` first.
+This uses headed Chromium with a temporary profile and harness site access;
+on Linux it needs a display such as Xvfb. Profiles and downloads are removed
+after the run. The image records the workspace as rendered, without Store framing.
+
 Older `docs/assets/capture-run-*` files are historical regression references.
 Their old inferred fields and seeded history describe that legacy fixture, not
 current Page Context or Store output. Existing URLs remain available for older

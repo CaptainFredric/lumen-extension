@@ -1,0 +1,37 @@
+{
+  "source": "Two Bug Garden states captured through the loaded extension; raw Compare viewport, without a marketing frame. Temporary harness site permissions substitute for a toolbar gesture.",
+  "generatedAt": "2026-09-14T03:32:36.474Z",
+  "generatorSha256": "a4922cc34d2fd788251d250779383e48a43fdff567232191526708ec8439b6d7",
+  "fixtureSha256": "38e5e56f792dad61d12d75fe478085741c59b2c7e27d7366a1e80cf0bf01082c",
+  "afterSha256": "fd835bd992b7c75192bfb3256a0459a38812d50f53b74911acefe5f9bccfbe54",
+  "captures": [
+    {
+      "id": "6ec37d65-818e-443d-bd2a-5a42ed780a38",
+      "health": "complete",
+      "redactions": 1
+    },
+    {
+      "id": "c6db5d02-5323-4894-88d1-c63f6c814cdc",
+      "health": "complete",
+      "redactions": 1
+    }
+  ],
+  "changed": "0.45%",
+  "revealPercent": 70,
+  "image": {
+    "file": "garden-compare.png",
+    "width": 1280,
+    "height": 900,
+    "sha256": "331c3686ca59fca370067feba6675e24ba773bfe914b01a906f78736341c05f8"
+  },
+  "environment": {
+    "platform": "darwin",
+    "node": "v24.14.0",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
+    "deviceScaleFactor": 1,
+    "viewport": {
+      "width": 1280,
+      "height": 900
+    }
+  }
+}

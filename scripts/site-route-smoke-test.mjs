@@ -20,7 +20,7 @@ try {
     await readFile(path.join(root, "docs/index.html"), "utf8"),
     "Preview must serve the deployed source.",
   );
-  assert.match(homepage, /Web captures,<br \/>ready to review\./);
+  assert.match(homepage, /Web screenshots<br \/>for review\./);
   assert.doesNotMatch(homepage, /review\.html|data-reveal/);
   assert.match(homepage, /sandbox="allow-same-origin"/);
   assert.match(homepage, /Review every capture before external sharing/);
@@ -101,7 +101,8 @@ try {
         sideBySide: proof.left >= hero.right,
         stacked: proof.top >= hero.bottom,
         image: [image.naturalWidth, image.naturalHeight],
-        features: document.querySelectorAll(".feature-card").length,
+        captureModes: [...document.querySelectorAll(".hero-capabilities span")].map(node => node.textContent),
+        formats: [...document.querySelectorAll(".artifact-list .file-type")].map(node => node.textContent),
         workflow: document.querySelectorAll(".workflow-card").length,
         brokenAnchors: [...document.querySelectorAll('a[href^="#"]')]
           .filter((link) => !document.getElementById(link.hash.slice(1)))
@@ -111,7 +112,8 @@ try {
     });
     assert.equal(layout.overflow, false, `Overflow at ${width}px`);
     assert.equal(layout.headingCount, 1);
-    assert.equal(layout.features, 4);
+    assert.deepEqual(layout.captureModes, ["Full page", "Visible", "Area", "Set"]);
+    assert.deepEqual(layout.formats, ["PNG", "PDF", "ZIP", "JSON"]);
     assert.equal(layout.workflow, 3);
     assert.deepEqual(layout.image, [1280, 800]);
     assert.deepEqual(layout.brokenAnchors, []);
@@ -318,15 +320,13 @@ try {
         .evaluate((element) => getComputedStyle(element).opacity),
       "1",
     );
-    await page
-      .getByText("Sample files", { exact: true })
-      .click();
-    assert.equal(
-      await page
-        .getByText("Bug Garden exports:", { exact: false })
-        .isVisible(),
-      true,
-    );
+    for (const selector of [".capture-details", ".build-details"]) {
+      const details = page.locator(selector);
+      assert.equal(await details.getAttribute("open"), null);
+      assert.equal(await details.locator("p").first().isVisible(), false);
+      await details.locator("summary").click();
+      assert.equal(await details.locator("p").first().isVisible(), true);
+    }
     await context.close();
   }
 

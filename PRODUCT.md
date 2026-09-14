@@ -49,6 +49,12 @@ than as a repeated slogan. Avoid dramatic noun fragments and language that
 assumes every capture represents a defect. Responsive capture saves chosen
 viewport states. It does not diagnose defects or discover breakpoints.
 Keep verification records accessible as supporting details.
+Headings name capabilities or tasks directly. Avoid filler such as "ready to",
+"what you need", and "useful details" where a concrete description fits.
+Give each feature one place in the page rather than repeating it for coverage.
+Keep build provenance behind supporting disclosures. Public mode labels mirror
+the launcher: Full page, Visible, Area, Set. Use formal UI names when directing
+someone to a control; ordinary prose can describe screenshots and the local library.
 
 Capture, responsive sets, selected areas, review, annotation, local library,
 comparison, bounded monitoring, and explicit reviewed Drive export belong to the

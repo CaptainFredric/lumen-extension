@@ -137,6 +137,23 @@ test("Store pack is one captured Bug Garden workflow with verified image hashes"
   }
 });
 
+test("site Compare image is a recorded raw workspace with two captures", async () => {
+  const proof = JSON.parse(await readFile(new URL("../docs/assets/garden-compare.json", import.meta.url), "utf8"));
+  const digest = bytes => createHash("sha256").update(bytes).digest("hex");
+  assert.equal(proof.image.file, "garden-compare.png");
+  const image = await readFile(new URL("../docs/assets/garden-compare.png", import.meta.url));
+  assert.equal(digest(image), proof.image.sha256);
+  assert.equal(image.readUInt32BE(16), proof.image.width);
+  assert.equal(image.readUInt32BE(20), proof.image.height);
+  assert.equal(digest(await readFile(new URL("../scripts/generate-site-compare.mjs", import.meta.url))), proof.generatorSha256);
+  assert.equal(digest(await readFile(new URL("../docs/bug-garden.html", import.meta.url))), proof.fixtureSha256);
+  assert.equal(proof.captures.length, 2);
+  assert.notEqual(proof.captures[0].id, proof.captures[1].id);
+  assert.ok(proof.captures.every(capture => capture.health === "complete" && capture.redactions >= 1));
+  assert.ok(parseFloat(proof.changed) > 0);
+  assert.equal(proof.revealPercent, 70);
+});
+
 test("public beta is pinned and the site has one accepted design system", async () => {
   const html = await readFile(new URL("../docs/index.html", import.meta.url), "utf8");
   const beta = JSON.parse(await readFile(new URL("../docs/beta-release.json", import.meta.url), "utf8"));
@@ -149,6 +166,7 @@ test("public beta is pinned and the site has one accepted design system", async 
   assert.doesNotMatch(html, /class="inspection-desk"|Local library|Capture history/);
   assert.match(html, /optional JSON file\.\s+This option starts off\./);
   assert.doesNotMatch(html, /The breakpoint\.|The problem\.|where it breaks|Send the evidence|Take the evidence|workflow-strip/);
+  assert.doesNotMatch(html, /ready to review|ready to revisit|what you need|diagnosis is up to you|id="features"|store-visual-change-review\.png/);
   assert.match(html, /id="revisit-title"/);
   assert.match(html, /Monitoring\s+requires explicit site permission/);
   assert.match(html, /In Settings, turn on <strong>Include capture details file<\/strong>/);
