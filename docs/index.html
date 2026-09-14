@@ -17,7 +17,7 @@
     <meta property="og:title" content="Lumen | Web screenshots for design review and QA" />
     <meta
       property="og:description"
-      content="Clean webpage captures. Useful context. A local workspace to review and annotate before sharing."
+      content="Capture full pages, selected areas, and responsive sets. Review, annotate, compare, and export in a local workspace."
     />
     <meta property="og:type" content="website" />
     <meta
@@ -50,7 +50,7 @@
     />
     <link rel="icon" href="brandmark.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/brandmark-512.png" />
-    <link rel="stylesheet" href="styles.css?v=20260913-inspection" />
+    <link rel="stylesheet" href="styles.css?v=20260913-plain" />
     <script src="script.js?v=20260911-proof" defer></script>
   </head>
   <body>
@@ -75,29 +75,29 @@
           <p class="eyebrow">
             For design review and web QA
           </p>
-          <h1 id="hero-title">The webpage.<br />The breakpoint.<br /><em>The problem.</em></h1>
+          <h1 id="hero-title">Web captures,<br />ready to review.</h1>
           <p class="hero-lede">
-            Take screenshots of a page or a selected region at multiple widths.
-            Mark the issue, cover private details, and optionally keep useful
-            page context with the capture.
+            Capture a full page, a selected area, or the same page at multiple
+            widths. Lumen keeps the results together so you can inspect, redact,
+            annotate, compare, and export them locally.
           </p>
           <div class="hero-actions">
             <a class="button button-primary" href="#install"
-              >Install from GitHub</a
+              >Install beta</a
             ><a class="button button-secondary" href="#explore"
-              >Try the test page <span aria-hidden="true">↓</span></a
+              >See the demo <span aria-hidden="true">↓</span></a
             >
           </div>
           <p class="hero-note">
             Chrome beta. Manual install. No account required.
           </p>
           <div class="hero-capabilities" aria-label="Capture options">
-            <span>Local storage</span><span>PNG / PDF / ZIP</span>
+            <span>Full page</span><span>Selected area</span><span>Responsive set</span><span>Local by default</span>
           </div>
         </div>
         <figure class="product-window" id="actual-app">
           <div class="window-bar">
-            <span>Inside the extension</span><span class="window-label">Select originals. Download a set.</span>
+            <span>Capture Result</span><span class="window-label">Three saved views</span>
           </div>
           <a
             class="editor-image-link"
@@ -119,26 +119,31 @@
             >
           </a>
           <figcaption>
-            Real extension UI using a test page. Click to inspect at full size.
+            Capture Result with a responsive set from the Bug Garden checkout.
           </figcaption>
         </figure>
       </section>
       <section id="explore" class="output-explorer section-shell" aria-labelledby="explore-title">
         <div class="explorer-copy">
           <p class="eyebrow">Bug Garden / Checkout 01</p>
-          <h2 id="explore-title">Find the width<br />where it breaks.</h2>
-          <p>This checkout has deliberate layout faults. At tablet width the coupon overlaps the address. On mobile the continue button clips.</p>
+          <h2 id="explore-title">The same page<br />at three widths.</h2>
+          <p>Bug Garden is a deliberately flawed checkout we use to test responsive capture. Switch widths to see how its layout changes.</p>
           <div class="sample-tabs" aria-label="Test page viewport" hidden>
             <button type="button" data-viewport="1280" aria-pressed="true">1280 px</button>
             <button type="button" data-viewport="1024" aria-pressed="false">1024 px</button>
             <button type="button" data-viewport="430" aria-pressed="false">430 px</button>
           </div>
-          <p class="sample-provenance">Live test page, scaled to fit. These are seeded defects, not Lumen detections. Open it in Chrome to try your first responsive set.</p>
+          <p class="sample-provenance">This is a live page preview, scaled to fit. The tablet overlap and clipped mobile button are built into the fixture. Lumen captures these states; diagnosis is up to you.</p>
           <a class="text-link" href="bug-garden.html" target="_blank" rel="noreferrer">Open the test page ↗</a>
-          <div class="proof-downloads" aria-label="Real extension exports"><strong>Download the actual screenshots</strong><a href="assets/garden-desktop.png">Desktop PNG</a><a href="assets/garden-tablet.png">Tablet PNG</a><a href="assets/garden-mobile.png">Mobile PNG</a><a href="assets/garden-run.json">Run record and page context</a><p>3 images. 3 email redactions across the set. 1 local library entry. Desktop uses the current window; this run used 1280 CSS pixels.</p></div>
           <details class="proof-downloads">
-            <summary>See the workflow inside Lumen</summary>
-            <p>Captured from this test page through the extension. The images are framed for the Store; the monitor is saved and paused.</p>
+            <summary>Sample files and test details</summary>
+            <a href="assets/garden-desktop.png">Desktop PNG</a>
+            <a href="assets/garden-tablet.png">Tablet PNG</a>
+            <a href="assets/garden-mobile.png">Mobile PNG</a>
+            <a href="assets/garden-run.json">Run record and page context</a>
+            <p>3 images, 3 email redactions, and 1 Capture Library entry. This run used a desktop window of 1280 CSS pixels.</p>
+            <a href="https://github.com/CaptainFredric/lumen-extension/blob/main/RELIABILITY_MATRIX.md" target="_blank" rel="noreferrer">Test coverage</a>
+            <p>Extension views framed for the Store. The sample monitor is saved and paused.</p>
             <a href="assets/store-control-surface.png">Capture Result</a>
             <a href="assets/store-responsive-set.png">Responsive set</a>
             <a href="assets/store-annotation-studio.png">Annotation and redaction</a>
@@ -152,12 +157,6 @@
           <figcaption id="garden-note">Desktop: the address and continue button fit.</figcaption>
         </figure>
       </section>
-      <div class="workflow-strip section-shell" aria-label="Capture workflow">
-        <p>FROM PAGE TO HANDOFF</p>
-        <span><b>01</b>Choose the area</span
-        ><span><b>02</b>Review &amp; annotate</span
-        ><span><b>03</b>Copy or export</span>
-      </div>
       <section
         class="workflow section-shell section-space"
         id="workflow"
@@ -166,11 +165,11 @@
         <div class="section-heading">
           <div>
             <p class="eyebrow">How it works</p>
-            <h2 id="workflow-title">Mark the issue.<br />Send the evidence.</h2>
+            <h2 id="workflow-title">Capture, review, export.</h2>
           </div>
           <p>
-            Each capture opens ready to review. Zoom in, mark the issue, cover
-            anything private, then choose how to save it.
+            Choose what you need from the page. Lumen opens the result with its
+            saved views together, ready to inspect or mark up.
           </p>
         </div>
         <div class="workflow-grid">
@@ -179,7 +178,7 @@
               <span class="step-number">01 / CAPTURE</span
               ><span class="subtle-label">Page or selection</span>
             </div>
-            <h3>Select a page or region.</h3>
+            <h3>Choose what to capture.</h3>
             <p>
               Capture a full page, the visible area, or a rectangle or lasso
               selection. Generate desktop, tablet, and mobile views in one run.
@@ -201,10 +200,11 @@
               <span class="step-number">02 / REVIEW</span
               ><span class="subtle-label">Before sharing</span>
             </div>
-            <h3>Redact before you export.</h3>
+            <h3>Review before you export.</h3>
             <p>
-              Review detected details and add your own redactions. Draw an arrow
-              or leave a note to make the issue clear.
+              Inspect the originals, cover private details, or open an image
+              in Annotation Studio to add arrows and notes. Automatic redaction
+              is optional.
             </p>
             <figure class="redaction-example">
               <img
@@ -222,7 +222,7 @@
               <span class="step-number">03 / EXPORT</span
               ><span class="subtle-label">Local files</span>
             </div>
-            <h3>Take the evidence with you.</h3>
+            <h3>Export what you need.</h3>
             <p>
               Copy an image or export PNG or PDF. Browse retained page parts
               and selected areas, then download selected originals together as a ZIP.
@@ -241,7 +241,7 @@
                 <span class="file-type">JSON</span
                 ><span
                   >Page Context<small
-                    >Colors, fonts, headings, navigation</small
+                    >Optional colors, fonts, headings, navigation</small
                   ></span
                 ><span class="file-count">1</span>
               </div>
@@ -257,7 +257,7 @@
               href="assets/garden-run.json"
               target="_blank"
               rel="noreferrer"
-              >Inspect the sample run <span aria-hidden="true">↗</span></a
+              >Sample run <span aria-hidden="true">↗</span></a
             >
           </article>
         </div>
@@ -267,6 +267,24 @@
           text inside images and embedded frames.
         </p>
       </section>
+      <section class="revisit-section section-shell section-space" aria-labelledby="revisit-title">
+        <div>
+          <p class="eyebrow">Library and Compare</p>
+          <h2 id="revisit-title">Saved work, ready to revisit.</h2>
+          <p>Capture Library keeps previews and capture details on your device.
+            Full resolution originals stay in Downloads. Compare two saved
+            captures to see what changed.</p>
+          <p>You can also schedule captures of a selected area. Monitoring
+            requires explicit site permission and runs while Chrome is available.</p>
+        </div>
+        <figure class="product-window">
+          <div class="window-bar"><span>Compare</span><span>Before / After</span></div>
+          <a href="assets/store-visual-change-review.png" target="_blank" rel="noreferrer" aria-label="Open the Compare screenshot at full size">
+            <img src="assets/store-visual-change-review.png" alt="Lumen Compare showing two captured states of the Bug Garden checkout with a before and after boundary." width="1280" height="800" loading="lazy" />
+          </a>
+          <figcaption>Two checkout states opened in Compare.</figcaption>
+        </figure>
+      </section>
       <section
         class="tools-section section-shell section-space"
         id="features"
@@ -274,16 +292,9 @@
       >
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Alongside the image</p>
-            <h2 id="features-title">Keep Page Context when you need it.</h2>
+            <p class="eyebrow">Capture options</p>
+            <h2 id="features-title">Useful details alongside the image.</h2>
           </div>
-          <a
-            class="text-link"
-            href="https://github.com/CaptainFredric/lumen-extension/blob/main/RELIABILITY_MATRIX.md"
-            target="_blank"
-            rel="noreferrer"
-            >Read the test coverage <span aria-hidden="true">↗</span></a
-          >
         </div>
         <div class="feature-grid">
           <article class="feature-card">
@@ -336,19 +347,19 @@
             require your setup and action.
           </p>
           <a class="text-link" href="privacy.html"
-            >How your data is handled <span aria-hidden="true">↗</span></a
+            >Privacy details <span aria-hidden="true">↗</span></a
           >
         </div>
         <div class="scope-details">
           <details open>
-            <summary>Know the beta's limits</summary>
+            <summary>Beta limitations</summary>
             <p>
               Local capture and editing are available now. Browser protected
               pages cannot be captured. Complex embeds, moving content, and
               unusual scrolling layouts may need a second pass.
             </p>
           </details>
-          <details><summary>Inspect saved example files</summary><p>Actual extension exports: <a href="assets/garden-desktop.png">desktop PNG</a>, <a href="assets/garden-tablet.png">tablet PNG</a>, <a href="assets/garden-mobile.png">mobile PNG</a>. <a href="assets/garden-run.json">The run record</a> includes extracted context and the saved library identifier.</p></details>
+          <details><summary>Sample files</summary><p>Bug Garden exports: <a href="assets/garden-desktop.png">desktop PNG</a>, <a href="assets/garden-tablet.png">tablet PNG</a>, <a href="assets/garden-mobile.png">mobile PNG</a>. <a href="assets/garden-run.json">The run record</a> includes extracted context and the saved library identifier.</p></details>
         </div>
       </section>
       <section

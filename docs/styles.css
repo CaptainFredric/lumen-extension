@@ -177,11 +177,16 @@ h3 { font-weight: 600; }
   padding-block: 72px;
   align-items: start;
 }
-.hero h1 em {
-  font-style: normal;
-  color: var(--ink);
-  background: linear-gradient(transparent 62%, #d9f36a 62%);
+.revisit-section {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 48px;
+  align-items: center;
 }
+.revisit-section h2 { margin-bottom: 24px; }
+.revisit-section p + p { margin-top: 16px; }
+.revisit-section > div > p:not(.eyebrow) { color: var(--muted); }
+.revisit-section img { display: block; width: 100%; height: auto; }
 .output-explorer {
   display: grid;
   align-items: center;
@@ -279,20 +284,20 @@ h3 { font-weight: 600; }
   border-right: 0;
 }
 .proof-downloads {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 16px;
+  display: block;
   padding-top: 24px;
   margin-top: 24px;
   border-top: 1px solid var(--line);
   font-size: 13px;
 }
-.proof-downloads strong { width: 100%; }
+.proof-downloads > * + * { margin-top: 12px; }
 .proof-downloads p {
   width: 100%;
   color: var(--muted);
 }
 .proof-downloads a {
+  display: inline-block;
+  margin-right: 12px;
   text-decoration: underline;
   text-underline-offset: 4px;
 }
@@ -398,26 +403,6 @@ details a { text-decoration: underline; }
   margin-left: auto;
   color: var(--quiet);
 }
-.workflow-strip {
-  display: grid;
-  grid-template-columns: 1.05fr repeat(3, 1fr);
-  gap: 20px;
-  align-items: center;
-  padding-block: 22px;
-  border-block: 1px solid var(--line);
-  font-size: 12px;
-  color: var(--ink);
-}
-.workflow-strip p {
-  color: var(--quiet);
-  font: 12px var(--font);
-  letter-spacing: 0;
-}
-.workflow-strip b {
-  margin-right: 12px;
-  color: var(--accent);
-  font: 10px var(--mono);
-}
 .section-heading {
   display: flex;
   align-items: flex-end;
@@ -426,6 +411,7 @@ details a { text-decoration: underline; }
   margin-bottom: 34px;
 }
 .section-heading h2,
+.revisit-section h2,
 .scope-copy h2,
 .install-section h2 {
   font-size: clamp(29px, 3.4vw, 43px);
@@ -929,6 +915,7 @@ code {
 @media (max-width: 820px) {
   .explorer-copy > p { max-width: 100%; }
   .hero,
+  .revisit-section,
   .output-explorer {
     grid-template-columns: 1fr;
     gap: 32px;
@@ -945,8 +932,6 @@ code {
   .hero-lede { max-width: 500px; }
   .product-window { width: 100%; }
   .hero-actions .button { padding-inline: 18px; }
-  .workflow-strip { grid-template-columns: repeat(3, 1fr); }
-  .workflow-strip p { grid-column: 1 / -1; }
   .workflow-grid { grid-template-columns: 1fr; }
   .capture-diagram,
   .redaction-example,
@@ -996,14 +981,6 @@ code {
   .image-action {
     right: 6px;
     bottom: 6px;
-  }
-  .workflow-strip {
-    gap: 13px;
-    font-size: 10px;
-  }
-  .workflow-strip b {
-    display: block;
-    margin: 0 0 5px;
   }
   .install-section { grid-template-columns: 1fr; }
   .site-footer {

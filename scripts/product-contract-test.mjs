@@ -147,7 +147,10 @@ test("public beta is pinned and the site has one accepted design system", async 
   assert.doesNotMatch(html, /archive\/refs\/heads\/main\.zip|inspection\.css/);
   assert.equal((html.match(/rel="stylesheet"/g) || []).length, 1);
   assert.doesNotMatch(html, /class="inspection-desk"|Local library|Capture history/);
-  assert.match(html, /optionally keep useful\s+page context/i);
+  assert.match(html, /optional JSON file\.\s+This option starts off\./);
+  assert.doesNotMatch(html, /The breakpoint\.|The problem\.|where it breaks|Send the evidence|Take the evidence|workflow-strip/);
+  assert.match(html, /id="revisit-title"/);
+  assert.match(html, /Monitoring\s+requires explicit site permission/);
   assert.match(html, /In Settings, turn on <strong>Include capture details file<\/strong>/);
   const settingsHtml = await readFile(new URL("../settings.html", import.meta.url), "utf8");
   assert.match(settingsHtml, /<strong>Include capture details file<\/strong>/);

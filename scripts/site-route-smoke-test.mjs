@@ -20,7 +20,7 @@ try {
     await readFile(path.join(root, "docs/index.html"), "utf8"),
     "Preview must serve the deployed source.",
   );
-  assert.match(homepage, /The webpage\./);
+  assert.match(homepage, /Web captures,<br \/>ready to review\./);
   assert.doesNotMatch(homepage, /review\.html|data-reveal/);
   assert.match(homepage, /sandbox="allow-same-origin"/);
   assert.match(homepage, /Review every capture before external sharing/);
@@ -71,6 +71,16 @@ try {
       if (message.type() === "error") errors.push(message.text());
     });
     await page.goto(origin, { waitUntil: "networkidle" });
+    const proofDetails = page.locator("#explore details.proof-downloads");
+    assert.equal(await proofDetails.getAttribute("open"), null);
+    const proofLink = proofDetails.locator('a[href="assets/garden-run.json"]');
+    assert.equal(await proofLink.isVisible(), false);
+    await proofDetails.locator("summary").focus();
+    await page.keyboard.press("Enter");
+    assert.equal(await proofLink.isVisible(), true);
+    await page.keyboard.press("Enter");
+    assert.equal(await proofLink.isVisible(), false);
+    await page.locator(".revisit-section").scrollIntoViewIfNeeded();
     await page.locator(".redaction-example").scrollIntoViewIfNeeded();
     await page.waitForFunction(() =>
       [...document.images]
@@ -298,6 +308,9 @@ try {
     await page.goto(origin);
     assert.equal(await page.locator("h1").isVisible(), true);
     assert.equal(await page.locator("#install").isVisible(), true);
+    const samples = page.locator("#explore details.proof-downloads");
+    await samples.locator("summary").click();
+    assert.equal(await samples.locator('a[href="assets/garden-run.json"]').isVisible(), true);
     assert.equal(
       await page
         .locator(".workflow-card")
@@ -306,11 +319,11 @@ try {
       "1",
     );
     await page
-      .getByText("Inspect saved example files", { exact: true })
+      .getByText("Sample files", { exact: true })
       .click();
     assert.equal(
       await page
-        .getByText("Actual extension exports:", { exact: false })
+        .getByText("Bug Garden exports:", { exact: false })
         .isVisible(),
       true,
     );

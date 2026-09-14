@@ -43,6 +43,13 @@ cancellation saves nothing, and changed page geometry requires a new review.
 
 ## Current boundaries
 
+Public copy describes tasks and outcomes in ordinary language. Evidence is an
+internal product concept; use the word publicly where it adds meaning rather
+than as a repeated slogan. Avoid dramatic noun fragments and language that
+assumes every capture represents a defect. Responsive capture saves chosen
+viewport states. It does not diagnose defects or discover breakpoints.
+Keep verification records accessible as supporting details.
+
 Capture, responsive sets, selected areas, review, annotation, local library,
 comparison, bounded monitoring, and explicit reviewed Drive export belong to the
 local product. Production accounts, billing, general cloud sync, and agent
